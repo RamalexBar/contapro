@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "ERP SaaS Colombia",
+    "slug": "erp-saas-colombia",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.erpsaascolombia.app"
+    },
+    "android": {
+      "package": "com.erpsaascolombia.app"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

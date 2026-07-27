@@ -1,0 +1,239 @@
+// Facturacion POS: ventas, cotizaciones, pedidos, devoluciones, notas, apartados
+
+enum SaleStatus {
+  DRAFT
+  PENDING_AUTHORIZATION
+  COMPLETED
+  CANCELLED
+  RETURNED_PARTIAL
+  RETURNED_FULL
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIAL
+  CREDIT
+  PENDING
+}
+
+model Sale {
+  id            String        @id @default(uuid())
+  companyId     String
+  branchId      String
+  number        Int           // consecutivo por sucursal (generado en use-case con transaccion)
+  customerId    String?
+  cashSessionId String?
+  sellerUserId  String
+  status        SaleStatus    @default(DRAFT)
+  paymentStatus PaymentStatus @default(PENDING)
+  type          String        @default("POS") // POS, CREDIT
+  subtotal      Decimal       @db.Decimal(14, 2)
+  discountTotal Decimal       @db.Decimal(14, 2) @default(0)
+  taxTotal      Decimal       @db.Decimal(14, 2) @default(0)
+  total         Decimal       @db.Decimal(14, 2)
+  // Preparado para facturacion electronica futura (DIAN):
+  cufe          String?
+  cude          String?
+  invoiceXmlUrl String?
+  cancelReason  String?
+  cancelledAt   DateTime?
+  createdAt     DateTime      @default(now())
+
+  items    SaleItem[]
+  payments SalePayment[]
+
+  @@unique([branchId, number])
+  @@index([companyId, branchId, createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id                            String  @id @default(uuid())
+  saleId                        String
+  sale                          Sale    @relation(fields: [saleId], references: [id])
+  productId                     String
+  presentationId                String?
+  batchId                       String?
+  quantity                      Decimal @db.Decimal(14, 4)
+  unitPrice                     Decimal @db.Decimal(14, 4)
+  discountPercent               Decimal @db.Decimal(5, 2) @default(0)
+  discountAmount                Decimal @db.Decimal(14, 2) @default(0)
+  taxPercent                    Decimal @db.Decimal(5, 2)
+  taxAmount                     Decimal @db.Decimal(14, 2)
+  total                         Decimal @db.Decimal(14, 2)
+  requiresDiscountAuthorization Boolean @default(false)
+  discountAuthorizationId       String?
+
+  @@map("sale_items")
+}
+
+model SalePayment {
+  id        String  @id @default(uuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  method    String  // CASH, CARD, TRANSFER, CREDIT, MIXED
+  amount    Decimal @db.Decimal(14, 2)
+  reference String?
+
+  @@map("sale_payments")
+}
+
+model Quote {
+  id           String   @id @default(uuid())
+  companyId    String
+  branchId     String
+  customerId   String?
+  sellerUserId String
+  status       String   @default("DRAFT") // DRAFT, SENT, ACCEPTED, EXPIRED, CONVERTED
+  validUntil   DateTime
+  subtotal     Decimal  @db.Decimal(14, 2)
+  total        Decimal  @db.Decimal(14, 2)
+  createdAt    DateTime @default(now())
+
+  items QuoteItem[]
+
+  @@index([companyId, branchId])
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id              String  @id @default(uuid())
+  quoteId         String
+  quote           Quote   @relation(fields: [quoteId], references: [id])
+  productId       String
+  quantity        Decimal @db.Decimal(14, 4)
+  unitPrice       Decimal @db.Decimal(14, 4)
+  discountPercent Decimal @db.Decimal(5, 2) @default(0)
+  total           Decimal @db.Decimal(14, 2)
+
+  @@map("quote_items")
+}
+
+model Order {
+  id           String    @id @default(uuid())
+  companyId    String
+  branchId     String
+  customerId   String?
+  status       String    @default("PENDING") // PENDING, CONFIRMED, DELIVERED, CANCELLED
+  deliveryDate DateTime?
+  total        Decimal   @db.Decimal(14, 2)
+  createdAt    DateTime  @default(now())
+
+  items OrderItem[]
+
+  @@index([companyId, branchId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  quantity  Decimal @db.Decimal(14, 4)
+  unitPrice Decimal @db.Decimal(14, 4)
+  total     Decimal @db.Decimal(14, 2)
+
+  @@map("order_items")
+}
+
+model Return {
+  id              String   @id @default(uuid())
+  companyId       String
+  branchId        String
+  saleId          String
+  customerId      String?
+  reason          String
+  status          String   @default("PENDING")
+  total           Decimal  @db.Decimal(14, 2)
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  items ReturnItem[]
+
+  @@index([companyId, branchId])
+  @@map("returns")
+}
+
+model ReturnItem {
+  id                String  @id @default(uuid())
+  returnId          String
+  return            Return  @relation(fields: [returnId], references: [id])
+  saleItemId        String
+  productId         String
+  quantity          Decimal @db.Decimal(14, 4)
+  unitPrice         Decimal @db.Decimal(14, 4)
+  total             Decimal @db.Decimal(14, 2)
+  restockedToBranch Boolean @default(true)
+
+  @@map("return_items")
+}
+
+model CreditNote {
+  id         String   @id @default(uuid())
+  companyId  String
+  branchId   String
+  saleId     String?
+  customerId String
+  reason     String
+  amount     Decimal  @db.Decimal(14, 2)
+  status     String   @default("ISSUED")
+  createdAt  DateTime @default(now())
+
+  @@index([companyId, branchId])
+  @@map("credit_notes")
+}
+
+model DebitNote {
+  id         String   @id @default(uuid())
+  companyId  String
+  branchId   String
+  customerId String
+  saleId     String?
+  reason     String
+  amount     Decimal  @db.Decimal(14, 2)
+  status     String   @default("ISSUED")
+  createdAt  DateTime @default(now())
+
+  @@index([companyId, branchId])
+  @@map("debit_notes")
+}
+
+model Layaway {
+  id          String   @id @default(uuid())
+  companyId   String
+  branchId    String
+  customerId  String
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  totalAmount Decimal  @db.Decimal(14, 2)
+  paidAmount  Decimal  @db.Decimal(14, 2) @default(0)
+  dueDate     DateTime
+  createdAt   DateTime @default(now())
+
+  items    LayawayItem[]
+  payments LayawayPayment[]
+
+  @@index([companyId, branchId])
+  @@map("layaways")
+}
+
+model LayawayItem {
+  id        String  @id @default(uuid())
+  layawayId String
+  layaway   Layaway @relation(fields: [layawayId], references: [id])
+  productId String
+  quantity  Decimal @db.Decimal(14, 4)
+  unitPrice Decimal @db.Decimal(14, 4)
+
+  @@map("layaway_items")
+}
+
+model LayawayPayment {
+  id        String   @id @default(uuid())
+  layawayId String
+  layaway   Layaway  @relation(fields: [layawayId], references: [id])
+  amount    Decimal  @db.Decimal(14, 2)
+  paidAt    DateTime @default(now())
+
+  @@map("layaway_payments")
+}

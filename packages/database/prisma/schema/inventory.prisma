@@ -1,0 +1,241 @@
+// Inventario: productos, categorias, marcas, presentaciones, stock, lotes, kardex
+
+enum CostMethod {
+  AVERAGE
+  LAST
+  FIFO
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  companyId String
+  name      String
+  parentId  String?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  products Product[]
+
+  @@unique([companyId, name, parentId])
+  @@index([companyId])
+  @@map("categories")
+}
+
+model Brand {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  products Product[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("brands")
+}
+
+model Product {
+  id            String     @id @default(uuid())
+  companyId     String
+  sku           String
+  name          String
+  description   String?
+  categoryId    String?
+  category      Category?  @relation(fields: [categoryId], references: [id])
+  brandId       String?
+  brand         Brand?     @relation(fields: [brandId], references: [id])
+  unit          String     @default("UN")
+  costMethod    CostMethod @default(AVERAGE)
+  currentCost   Decimal    @db.Decimal(14, 4) @default(0)
+  currentPrice  Decimal    @db.Decimal(14, 4) @default(0)
+  taxRate       Decimal    @db.Decimal(5, 2)  @default(19) // IVA %
+  allowsDecimal Boolean    @default(false)
+  tracksBatches Boolean    @default(false)
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  images         ProductImage[]
+  barcodes       Barcode[]
+  presentations  ProductPresentation[]
+  branchStocks   ProductBranchStock[]
+  batches        Batch[]
+  stockMovements StockMovement[]
+
+  @@unique([companyId, sku])
+  @@index([companyId])
+  @@index([companyId, name])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  url       String  // path en Supabase Storage
+  order     Int     @default(0)
+
+  @@map("product_images")
+}
+
+model Barcode {
+  id        String  @id @default(uuid())
+  companyId String
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  code      String
+  type      String  @default("EAN13")
+
+  @@unique([companyId, code])
+  @@index([productId])
+  @@map("barcodes")
+}
+
+model ProductPresentation {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  name      String  // ej. "Caja x24"
+  factor    Decimal @db.Decimal(10, 4) // unidades base por presentacion
+  price     Decimal @db.Decimal(14, 4)
+
+  @@map("product_presentations")
+}
+
+model ProductBranchStock {
+  id        String   @id @default(uuid())
+  companyId String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  branchId  String
+  quantity  Decimal  @db.Decimal(14, 4) @default(0)
+  reserved  Decimal  @db.Decimal(14, 4) @default(0)
+  minStock  Decimal  @db.Decimal(14, 4) @default(0)
+  maxStock  Decimal  @db.Decimal(14, 4) @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, branchId])
+  @@index([companyId, branchId])
+  @@map("product_branch_stocks")
+}
+
+model Batch {
+  id             String    @id @default(uuid())
+  companyId      String
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id])
+  branchId       String
+  batchNumber    String
+  expirationDate DateTime?
+  quantity       Decimal   @db.Decimal(14, 4)
+  costAtEntry    Decimal   @db.Decimal(14, 4)
+  createdAt      DateTime  @default(now())
+
+  @@index([companyId, branchId, productId])
+  @@index([expirationDate])
+  @@map("batches")
+}
+
+enum StockMovementType {
+  PURCHASE_IN
+  SALE_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  RETURN_IN
+  RETURN_OUT
+}
+
+model StockMovement {
+  id              String            @id @default(uuid())
+  companyId       String
+  branchId        String
+  productId       String
+  product         Product           @relation(fields: [productId], references: [id])
+  batchId         String?
+  type            StockMovementType
+  quantity        Decimal           @db.Decimal(14, 4)
+  unitCost        Decimal           @db.Decimal(14, 4)
+  referenceType   String?           // "Sale", "PurchaseOrder", "StockTransfer", "PhysicalInventory"
+  referenceId     String?
+  createdByUserId String
+  createdAt       DateTime          @default(now())
+
+  @@index([companyId, branchId, productId, createdAt])
+  @@map("stock_movements")
+}
+
+model StockTransfer {
+  id                String   @id @default(uuid())
+  companyId         String
+  fromBranchId      String
+  toBranchId        String
+  status            String   @default("PENDING") // PENDING, IN_TRANSIT, RECEIVED, CANCELLED
+  requestedByUserId String
+  receivedByUserId  String?
+  createdAt         DateTime @default(now())
+
+  items StockTransferItem[]
+
+  @@index([companyId])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id              String        @id @default(uuid())
+  stockTransferId String
+  stockTransfer   StockTransfer @relation(fields: [stockTransferId], references: [id])
+  productId       String
+  quantity        Decimal       @db.Decimal(14, 4)
+  batchId         String?
+
+  @@map("stock_transfer_items")
+}
+
+model PhysicalInventory {
+  id              String    @id @default(uuid())
+  companyId       String
+  branchId        String
+  status          String    @default("OPEN") // OPEN, CLOSED
+  startedAt       DateTime  @default(now())
+  closedAt        DateTime?
+  createdByUserId String
+
+  items PhysicalInventoryItem[]
+
+  @@index([companyId, branchId])
+  @@map("physical_inventories")
+}
+
+model PhysicalInventoryItem {
+  id                  String            @id @default(uuid())
+  physicalInventoryId String
+  physicalInventory   PhysicalInventory @relation(fields: [physicalInventoryId], references: [id])
+  productId           String
+  systemQuantity      Decimal           @db.Decimal(14, 4)
+  countedQuantity     Decimal           @db.Decimal(14, 4)
+  difference          Decimal           @db.Decimal(14, 4)
+
+  @@map("physical_inventory_items")
+}
+
+/// Historial de saldos por producto/sucursal (costo promedio). Preparado para FIFO futuro
+/// (Batch + Product.costMethod ya soportan el dato de entrada por lote).
+model Kardex {
+  id          String   @id @default(uuid())
+  companyId   String
+  branchId    String
+  productId   String
+  movementId  String
+  balanceQty  Decimal  @db.Decimal(14, 4)
+  balanceCost Decimal  @db.Decimal(14, 4)
+  averageCost Decimal  @db.Decimal(14, 4)
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, branchId, productId, createdAt])
+  @@map("kardex")
+}

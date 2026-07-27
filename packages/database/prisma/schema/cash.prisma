@@ -1,0 +1,69 @@
+// Caja: apertura/cierre/arqueo (funcional), asociada siempre a un empleado/usuario responsable
+
+model CashRegister {
+  id        String   @id @default(uuid())
+  companyId String
+  branchId  String
+  code      String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  sessions CashSession[]
+
+  @@unique([branchId, code])
+  @@index([companyId])
+  @@map("cash_registers")
+}
+
+model CashSession {
+  id                    String       @id @default(uuid())
+  companyId             String
+  branchId              String
+  cashRegisterId        String
+  cashRegister          CashRegister @relation(fields: [cashRegisterId], references: [id])
+  openedByUserId        String       // responsable de la apertura
+  closedByUserId        String?      // responsable del cierre
+  openingAmount         Decimal      @db.Decimal(14, 2)
+  closingAmountExpected Decimal?     @db.Decimal(14, 2)
+  closingAmountCounted  Decimal?     @db.Decimal(14, 2)
+  difference            Decimal?     @db.Decimal(14, 2)
+  status                String       @default("OPEN") // OPEN, CLOSED
+  openedAt              DateTime     @default(now())
+  closedAt              DateTime?
+  notes                 String?
+
+  movements CashMovement[]
+  counts    CashCount[]
+
+  @@index([companyId, branchId, status])
+  @@map("cash_sessions")
+}
+
+model CashMovement {
+  id              String      @id @default(uuid())
+  cashSessionId   String
+  cashSession     CashSession @relation(fields: [cashSessionId], references: [id])
+  type            String      // SALE_IN, INCOME, EXPENSE, WITHDRAWAL, DEPOSIT
+  amount          Decimal     @db.Decimal(14, 2)
+  concept         String
+  referenceType   String?
+  referenceId     String?
+  createdByUserId String
+  createdAt       DateTime    @default(now())
+
+  @@index([cashSessionId])
+  @@map("cash_movements")
+}
+
+/// Conteo de denominaciones para el arqueo de caja
+model CashCount {
+  id            String      @id @default(uuid())
+  cashSessionId String
+  cashSession   CashSession @relation(fields: [cashSessionId], references: [id])
+  denomination  Decimal     @db.Decimal(14, 2)
+  quantity      Int
+  subtotal      Decimal     @db.Decimal(14, 2)
+
+  @@map("cash_counts")
+}

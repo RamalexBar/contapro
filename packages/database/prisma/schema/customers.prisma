@@ -1,0 +1,52 @@
+// Clientes: estado de cuenta, creditos, abonos, limite de credito
+
+model Customer {
+  id             String   @id @default(uuid())
+  companyId      String
+  documentType   String   // CC, NIT, CE, PASSPORT
+  documentNumber String
+  name           String
+  email          String?
+  phone          String?
+  address        String?
+  creditLimit    Decimal  @db.Decimal(14, 2) @default(0)
+  currentBalance Decimal  @db.Decimal(14, 2) @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  creditMovements CustomerCreditMovement[]
+  payments        CustomerPayment[]
+
+  @@unique([companyId, documentNumber])
+  @@index([companyId])
+  @@map("customers")
+}
+
+model CustomerCreditMovement {
+  id            String   @id @default(uuid())
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id])
+  type          String   // CHARGE, PAYMENT, ADJUSTMENT
+  amount        Decimal  @db.Decimal(14, 2)
+  referenceType String?
+  referenceId   String?
+  balanceAfter  Decimal  @db.Decimal(14, 2)
+  createdAt     DateTime @default(now())
+
+  @@index([customerId])
+  @@map("customer_credit_movements")
+}
+
+model CustomerPayment {
+  id              String   @id @default(uuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  amount          Decimal  @db.Decimal(14, 2)
+  method          String
+  saleId          String?
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@index([customerId])
+  @@map("customer_payments")
+}

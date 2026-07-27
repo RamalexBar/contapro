@@ -1,0 +1,12 @@
+{
+  "name": "@erp/shared-utils",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {},
+  "devDependencies": {
+    "@erp/config": "workspace:*",
+    "typescript": "^5.6.3"
+  }
+}

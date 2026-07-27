@@ -1,0 +1,121 @@
+// Proveedores / Compras (STUB en la iteracion 1: modelo completo, sin logica de negocio todavia)
+// Ver apps/api/src/modules/suppliers/README.md
+
+model Supplier {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  nit         String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([companyId, nit])
+  @@index([companyId])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id                String    @id @default(uuid())
+  companyId         String
+  branchId          String
+  supplierId        String
+  status            String    @default("DRAFT") // DRAFT, SENT, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
+  expectedDate      DateTime?
+  total             Decimal   @db.Decimal(14, 2)
+  createdByUserId   String
+  createdAt         DateTime  @default(now())
+
+  items PurchaseOrderItem[]
+
+  @@index([companyId, branchId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  productId       String
+  quantity        Decimal       @db.Decimal(14, 4)
+  unitCost        Decimal       @db.Decimal(14, 4)
+  total           Decimal       @db.Decimal(14, 2)
+
+  @@map("purchase_order_items")
+}
+
+model GoodsReceipt {
+  id               String   @id @default(uuid())
+  companyId        String
+  branchId         String
+  purchaseOrderId  String?
+  supplierId       String
+  receivedByUserId String
+  createdAt        DateTime @default(now())
+
+  items GoodsReceiptItem[]
+
+  @@index([companyId, branchId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id             String       @id @default(uuid())
+  goodsReceiptId String
+  goodsReceipt   GoodsReceipt @relation(fields: [goodsReceiptId], references: [id])
+  productId      String
+  quantity       Decimal      @db.Decimal(14, 4)
+  unitCost       Decimal      @db.Decimal(14, 4)
+  batchNumber    String?
+  expirationDate DateTime?
+
+  @@map("goods_receipt_items")
+}
+
+model Purchase {
+  id            String   @id @default(uuid())
+  companyId     String
+  branchId      String
+  supplierId    String
+  invoiceNumber String
+  total         Decimal  @db.Decimal(14, 2)
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+
+  accountsPayable AccountPayable[]
+
+  @@index([companyId, branchId])
+  @@map("purchases")
+}
+
+model AccountPayable {
+  id         String   @id @default(uuid())
+  companyId  String
+  supplierId String
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id])
+  amount     Decimal  @db.Decimal(14, 2)
+  balance    Decimal  @db.Decimal(14, 2)
+  dueDate    DateTime
+  status     String   @default("PENDING") // PENDING, PARTIAL, PAID, OVERDUE
+
+  payments SupplierPayment[]
+
+  @@index([companyId])
+  @@map("accounts_payable")
+}
+
+model SupplierPayment {
+  id               String         @id @default(uuid())
+  accountPayableId String
+  accountPayable   AccountPayable @relation(fields: [accountPayableId], references: [id])
+  amount           Decimal        @db.Decimal(14, 2)
+  method           String
+  paidAt           DateTime       @default(now())
+  createdByUserId  String
+
+  @@map("supplier_payments")
+}

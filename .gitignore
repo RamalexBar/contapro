@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+.turbo/
+.env
+.env.local
+*.log
+.DS_Store
+
+# Prisma
+packages/database/prisma/migrations/dev.db
+packages/database/generated/
+
+# Expo
+apps/mobile/.expo/
+apps/mobile/node_modules/
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# SQLite local
+*.sqlite
+*.sqlite3

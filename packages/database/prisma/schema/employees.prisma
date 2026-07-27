@@ -1,0 +1,42 @@
+// Empleados (STUB en la iteracion 1: modelo completo, sin logica de negocio todavia)
+// Ver apps/api/src/modules/employees/README.md
+
+model Employee {
+  id                String    @id @default(uuid())
+  companyId         String
+  branchId          String
+  userId            String?   @unique
+  user              User?     @relation(fields: [userId], references: [id])
+  documentType      String
+  documentNumber    String
+  firstName         String
+  lastName          String
+  birthDate         DateTime?
+  address           String?
+  phone             String?
+  email             String?
+  position          String
+  contractType      String    // FIXED_TERM, INDEFINITE, SERVICE, LEARNING
+  baseSalary        Decimal   @db.Decimal(14, 2)
+  hireDate          DateTime
+  terminationDate   DateTime?
+  status            String    @default("ACTIVE") // ACTIVE, INACTIVE, ON_LEAVE
+  eps               String?
+  arlRiskLevel      String?   // I, II, III, IV, V
+  pensionFund       String?
+  compensationFund  String?
+  bankName          String?
+  bankAccountNumber String?
+  createdAt         DateTime  @default(now())
+
+  timeEntries    TimeEntry[]
+  vacations      Vacation[]
+  leaves         LeavePermission[]
+  absences       Absence[]
+  sickLeaves     SickLeave[]
+  payrollDetails PayrollDetail[]
+
+  @@unique([companyId, documentNumber])
+  @@index([companyId, branchId])
+  @@map("employees")
+}

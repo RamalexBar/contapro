@@ -1,0 +1,68 @@
+// Control de horarios (STUB en la iteracion 1: modelo completo, sin logica de negocio todavia)
+// Ver apps/api/src/modules/timetracking/README.md
+
+model TimeEntry {
+  id         String    @id @default(uuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  branchId   String
+  clockIn    DateTime
+  clockOut   DateTime?
+  source     String    @default("MANUAL") // MANUAL, BIOMETRIC, APP
+
+  notes String?
+
+  @@index([employeeId, clockIn])
+  @@map("time_entries")
+}
+
+model Vacation {
+  id               String   @id @default(uuid())
+  employeeId       String
+  employee         Employee @relation(fields: [employeeId], references: [id])
+  startDate        DateTime
+  endDate          DateTime
+  daysTaken        Int
+  status           String   @default("REQUESTED") // REQUESTED, APPROVED, REJECTED, TAKEN
+  approvedByUserId String?
+
+  @@map("vacations")
+}
+
+model LeavePermission {
+  id               String   @id @default(uuid())
+  employeeId       String
+  employee         Employee @relation(fields: [employeeId], references: [id])
+  type             String   // PERSONAL, PATERNITY, MATERNITY, BEREAVEMENT, OTHER
+  startDate        DateTime
+  endDate          DateTime
+  paid             Boolean  @default(false)
+  status           String   @default("REQUESTED")
+  approvedByUserId String?
+
+  @@map("leave_permissions")
+}
+
+model Absence {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  type       String   // UNJUSTIFIED, JUSTIFIED
+  reason     String?
+
+  @@map("absences")
+}
+
+model SickLeave {
+  id               String   @id @default(uuid())
+  employeeId       String
+  employee         Employee @relation(fields: [employeeId], references: [id])
+  startDate        DateTime
+  endDate          DateTime
+  type             String   // GENERAL, LABOR_ARL, MATERNITY
+  supportingDocUrl String?
+  status           String   @default("SUBMITTED")
+
+  @@map("sick_leaves")
+}

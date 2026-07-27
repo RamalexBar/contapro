@@ -1,0 +1,132 @@
+// Contabilidad (STUB en la iteracion 1: modelo completo, sin logica de negocio todavia)
+// Ver apps/api/src/modules/accounting/README.md
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+model ChartOfAccounts {
+  id             String            @id @default(uuid())
+  companyId      String
+  code           String
+  name           String
+  type           AccountType
+  parentId       String?
+  parent         ChartOfAccounts?  @relation("AccountTree", fields: [parentId], references: [id])
+  children       ChartOfAccounts[] @relation("AccountTree")
+  level          Int
+  isActive       Boolean           @default(true)
+  acceptsEntries Boolean           @default(true)
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("chart_of_accounts")
+}
+
+model JournalEntry {
+  id              String    @id @default(uuid())
+  companyId       String
+  branchId        String?
+  number          Int
+  date            DateTime
+  description     String
+  type            String    // MANUAL, SALE, PURCHASE, PAYROLL, ADJUSTMENT
+  sourceType      String?
+  sourceId        String?
+  status          String    @default("DRAFT") // DRAFT, POSTED, VOID
+  createdByUserId String
+  postedAt        DateTime?
+  createdAt       DateTime  @default(now())
+
+  lines JournalEntryLine[]
+
+  @@unique([companyId, number])
+  @@index([companyId, date])
+  @@map("journal_entries")
+}
+
+model JournalEntryLine {
+  id             String       @id @default(uuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
+  accountId      String
+  debit          Decimal      @db.Decimal(14, 2) @default(0)
+  credit         Decimal      @db.Decimal(14, 2) @default(0)
+  description    String?
+  thirdPartyType String?
+  thirdPartyId   String?
+
+  @@map("journal_entry_lines")
+}
+
+model FinancialPeriod {
+  id        String    @id @default(uuid())
+  companyId String
+  year      Int
+  month     Int
+  status    String    @default("OPEN") // OPEN, CLOSED
+  closedAt  DateTime?
+
+  @@unique([companyId, year, month])
+  @@map("financial_periods")
+}
+
+model BankAccount {
+  id             String   @id @default(uuid())
+  companyId      String
+  bankName       String
+  accountNumber  String
+  accountType    String
+  currentBalance Decimal  @db.Decimal(14, 2) @default(0)
+
+  transactions    BankTransaction[]
+  reconciliations BankReconciliation[]
+
+  @@index([companyId])
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id            String      @id @default(uuid())
+  bankAccountId String
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  date          DateTime
+  description   String
+  amount        Decimal     @db.Decimal(14, 2)
+  type          String      // DEBIT, CREDIT
+  reconciled    Boolean     @default(false)
+
+  @@index([bankAccountId])
+  @@map("bank_transactions")
+}
+
+model BankReconciliation {
+  id               String      @id @default(uuid())
+  bankAccountId    String
+  bankAccount      BankAccount @relation(fields: [bankAccountId], references: [id])
+  periodStart      DateTime
+  periodEnd        DateTime
+  statementBalance Decimal     @db.Decimal(14, 2)
+  bookBalance      Decimal     @db.Decimal(14, 2)
+  status           String      @default("IN_PROGRESS")
+  createdAt        DateTime    @default(now())
+
+  items BankReconciliationItem[]
+
+  @@map("bank_reconciliations")
+}
+
+model BankReconciliationItem {
+  id                 String             @id @default(uuid())
+  reconciliationId   String
+  reconciliation     BankReconciliation @relation(fields: [reconciliationId], references: [id])
+  bankTransactionId  String?
+  journalEntryLineId String?
+  matched            Boolean            @default(false)
+
+  @@map("bank_reconciliation_items")
+}

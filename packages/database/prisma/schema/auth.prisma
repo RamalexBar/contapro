@@ -1,0 +1,173 @@
+// Autenticacion, RBAC, Auditoria (inmutable), Seguridad de descuentos
+
+model User {
+  id                  String    @id @default(uuid())
+  companyId           String
+  company             Company   @relation(fields: [companyId], references: [id])
+  email               String
+  passwordHash        String
+  pinHash              String?  // PIN corto para autorizaciones rapidas en POS
+  fullName            String
+  phone               String?
+  isActive            Boolean   @default(true)
+  mustChangePassword  Boolean   @default(false)
+  lastLoginAt         DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  branches      UserBranch[]
+  roles         UserRole[]
+  permissions   UserPermission[]
+  refreshTokens RefreshToken[]
+  discountLimit CashierDiscountLimit?
+  employee      Employee?
+
+  @@unique([companyId, email])
+  @@index([companyId])
+  @@map("users")
+}
+
+model UserBranch {
+  userId    String
+  branchId  String
+  isDefault Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id])
+  branch    Branch  @relation(fields: [branchId], references: [id])
+
+  @@id([userId, branchId])
+  @@map("user_branches")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  companyId   String? // null = rol de sistema, compartido, no editable por el tenant
+  company     Company? @relation(fields: [companyId], references: [id])
+  name        String   // ADMINISTRADOR, PROPIETARIO, CONTADOR, SUPERVISOR, CAJERO, EMPLEADO o custom
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@unique([companyId, name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  code        String @unique // "product.price.update", "product.delete", "discount.authorize", ...
+  module      String // "inventory", "pos", "cash", "rbac", ...
+  description String
+
+  userGrants      UserPermission[]
+  roleAssignments RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model UserPermission {
+  userId       String
+  permissionId String
+  granted      Boolean // true = concede permiso extra, false = revoca explicitamente
+  user         User       @relation(fields: [userId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  tokenHash   String
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdByIp String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+/// Registro de auditoria INMUTABLE: el repositorio solo expone create()/lecturas.
+/// Cubre: cambios de precio/costo/codigo de barras, creacion/eliminacion de productos,
+/// facturas anuladas, devoluciones, cambios de inventario, apertura/cierre de caja,
+/// cambio de permisos/usuarios, inicio/cierre de sesion, intentos fallidos, autorizacion de descuentos.
+model AuditLog {
+  id          String   @id @default(uuid())
+  companyId   String
+  branchId    String?
+  userId      String?
+  action      String   // PRODUCT_PRICE_CHANGED, PRODUCT_COST_CHANGED, PRODUCT_BARCODE_CHANGED,
+                        // PRODUCT_CREATED, PRODUCT_DELETED, SALE_CANCELLED, RETURN_CREATED,
+                        // STOCK_ADJUSTED, CASH_SESSION_OPENED, CASH_SESSION_CLOSED,
+                        // PERMISSION_CHANGED, USER_CREATED, USER_UPDATED, LOGIN_SUCCESS,
+                        // LOGIN_FAILED, LOGOUT, DISCOUNT_AUTHORIZED
+  entityType  String
+  entityId    String
+  description String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+/// Porcentaje maximo de descuento que puede aplicar un cajero sin autorizacion.
+model CashierDiscountLimit {
+  id                 String   @id @default(uuid())
+  companyId          String
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id])
+  maxDiscountPercent Decimal  @db.Decimal(5, 2)
+  updatedAt          DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("cashier_discount_limits")
+}
+
+/// Se crea cuando un supervisor/admin autoriza (PIN o password) un descuento
+/// que excede el limite del cajero. Referencia venta/item, quien vendio, quien autorizo, motivo.
+model DiscountAuthorization {
+  id                 String   @id @default(uuid())
+  companyId          String
+  saleId             String?
+  saleItemId         String?
+  productId          String
+  requestedByUserId  String // cajero que realizo la venta
+  authorizedByUserId String // supervisor/admin que autorizo
+  discountPercent    Decimal  @db.Decimal(5, 2)
+  reason             String?
+  method             String   // PIN, PASSWORD
+  createdAt          DateTime @default(now())
+
+  @@index([companyId])
+  @@map("discount_authorizations")
+}

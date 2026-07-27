@@ -1,0 +1,45 @@
+// Sincronizacion offline (STUB en la iteracion 1: patron outbox, sin motor de sync todavia)
+// Ver apps/api/src/modules/sync/README.md y apps/mobile/src/lib/local-db
+
+model SyncDevice {
+  id               String    @id @default(uuid())
+  companyId        String
+  branchId         String
+  userId           String
+  deviceIdentifier String
+  platform         String    // ANDROID, IOS, WEB
+  lastSyncAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([companyId, deviceIdentifier])
+  @@map("sync_devices")
+}
+
+model SyncOutbox {
+  id             String    @id @default(uuid())
+  companyId      String
+  branchId       String
+  entityType     String    // "Sale", "CashMovement", "StockMovement", ...
+  entityId       String
+  operation      String    // CREATE, UPDATE, DELETE
+  payload        Json
+  originDeviceId String?
+  status         String    @default("PENDING") // PENDING, SYNCED, CONFLICT, ERROR
+  createdAt      DateTime  @default(now())
+  syncedAt       DateTime?
+
+  @@index([companyId, status])
+  @@map("sync_outbox")
+}
+
+model SyncConflictLog {
+  id               String    @id @default(uuid())
+  outboxEventId    String
+  conflictReason   String
+  resolution       String?   // SERVER_WINS, CLIENT_WINS, MANUAL
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@map("sync_conflict_logs")
+}

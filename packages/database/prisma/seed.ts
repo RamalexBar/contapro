@@ -1,0 +1,227 @@
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS, SYSTEM_ROLES } from "@erp/shared-types";
+
+const prisma = new PrismaClient();
+
+const DEMO_PASSWORD = "Demo1234!";
+
+async function main() {
+  console.log("Seed: creando empresa demo 'Minimarket La Esquina'...");
+
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const pinHash = await bcrypt.hash("1234", 10);
+
+  await prisma.$transaction(async (tx) => {
+    // ---- Catalogo de permisos ----
+    for (const permission of PERMISSIONS) {
+      await tx.permission.upsert({
+        where: { code: permission.code },
+        create: permission,
+        update: { module: permission.module, description: permission.description },
+      });
+    }
+
+    // ---- Roles de sistema + sus permisos por defecto ----
+    for (const roleName of SYSTEM_ROLES) {
+      let role = await tx.role.findFirst({ where: { name: roleName, companyId: null } });
+      if (!role) {
+        role = await tx.role.create({ data: { name: roleName, isSystem: true, companyId: null } });
+      }
+
+      const permissionCodes = DEFAULT_ROLE_PERMISSIONS[roleName];
+      const permissions = await tx.permission.findMany({ where: { code: { in: permissionCodes } } });
+      for (const permission of permissions) {
+        await tx.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+          create: { roleId: role.id, permissionId: permission.id },
+          update: {},
+        });
+      }
+    }
+
+    // ---- Plan + Empresa + Sucursal ----
+    const plan = await tx.plan.upsert({
+      where: { code: "BASICO" },
+      create: {
+        code: "BASICO",
+        name: "Plan Basico",
+        priceMonthly: 49900,
+        priceYearly: 499000,
+        maxBranches: 3,
+        maxUsers: 10,
+        features: { pos: true, inventory: true, cash: true, payroll: false, accounting: false },
+      },
+      update: {},
+    });
+
+    const company = await tx.company.upsert({
+      where: { nit: "900123456-7" },
+      create: {
+        name: "Minimarket La Esquina",
+        legalName: "Minimarket La Esquina S.A.S.",
+        nit: "900123456-7",
+        email: "contacto@minimarketlaesquina.demo",
+        phone: "3001234567",
+      },
+      update: {},
+    });
+
+    const branch = await tx.branch.upsert({
+      where: { companyId_code: { companyId: company.id, code: "PRIN" } },
+      create: {
+        companyId: company.id,
+        name: "Sucursal Principal",
+        code: "PRIN",
+        address: "Cra 10 # 20-30, Manizales",
+        isMain: true,
+      },
+      update: {},
+    });
+
+    const periodStart = new Date();
+    const periodEnd = new Date();
+    periodEnd.setDate(periodEnd.getDate() + 30);
+
+    const existingSubscription = await tx.subscription.findFirst({ where: { companyId: company.id } });
+    if (!existingSubscription) {
+      await tx.subscription.create({
+        data: {
+          companyId: company.id,
+          planId: plan.id,
+          status: "ACTIVE",
+          billingCycle: "MONTHLY",
+          startDate: periodStart,
+          currentPeriodEnd: periodEnd,
+        },
+      });
+    }
+
+    // ---- Usuarios demo ----
+    const adminRole = await tx.role.findFirstOrThrow({ where: { name: "ADMINISTRADOR", companyId: null } });
+    const cajeroRole = await tx.role.findFirstOrThrow({ where: { name: "CAJERO", companyId: null } });
+
+    const admin = await tx.user.upsert({
+      where: { companyId_email: { companyId: company.id, email: "admin@demo.com" } },
+      create: {
+        companyId: company.id,
+        email: "admin@demo.com",
+        passwordHash,
+        pinHash,
+        fullName: "Admin Demo",
+      },
+      update: {},
+    });
+    await tx.userBranch.upsert({
+      where: { userId_branchId: { userId: admin.id, branchId: branch.id } },
+      create: { userId: admin.id, branchId: branch.id, isDefault: true },
+      update: {},
+    });
+    await tx.userRole.upsert({
+      where: { userId_roleId: { userId: admin.id, roleId: adminRole.id } },
+      create: { userId: admin.id, roleId: adminRole.id },
+      update: {},
+    });
+
+    const cajero = await tx.user.upsert({
+      where: { companyId_email: { companyId: company.id, email: "cajero@demo.com" } },
+      create: {
+        companyId: company.id,
+        email: "cajero@demo.com",
+        passwordHash,
+        pinHash,
+        fullName: "Cajero Demo",
+      },
+      update: {},
+    });
+    await tx.userBranch.upsert({
+      where: { userId_branchId: { userId: cajero.id, branchId: branch.id } },
+      create: { userId: cajero.id, branchId: branch.id, isDefault: true },
+      update: {},
+    });
+    await tx.userRole.upsert({
+      where: { userId_roleId: { userId: cajero.id, roleId: cajeroRole.id } },
+      create: { userId: cajero.id, roleId: cajeroRole.id },
+      update: {},
+    });
+    await tx.cashierDiscountLimit.upsert({
+      where: { userId: cajero.id },
+      create: { companyId: company.id, userId: cajero.id, maxDiscountPercent: 5 },
+      update: { maxDiscountPercent: 5 },
+    });
+
+    // ---- Inventario demo ----
+    let category = await tx.category.findFirst({
+      where: { companyId: company.id, name: "Abarrotes", parentId: null },
+    });
+    if (!category) {
+      category = await tx.category.create({ data: { companyId: company.id, name: "Abarrotes" } });
+    }
+    const brand = await tx.brand.upsert({
+      where: { companyId_name: { companyId: company.id, name: "Diana" } },
+      create: { companyId: company.id, name: "Diana" },
+      update: {},
+    });
+
+    const demoProducts = [
+      { sku: "ARR-001", name: "Arroz Diana 500g", cost: 2800, price: 3500, barcode: "7702001001001" },
+      { sku: "ACE-001", name: "Aceite Girasol 1L", cost: 8500, price: 11000, barcode: "7702001001002" },
+      { sku: "PAN-001", name: "Pan Tajado Bimbo", cost: 4200, price: 5500, barcode: "7702001001003" },
+      { sku: "LEC-001", name: "Leche Entera 1L", cost: 3100, price: 4200, barcode: "7702001001004" },
+      { sku: "AZU-001", name: "Azucar Blanca 1kg", cost: 2600, price: 3400, barcode: "7702001001005" },
+    ];
+
+    for (const p of demoProducts) {
+      const product = await tx.product.upsert({
+        where: { companyId_sku: { companyId: company.id, sku: p.sku } },
+        create: {
+          companyId: company.id,
+          sku: p.sku,
+          name: p.name,
+          categoryId: category.id,
+          brandId: brand.id,
+          currentCost: p.cost,
+          currentPrice: p.price,
+        },
+        update: {},
+      });
+      await tx.barcode.upsert({
+        where: { companyId_code: { companyId: company.id, code: p.barcode } },
+        create: { companyId: company.id, productId: product.id, code: p.barcode },
+        update: {},
+      });
+      await tx.productBranchStock.upsert({
+        where: { productId_branchId: { productId: product.id, branchId: branch.id } },
+        create: {
+          companyId: company.id,
+          productId: product.id,
+          branchId: branch.id,
+          quantity: 100,
+          minStock: 10,
+          maxStock: 300,
+        },
+        update: {},
+      });
+    }
+
+    // ---- Caja registradora ----
+    await tx.cashRegister.upsert({
+      where: { branchId_code: { branchId: branch.id, code: "CAJA-1" } },
+      create: { companyId: company.id, branchId: branch.id, code: "CAJA-1", name: "Caja Principal" },
+      update: {},
+    });
+  });
+
+  console.log("Seed completado.");
+  console.log(`  Admin  -> admin@demo.com / ${DEMO_PASSWORD}`);
+  console.log(`  Cajero -> cajero@demo.com / ${DEMO_PASSWORD} (limite descuento 5%, PIN 1234)`);
+}
+
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

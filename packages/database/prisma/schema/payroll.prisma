@@ -1,0 +1,114 @@
+// Nomina Colombia (STUB en la iteracion 1: modelo completo, sin motor de calculo todavia)
+// Ver apps/api/src/modules/payroll/README.md
+//
+// PayrollParameter permite actualizar los valores legales (salario minimo, auxilio de transporte,
+// UVT, porcentajes de ley) cada año SIN modificar el codigo.
+
+model PayrollParameter {
+  id                            String    @id @default(uuid())
+  year                          Int       @unique
+  effectiveFrom                 DateTime
+  effectiveTo                   DateTime?
+  minimumWage                   Decimal   @db.Decimal(14, 2)
+  transportAllowance            Decimal   @db.Decimal(14, 2)
+  uvt                           Decimal   @db.Decimal(14, 2)
+  healthEmployeePercent         Decimal   @db.Decimal(5, 2)
+  healthEmployerPercent         Decimal   @db.Decimal(5, 2)
+  pensionEmployeePercent        Decimal   @db.Decimal(5, 2)
+  pensionEmployerPercent        Decimal   @db.Decimal(5, 2)
+  arlPercentByRiskLevel         Json      // { "I": 0.522, "II": 1.044, "III": 2.436, "IV": 4.35, "V": 6.96 }
+  severancePercent              Decimal   @db.Decimal(5, 2) // cesantias 8.33%
+  severanceInterestPercent      Decimal   @db.Decimal(5, 2) // 12% anual
+  serviceBonusPercent           Decimal   @db.Decimal(5, 2) // prima de servicios
+  vacationPercent               Decimal   @db.Decimal(5, 2)
+  familyCompensationPercent     Decimal   @db.Decimal(5, 2) // caja de compensacion 4%
+  icbfPercent                   Decimal   @db.Decimal(5, 2)
+  senaPercent                   Decimal   @db.Decimal(5, 2)
+  overtimeDayPercent             Decimal  @db.Decimal(5, 2) // hora extra diurna 25%
+  overtimeNightPercent           Decimal  @db.Decimal(5, 2) // hora extra nocturna 75%
+  nightSurchargePercent          Decimal  @db.Decimal(5, 2) // recargo nocturno 35%
+  sundayHolidaySurchargePercent  Decimal  @db.Decimal(5, 2) // recargo dominical/festivo 75%
+  extra                          Json?    // valores adicionales aun no modelados explicitamente
+  isActive                       Boolean  @default(true)
+  createdAt                      DateTime @default(now())
+
+  @@map("payroll_parameters")
+}
+
+model PayrollConcept {
+  id             String  @id @default(uuid())
+  code           String  @unique // SALARY, TRANSPORT_ALLOWANCE, OVERTIME_DAY, OVERTIME_NIGHT,
+                                  // SUNDAY_SURCHARGE, HOLIDAY_SURCHARGE, NIGHT_SURCHARGE, BONUS,
+                                  // COMMISSION, VACATION, SEVERANCE, SEVERANCE_INTEREST,
+                                  // SERVICE_BONUS, HEALTH_EMPLOYEE, PENSION_EMPLOYEE,
+                                  // HEALTH_EMPLOYER, PENSION_EMPLOYER, ARL, CCF, ICBF, SENA,
+                                  // GARNISHMENT, LOAN_DEDUCTION, OTHER
+  name           String
+  category       String  // INCOME, DEDUCTION, EMPLOYER_CONTRIBUTION, PROVISION
+  isTaxable      Boolean @default(false)
+  isSalaryFactor Boolean @default(true) // constitutivo de salario
+
+  @@map("payroll_concepts")
+}
+
+model Payroll {
+  id              String    @id @default(uuid())
+  companyId       String
+  branchId        String?
+  year            Int
+  month           Int
+  periodType      String    @default("MONTHLY") // MONTHLY, BIWEEKLY
+  startDate       DateTime
+  endDate         DateTime
+  status          String    @default("DRAFT") // DRAFT, CALCULATED, APPROVED, PAID, CLOSED
+  createdByUserId String
+  calculatedAt    DateTime?
+  paidAt          DateTime?
+
+  details PayrollDetail[]
+
+  @@unique([companyId, branchId, year, month, periodType])
+  @@map("payrolls")
+}
+
+model PayrollDetail {
+  id                String   @id @default(uuid())
+  payrollId         String
+  payroll           Payroll  @relation(fields: [payrollId], references: [id])
+  employeeId        String
+  employee          Employee @relation(fields: [employeeId], references: [id])
+  grossTotal        Decimal  @db.Decimal(14, 2) @default(0)
+  totalDeductions   Decimal  @db.Decimal(14, 2) @default(0)
+  netPay            Decimal  @db.Decimal(14, 2) @default(0)
+  employerCostTotal Decimal  @db.Decimal(14, 2) @default(0)
+  status            String   @default("DRAFT")
+
+  items   PayrollItem[]
+  payslip PayslipDocument?
+
+  @@index([payrollId])
+  @@map("payroll_details")
+}
+
+model PayrollItem {
+  id              String        @id @default(uuid())
+  payrollDetailId String
+  payrollDetail   PayrollDetail @relation(fields: [payrollDetailId], references: [id])
+  conceptCode     String
+  quantity        Decimal?      @db.Decimal(14, 4)
+  rate            Decimal?      @db.Decimal(14, 4)
+  amount          Decimal       @db.Decimal(14, 2)
+
+  @@map("payroll_items")
+}
+
+model PayslipDocument {
+  id              String        @id @default(uuid())
+  payrollDetailId String        @unique
+  payrollDetail   PayrollDetail @relation(fields: [payrollDetailId], references: [id])
+  generatedAt     DateTime      @default(now())
+  fileUrl         String?       // futuro PDF en Supabase Storage
+  summaryJson     Json
+
+  @@map("payslip_documents")
+}
