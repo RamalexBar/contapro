@@ -1,4 +1,4 @@
-# ERP SaaS Colombia
+# Contapro — ERP SaaS Colombia
 
 ERP modular multiempresa/multisucursal para pequeños y medianos negocios (tiendas, supermercados,
 minimercados, papelerías, ferreterías, boutiques, droguerías) en Colombia. Inspirado en Alegra, Siigo,
@@ -8,6 +8,18 @@ para escalar a miles de clientes bajo modalidad SaaS.
 > Este repositorio corresponde a la **iteración 1**: scaffold completo del monorepo + módulos core
 > funcionales. Ver [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el detalle de qué está implementado y
 > qué queda modelado (Prisma) para siguientes iteraciones.
+
+## Contenido
+
+- [Stack](#stack)
+- [Estructura del monorepo](#estructura-del-monorepo)
+- [Arquitectura multi-tenant](#arquitectura-multi-tenant)
+- [Requisitos previos](#requisitos-previos)
+- [Arranque local](#arranque-local)
+- [Scripts disponibles](#scripts-disponibles)
+- [Solución de problemas](#solución-de-problemas)
+- [Estado de verificación de esta sesión](#estado-de-verificación-de-esta-sesión)
+- [Documentación](#documentación)
 
 ## Stack
 
@@ -24,7 +36,7 @@ para escalar a miles de clientes bajo modalidad SaaS.
 ## Estructura del monorepo
 
 ```
-erp-saas-colombia/
+contapro/
 ├── apps/
 │   ├── api/        # Backend Express + TS (Clean Architecture por módulo)
 │   ├── web/        # Frontend React + Vite + TS + Tailwind
@@ -44,49 +56,101 @@ negocio tiene `companyId`, y una extensión de Prisma Client (`apps/api/src/shar
 inyecta automáticamente el filtro usando el contexto de la request (`AsyncLocalStorage`). Ver
 `apps/api/src/shared/prisma/README.md` para la convención de `update`/`delete` por id.
 
+## Requisitos previos
+
+| Herramienta | Versión | Notas |
+|---|---|---|
+| [Node.js](https://nodejs.org) | ≥ 20 | incluye `corepack` |
+| [pnpm](https://pnpm.io) | 9.x | se activa con `corepack`, no hace falta instalarlo aparte |
+| [Docker](https://www.docker.com/) | cualquiera reciente | para levantar Postgres + Adminer local |
+| [Git](https://git-scm.com/) | cualquiera reciente | |
+
+Opcional, solo si vas a trabajar en la app móvil:
+
+- [Expo CLI](https://docs.expo.dev/get-started/installation/) (`npx expo`) y la app **Expo Go** en tu
+  teléfono, o un emulador Android/iOS configurado.
+
 ## Arranque local
 
 ```bash
-# 1. Habilitar pnpm (si no lo tienes)
+# 1. Clonar el repositorio
+git clone https://github.com/RamalexBar/contapro.git
+cd contapro
+
+# 2. Habilitar pnpm (si no lo tienes)
 corepack enable
 corepack prepare pnpm@9.15.0 --activate
 
-# 2. Instalar dependencias
+# 3. Instalar dependencias de todo el monorepo
 pnpm install
 
-# 3. Levantar Postgres local
+# 4. Levantar Postgres local (+ Adminer en http://localhost:8080)
 docker compose up -d postgres
 
-# 4. Variables de entorno
+# 5. Variables de entorno
 cp .env.example apps/api/.env
 cp .env.example packages/database/.env
-cp .env.example apps/web/.env   # solo usa VITE_API_BASE_URL
+cp .env.example apps/web/.env   # apps/web solo usa VITE_API_BASE_URL
 
-# 5. Migraciones + seed (empresa demo)
+# 6. Migraciones + seed (crea la empresa demo "Minimarket La Esquina")
 pnpm db:migrate --name init
 pnpm db:seed
 
-# 6. Levantar backend y frontend
+# 7. Levantar backend y frontend (en dos terminales, o con `pnpm dev` desde la raíz)
 pnpm --filter @erp/api dev     # http://localhost:4000
 pnpm --filter @erp/web dev     # http://localhost:5173
 ```
 
 Credenciales del seed: `admin@demo.com` / `Demo1234!` (Administrador) y `cajero@demo.com` / `Demo1234!`
-(Cajero, límite de descuento 5%).
+(Cajero, límite de descuento 5%, PIN `1234`).
+
+Para la app móvil (scaffold, ver [alcance](./docs/ALCANCE.md#-móvil-expo)):
+
+```bash
+pnpm --filter @erp/mobile start
+```
+
+## Scripts disponibles
+
+Desde la raíz del monorepo (usan [Turborepo](https://turbo.build) para orquestar todos los paquetes):
+
+| Comando | Qué hace |
+|---|---|
+| `pnpm dev` | Levanta todos los apps en modo desarrollo |
+| `pnpm build` | Compila todos los apps/paquetes |
+| `pnpm lint` | Corre ESLint en todo el monorepo |
+| `pnpm db:migrate` | Aplica migraciones de Prisma (`packages/database`) |
+| `pnpm db:seed` | Siembra la empresa demo |
+| `pnpm db:studio` | Abre Prisma Studio para explorar la base de datos |
+
+También puedes apuntar a un solo paquete con `pnpm --filter @erp/<nombre> <script>`, por ejemplo
+`pnpm --filter @erp/api dev` o `pnpm --filter @erp/web build`.
+
+## Solución de problemas
+
+- **`corepack: command not found`**: viene incluido con Node ≥ 16.9; si no aparece, actualiza Node
+  o instala pnpm manualmente con `npm i -g pnpm@9`.
+- **Prisma no encuentra el schema**: el schema está partido en `packages/database/prisma/schema/*.prisma`
+  (feature multi-archivo de Prisma); los comandos `db:migrate`/`db:seed`/`db:studio` ya apuntan ahí vía
+  `package.json#prisma.schema`, no hace falta pasar `--schema` a mano.
+- **Puerto 5432/4000/5173 ocupado**: cambia el puerto en `docker-compose.yml` (Postgres) o en
+  `apps/api/.env` (`PORT`) / `apps/web/vite.config.ts` (`server.port`).
+- **La app móvil no conecta a la API**: `localhost` no apunta a tu máquina desde un emulador/dispositivo
+  físico; usa la IP de tu red local o `expo start --tunnel`, y define `EXPO_PUBLIC_API_BASE_URL`.
 
 ## Estado de verificación de esta sesión
 
-Este entorno de generación no tiene Docker ni PostgreSQL disponibles, así que no se pudo correr
+Este entorno de generación no tenía Docker ni PostgreSQL disponibles, así que no se pudo correr
 `prisma migrate` ni probar los endpoints en vivo. Lo que sí se verificó automáticamente:
 
 - ✅ `pnpm install` en todo el monorepo (workspaces resueltos correctamente).
 - ✅ `prisma generate` — el schema completo (todos los dominios) valida sin errores.
-- ✅ `tsc --noEmit` sin errores en `apps/api`, `apps/web`, `packages/database`,
+- ✅ `tsc --noEmit` sin errores en `apps/api`, `apps/web`, `apps/mobile`, `packages/database`,
   `packages/shared-types` y `packages/shared-utils`.
 
-Pendiente de verificar por ti (requiere Postgres — ver sección "Arranque local"): las migraciones,
-el seed, y los flujos end-to-end (login, crear producto, abrir caja, venta con/sin autorización de
-descuento) descritos en `docs/ALCANCE.md`.
+Pendiente de verificar por ti (requiere Postgres — ver [Arranque local](#arranque-local)): las
+migraciones, el seed, y los flujos end-to-end (login, crear producto, abrir caja, venta con/sin
+autorización de descuento) descritos en `docs/ALCANCE.md`.
 
 ## Documentación
 
