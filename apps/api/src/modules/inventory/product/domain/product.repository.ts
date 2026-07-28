@@ -25,6 +25,7 @@ export interface ProductListItem {
   brandId: string | null;
   currentPrice: number;
   currentCost: number;
+  taxRate: number;
   isActive: boolean;
   barcodes: string[];
 }

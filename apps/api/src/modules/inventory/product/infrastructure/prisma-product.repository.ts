@@ -134,6 +134,7 @@ export class PrismaProductRepository implements IProductRepository {
       brandId: row.brandId,
       currentPrice: Number(row.currentPrice),
       currentCost: Number(row.currentCost),
+      taxRate: Number(row.taxRate),
       isActive: row.isActive,
       barcodes: row.barcodes.map((b) => b.code),
     }));

@@ -7,6 +7,7 @@ export interface ProductListItem {
   name: string;
   currentPrice: number;
   currentCost: number;
+  taxRate: number;
   isActive: boolean;
   barcodes: string[];
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { formatCOP } from "@erp/shared-utils";
+import { applyDiscount, calculateTax, formatCOP, round2 } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
@@ -17,6 +17,14 @@ interface CartLine {
   unitPrice: number;
   quantity: number;
   discountPercent: number;
+  taxRate: number;
+}
+
+function lineTotal(line: CartLine): number {
+  const subtotal = round2(line.unitPrice * line.quantity);
+  const taxableBase = applyDiscount(subtotal, line.discountPercent);
+  const taxAmount = calculateTax(taxableBase, line.taxRate);
+  return round2(taxableBase + taxAmount);
 }
 
 export function POSPage() {
@@ -34,7 +42,7 @@ export function POSPage() {
   const [sale, setSale] = useState<SaleResponse | null>(null);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
 
-  const total = cart.reduce((sum, l) => sum + l.unitPrice * l.quantity * (1 - l.discountPercent / 100), 0);
+  const total = round2(cart.reduce((sum, l) => sum + lineTotal(l), 0));
 
   const saleMutation = useMutation({
     mutationFn: () =>
@@ -42,7 +50,7 @@ export function POSPage() {
         branchId: user!.branchId!,
         cashSessionId: activeSession?.id,
         items: cart.map((l) => ({ productId: l.productId, quantity: l.quantity, discountPercent: l.discountPercent })),
-        payments: [{ method: "CASH", amount: Math.round(total) }],
+        payments: [{ method: "CASH", amount: total }],
       }),
     onSuccess: (result) => {
       setSale(result);
@@ -65,13 +73,16 @@ export function POSPage() {
     },
   });
 
-  function addToCart(product: { id: string; name: string; currentPrice: number }) {
+  function addToCart(product: { id: string; name: string; currentPrice: number; taxRate: number }) {
     setCart((prev) => {
       const existing = prev.find((l) => l.productId === product.id);
       if (existing) {
         return prev.map((l) => (l.productId === product.id ? { ...l, quantity: l.quantity + 1 } : l));
       }
-      return [...prev, { productId: product.id, name: product.name, unitPrice: product.currentPrice, quantity: 1, discountPercent: 0 }];
+      return [
+        ...prev,
+        { productId: product.id, name: product.name, unitPrice: product.currentPrice, quantity: 1, discountPercent: 0, taxRate: product.taxRate },
+      ];
     });
   }
 
@@ -131,14 +142,14 @@ export function POSPage() {
                     )
                   }
                 />
-                <span className="w-24 text-right">{formatCOP(line.unitPrice * line.quantity * (1 - line.discountPercent / 100))}</span>
+                <span className="w-24 text-right">{formatCOP(lineTotal(line))}</span>
               </div>
             ))}
             {cart.length === 0 && <p className="text-sm text-gray-400">Agrega productos desde la izquierda</p>}
           </div>
 
           <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
-            <span className="font-semibold">Total: {formatCOP(total)}</span>
+            <span className="font-semibold">Total (IVA incl.): {formatCOP(total)}</span>
             <Button disabled={cart.length === 0 || saleMutation.isPending} onClick={() => saleMutation.mutate()}>
               Cobrar
             </Button>
