@@ -4,6 +4,8 @@ import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 import { ProductListPage } from "../features/inventory/pages/ProductListPage";
 import { POSPage } from "../features/pos/pages/POSPage";
 import { CashSessionPage } from "../features/cash/pages/CashSessionPage";
+import { EmployeeListPage } from "../features/employees/pages/EmployeeListPage";
+import { PayrollPage } from "../features/payroll/pages/PayrollPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -38,6 +40,22 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <CashSessionPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/employees",
+    element: (
+      <ProtectedRoute>
+        <EmployeeListPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/payroll",
+    element: (
+      <ProtectedRoute>
+        <PayrollPage />
       </ProtectedRoute>
     ),
   },
