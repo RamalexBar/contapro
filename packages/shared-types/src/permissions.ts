@@ -39,6 +39,22 @@ export const PERMISSIONS = [
   { code: "rbac.manage", module: "rbac", description: "Administrar roles, usuarios y permisos" },
   { code: "audit.read", module: "audit", description: "Consultar el log de auditoria" },
   { code: "dashboard.read", module: "dashboard", description: "Ver el dashboard" },
+
+  { code: "employee.create", module: "employees", description: "Crear empleados" },
+  { code: "employee.read", module: "employees", description: "Ver empleados" },
+  { code: "employee.update", module: "employees", description: "Editar datos de empleados" },
+  { code: "employee.deactivate", module: "employees", description: "Dar de baja empleados" },
+
+  { code: "timetracking.clock", module: "timetracking", description: "Marcar su propia entrada/salida" },
+  { code: "timetracking.manage", module: "timetracking", description: "Marcar/editar entrada-salida de otros empleados" },
+  { code: "timetracking.read", module: "timetracking", description: "Consultar registros de horarios" },
+
+  { code: "payroll.parameter.manage", module: "payroll", description: "Administrar parametros legales de nomina por año" },
+  { code: "payroll.create", module: "payroll", description: "Crear periodos de nomina" },
+  { code: "payroll.read", module: "payroll", description: "Ver periodos y detalle de nomina" },
+  { code: "payroll.calculate", module: "payroll", description: "Calcular/recalcular una nomina" },
+  { code: "payroll.approve", module: "payroll", description: "Aprobar una nomina calculada" },
+  { code: "payroll.pay", module: "payroll", description: "Marcar una nomina aprobada como pagada" },
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];
@@ -52,6 +68,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "sale.read",
     "audit.read",
     "dashboard.read",
+    "employee.read",
+    "timetracking.read",
+    "payroll.parameter.manage",
+    "payroll.create",
+    "payroll.read",
+    "payroll.calculate",
+    "payroll.approve",
+    "payroll.pay",
   ],
   SUPERVISOR: [
     "product.create",
@@ -79,6 +103,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "cash.movement.create",
     "audit.read",
     "dashboard.read",
+    "employee.create",
+    "employee.read",
+    "employee.update",
+    "employee.deactivate",
+    "timetracking.clock",
+    "timetracking.manage",
+    "timetracking.read",
   ],
   CAJERO: [
     // Explicitamente SIN product.price.update / product.cost.update / product.barcode.update / product.delete
@@ -92,6 +123,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "cash.session.close",
     "cash.movement.create",
     "dashboard.read",
+    "timetracking.clock",
   ],
-  EMPLEADO: ["dashboard.read"],
+  EMPLEADO: ["dashboard.read", "timetracking.clock"],
 };

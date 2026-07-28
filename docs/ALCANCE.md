@@ -19,6 +19,9 @@ la base de datos.
 | **Auditoría** | Registro inmutable (solo `INSERT`) de cambios de precio/costo/código de barras, creación/eliminación de productos, ventas anuladas, devoluciones, apertura/cierre de caja, cambios de permisos/usuarios, login/logout, intentos fallidos, autorización de descuentos |
 | **Dashboard** | Ventas del día, productos más vendidos, productos con stock bajo, caja activa |
 | **Seguridad de productos** | Cajeros NO pueden modificar precio/costo/código de barras ni eliminar productos (permisos dedicados) |
+| **Empleados** | CRUD completo (crear, listar, editar, dar de baja), validación de cédula colombiana |
+| **Control de horarios (parcial)** | Marcación de entrada/salida (`TimeEntry`), consulta por empleado/rango de fechas — alimenta el motor de nómina. Vacaciones/permisos/ausencias/incapacidades siguen sin implementar (ver abajo) |
+| **Nómina Colombia (iteración 2)** | Parámetros legales por año (`PayrollParameter`, tabla global), ciclo de vida de período (`DRAFT` → `CALCULATED` → `APPROVED` → `PAID`), motor de liquidación real: salario prorrateado, auxilio de transporte, horas extra/recargos desde `TimeEntry`, deducciones de ley, aportes patronales y provisiones. Desprendible como JSON (`PayslipDocument.summaryJson`). Ver `apps/api/src/modules/payroll/README.md` para las limitaciones conocidas (festivos, PDF, contabilidad) |
 
 ## 🧱 Modelado en Prisma, con rutas stub (`501 Not Implemented`) documentadas
 
@@ -27,13 +30,13 @@ Cada uno de estos módulos tiene su `schema.prisma` completo y un `README.md` pr
 
 - **Proveedores / Compras**: órdenes de compra, recepción de mercancía, cuentas por pagar.
 - **Contabilidad**: plan de cuentas, comprobantes (libro diario/mayor), balance general, estado de
-  resultados, flujo de caja, conciliación bancaria.
-- **Empleados**: datos personales, cargo, salario, contrato.
-- **Control de horarios**: entrada/salida, horas extra/nocturnas/dominicales/festivas, vacaciones,
-  permisos, ausencias, incapacidades.
-- **Nómina Colombia**: cálculo completo (salario, auxilio transporte, recargos, prima, cesantías,
-  seguridad social, parafiscales, embargos, libranzas) con parámetros legales parametrizables por año
-  (`PayrollParameter`) — sin motor de cálculo ni generación de PDF todavía.
+  resultados, flujo de caja, conciliación bancaria. También pendiente: generar el `JournalEntry`
+  de nómina al aprobar un período (hoy nómina no toca contabilidad).
+- **Control de horarios (resto)**: vacaciones, permisos, ausencias, incapacidades (flujo de
+  aprobación REQUESTED → APPROVED/REJECTED) y calendario de festivos colombianos para el recargo
+  dominical/festivo de nómina.
+- **Nómina Colombia (resto)**: generación de PDF del desprendible, reportes mensual/anual
+  consolidados, deducciones detalladas (libranzas/embargos).
 - **Panel administrador SaaS**: planes, suscripciones, historial de pagos, período de gracia de 2 días,
   recordatorios (8/5/3/1 días antes + día de vencimiento), renovación calculada desde la fecha de
   vencimiento original.
@@ -50,8 +53,10 @@ Solo scaffold: navegación, pantallas de login/POS/dashboard consumiendo la mism
 
 ## Próximos pasos sugeridos (por orden de valor de negocio)
 
-1. Nómina Colombia (motor de cálculo + desprendible en PDF).
+1. ~~Nómina Colombia (motor de cálculo)~~ — implementado en la iteración 2, ver arriba. Queda:
+   PDF del desprendible, calendario de festivos colombianos.
 2. Contabilidad (comprobantes automáticos desde ventas/compras/nómina + libros).
 3. Proveedores/compras (cierra el ciclo de costos e inventario).
 4. Panel administrador SaaS (cobro de suscripciones real).
 5. Sincronización offline completa en móvil.
+6. Vacaciones/permisos/ausencias/incapacidades (resto de `modules/timetracking`).

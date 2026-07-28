@@ -1,20 +1,29 @@
-# Modulo: Empleados (STUB)
+# Modulo: Empleados
 
-Estado: **modelo de datos completo en Prisma, sin logica de negocio implementada.**
+Estado: **funcional** (CRUD completo). Ver `docs/ALCANCE.md` para el estado general del proyecto.
 
-## Modelo ya disponible (`packages/database/prisma/schema/employees.prisma`)
+## Endpoints
 
-`Employee`: datos personales, documento, cargo, tipo de contrato, salario base, fecha de
-ingreso/retiro, estado, EPS/ARL/fondo de pension/caja de compensacion (necesarios para nomina),
-y vinculo opcional a `User` (si el empleado tambien es usuario del sistema).
+- `GET /employees?branchId=&status=` — listar (permiso `employee.read`).
+- `GET /employees/:id` — detalle (permiso `employee.read`).
+- `POST /employees` — crear (permiso `employee.create`). Valida cedula colombiana con
+  `isValidCedula` (`@erp/shared-utils`) cuando `documentType === "CC"`.
+- `PATCH /employees/:id` — actualizar datos (permiso `employee.update`).
+- `POST /employees/:id/deactivate` — dar de baja (`status: INACTIVE` + `terminationDate`, NO
+  borra el registro) (permiso `employee.deactivate`).
 
-## Que falta implementar
+Todas las mutaciones quedan auditadas (`EMPLOYEE_CREATED`, `EMPLOYEE_UPDATED`,
+`EMPLOYEE_DEACTIVATED`).
 
-1. CRUD de empleados (`domain/employee.repository.ts`, casos de uso, controller/routes).
-2. Validaciones colombianas: documento (cedula/CE), rango de `arlRiskLevel` (I-V).
-3. Vinculacion opcional con `User` + `Role` (ej. un cajero que ademas es un `Employee`).
-4. Relacion con `modules/timetracking` (control de horarios) y `modules/payroll` (nomina),
-   que ya referencian `Employee` en sus modelos Prisma.
-5. Auditoria de creacion/edicion/retiro de empleados.
+## Uso desde otros modulos
 
-Por ahora las rutas devuelven `501 Not Implemented` (ver `interfaces/employees.routes.ts`).
+- `modules/timetracking`: usa `IEmployeeRepository.findByIdOrThrow` / `findByUserId` para
+  resolver la sucursal del empleado y validar que un usuario solo marque su propia entrada/salida.
+- `modules/payroll`: usa `IEmployeeRepository.listActiveForPeriod` para saber que empleados
+  liquidar en un periodo (considera `hireDate`/`terminationDate`).
+
+## Pendiente (no implementado en esta iteracion)
+
+- Vinculacion explicita de un `Employee` existente a un `User` recien creado desde la UI (hoy
+  `Employee.userId` se puede setear a mano en la base, pero no hay endpoint dedicado).
+- Reportes/exportables de nomina de personal.

@@ -1,23 +1,38 @@
-# Modulo: Control de Horarios (STUB)
+# Modulo: Control de Horarios
 
-Estado: **modelo de datos completo en Prisma, sin logica de negocio implementada.**
+Estado: **parcialmente funcional**. Marcacion de entrada/salida (lo que necesita Nomina para
+calcular horas extra/recargos) esta implementado. Vacaciones/permisos/ausencias/incapacidades
+siguen siendo stub (`501`).
 
-## Modelos ya disponibles (`packages/database/prisma/schema/timetracking.prisma`)
+## Endpoints funcionales
 
-- `TimeEntry` — entrada/salida (`clockIn`/`clockOut`), origen (manual/biometrico/app).
-- `Vacation` — solicitud y aprobacion de vacaciones.
-- `LeavePermission` — permisos (personal, paternidad, maternidad, luto, otro).
-- `Absence` — ausencias justificadas/injustificadas.
-- `SickLeave` — incapacidades (general, laboral/ARL, maternidad).
+- `POST /time-entries/clock-in` — marca entrada (`employeeId`, `clockIn?` por defecto ahora,
+  `source`, `notes`). Permiso `timetracking.clock`.
+- `POST /time-entries/:id/clock-out` — marca salida de una entrada abierta. Permiso
+  `timetracking.clock`.
+- `GET /time-entries?employeeId=&from=&to=` — listar. Permiso `timetracking.read`.
 
-## Que falta implementar
+Un usuario que **solo** tiene `timetracking.clock` (Cajero/Empleado por defecto) unicamente puede
+marcar su propia entrada/salida, resuelta via `Employee.userId`. Quien tiene
+`timetracking.manage` (Supervisor/Administrador/Propietario) puede marcar por cualquier empleado.
 
-1. Registro de entrada/salida (`POST /time-entries/clock-in`, `/clock-out`) por empleado.
-2. Calculo de horas laboradas/extras/nocturnas/dominicales/festivas por periodo, usando los
-   porcentajes definidos en `PayrollParameter` (`modules/payroll`), para alimentar la nomina.
-3. Flujo de aprobacion de vacaciones/permisos/incapacidades (estados REQUESTED -> APPROVED/REJECTED).
-4. Reportes por empleado/sucursal/periodo (horas trabajadas, ausentismo, etc.).
-5. Integracion con `modules/payroll`: los conceptos de horas extra/recargos de la nomina de un
-   periodo deben poder derivarse automaticamente de `TimeEntry` en vez de digitarse a mano.
+`TimeEntry` no tiene columna `companyId` (ver `timetracking.prisma`): el aislamiento multi-tenant
+se hace a mano en `PrismaTimeTrackingRepository` filtrando por la relacion `employee.companyId`
+en cada consulta (no queda cubierto por la extension automatica de `tenant.extension.ts`).
 
-Por ahora las rutas devuelven `501 Not Implemented` (ver `interfaces/timetracking.routes.ts`).
+## Limitaciones conocidas del calculo de horas para Nomina (`modules/payroll`)
+
+- Cada `TimeEntry` se clasifica como diurna/nocturna **en bloque** segun la hora de inicio; una
+  marcacion que cruza la franja diurna/nocturna no se divide.
+- Las horas que exceden 8 en una misma marcacion se tratan como extra; si un empleado tiene
+  varias marcaciones el mismo dia, no se acumulan entre si.
+- El recargo dominical/festivo solo detecta **domingo** — no hay calendario de festivos
+  colombianos (son moviles, requieren mantenimiento anual).
+
+Ver `apps/api/src/modules/payroll/application/payroll-calculator.ts` para el detalle.
+
+## Que sigue sin implementar
+
+- `POST /vacations`, `/leave-permissions`, `/absences`, `/sick-leaves` (modelos ya listos en
+  `timetracking.prisma`, flujo de aprobacion REQUESTED -> APPROVED/REJECTED pendiente).
+- Reportes por empleado/sucursal/periodo.

@@ -210,6 +210,84 @@ async function main() {
       create: { companyId: company.id, branchId: branch.id, code: "CAJA-1", name: "Caja Principal" },
       update: {},
     });
+
+    // ---- Empleados demo (para Nomina) ----
+    // Empleado 1: salario <= 2 SMLV de ejemplo -> SI tiene derecho a auxilio de transporte.
+    await tx.employee.upsert({
+      where: { companyId_documentNumber: { companyId: company.id, documentNumber: "1023456789" } },
+      create: {
+        companyId: company.id,
+        branchId: branch.id,
+        documentType: "CC",
+        documentNumber: "1023456789",
+        firstName: "Laura",
+        lastName: "Gomez",
+        position: "Auxiliar de bodega",
+        contractType: "INDEFINITE",
+        baseSalary: 1400000,
+        hireDate: new Date("2024-02-01"),
+        eps: "Sura EPS",
+        arlRiskLevel: "I",
+        pensionFund: "Porvenir",
+        compensationFund: "Comfamiliar",
+      },
+      update: {},
+    });
+
+    // Empleado 2: salario > 2 SMLV de ejemplo -> NO tiene derecho a auxilio de transporte.
+    await tx.employee.upsert({
+      where: { companyId_documentNumber: { companyId: company.id, documentNumber: "1034567890" } },
+      create: {
+        companyId: company.id,
+        branchId: branch.id,
+        documentType: "CC",
+        documentNumber: "1034567890",
+        firstName: "Carlos",
+        lastName: "Restrepo",
+        position: "Supervisor de tienda",
+        contractType: "INDEFINITE",
+        baseSalary: 3500000,
+        hireDate: new Date("2023-06-15"),
+        eps: "Sura EPS",
+        arlRiskLevel: "I",
+        pensionFund: "Porvenir",
+        compensationFund: "Comfamiliar",
+      },
+      update: {},
+    });
+
+    // ---- Parametros legales de nomina 2026 ----
+    // IMPORTANTE: estos son valores de EJEMPLO para poder probar el motor de calculo end-to-end.
+    // NO son cifras oficiales del DIAN/Mintrabajo -- verificalas contra la legislacion vigente
+    // antes de liquidar nomina real. Ver docs/ALCANCE.md y modules/payroll/README.md.
+    await tx.payrollParameter.upsert({
+      where: { year: 2026 },
+      create: {
+        year: 2026,
+        effectiveFrom: new Date("2026-01-01"),
+        minimumWage: 1400000,
+        transportAllowance: 200000,
+        uvt: 49000,
+        healthEmployeePercent: 4,
+        healthEmployerPercent: 8.5,
+        pensionEmployeePercent: 4,
+        pensionEmployerPercent: 12,
+        arlPercentByRiskLevel: { I: 0.522, II: 1.044, III: 2.436, IV: 4.35, V: 6.96 },
+        severancePercent: 8.33,
+        severanceInterestPercent: 12,
+        serviceBonusPercent: 8.33,
+        vacationPercent: 4.17,
+        familyCompensationPercent: 4,
+        icbfPercent: 3,
+        senaPercent: 2,
+        overtimeDayPercent: 25,
+        overtimeNightPercent: 75,
+        nightSurchargePercent: 35,
+        sundayHolidaySurchargePercent: 75,
+        monthlyHoursDivisor: 220,
+      },
+      update: {},
+    });
   });
 
   console.log("Seed completado.");

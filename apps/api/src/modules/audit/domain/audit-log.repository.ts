@@ -21,7 +21,17 @@ export type AuditAction =
   | "USER_UPDATED"
   | "LOGIN_SUCCESS"
   | "LOGIN_FAILED"
-  | "LOGOUT";
+  | "LOGOUT"
+  | "EMPLOYEE_CREATED"
+  | "EMPLOYEE_UPDATED"
+  | "EMPLOYEE_DEACTIVATED"
+  | "TIME_ENTRY_CLOCK_IN"
+  | "TIME_ENTRY_CLOCK_OUT"
+  | "PAYROLL_PARAMETER_CREATED"
+  | "PAYROLL_CREATED"
+  | "PAYROLL_CALCULATED"
+  | "PAYROLL_APPROVED"
+  | "PAYROLL_PAID";
 
 export interface AuditLogEntry {
   id: string;

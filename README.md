@@ -5,9 +5,11 @@ minimercados, papelerías, ferreterías, boutiques, droguerías) en Colombia. In
 World Office y Siesa, construido con Clean Architecture, principios SOLID y diseño modular pensado
 para escalar a miles de clientes bajo modalidad SaaS.
 
-> Este repositorio corresponde a la **iteración 1**: scaffold completo del monorepo + módulos core
-> funcionales. Ver [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el detalle de qué está implementado y
-> qué queda modelado (Prisma) para siguientes iteraciones.
+> Este repositorio arrancó como **iteración 1** (scaffold completo del monorepo + módulos core
+> funcionales) y en la **iteración 2** se implementó Nómina Colombia (motor de liquidación real,
+> ver `apps/api/src/modules/payroll/README.md`) junto con Empleados (CRUD) y Control de horarios
+> (marcación de entrada/salida). Ver [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el detalle de qué
+> está implementado y qué queda modelado (Prisma) para siguientes iteraciones.
 
 ## Contenido
 
@@ -92,7 +94,8 @@ cp .env.example apps/api/.env
 cp .env.example packages/database/.env
 cp .env.example apps/web/.env   # apps/web solo usa VITE_API_BASE_URL
 
-# 6. Migraciones + seed (crea la empresa demo "Minimarket La Esquina")
+# 6. Migraciones + seed (crea la empresa demo "Minimarket La Esquina", 2 empleados demo y los
+#    parametros de nomina 2026 de ejemplo)
 pnpm db:migrate --name init
 pnpm db:seed
 
@@ -100,6 +103,10 @@ pnpm db:seed
 pnpm --filter @erp/api dev     # http://localhost:4000
 pnpm --filter @erp/web dev     # http://localhost:5173
 ```
+
+> Si ya habías corrido `pnpm db:migrate --name init` en una clonación anterior a la iteración 2
+> (antes de que existiera `PayrollParameter.monthlyHoursDivisor`), corre
+> `pnpm db:migrate --name add_payroll_hours_divisor` para traer tu base de datos al día.
 
 Credenciales del seed: `admin@demo.com` / `Demo1234!` (Administrador) y `cajero@demo.com` / `Demo1234!`
 (Cajero, límite de descuento 5%, PIN `1234`).
@@ -140,17 +147,26 @@ También puedes apuntar a un solo paquete con `pnpm --filter @erp/<nombre> <scri
 
 ## Estado de verificación de esta sesión
 
-Este entorno de generación no tenía Docker ni PostgreSQL disponibles, así que no se pudo correr
-`prisma migrate` ni probar los endpoints en vivo. Lo que sí se verificó automáticamente:
+**Iteración 1**: este entorno de generación no tenía Docker ni PostgreSQL disponibles, así que no
+se pudo correr `prisma migrate` ni probar los endpoints en vivo. Lo que sí se verificó
+automáticamente: `pnpm install`, `prisma generate` y `tsc --noEmit` sin errores en todo el
+monorepo.
 
-- ✅ `pnpm install` en todo el monorepo (workspaces resueltos correctamente).
-- ✅ `prisma generate` — el schema completo (todos los dominios) valida sin errores.
+**Iteración 2** (Nómina/Empleados/Control de horarios): mismo entorno sin Docker/PostgreSQL
+disponibles. Se verificó automáticamente:
+
+- ✅ `prisma generate` con el nuevo campo `PayrollParameter.monthlyHoursDivisor`.
 - ✅ `tsc --noEmit` sin errores en `apps/api`, `apps/web`, `apps/mobile`, `packages/database`,
   `packages/shared-types` y `packages/shared-utils`.
 
-Pendiente de verificar por ti (requiere Postgres — ver [Arranque local](#arranque-local)): las
-migraciones, el seed, y los flujos end-to-end (login, crear producto, abrir caja, venta con/sin
-autorización de descuento) descritos en `docs/ALCANCE.md`.
+Pendiente de verificar por ti (requiere Postgres — ver [Arranque local](#arranque-local)):
+
+- Migraciones + seed (ahora también crea 2 empleados demo y `PayrollParameter` 2026 de ejemplo).
+- Flujos end-to-end de iteración 1 (login, crear producto, abrir caja, venta con/sin autorización
+  de descuento).
+- Flujo end-to-end de nómina: `POST /employees` → `POST /time-entries/clock-in` +
+  `/clock-out` → `POST /payrolls` → `POST /payrolls/:id/calculate` → inspeccionar
+  `PayrollItem`/`PayslipDocument` de `GET /payrolls/:id` → `approve` → `pay`.
 
 ## Documentación
 

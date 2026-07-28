@@ -1,33 +1,64 @@
-# Modulo: Nomina Colombia (STUB)
+# Modulo: Nomina Colombia
 
-Estado: **modelo de datos completo en Prisma (incluye parametros legales parametrizables),
-sin motor de calculo implementado todavia.**
+Estado: **funcional** (motor de liquidacion real). Ver `docs/ALCANCE.md` para el estado general.
 
-## Modelos ya disponibles (`packages/database/prisma/schema/payroll.prisma`)
+> **IMPORTANTE**: los porcentajes/valores de `PayrollParameter` sembrados por el seed
+> (`packages/database/prisma/seed.ts`) son de **EJEMPLO** para poder probar el flujo end-to-end.
+> NO son cifras oficiales del DIAN/Mintrabajo. Verifica los valores reales del año a liquidar
+> antes de usar esto en produccion.
 
-- `PayrollParameter` — **todos los valores legales parametrizables por año** (salario minimo,
-  auxilio de transporte, UVT, % salud/pension/ARL por nivel de riesgo, % cesantias/intereses/
-  prima/vacaciones, % caja de compensacion/ICBF/SENA, % horas extra/recargos). Actualizar la
-  legislacion de un año nuevo es crear una fila nueva, **sin tocar codigo**.
-- `PayrollConcept` — catalogo de conceptos (devengados, deducciones, aportes patronales, provisiones).
-- `Payroll` — periodo de nomina (mensual/quincenal) por empresa/sucursal.
-- `PayrollDetail` + `PayrollItem` — el detalle por empleado y cada concepto liquidado.
-- `PayslipDocument` — desprendible de pago (hoy solo el JSON resumen; el PDF queda para despues).
+## Modelos (`packages/database/prisma/schema/payroll.prisma`)
 
-## Que falta implementar
+`PayrollParameter` es una tabla **global** (sin `companyId`): la legislacion laboral colombiana es
+la misma para todas las empresas del SaaS, asi que una fila nueva por año la ven todas las
+empresas — no hace falta tocar codigo para actualizar la legislacion de un año nuevo.
 
-1. Motor de liquidacion (`application/use-cases/calculate-payroll.use-case.ts`):
-   - Tomar `Employee.baseSalary` + `PayrollParameter` vigente para el periodo.
-   - Sumar horas extra/recargos desde `modules/timetracking` (`TimeEntry`).
-   - Calcular auxilio de transporte (solo si `baseSalary <= 2 x salario minimo`, regla legal).
-   - Calcular deducciones (salud 4%, pension 4%, embargos/libranzas si existen).
-   - Calcular aportes patronales (salud, pension, ARL segun `arlRiskLevel`, caja de
-     compensacion, ICBF, SENA) y provisiones (cesantias, intereses, prima, vacaciones).
-2. Generacion de `PayrollDetail`/`PayrollItem` por empleado y su `PayslipDocument`.
-3. Reportes: mensual (por periodo) y anual (consolidado), y el desprendible individual (PDF,
-   via Supabase Storage, reutilizando `PayslipDocument.fileUrl`).
-4. Integracion con `modules/accounting` (STUB): al aprobar una nomina, generar el `JournalEntry`
-   correspondiente (gasto de nomina, pasivos laborales, retenciones).
-5. Endpoint para administrar `PayrollParameter` por año (solo Administrador/Contador).
+## Endpoints
 
-Por ahora las rutas devuelven `501 Not Implemented` (ver `interfaces/payroll.routes.ts`).
+- `POST /payroll-parameters`, `GET /payroll-parameters` — permiso `payroll.parameter.manage`
+  (Administrador/Propietario/Contador).
+- `POST /payrolls` — crea un periodo `DRAFT` (`year`, `month`, `periodType`, `startDate`,
+  `endDate`, `branchId?`). Permiso `payroll.create`.
+- `GET /payrolls`, `GET /payrolls/:id` — listar / detalle con `PayrollDetail` + `PayrollItem` +
+  `PayslipDocument` por empleado. Permiso `payroll.read`.
+- `POST /payrolls/:id/calculate` — corre el motor de liquidacion (desde `DRAFT` o para
+  recalcular desde `CALCULATED`), deja el periodo en `CALCULATED`. Permiso `payroll.calculate`.
+- `POST /payrolls/:id/approve` — `CALCULATED` -> `APPROVED`. Permiso `payroll.approve`.
+- `POST /payrolls/:id/pay` — `APPROVED` -> `PAID`. Permiso `payroll.pay`.
+- `GET /payslips/:id` — desprendible individual (JSON, ver mas abajo). Permiso `payroll.read`.
+
+## Motor de liquidacion (`application/payroll-calculator.ts` + `calculate-payroll.use-case.ts`)
+
+Por cada `Employee` activo en la sucursal/periodo (`IEmployeeRepository.listActiveForPeriod`):
+
+1. **Prorrateo**: mes comercial de 30 dias, prorrateado por `hireDate`/`terminationDate` si caen
+   dentro del periodo (`daysWorkedInPeriod`).
+2. **Devengados**: `SALARY` (prorateado), `TRANSPORT_ALLOWANCE` (solo si `baseSalary <= 2 x
+   minimumWage`), y horas extra/recargos derivados de `TimeEntry` (`OVERTIME_DAY`,
+   `OVERTIME_NIGHT`, `NIGHT_SURCHARGE`, `SUNDAY_SURCHARGE`) — ver las limitaciones de
+   clasificacion de horas en `modules/timetracking/README.md`.
+3. **Deducciones** (`HEALTH_EMPLOYEE`, `PENSION_EMPLOYEE`) sobre la base salarial (sin auxilio de
+   transporte, que no es constitutivo de salario).
+4. **Aportes patronales** (`HEALTH_EMPLOYER`, `PENSION_EMPLOYER`, `ARL` segun
+   `Employee.arlRiskLevel`, `CCF`, `ICBF`, `SENA`) y **provisiones** (`SEVERANCE`,
+   `SEVERANCE_INTEREST`, `SERVICE_BONUS`, `VACATION`) — no afectan `netPay`, solo
+   `employerCostTotal`.
+5. Persiste `PayrollDetail` + `PayrollItem[]` + `PayslipDocument` (JSON resumen) en una sola
+   transaccion Prisma (`PrismaPayrollRepository.saveCalculationResults`), borrando el detalle
+   previo si es un recalculo.
+
+`PayslipDocument`/`TimeEntry` no tienen `companyId` en el modelo Prisma; el aislamiento
+multi-tenant de esas consultas se hace a mano via la relacion (`payrollDetail.payroll.companyId` /
+`employee.companyId`) en los repositorios de infraestructura — ver comentarios en
+`prisma-payroll.repository.ts` y `prisma-timetracking.repository.ts`.
+
+## Que sigue sin implementar
+
+1. **PDF del desprendible** — `PayslipDocument.fileUrl` existe mas no se genera; hoy solo
+   `summaryJson`.
+2. **Integracion contable**: al aprobar una nomina, generar el `JournalEntry` correspondiente
+   (gasto de nomina, pasivos laborales, retenciones) — `modules/accounting` es 100% stub, se
+   implementa cuando se aborde ese modulo.
+3. **Calendario de festivos colombianos** para el recargo dominical/festivo (hoy solo domingo).
+4. **Deducciones detalladas** (libranzas/embargos) — hoy no hay conceptos automaticos para esto.
+5. **Reportes** mensual/anual consolidados.

@@ -28,6 +28,7 @@ model PayrollParameter {
   overtimeNightPercent           Decimal  @db.Decimal(5, 2) // hora extra nocturna 75%
   nightSurchargePercent          Decimal  @db.Decimal(5, 2) // recargo nocturno 35%
   sundayHolidaySurchargePercent  Decimal  @db.Decimal(5, 2) // recargo dominical/festivo 75%
+  monthlyHoursDivisor            Decimal  @db.Decimal(6, 2) // divisor de horas mensuales para la tarifa hora (verificar contra la legislacion vigente del periodo)
   extra                          Json?    // valores adicionales aun no modelados explicitamente
   isActive                       Boolean  @default(true)
   createdAt                      DateTime @default(now())

@@ -5,3 +5,6 @@ export * from "./inventory";
 export * from "./pos";
 export * from "./cash";
 export * from "./dashboard";
+export * from "./employees";
+export * from "./timetracking";
+export * from "./payroll";

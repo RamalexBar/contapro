@@ -1,0 +1,99 @@
+import type { NextFunction, Request, Response } from "express";
+import type { CreatePayrollParameterUseCase } from "../application/use-cases/create-payroll-parameter.use-case";
+import type { ListPayrollParametersUseCase } from "../application/use-cases/list-payroll-parameters.use-case";
+import type { CreatePayrollUseCase } from "../application/use-cases/create-payroll.use-case";
+import type { ListPayrollsUseCase } from "../application/use-cases/list-payrolls.use-case";
+import type { CalculatePayrollUseCase } from "../application/use-cases/calculate-payroll.use-case";
+import type { ApprovePayrollUseCase } from "../application/use-cases/approve-payroll.use-case";
+import type { PayPayrollUseCase } from "../application/use-cases/pay-payroll.use-case";
+import type { IPayrollRepository } from "../domain/payroll.repository";
+import { createPayrollParameterSchema, createPayrollSchema } from "./payroll.validators";
+
+export class PayrollController {
+  constructor(
+    private readonly payrollRepo: IPayrollRepository,
+    private readonly createParameterUseCase: CreatePayrollParameterUseCase,
+    private readonly listParametersUseCase: ListPayrollParametersUseCase,
+    private readonly createPayrollUseCase: CreatePayrollUseCase,
+    private readonly listPayrollsUseCase: ListPayrollsUseCase,
+    private readonly calculatePayrollUseCase: CalculatePayrollUseCase,
+    private readonly approvePayrollUseCase: ApprovePayrollUseCase,
+    private readonly payPayrollUseCase: PayPayrollUseCase
+  ) {}
+
+  createParameter = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = createPayrollParameterSchema.parse(req.body);
+      res.status(201).json(await this.createParameterUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listParameters = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await this.listParametersUseCase.execute() });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  create = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = createPayrollSchema.parse(req.body);
+      res.status(201).json(await this.createPayrollUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  list = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const year = typeof req.query.year === "string" ? Number(req.query.year) : undefined;
+      const branchId = typeof req.query.branchId === "string" ? req.query.branchId : undefined;
+      res.json({ data: await this.listPayrollsUseCase.execute({ year, branchId }) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.payrollRepo.findWithDetailsOrThrow(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPayslip = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.payrollRepo.findPayslipByIdOrThrow(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  calculate = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.calculatePayrollUseCase.execute(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  approve = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.approvePayrollUseCase.execute(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  pay = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.payPayrollUseCase.execute(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+}
