@@ -13,7 +13,9 @@ const auditService = new AuditService(new PrismaAuditLogRepository());
 export const timeTrackingController = new TimeTrackingController(
   new ClockInUseCase(timeTrackingRepo, employeeRepo, auditService),
   new ClockOutUseCase(timeTrackingRepo, employeeRepo, auditService),
-  new ListTimeEntriesUseCase(timeTrackingRepo)
+  new ListTimeEntriesUseCase(timeTrackingRepo),
+  employeeRepo,
+  timeTrackingRepo
 );
 
 export { timeTrackingRepo };

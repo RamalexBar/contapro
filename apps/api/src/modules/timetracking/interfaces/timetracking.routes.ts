@@ -8,6 +8,11 @@ export const timetrackingRouter = Router();
 timetrackingRouter.use(tenantContextMiddleware);
 
 timetrackingRouter.get("/time-entries", requirePermission("timetracking.read"), timeTrackingController.list);
+timetrackingRouter.get(
+  "/time-entries/my-open",
+  requirePermission("timetracking.clock"),
+  timeTrackingController.myOpenEntry
+);
 timetrackingRouter.post("/time-entries/clock-in", requirePermission("timetracking.clock"), timeTrackingController.clockIn);
 timetrackingRouter.post("/time-entries/:id/clock-out", requirePermission("timetracking.clock"), timeTrackingController.clockOut);
 

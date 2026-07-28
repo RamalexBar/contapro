@@ -8,8 +8,9 @@ const NAV_ITEMS = [
   { to: "/products", label: "Inventario" },
   { to: "/pos", label: "Punto de venta" },
   { to: "/cash", label: "Caja" },
-  { to: "/employees", label: "Empleados", permission: "employee.read" },
-  { to: "/payroll", label: "Nomina", permission: "payroll.read" },
+  { to: "/employees", label: "Empleados", permissions: ["employee.read"] },
+  { to: "/payroll", label: "Nomina", permissions: ["payroll.read"] },
+  { to: "/timetracking", label: "Horarios", permissions: ["timetracking.clock", "timetracking.read"] },
 ];
 
 export function AppLayout({ children }: PropsWithChildren) {
@@ -29,7 +30,7 @@ export function AppLayout({ children }: PropsWithChildren) {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <nav className="flex items-center gap-4">
             <span className="font-semibold text-brand-700">ERP</span>
-            {NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission)).map((item) => (
+            {NAV_ITEMS.filter((item) => !item.permissions || item.permissions.some(hasPermission)).map((item) => (
               <Link key={item.to} to={item.to} className="text-sm text-gray-600 hover:text-brand-700">
                 {item.label}
               </Link>

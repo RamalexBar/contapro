@@ -4,6 +4,8 @@ import type { ListEmployeesUseCase } from "../application/use-cases/list-employe
 import type { UpdateEmployeeUseCase } from "../application/use-cases/update-employee.use-case";
 import type { DeactivateEmployeeUseCase } from "../application/use-cases/deactivate-employee.use-case";
 import type { IEmployeeRepository } from "../domain/employee.repository";
+import { getTenantContext } from "../../../shared/context/request-context";
+import { NotFoundError } from "../../../shared/errors/app-error";
 import { createEmployeeSchema, deactivateEmployeeSchema, updateEmployeeSchema } from "./employee.validators";
 
 export class EmployeeController {
@@ -28,6 +30,18 @@ export class EmployeeController {
   getById = async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(await this.repo.findByIdOrThrow(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** Empleado vinculado al usuario autenticado (self-service, sin requerir employee.read). */
+  me = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ctx = getTenantContext();
+      const employee = await this.repo.findByUserId(ctx.userId);
+      if (!employee) throw new NotFoundError("Employee");
+      res.json(employee);
     } catch (err) {
       next(err);
     }

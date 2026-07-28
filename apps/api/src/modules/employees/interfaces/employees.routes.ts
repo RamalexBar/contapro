@@ -7,6 +7,7 @@ export const employeesRouter = Router();
 employeesRouter.use(tenantContextMiddleware);
 
 employeesRouter.get("/employees", requirePermission("employee.read"), employeeController.list);
+employeesRouter.get("/employees/me", employeeController.me);
 employeesRouter.get("/employees/:id", requirePermission("employee.read"), employeeController.getById);
 employeesRouter.post("/employees", requirePermission("employee.create"), employeeController.create);
 employeesRouter.patch("/employees/:id", requirePermission("employee.update"), employeeController.update);
