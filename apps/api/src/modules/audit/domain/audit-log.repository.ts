@@ -43,7 +43,11 @@ export type AuditAction =
   | "PAYROLL_CREATED"
   | "PAYROLL_CALCULATED"
   | "PAYROLL_APPROVED"
-  | "PAYROLL_PAID";
+  | "PAYROLL_PAID"
+  | "ACCOUNT_CREATED"
+  | "JOURNAL_ENTRY_CREATED"
+  | "JOURNAL_ENTRY_POSTED"
+  | "JOURNAL_ENTRY_VOIDED";
 
 export interface AuditLogEntry {
   id: string;

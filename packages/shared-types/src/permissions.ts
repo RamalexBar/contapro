@@ -59,6 +59,9 @@ export const PERMISSIONS = [
   { code: "payroll.calculate", module: "payroll", description: "Calcular/recalcular una nomina" },
   { code: "payroll.approve", module: "payroll", description: "Aprobar una nomina calculada" },
   { code: "payroll.pay", module: "payroll", description: "Marcar una nomina aprobada como pagada" },
+
+  { code: "accounting.manage", module: "accounting", description: "Administrar plan de cuentas y comprobantes contables" },
+  { code: "accounting.read", module: "accounting", description: "Consultar plan de cuentas, comprobantes y reportes financieros" },
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];
@@ -81,6 +84,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "payroll.calculate",
     "payroll.approve",
     "payroll.pay",
+    "accounting.manage",
+    "accounting.read",
   ],
   SUPERVISOR: [
     "product.create",

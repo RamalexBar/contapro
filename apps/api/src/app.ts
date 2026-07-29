@@ -24,9 +24,9 @@ import { customerRouter } from "./modules/customers/interfaces/customer.routes";
 import { employeesRouter } from "./modules/employees/interfaces/employees.routes";
 import { timetrackingRouter } from "./modules/timetracking/interfaces/timetracking.routes";
 import { payrollRouter } from "./modules/payroll/interfaces/payroll.routes";
+import { accountingRouter } from "./modules/accounting/interfaces/accounting.routes";
 
 import { suppliersRouter } from "./modules/suppliers/interfaces/suppliers.routes";
-import { accountingRouter } from "./modules/accounting/interfaces/accounting.routes";
 import { saasAdminRouter } from "./modules/saas-admin/interfaces/saas-admin.routes";
 import { syncRouter } from "./modules/sync/interfaces/sync.routes";
 
@@ -58,10 +58,10 @@ app.use("/api", customerRouter);
 app.use("/api", employeesRouter);
 app.use("/api", timetrackingRouter);
 app.use("/api", payrollRouter);
+app.use("/api", accountingRouter);
 
 // ---- Modulos stub (501, ver docs/ALCANCE.md) ----
 app.use("/api", suppliersRouter);
-app.use("/api", accountingRouter);
 app.use("/api", saasAdminRouter);
 app.use("/api", syncRouter);
 
