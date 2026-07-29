@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { tenantContextMiddleware } from "../../../shared/middlewares/tenant-context.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
-import { notImplemented } from "../../../shared/middlewares/not-implemented.middleware";
-import { timeTrackingController } from "../timetracking.container";
+import { timeTrackingController, timeOffController } from "../timetracking.container";
 
 export const timetrackingRouter = Router();
 timetrackingRouter.use(tenantContextMiddleware);
@@ -16,9 +15,44 @@ timetrackingRouter.get(
 timetrackingRouter.post("/time-entries/clock-in", requirePermission("timetracking.clock"), timeTrackingController.clockIn);
 timetrackingRouter.post("/time-entries/:id/clock-out", requirePermission("timetracking.clock"), timeTrackingController.clockOut);
 
-// Vacaciones/permisos/incapacidades/ausencias: aun no implementado, ver README.md del modulo.
-const stub = notImplemented("timetracking");
-timetrackingRouter.all("/vacations", stub);
-timetrackingRouter.all("/leave-permissions", stub);
-timetrackingRouter.all("/absences", stub);
-timetrackingRouter.all("/sick-leaves", stub);
+// ---- Vacaciones ----
+timetrackingRouter.get("/vacations", requirePermission("timeoff.read"), timeOffController.listVacations);
+timetrackingRouter.post("/vacations", requirePermission("timeoff.request"), timeOffController.requestVacation);
+timetrackingRouter.post("/vacations/:id/approve", requirePermission("timeoff.manage"), timeOffController.approveVacation);
+timetrackingRouter.post("/vacations/:id/reject", requirePermission("timeoff.manage"), timeOffController.rejectVacation);
+
+// ---- Permisos ----
+timetrackingRouter.get("/leave-permissions", requirePermission("timeoff.read"), timeOffController.listLeavePermissions);
+timetrackingRouter.post(
+  "/leave-permissions",
+  requirePermission("timeoff.request"),
+  timeOffController.requestLeavePermission
+);
+timetrackingRouter.post(
+  "/leave-permissions/:id/approve",
+  requirePermission("timeoff.manage"),
+  timeOffController.approveLeavePermission
+);
+timetrackingRouter.post(
+  "/leave-permissions/:id/reject",
+  requirePermission("timeoff.manage"),
+  timeOffController.rejectLeavePermission
+);
+
+// ---- Ausencias (siempre registradas por un manager, sin flujo de aprobacion) ----
+timetrackingRouter.get("/absences", requirePermission("timeoff.read"), timeOffController.listAbsences);
+timetrackingRouter.post("/absences", requirePermission("timeoff.manage"), timeOffController.registerAbsence);
+
+// ---- Incapacidades ----
+timetrackingRouter.get("/sick-leaves", requirePermission("timeoff.read"), timeOffController.listSickLeaves);
+timetrackingRouter.post("/sick-leaves", requirePermission("timeoff.request"), timeOffController.submitSickLeave);
+timetrackingRouter.post(
+  "/sick-leaves/:id/approve",
+  requirePermission("timeoff.manage"),
+  timeOffController.approveSickLeave
+);
+timetrackingRouter.post(
+  "/sick-leaves/:id/reject",
+  requirePermission("timeoff.manage"),
+  timeOffController.rejectSickLeave
+);

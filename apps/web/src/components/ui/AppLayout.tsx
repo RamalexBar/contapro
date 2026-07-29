@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: "/employees", label: "Empleados", permissions: ["employee.read"] },
   { to: "/payroll", label: "Nomina", permissions: ["payroll.read"] },
   { to: "/timetracking", label: "Horarios", permissions: ["timetracking.clock", "timetracking.read"] },
+  { to: "/time-off", label: "Vacaciones", permissions: ["timeoff.request", "timeoff.manage", "timeoff.read"] },
 ];
 
 export function AppLayout({ children }: PropsWithChildren) {

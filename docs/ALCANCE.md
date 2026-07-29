@@ -20,7 +20,7 @@ la base de datos.
 | **Dashboard** | Ventas del día, productos más vendidos, productos con stock bajo, caja activa |
 | **Seguridad de productos** | Cajeros NO pueden modificar precio/costo/código de barras ni eliminar productos (permisos dedicados) |
 | **Empleados** | CRUD completo (crear, listar, editar, dar de baja), validación de cédula colombiana |
-| **Control de horarios (parcial)** | Marcación de entrada/salida (`TimeEntry`), consulta por empleado/rango de fechas — alimenta el motor de nómina. Vacaciones/permisos/ausencias/incapacidades siguen sin implementar (ver abajo) |
+| **Control de horarios** | Marcación de entrada/salida (`TimeEntry`), consulta por empleado/rango de fechas — alimenta el motor de nómina. Vacaciones y permisos con flujo de aprobación `REQUESTED` → `APPROVED`/`REJECTED`, incapacidades (`SUBMITTED` → `APPROVED`/`REJECTED`), y registro de ausencias justificadas/injustificadas (sin flujo de aprobación, las registra un supervisor). Falta el calendario de festivos colombianos (ver abajo) |
 | **Nómina Colombia (iteración 2)** | Parámetros legales por año (`PayrollParameter`, tabla global), ciclo de vida de período (`DRAFT` → `CALCULATED` → `APPROVED` → `PAID`), motor de liquidación real: salario prorrateado, auxilio de transporte, horas extra/recargos desde `TimeEntry`, deducciones de ley, aportes patronales y provisiones. Desprendible como JSON (`PayslipDocument.summaryJson`). Ver `apps/api/src/modules/payroll/README.md` para las limitaciones conocidas (festivos, PDF, contabilidad) |
 
 ## 🧱 Modelado en Prisma, con rutas stub (`501 Not Implemented`) documentadas
@@ -32,9 +32,9 @@ Cada uno de estos módulos tiene su `schema.prisma` completo y un `README.md` pr
 - **Contabilidad**: plan de cuentas, comprobantes (libro diario/mayor), balance general, estado de
   resultados, flujo de caja, conciliación bancaria. También pendiente: generar el `JournalEntry`
   de nómina al aprobar un período (hoy nómina no toca contabilidad).
-- **Control de horarios (resto)**: vacaciones, permisos, ausencias, incapacidades (flujo de
-  aprobación REQUESTED → APPROVED/REJECTED) y calendario de festivos colombianos para el recargo
-  dominical/festivo de nómina.
+- **Control de horarios (resto)**: calendario de festivos colombianos para el recargo
+  dominical/festivo de nómina (vacaciones/permisos/ausencias/incapacidades ya estan implementados,
+  ver arriba).
 - **Nómina Colombia (resto)**: generación de PDF del desprendible, reportes mensual/anual
   consolidados, deducciones detalladas (libranzas/embargos).
 - **Panel administrador SaaS**: planes, suscripciones, historial de pagos, período de gracia de 2 días,
@@ -59,4 +59,5 @@ Solo scaffold: navegación, pantallas de login/POS/dashboard consumiendo la mism
 3. Proveedores/compras (cierra el ciclo de costos e inventario).
 4. Panel administrador SaaS (cobro de suscripciones real).
 5. Sincronización offline completa en móvil.
-6. Vacaciones/permisos/ausencias/incapacidades (resto de `modules/timetracking`).
+6. ~~Vacaciones/permisos/ausencias/incapacidades~~ — implementado. Queda: calendario de festivos
+   colombianos.

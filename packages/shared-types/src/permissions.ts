@@ -49,6 +49,10 @@ export const PERMISSIONS = [
   { code: "timetracking.manage", module: "timetracking", description: "Marcar/editar entrada-salida de otros empleados" },
   { code: "timetracking.read", module: "timetracking", description: "Consultar registros de horarios" },
 
+  { code: "timeoff.request", module: "timetracking", description: "Solicitar vacaciones/permisos/incapacidades propias" },
+  { code: "timeoff.manage", module: "timetracking", description: "Aprobar/rechazar solicitudes y registrar ausencias de cualquier empleado" },
+  { code: "timeoff.read", module: "timetracking", description: "Consultar vacaciones, permisos, ausencias e incapacidades" },
+
   { code: "payroll.parameter.manage", module: "payroll", description: "Administrar parametros legales de nomina por año" },
   { code: "payroll.create", module: "payroll", description: "Crear periodos de nomina" },
   { code: "payroll.read", module: "payroll", description: "Ver periodos y detalle de nomina" },
@@ -70,6 +74,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "dashboard.read",
     "employee.read",
     "timetracking.read",
+    "timeoff.read",
     "payroll.parameter.manage",
     "payroll.create",
     "payroll.read",
@@ -110,6 +115,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "timetracking.clock",
     "timetracking.manage",
     "timetracking.read",
+    "timeoff.request",
+    "timeoff.manage",
+    "timeoff.read",
   ],
   CAJERO: [
     // Explicitamente SIN product.price.update / product.cost.update / product.barcode.update / product.delete
@@ -124,6 +132,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "cash.movement.create",
     "dashboard.read",
     "timetracking.clock",
+    "timeoff.request",
   ],
-  EMPLEADO: ["dashboard.read", "timetracking.clock"],
+  EMPLEADO: ["dashboard.read", "timetracking.clock", "timeoff.request"],
 };

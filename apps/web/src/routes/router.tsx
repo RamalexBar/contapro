@@ -7,6 +7,7 @@ import { CashSessionPage } from "../features/cash/pages/CashSessionPage";
 import { EmployeeListPage } from "../features/employees/pages/EmployeeListPage";
 import { PayrollPage } from "../features/payroll/pages/PayrollPage";
 import { TimeTrackingPage } from "../features/timetracking/pages/TimeTrackingPage";
+import { TimeOffPage } from "../features/time-off/pages/TimeOffPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -65,6 +66,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <TimeTrackingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/time-off",
+    element: (
+      <ProtectedRoute>
+        <TimeOffPage />
       </ProtectedRoute>
     ),
   },
