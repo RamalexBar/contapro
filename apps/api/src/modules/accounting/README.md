@@ -23,9 +23,8 @@ implementados. Flujo de caja y conciliacion bancaria pendientes.**
 3. Generacion automatica de comprobantes al ocurrir el hecho economico, cada uno con sus
    cuentas estandar (`upsertByCode`, se crean solas la primera vez que se usan):
    - `PostPayrollJournalEntryUseCase` — nomina: devengado + aportes patronales + provisiones
-     vs neto a pagar + retenciones + pasivos. **NOTA:** el caso de uso existe y esta
-     exportado en `accounting.container.ts`, pero `approve-payroll.use-case.ts` todavia NO lo
-     invoca — falta esa unica linea de integracion en el modulo de nomina.
+     vs neto a pagar + retenciones + pasivos. Se invoca desde `ApprovePayrollUseCase` al
+     aprobar el periodo (`modules/payroll`).
    - `PostSaleJournalEntryUseCase` — venta completada (`CreateSaleUseCase` /
      `AuthorizeDiscountUseCase` en `modules/pos/sale`): debito Caja/Bancos/Clientes segun el
      metodo de pago registrado, credito Ingresos por ventas + IVA generado (cuenta 2408).
@@ -45,7 +44,6 @@ implementados. Flujo de caja y conciliacion bancaria pendientes.**
    diferencias) y cerrar el periodo (`FinancialPeriod.status = CLOSED`).
 4. Comprobante de abono a proveedor (`SupplierPayment`) y de anulacion de compra — ver
    `modules/suppliers/README.md`.
-5. Conectar `PostPayrollJournalEntryUseCase` en `approve-payroll.use-case.ts` (ver nota arriba).
 
 Las rutas de flujo de caja y conciliacion bancaria siguen devolviendo `501 Not Implemented`
 (ver `interfaces/accounting.routes.ts`).
