@@ -35,7 +35,8 @@ Por cada `Employee` activo en la sucursal/periodo (`IEmployeeRepository.listActi
    dentro del periodo (`daysWorkedInPeriod`).
 2. **Devengados**: `SALARY` (prorateado), `TRANSPORT_ALLOWANCE` (solo si `baseSalary <= 2 x
    minimumWage`), y horas extra/recargos derivados de `TimeEntry` (`OVERTIME_DAY`,
-   `OVERTIME_NIGHT`, `NIGHT_SURCHARGE`, `SUNDAY_SURCHARGE`) — ver las limitaciones de
+   `OVERTIME_NIGHT`, `NIGHT_SURCHARGE`, `SUNDAY_SURCHARGE` — este ultimo aplica a domingo Y a
+   festivo colombiano, ver `@erp/shared-utils/colombian-holidays.ts`) — ver las limitaciones de
    clasificacion de horas en `modules/timetracking/README.md`.
 3. **Deducciones** (`HEALTH_EMPLOYEE`, `PENSION_EMPLOYEE`) sobre la base salarial (sin auxilio de
    transporte, que no es constitutivo de salario).
@@ -59,6 +60,5 @@ multi-tenant de esas consultas se hace a mano via la relacion (`payrollDetail.pa
 2. **Integracion contable**: al aprobar una nomina, generar el `JournalEntry` correspondiente
    (gasto de nomina, pasivos laborales, retenciones) — `modules/accounting` es 100% stub, se
    implementa cuando se aborde ese modulo.
-3. **Calendario de festivos colombianos** para el recargo dominical/festivo (hoy solo domingo).
-4. **Deducciones detalladas** (libranzas/embargos) — hoy no hay conceptos automaticos para esto.
-5. **Reportes** mensual/anual consolidados.
+3. **Deducciones detalladas** (libranzas/embargos) — hoy no hay conceptos automaticos para esto.
+4. **Reportes** mensual/anual consolidados.

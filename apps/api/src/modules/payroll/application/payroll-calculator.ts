@@ -1,4 +1,4 @@
-import { COMPANY_TIMEZONE, round2 } from "@erp/shared-utils";
+import { COMPANY_TIMEZONE, isColombianHoliday, round2 } from "@erp/shared-utils";
 import type { EmployeeRecord } from "../../employees/domain/employee.repository";
 import type { TimeEntryRecord } from "../../timetracking/domain/timetracking.repository";
 import type { PayrollParameterRecord } from "../domain/payroll-parameter.repository";
@@ -55,8 +55,7 @@ interface HourBuckets {
 /**
  * LIMITACION CONOCIDA (documentada tambien en el README del modulo): cada `TimeEntry` se
  * clasifica como diurna/nocturna en bloque segun la hora de INICIO de la marcacion (no se
- * divide una misma marcacion que cruza la franja diurna/nocturna), y el recargo dominical solo
- * aplica a domingo (no hay calendario de festivos colombianos todavia). Las horas que exceden
+ * divide una misma marcacion que cruza la franja diurna/nocturna). Las horas que exceden
  * 8 por marcacion se tratan como extra; si un empleado tiene varias marcaciones el mismo dia,
  * no se acumulan entre si para el calculo de horas extra.
  */
@@ -79,7 +78,7 @@ function classifyTimeEntries(entries: TimeEntryRecord[]): HourBuckets {
 
     const startHour = bogotaHour(entry.clockIn);
     const isNight = startHour >= 21 || startHour < 6;
-    const isSunday = bogotaWeekday(entry.clockIn) === 0;
+    const isSundayOrHoliday = bogotaWeekday(entry.clockIn) === 0 || isColombianHoliday(entry.clockIn);
 
     if (isNight) {
       buckets.ordinaryNightHours += ordinaryHours;
@@ -88,7 +87,7 @@ function classifyTimeEntries(entries: TimeEntryRecord[]): HourBuckets {
       buckets.ordinaryDayHours += ordinaryHours;
       buckets.overtimeDayHours += overtimeHours;
     }
-    if (isSunday) {
+    if (isSundayOrHoliday) {
       buckets.sundayOrdinaryHours += ordinaryHours;
     }
   }

@@ -55,14 +55,15 @@ aislamiento manual via `employee.companyId` que `TimeEntry`.
   marcacion que cruza la franja diurna/nocturna no se divide.
 - Las horas que exceden 8 en una misma marcacion se tratan como extra; si un empleado tiene
   varias marcaciones el mismo dia, no se acumulan entre si.
-- El recargo dominical/festivo solo detecta **domingo** — no hay calendario de festivos
-  colombianos (son moviles, requieren mantenimiento anual).
+- El recargo dominical/festivo detecta domingo **y** festivo colombiano (calculado
+  algoritmicamente, no requiere mantenimiento anual: ver
+  `packages/shared-utils/src/colombian-holidays.ts`, algoritmo de Pascua de Meeus/Jones/Butcher +
+  regla de traslado al lunes de la Ley Emiliani).
 
 Ver `apps/api/src/modules/payroll/application/payroll-calculator.ts` para el detalle.
 
 ## Que sigue sin implementar
 
-- Calendario de festivos colombianos (afecta el recargo dominical/festivo de nomina, ver arriba).
 - Reportes por empleado/sucursal/periodo.
 - `Vacation.daysTaken` lo indica quien solicita (no se calcula automaticamente contra un
   calendario de dias habiles/festivos).
