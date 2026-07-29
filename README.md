@@ -6,10 +6,13 @@ World Office y Siesa, construido con Clean Architecture, principios SOLID y dise
 para escalar a miles de clientes bajo modalidad SaaS.
 
 > Este repositorio arrancó como **iteración 1** (scaffold completo del monorepo + módulos core
-> funcionales) y en la **iteración 2** se implementó Nómina Colombia (motor de liquidación real,
+> funcionales), en la **iteración 2** se implementó Nómina Colombia (motor de liquidación real,
 > ver `apps/api/src/modules/payroll/README.md`) junto con Empleados (CRUD) y Control de horarios
-> (marcación de entrada/salida). Ver [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el detalle de qué
-> está implementado y qué queda modelado (Prisma) para siguientes iteraciones.
+> (marcación de entrada/salida), y en la **iteración 3** se implementó Contabilidad (plan de
+> cuentas, comprobantes, contabilización automática de nómina/venta/compra, reportes) y un
+> registro mínimo de Proveedores/Compras (ver `apps/api/src/modules/accounting/README.md` y
+> `apps/api/src/modules/suppliers/README.md`). Ver [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el
+> detalle de qué está implementado y qué queda modelado (Prisma) para siguientes iteraciones.
 
 ## Contenido
 
@@ -144,29 +147,41 @@ También puedes apuntar a un solo paquete con `pnpm --filter @erp/<nombre> <scri
   `apps/api/.env` (`PORT`) / `apps/web/vite.config.ts` (`server.port`).
 - **La app móvil no conecta a la API**: `localhost` no apunta a tu máquina desde un emulador/dispositivo
   físico; usa la IP de tu red local o `expo start --tunnel`, y define `EXPO_PUBLIC_API_BASE_URL`.
+- **`EPERM: operation not permitted, rename ... query_engine-windows.dll.node`** (Windows, al correr
+  `pnpm db:migrate`/`pnpm db:generate`): el motor de Prisma sigue cargado en memoria porque
+  `pnpm --filter @erp/api dev` está corriendo. Detén la API antes de migrar/regenerar, o ignóralo si
+  el schema no cambió (el cliente ya cargado sigue siendo válido y `tsx watch` reinicia solo).
+- **`Environment variable not found: DATABASE_URL`** al correr comandos de Prisma: falta crear
+  `packages/database/.env` (paso 5 de [Arranque local](#arranque-local)); Prisma solo lee el `.env`
+  del mismo directorio que `prisma/schema`, no el de la raíz del repo.
 
 ## Estado de verificación de esta sesión
 
-**Iteración 1**: este entorno de generación no tenía Docker ni PostgreSQL disponibles, así que no
-se pudo correr `prisma migrate` ni probar los endpoints en vivo. Lo que sí se verificó
-automáticamente: `pnpm install`, `prisma generate` y `tsc --noEmit` sin errores en todo el
-monorepo.
+**Iteraciones 1 y 2**: verificadas por `tsc --noEmit` y `prisma generate` sin errores en todo el
+monorepo. En esas sesiones no había Docker/PostgreSQL disponibles, así que los flujos end-to-end
+quedaron pendientes de correr contra una base real.
 
-**Iteración 2** (Nómina/Empleados/Control de horarios): mismo entorno sin Docker/PostgreSQL
-disponibles. Se verificó automáticamente:
+**Iteración 3** (Contabilidad + Proveedores/Compras minimo): con Docker ya disponible en esta
+máquina, se levantó Postgres real (`docker compose up -d`), se corrieron las migraciones y el seed,
+y se probó en vivo contra la API (no solo compilación):
 
-- ✅ `prisma generate` con el nuevo campo `PayrollParameter.monthlyHoursDivisor`.
-- ✅ `tsc --noEmit` sin errores en `apps/api`, `apps/web`, `apps/mobile`, `packages/database`,
-  `packages/shared-types` y `packages/shared-utils`.
+- ✅ Login (`admin@demo.com`) devuelve JWT con los permisos `accounting.*`/`suppliers.*` sembrados.
+- ✅ Venta completa (`POST /api/sales`, pago CASH) genera y postea automáticamente el comprobante:
+  débito Caja, crédito Ingresos por ventas + IVA generado.
+- ✅ Proveedor + compra (`POST /api/suppliers`, `POST /api/purchases`) genera y postea el
+  comprobante: débito Inventario + IVA descontable, crédito Proveedores nacionales.
+- ✅ Venta y compra netean correctamente en la misma cuenta de IVA (2408) — confirmado en el libro
+  mayor (`GET /api/reports/ledger/:accountId`).
+- ✅ Balance General (`GET /api/reports/balance-sheet`) cuadra: activos = pasivos + patrimonio.
 
-Pendiente de verificar por ti (requiere Postgres — ver [Arranque local](#arranque-local)):
+Pendiente de verificar por ti:
 
-- Migraciones + seed (ahora también crea 2 empleados demo y `PayrollParameter` 2026 de ejemplo).
-- Flujos end-to-end de iteración 1 (login, crear producto, abrir caja, venta con/sin autorización
-  de descuento).
+- Probar la app web (`http://localhost:5173`) en el navegador — la API ya quedó confirmada
+  funcionando correctamente para los flujos que consume el front (empleados, vacaciones/permisos,
+  incapacidades, ausencias, refresh de sesión).
 - Flujo end-to-end de nómina: `POST /employees` → `POST /time-entries/clock-in` +
-  `/clock-out` → `POST /payrolls` → `POST /payrolls/:id/calculate` → inspeccionar
-  `PayrollItem`/`PayslipDocument` de `GET /payrolls/:id` → `approve` → `pay`.
+  `/clock-out` → `POST /payrolls` → `POST /payrolls/:id/calculate` → `approve` (ahora también
+  contabiliza automáticamente, ver `apps/api/src/modules/accounting/README.md`) → `pay`.
 
 ## Documentación
 

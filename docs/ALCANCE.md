@@ -21,17 +21,19 @@ la base de datos.
 | **Seguridad de productos** | Cajeros NO pueden modificar precio/costo/código de barras ni eliminar productos (permisos dedicados) |
 | **Empleados** | CRUD completo (crear, listar, editar, dar de baja), validación de cédula colombiana |
 | **Control de horarios** | Marcación de entrada/salida (`TimeEntry`), consulta por empleado/rango de fechas — alimenta el motor de nómina. Vacaciones y permisos con flujo de aprobación `REQUESTED` → `APPROVED`/`REJECTED`, incapacidades (`SUBMITTED` → `APPROVED`/`REJECTED`), y registro de ausencias justificadas/injustificadas (sin flujo de aprobación, las registra un supervisor) |
-| **Nómina Colombia (iteración 2)** | Parámetros legales por año (`PayrollParameter`, tabla global), ciclo de vida de período (`DRAFT` → `CALCULATED` → `APPROVED` → `PAID`), motor de liquidación real: salario prorrateado, auxilio de transporte, horas extra/recargos desde `TimeEntry` (recargo dominical/festivo con **calendario de festivos colombianos calculado algorítmicamente**, `packages/shared-utils/src/colombian-holidays.ts`), deducciones de ley, aportes patronales y provisiones. Desprendible como JSON (`PayslipDocument.summaryJson`). Ver `apps/api/src/modules/payroll/README.md` para las limitaciones conocidas (PDF, contabilidad) |
+| **Nómina Colombia (iteración 2)** | Parámetros legales por año (`PayrollParameter`, tabla global), ciclo de vida de período (`DRAFT` → `CALCULATED` → `APPROVED` → `PAID`), motor de liquidación real: salario prorrateado, auxilio de transporte, horas extra/recargos desde `TimeEntry` (recargo dominical/festivo con **calendario de festivos colombianos calculado algorítmicamente**, `packages/shared-utils/src/colombian-holidays.ts`), deducciones de ley, aportes patronales y provisiones. Desprendible como JSON (`PayslipDocument.summaryJson`). Al aprobar un período genera y postea automáticamente su comprobante contable (ver Contabilidad). Ver `apps/api/src/modules/payroll/README.md` para las limitaciones conocidas (PDF) |
+| **Contabilidad (iteración 3, sin UI web todavía)** | Plan de cuentas (CRUD, jerárquico), comprobantes manuales (crear/postear/anular con validación de partida doble), libro mayor, Balance General y Estado de Resultados. Contabilización automática al completar una venta, registrar una compra y aprobar una nómina (mismas cuentas estándar creadas solas, cuenta de IVA neteada entre venta/compra). Ver `apps/api/src/modules/accounting/README.md` para lo pendiente (flujo de caja, conciliación bancaria) |
+| **Proveedores / Compras (mínimo, iteración 3, sin UI web todavía)** | CRUD básico de proveedores y registro directo de una factura de compra (`Purchase` + `AccountPayable`), sin pasar por orden de compra ni recepción de mercancía. Dispara la contabilización automática de la compra. Ver `apps/api/src/modules/suppliers/README.md` para lo pendiente (orden de compra, recepción con impacto en inventario, abonos) |
 
 ## 🧱 Modelado en Prisma, con rutas stub (`501 Not Implemented`) documentadas
 
 Cada uno de estos módulos tiene su `schema.prisma` completo y un `README.md` propio en
 `apps/api/src/modules/<modulo>/README.md` con el detalle de lo que falta implementar:
 
-- **Proveedores / Compras**: órdenes de compra, recepción de mercancía, cuentas por pagar.
-- **Contabilidad**: plan de cuentas, comprobantes (libro diario/mayor), balance general, estado de
-  resultados, flujo de caja, conciliación bancaria. También pendiente: generar el `JournalEntry`
-  de nómina al aprobar un período (hoy nómina no toca contabilidad).
+- **Proveedores / Compras (resto)**: orden de compra, recepción de mercancía (con impacto real en
+  inventario/costeo), abonos a cuentas por pagar. El registro mínimo de compra ya es funcional,
+  ver tabla de arriba.
+- **Contabilidad (resto)**: flujo de caja, conciliación bancaria.
 - **Nómina Colombia (resto)**: generación de PDF del desprendible, reportes mensual/anual
   consolidados, deducciones detalladas (libranzas/embargos).
 - **Panel administrador SaaS**: planes, suscripciones, historial de pagos, período de gracia de 2 días,
@@ -50,10 +52,12 @@ Solo scaffold: navegación, pantallas de login/POS/dashboard consumiendo la mism
 
 ## Próximos pasos sugeridos (por orden de valor de negocio)
 
-1. ~~Nómina Colombia (motor de cálculo)~~ — implementado en la iteración 2, ver arriba. Queda:
-   PDF del desprendible.
-2. Contabilidad (comprobantes automáticos desde ventas/compras/nómina + libros).
-3. Proveedores/compras (cierra el ciclo de costos e inventario).
+1. ~~Nómina Colombia (motor de cálculo)~~ — implementado en la iteración 2. Queda: PDF del
+   desprendible.
+2. ~~Contabilidad (comprobantes automáticos desde ventas/compras/nómina + libros)~~ — implementado
+   en la iteración 3. Queda: flujo de caja, conciliación bancaria.
+3. Proveedores/compras: orden de compra y recepción de mercancía con impacto real en inventario
+   (el registro mínimo de la factura ya es funcional, ver iteración 3).
 4. Panel administrador SaaS (cobro de suscripciones real).
 5. Sincronización offline completa en móvil.
 6. ~~Vacaciones/permisos/ausencias/incapacidades~~ — implementado.
