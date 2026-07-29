@@ -4,18 +4,56 @@ import type { CreateRoleUseCase } from "../application/use-cases/create-role.use
 import type { AssignPermissionUseCase } from "../application/use-cases/assign-permission.use-case";
 import type { GrantUserPermissionUseCase } from "../application/use-cases/grant-user-permission.use-case";
 import type { ListEffectivePermissionsUseCase } from "../application/use-cases/list-effective-permissions.use-case";
-import type { IPermissionRepository, IRoleRepository } from "../domain/rbac.types";
-import { assignPermissionsSchema, createRoleSchema, grantUserPermissionSchema } from "./rbac.validators";
+import type { AssignRoleUseCase } from "../application/use-cases/assign-role.use-case";
+import type { RemoveRoleUseCase } from "../application/use-cases/remove-role.use-case";
+import type { IPermissionRepository, IRoleRepository, IUserDirectoryRepository } from "../domain/rbac.types";
+import {
+  assignPermissionsSchema,
+  assignRoleSchema,
+  createRoleSchema,
+  grantUserPermissionSchema,
+} from "./rbac.validators";
 
 export class RbacController {
   constructor(
     private readonly roleRepo: IRoleRepository,
     private readonly permissionRepo: IPermissionRepository,
+    private readonly userDirectoryRepo: IUserDirectoryRepository,
     private readonly createRoleUseCase: CreateRoleUseCase,
     private readonly assignPermissionUseCase: AssignPermissionUseCase,
     private readonly grantUserPermissionUseCase: GrantUserPermissionUseCase,
-    private readonly listEffectivePermissionsUseCase: ListEffectivePermissionsUseCase
+    private readonly listEffectivePermissionsUseCase: ListEffectivePermissionsUseCase,
+    private readonly assignRoleUseCase: AssignRoleUseCase,
+    private readonly removeRoleUseCase: RemoveRoleUseCase
   ) {}
+
+  listUsers = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await this.userDirectoryRepo.list() });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  assignRole = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ctx = getTenantContext();
+      const body = assignRoleSchema.parse(req.body);
+      await this.assignRoleUseCase.execute(ctx.companyId, req.params.userId, body.roleId);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  removeRole = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.removeRoleUseCase.execute(req.params.userId, req.params.roleId);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
 
   listRoles = async (_req: Request, res: Response, next: NextFunction) => {
     try {

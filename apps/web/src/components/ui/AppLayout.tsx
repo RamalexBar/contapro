@@ -12,6 +12,14 @@ const NAV_ITEMS = [
   { to: "/payroll", label: "Nomina", permissions: ["payroll.read"] },
   { to: "/timetracking", label: "Horarios", permissions: ["timetracking.clock", "timetracking.read"] },
   { to: "/time-off", label: "Vacaciones", permissions: ["timeoff.request", "timeoff.manage", "timeoff.read"] },
+  { to: "/rbac", label: "Roles y permisos", permissions: ["rbac.manage"] },
+  { to: "/customers", label: "Clientes", permissions: ["customer.read"] },
+  { to: "/audit", label: "Auditoria", permissions: ["audit.read"] },
+  {
+    to: "/quotes-notes",
+    label: "Cotizaciones",
+    permissions: ["quote.create", "creditnote.create", "debitnote.create", "sale.read"],
+  },
 ];
 
 export function AppLayout({ children }: PropsWithChildren) {

@@ -12,3 +12,7 @@ export const grantUserPermissionSchema = z.object({
   permissionCode: z.string(),
   granted: z.boolean(),
 });
+
+export const assignRoleSchema = z.object({
+  roleId: z.string().uuid(),
+});

@@ -8,6 +8,10 @@ import { EmployeeListPage } from "../features/employees/pages/EmployeeListPage";
 import { PayrollPage } from "../features/payroll/pages/PayrollPage";
 import { TimeTrackingPage } from "../features/timetracking/pages/TimeTrackingPage";
 import { TimeOffPage } from "../features/time-off/pages/TimeOffPage";
+import { RbacPage } from "../features/rbac/pages/RbacPage";
+import { CustomerListPage } from "../features/customers/pages/CustomerListPage";
+import { AuditLogPage } from "../features/audit/pages/AuditLogPage";
+import { QuotesAndNotesPage } from "../features/pos/pages/QuotesAndNotesPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -74,6 +78,38 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <TimeOffPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/rbac",
+    element: (
+      <ProtectedRoute>
+        <RbacPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/customers",
+    element: (
+      <ProtectedRoute>
+        <CustomerListPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/audit",
+    element: (
+      <ProtectedRoute>
+        <AuditLogPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/quotes-notes",
+    element: (
+      <ProtectedRoute>
+        <QuotesAndNotesPage />
       </ProtectedRoute>
     ),
   },

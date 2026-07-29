@@ -24,3 +24,17 @@ export interface IPermissionRepository {
   listAll(): Promise<PermissionInfo[]>;
   findByCodes(codes: string[]): Promise<PermissionInfo[]>;
 }
+
+export interface UserSummary {
+  id: string;
+  email: string;
+  fullName: string;
+  isActive: boolean;
+  roles: string[];
+}
+
+export interface IUserDirectoryRepository {
+  list(): Promise<UserSummary[]>;
+  assignRole(companyId: string, userId: string, roleId: string): Promise<void>;
+  removeRole(userId: string, roleId: string): Promise<void>;
+}
