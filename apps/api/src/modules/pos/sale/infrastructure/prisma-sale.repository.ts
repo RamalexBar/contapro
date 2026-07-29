@@ -27,6 +27,7 @@ function toRecord(row: any): SaleRecord {
       requiresDiscountAuthorization: item.requiresDiscountAuthorization,
       discountAuthorizationId: item.discountAuthorizationId,
     })),
+    payments: row.payments.map((p: any) => ({ method: p.method, amount: Number(p.amount) })),
   };
 }
 

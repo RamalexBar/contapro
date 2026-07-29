@@ -62,6 +62,9 @@ export const PERMISSIONS = [
 
   { code: "accounting.manage", module: "accounting", description: "Administrar plan de cuentas y comprobantes contables" },
   { code: "accounting.read", module: "accounting", description: "Consultar plan de cuentas, comprobantes y reportes financieros" },
+
+  { code: "suppliers.manage", module: "suppliers", description: "Crear proveedores y registrar compras" },
+  { code: "suppliers.read", module: "suppliers", description: "Consultar proveedores y compras registradas" },
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];
@@ -86,6 +89,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "payroll.pay",
     "accounting.manage",
     "accounting.read",
+    "suppliers.manage",
+    "suppliers.read",
   ],
   SUPERVISOR: [
     "product.create",
@@ -123,6 +128,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "timeoff.request",
     "timeoff.manage",
     "timeoff.read",
+    "suppliers.manage",
+    "suppliers.read",
   ],
   CAJERO: [
     // Explicitamente SIN product.price.update / product.cost.update / product.barcode.update / product.delete

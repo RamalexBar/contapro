@@ -47,7 +47,9 @@ export type AuditAction =
   | "ACCOUNT_CREATED"
   | "JOURNAL_ENTRY_CREATED"
   | "JOURNAL_ENTRY_POSTED"
-  | "JOURNAL_ENTRY_VOIDED";
+  | "JOURNAL_ENTRY_VOIDED"
+  | "SUPPLIER_CREATED"
+  | "PURCHASE_REGISTERED";
 
 export interface AuditLogEntry {
   id: string;

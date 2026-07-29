@@ -3,6 +3,7 @@ import { applyDiscount, calculateTax, round2 } from "@erp/shared-utils";
 import { getTenantContext } from "../../../../../shared/context/request-context";
 import { ValidationError } from "../../../../../shared/errors/app-error";
 import type { AuditService } from "../../../../audit/application/audit.service";
+import type { PostSaleJournalEntryUseCase } from "../../../../accounting/application/use-cases/post-sale-journal-entry.use-case";
 import type { IProductRepository } from "../../../../inventory/product/domain/product.repository";
 import type { ComputedSaleItem, ISaleRepository, SaleRecord } from "../../domain/sale.repository";
 import type { IDiscountLimitRepository } from "../../domain/discount-limit.repository";
@@ -20,6 +21,7 @@ export class CreateSaleUseCase {
     private readonly saleRepo: ISaleRepository,
     private readonly productRepo: IProductRepository,
     private readonly discountLimitRepo: IDiscountLimitRepository,
+    private readonly postSaleJournalEntry: PostSaleJournalEntryUseCase,
     private readonly audit: AuditService
   ) {}
 
@@ -105,6 +107,20 @@ export class CreateSaleUseCase {
         : `Venta #${sale.number} completada por ${total}`,
       metadata: { total, needsAuthorization },
     });
+
+    if (sale.status === "COMPLETED") {
+      await this.postSaleJournalEntry.execute({
+        saleId: sale.id,
+        branchId: sale.branchId,
+        date: sale.createdAt,
+        number: sale.number,
+        subtotal: sale.subtotal,
+        discountTotal: sale.discountTotal,
+        taxTotal: sale.taxTotal,
+        total: sale.total,
+        payments: sale.payments,
+      });
+    }
 
     return sale;
   }

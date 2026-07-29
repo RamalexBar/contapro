@@ -2,6 +2,7 @@ import type { AuthorizeDiscountInput } from "@erp/shared-types";
 import { getTenantContext } from "../../../../../shared/context/request-context";
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "../../../../../shared/errors/app-error";
 import type { AuditService } from "../../../../audit/application/audit.service";
+import type { PostSaleJournalEntryUseCase } from "../../../../accounting/application/use-cases/post-sale-journal-entry.use-case";
 import type { IUserRepository } from "../../../../auth/domain/user.repository";
 import { verifySecret } from "../../../../auth/infrastructure/password-hasher.service";
 import { prisma } from "../../../../../shared/prisma/prisma-client";
@@ -16,6 +17,7 @@ export class AuthorizeDiscountUseCase {
   constructor(
     private readonly saleRepo: ISaleRepository,
     private readonly userRepo: IUserRepository,
+    private readonly postSaleJournalEntry: PostSaleJournalEntryUseCase,
     private readonly audit: AuditService
   ) {}
 
@@ -63,6 +65,20 @@ export class AuthorizeDiscountUseCase {
     });
 
     const updatedSale = await this.saleRepo.authorizeItemDiscount(sale.id, item.id, discountAuthorization.id);
+
+    if (sale.status === "PENDING_AUTHORIZATION" && updatedSale.status === "COMPLETED") {
+      await this.postSaleJournalEntry.execute({
+        saleId: updatedSale.id,
+        branchId: updatedSale.branchId,
+        date: updatedSale.createdAt,
+        number: updatedSale.number,
+        subtotal: updatedSale.subtotal,
+        discountTotal: updatedSale.discountTotal,
+        taxTotal: updatedSale.taxTotal,
+        total: updatedSale.total,
+        payments: updatedSale.payments,
+      });
+    }
 
     await this.audit.record({
       action: "DISCOUNT_AUTHORIZED",

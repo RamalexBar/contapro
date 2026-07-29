@@ -56,6 +56,7 @@ export interface SaleRecord {
     requiresDiscountAuthorization: boolean;
     discountAuthorizationId: string | null;
   }>;
+  payments: Array<{ method: string; amount: number }>;
 }
 
 export interface ISaleRepository {

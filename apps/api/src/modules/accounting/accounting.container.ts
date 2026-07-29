@@ -8,6 +8,8 @@ import { CreateJournalEntryUseCase } from "./application/use-cases/create-journa
 import { PostJournalEntryUseCase } from "./application/use-cases/post-journal-entry.use-case";
 import { VoidJournalEntryUseCase } from "./application/use-cases/void-journal-entry.use-case";
 import { PostPayrollJournalEntryUseCase } from "./application/use-cases/post-payroll-journal-entry.use-case";
+import { PostSaleJournalEntryUseCase } from "./application/use-cases/post-sale-journal-entry.use-case";
+import { PostPurchaseJournalEntryUseCase } from "./application/use-cases/post-purchase-journal-entry.use-case";
 import { AccountingController } from "./interfaces/accounting.controller";
 
 const accountRepo = new PrismaChartOfAccountsRepository();
@@ -32,6 +34,16 @@ export const accountingController = new AccountingController(
 
 /** Usado por payroll.container.ts para generar el comprobante de nomina al aprobar un periodo. */
 export const postPayrollJournalEntryUseCase = new PostPayrollJournalEntryUseCase(
+  accountRepo,
+  createEntryUseCase,
+  postEntryUseCase
+);
+
+/** Usado por sale.container.ts para contabilizar una venta al completarse. */
+export const postSaleJournalEntryUseCase = new PostSaleJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
+
+/** Usado por suppliers.container.ts para contabilizar una compra al registrarse. */
+export const postPurchaseJournalEntryUseCase = new PostPurchaseJournalEntryUseCase(
   accountRepo,
   createEntryUseCase,
   postEntryUseCase

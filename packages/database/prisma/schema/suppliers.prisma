@@ -81,8 +81,10 @@ model Purchase {
   branchId      String
   supplierId    String
   invoiceNumber String
+  subtotal      Decimal  @db.Decimal(14, 2)
+  taxTotal      Decimal  @db.Decimal(14, 2) @default(0)
   total         Decimal  @db.Decimal(14, 2)
-  status        String   @default("PENDING")
+  status        String   @default("REGISTERED") // REGISTERED, CANCELLED
   createdAt     DateTime @default(now())
 
   accountsPayable AccountPayable[]
