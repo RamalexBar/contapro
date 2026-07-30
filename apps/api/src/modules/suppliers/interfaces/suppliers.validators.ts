@@ -7,6 +7,7 @@ export const createSupplierSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional(),
   address: z.string().optional(),
+  isObligatedToInvoice: z.boolean().optional(),
 });
 
 export const createPurchaseSchema = z.object({

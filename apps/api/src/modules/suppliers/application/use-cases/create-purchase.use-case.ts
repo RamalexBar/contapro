@@ -2,6 +2,7 @@ import { round2 } from "@erp/shared-utils";
 import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { PostPurchaseJournalEntryUseCase } from "../../../accounting/application/use-cases/post-purchase-journal-entry.use-case";
+import type { GenerateElectronicSupportDocumentUseCase } from "../../../electronic-invoicing/application/use-cases/generate-electronic-support-document.use-case";
 import type { ISupplierRepository } from "../../domain/supplier.repository";
 import type { CreatePurchaseData, IPurchaseRepository, PurchaseRecord } from "../../domain/purchase.repository";
 
@@ -15,11 +16,12 @@ export class CreatePurchaseUseCase {
     private readonly purchaseRepo: IPurchaseRepository,
     private readonly supplierRepo: ISupplierRepository,
     private readonly postPurchaseJournalEntry: PostPurchaseJournalEntryUseCase,
+    private readonly generateElectronicSupportDocument: GenerateElectronicSupportDocumentUseCase,
     private readonly audit: AuditService
   ) {}
 
   async execute(data: CreatePurchaseData): Promise<PurchaseRecord> {
-    await this.supplierRepo.findByIdOrThrow(data.supplierId);
+    const supplier = await this.supplierRepo.findByIdOrThrow(data.supplierId);
 
     const expectedTotal = round2(data.subtotal + data.taxTotal);
     if (expectedTotal !== round2(data.total)) {
@@ -44,6 +46,31 @@ export class CreatePurchaseUseCase {
       taxTotal: purchase.taxTotal,
       total: purchase.total,
     });
+
+    if (!supplier.isObligatedToInvoice) {
+      // El proveedor no puede expedir su propia factura electronica -- la empresa, como
+      // compradora, debe generar el documento soporte. No bloquea el registro de la compra si
+      // falla (ej. sin resolucion de numeracion vigente para documento soporte).
+      try {
+        await this.generateElectronicSupportDocument.execute({
+          purchaseId: purchase.id,
+          branchId: purchase.branchId,
+          supplierId: data.supplierId,
+          issueDate: purchase.createdAt,
+          subtotal: purchase.subtotal,
+          taxTotal: purchase.taxTotal,
+          total: purchase.total,
+        });
+      } catch (err) {
+        await this.audit.record({
+          action: "ELECTRONIC_SUPPORT_DOCUMENT_GENERATION_FAILED",
+          entityType: "Purchase",
+          entityId: purchase.id,
+          description: `No se pudo generar el documento soporte electronico: ${(err as Error).message}`,
+          metadata: {},
+        });
+      }
+    }
 
     return purchase;
   }

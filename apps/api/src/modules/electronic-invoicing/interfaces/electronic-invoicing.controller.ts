@@ -7,6 +7,8 @@ import type { GetElectronicCreditNoteUseCase } from "../application/use-cases/ge
 import type { ResubmitElectronicCreditNoteUseCase } from "../application/use-cases/resubmit-electronic-credit-note.use-case";
 import type { GetElectronicDebitNoteUseCase } from "../application/use-cases/get-electronic-debit-note.use-case";
 import type { ResubmitElectronicDebitNoteUseCase } from "../application/use-cases/resubmit-electronic-debit-note.use-case";
+import type { GetElectronicSupportDocumentUseCase } from "../application/use-cases/get-electronic-support-document.use-case";
+import type { ResubmitElectronicSupportDocumentUseCase } from "../application/use-cases/resubmit-electronic-support-document.use-case";
 import { createNumberingResolutionSchema } from "./electronic-invoicing.validators";
 
 export class ElectronicInvoicingController {
@@ -18,7 +20,9 @@ export class ElectronicInvoicingController {
     private readonly getCreditNoteUseCase: GetElectronicCreditNoteUseCase,
     private readonly resubmitCreditNoteUseCase: ResubmitElectronicCreditNoteUseCase,
     private readonly getDebitNoteUseCase: GetElectronicDebitNoteUseCase,
-    private readonly resubmitDebitNoteUseCase: ResubmitElectronicDebitNoteUseCase
+    private readonly resubmitDebitNoteUseCase: ResubmitElectronicDebitNoteUseCase,
+    private readonly getSupportDocumentUseCase: GetElectronicSupportDocumentUseCase,
+    private readonly resubmitSupportDocumentUseCase: ResubmitElectronicSupportDocumentUseCase
   ) {}
 
   createResolution = async (req: Request, res: Response, next: NextFunction) => {
@@ -116,6 +120,34 @@ export class ElectronicInvoicingController {
   resubmitDebitNote = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.resubmitDebitNoteUseCase.execute(req.params.debitNoteId);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getBySupportDocument = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const doc = await this.getSupportDocumentUseCase.execute(req.params.purchaseId);
+      const { xmlContent: _xmlContent, signedXmlContent: _signedXmlContent, ...metadata } = doc;
+      res.json(metadata);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getXmlBySupportDocument = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const doc = await this.getSupportDocumentUseCase.execute(req.params.purchaseId);
+      res.type("application/xml").send(doc.signedXmlContent ?? doc.xmlContent);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resubmitSupportDocument = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.resubmitSupportDocumentUseCase.execute(req.params.purchaseId);
       res.status(204).send();
     } catch (err) {
       next(err);

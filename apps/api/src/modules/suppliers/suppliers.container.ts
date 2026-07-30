@@ -1,6 +1,7 @@
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
 import { postPurchaseJournalEntryUseCase } from "../accounting/accounting.container";
+import { generateElectronicSupportDocumentUseCase } from "../electronic-invoicing/electronic-invoicing.container";
 import { PrismaSupplierRepository } from "./infrastructure/prisma-supplier.repository";
 import { PrismaPurchaseRepository } from "./infrastructure/prisma-purchase.repository";
 import { CreateSupplierUseCase } from "./application/use-cases/create-supplier.use-case";
@@ -15,5 +16,11 @@ const auditService = new AuditService(new PrismaAuditLogRepository());
 export const suppliersController = new SuppliersController(
   new CreateSupplierUseCase(supplierRepo, auditService),
   new ListSuppliersUseCase(supplierRepo),
-  new CreatePurchaseUseCase(purchaseRepo, supplierRepo, postPurchaseJournalEntryUseCase, auditService)
+  new CreatePurchaseUseCase(
+    purchaseRepo,
+    supplierRepo,
+    postPurchaseJournalEntryUseCase,
+    generateElectronicSupportDocumentUseCase,
+    auditService
+  )
 );

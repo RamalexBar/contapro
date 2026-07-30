@@ -12,6 +12,11 @@ model Supplier {
   address     String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  // false = proveedor no obligado a facturar electronicamente (persona natural, vendedor
+  // informal) -- cada compra registrada contra el genera un documento soporte electronico
+  // (ver electronic-invoicing.prisma). Default true = proveedor formal/registrado, el caso
+  // comun, para que proveedores existentes no generen documentos soporte sin marcarlo.
+  isObligatedToInvoice Boolean @default(true)
 
   @@unique([companyId, nit])
   @@index([companyId])
@@ -86,8 +91,12 @@ model Purchase {
   total         Decimal  @db.Decimal(14, 2)
   status        String   @default("REGISTERED") // REGISTERED, CANCELLED
   createdAt     DateTime @default(now())
+  // Preparado para documento soporte electronico (DIAN, ver electronic-invoicing.prisma):
+  cuds          String?
+  xmlUrl        String?
 
   accountsPayable AccountPayable[]
+  electronicSupportDocument ElectronicSupportDocument?
 
   @@index([companyId, branchId])
   @@map("purchases")

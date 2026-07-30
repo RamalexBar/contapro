@@ -5,6 +5,8 @@ export interface CreateSupplierData {
   phone?: string;
   email?: string;
   address?: string;
+  /** false = requiere documento soporte electronico en cada compra (ver electronic-invoicing). */
+  isObligatedToInvoice?: boolean;
 }
 
 export interface SupplierRecord {
@@ -16,6 +18,7 @@ export interface SupplierRecord {
   email: string | null;
   address: string | null;
   isActive: boolean;
+  isObligatedToInvoice: boolean;
 }
 
 export interface ISupplierRepository {

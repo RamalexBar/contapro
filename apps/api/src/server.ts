@@ -5,6 +5,7 @@ import {
   pollDianCreditNoteSubmissionsUseCase,
   pollDianDebitNoteSubmissionsUseCase,
   pollDianSubmissionsUseCase,
+  pollDianSupportDocumentSubmissionsUseCase,
 } from "./modules/electronic-invoicing/electronic-invoicing.container";
 
 app.listen(env.PORT, () => {
@@ -16,5 +17,6 @@ if (env.DIAN_CERTIFICATE_PATH) {
     pollDianSubmissionsUseCase,
     pollDianCreditNoteSubmissionsUseCase,
     pollDianDebitNoteSubmissionsUseCase,
+    pollDianSupportDocumentSubmissionsUseCase,
   ]);
 }

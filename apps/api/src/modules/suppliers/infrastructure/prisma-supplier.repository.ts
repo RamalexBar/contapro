@@ -13,6 +13,7 @@ function toRecord(row: {
   email: string | null;
   address: string | null;
   isActive: boolean;
+  isObligatedToInvoice: boolean;
 }): SupplierRecord {
   return {
     id: row.id,
@@ -23,6 +24,7 @@ function toRecord(row: {
     email: row.email,
     address: row.address,
     isActive: row.isActive,
+    isObligatedToInvoice: row.isObligatedToInvoice,
   };
 }
 
@@ -38,6 +40,7 @@ export class PrismaSupplierRepository implements ISupplierRepository {
           phone: data.phone,
           email: data.email,
           address: data.address,
+          isObligatedToInvoice: data.isObligatedToInvoice ?? true,
         },
       });
       return toRecord(row);

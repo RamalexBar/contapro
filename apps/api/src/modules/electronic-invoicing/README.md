@@ -1,22 +1,25 @@
 # Modulo: Facturacion electronica DIAN
 
-Estado: **generacion local de CUFE/CUDE (SHA-384) y XML tipo UBL 2.1 por cada venta completada y
-cada nota credito/debito que referencia una venta ya facturada, con numeracion DIAN real
-(resolucion/rango/consecutivo por tipo de documento) consumida atomicamente e independiente del
-consecutivo interno del POS. Si hay un certificado configurado (`DIAN_CERTIFICATE_PATH`), tambien
-firma el XML con XAdES y lo encola para envio SOAP a la DIAN (poller en proceso, uno por tipo de
-documento). Sin certificado configurado (el estado por defecto), el comportamiento es identico al
-de antes: solo CUFE/CUDE + XML local, sin firma ni envio. El envio real a la DIAN NO esta
-verificado contra su servicio real todavia (no hay credenciales de habilitacion reales, ver
-"Limitaciones e items sin verificar").**
+Estado: **generacion local de CUFE/CUDE/CUDS (SHA-384) y XML tipo UBL por cada venta completada,
+cada nota credito/debito que referencia una venta ya facturada, y cada compra a un proveedor no
+obligado a facturar electronicamente, con numeracion DIAN real (resolucion/rango/consecutivo por
+tipo de documento) consumida atomicamente e independiente del consecutivo interno del POS. Si hay
+un certificado configurado (`DIAN_CERTIFICATE_PATH`), tambien firma el XML con XAdES y lo encola
+para envio SOAP a la DIAN (poller en proceso, uno por tipo de documento). Sin certificado
+configurado (el estado por defecto), el comportamiento es identico al de antes: solo
+CUFE/CUDE/CUDS + XML local, sin firma ni envio. El envio real a la DIAN NO esta verificado contra
+su servicio real todavia (no hay credenciales de habilitacion reales, ver "Limitaciones e items
+sin verificar"). **El documento soporte (compras) es la parte MENOS verificada de todo el
+modulo** — su esquema XML tiene mucha menos documentacion publica que factura/notas, ver mas
+abajo.
 
 ## Modelos (`packages/database/prisma/schema/electronic-invoicing.prisma`)
 
 - `InvoiceNumberingResolution` — rango de numeracion autorizado por la DIAN (prefijo, rango,
   consecutivo, vigencia), por empresa, opcionalmente por sucursal, y por `documentType`
-  (`FACTURA_VENTA` | `NOTA_CREDITO` | `NOTA_DEBITO` — la DIAN emite resoluciones separadas por
-  tipo de documento en la vida real). Independiente de `Sale.number` (ticket POS por sucursal,
-  no debe tocarse).
+  (`FACTURA_VENTA` | `NOTA_CREDITO` | `NOTA_DEBITO` | `DOCUMENTO_SOPORTE` — la DIAN emite
+  resoluciones separadas por tipo de documento en la vida real). Independiente de `Sale.number`
+  (ticket POS por sucursal, no debe tocarse).
 - `ElectronicInvoice` — un registro por venta facturada electronicamente: numero DIAN asignado,
   CUFE, datos del comprador, el XML sin firmar (`xmlContent`) y firmado (`signedXmlContent`), y
   el estado del envio a la DIAN (`status`, `dianTrackingId`, `dianResponseXml`,
@@ -25,6 +28,11 @@ verificado contra su servicio real todavia (no hay credenciales de habilitacion 
   credito/debito: mismo shape, pero con `cude` en vez de `cufe` y un `referenceCufe` (el CUFE de
   la factura original que la nota afecta, obtenido via `Sale.electronicInvoice` de la venta
   referenciada). Enlazados 1:1 a `CreditNote`/`DebitNote`.
+- `ElectronicSupportDocument` — documento soporte por cada compra a un `Supplier` con
+  `isObligatedToInvoice=false`: mismo shape que los anteriores, con `cuds` en vez de
+  `cufe`/`cude` y **sin** campo de referencia (a diferencia de las notas, el documento soporte
+  no afecta un documento previo — es el documento original de esa compra). Enlazado 1:1 a
+  `Purchase`.
 
 ## Implementado
 
@@ -88,6 +96,19 @@ verificado contra su servicio real todavia (no hay credenciales de habilitacion 
     `IElectronicDocumentSubmissionRepository` — no hay una segunda maquina de estados duplicada.
     Endpoints: `GET/POST /electronic-invoicing/credit-notes/:creditNoteId[...]` y
     `.../debit-notes/:debitNoteId[...]`, mismos permisos que facturas.
+11. **Documento soporte electronico (compras, CUDS)**: `Supplier` gano el campo
+    `isObligatedToInvoice` (default `true`). Al registrar una compra (`CreatePurchaseUseCase`)
+    contra un proveedor marcado `false`, se llama a `GenerateElectronicSupportDocumentUseCase`
+    (mismo patron try/catch no bloqueante). Genera el CUDS
+    (`application/cuds-generator.ts`, con pruebas — sin campo de referencia) y el XML
+    (`application/ubl-support-document-xml-builder.ts`, con los roles de comprador/vendedor
+    **invertidos** respecto a facturas: `AccountingSupplierParty` = el proveedor,
+    `AccountingCustomerParty` = la propia empresa, porque quien emite el documento es la empresa
+    actuando en nombre del proveedor que no puede facturar). Compras contra proveedores sin
+    marcar (el caso comun, default `true`) no generan nada. Reusa la misma infraestructura de
+    firma/envio/reenvio que facturas y notas. Endpoints:
+    `GET/POST /electronic-invoicing/purchases/:purchaseId[...]`. **Esta es la parte menos
+    verificada de todo el modulo — ver limitaciones.**
 
 ## Como probar localmente sin credenciales DIAN
 
@@ -132,10 +153,20 @@ credenciales de habilitacion reales.
    - La lista completa de codigos de impuesto (hoy solo IVA/INC/ICA con montos de INC e ICA
      fijos en 0 desde `CreateSaleUseCase`, que no discrimina impuestos por tipo).
    - El tipo de documento/numero correcto para "consumidor final" (`DIAN_GENERIC_FINAL_CONSUMER`).
-6. **CUDE de notas (nuevo)**: el orden de concatenacion (`application/cude-generator.ts`) y los
+6. **CUDE de notas**: el orden de concatenacion (`application/cude-generator.ts`) y los
    codigos de tipo de nota (`DIAN_NOTE_TYPE_CODE` en `application/constants.ts`, "91"/"92") son
    la misma clase de estimacion sin verificar que el CUFE — confirmar contra el Anexo Tecnico
-   antes de un envio real. Documento soporte electronico (compras a no obligados a facturar) y
-   PDF de representacion grafica (RIDE) siguen sin implementar.
+   antes de un envio real.
 7. `DIAN_SOFTWARE_ID`/`DIAN_SOFTWARE_PIN` se envian en el sobre SOAP tal como estan documentados
    publicamente, pero su ubicacion/formato exacto dentro del sobre esta sin confirmar.
+8. **Documento soporte (CUDS) — la parte MENOS verificada de todo el modulo**:
+   - El **esquema XML** en `application/ubl-support-document-xml-builder.ts` reutiliza la forma
+     UBL "Invoice" como aproximacion (mismo `InvoiceTypeCode` "05" que se cita habitualmente para
+     este tipo de documento, pero sin confirmar contra el XSD/Anexo Tecnico real de documento
+     soporte, que probablemente no sea identico al de factura). Tratar como placeholder.
+   - El orden de concatenacion del CUDS (`application/cuds-generator.ts`) tiene aun menos
+     documentacion publica disponible para contrastar que CUFE/CUDE.
+   - El `documentType` del proveedor se asume siempre `"NIT"` (`GenerateElectronicSupportDocumentUseCase`)
+     porque `Supplier` no distingue tipo de documento — un proveedor persona natural
+     probablemente deberia llevar cedula (CC), no NIT. Sin verificar/sin campo dedicado todavia.
+9. PDF de representacion grafica (RIDE) sigue sin implementar para ningun tipo de documento.

@@ -1,9 +1,11 @@
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
 import { customerRepo } from "../customers/customer.container";
+import { PrismaSupplierRepository } from "../suppliers/infrastructure/prisma-supplier.repository";
 import { PrismaElectronicInvoiceRepository } from "./infrastructure/prisma-electronic-invoice.repository";
 import { PrismaElectronicCreditNoteRepository } from "./infrastructure/prisma-electronic-credit-note.repository";
 import { PrismaElectronicDebitNoteRepository } from "./infrastructure/prisma-electronic-debit-note.repository";
+import { PrismaElectronicSupportDocumentRepository } from "./infrastructure/prisma-electronic-support-document.repository";
 import { PrismaInvoiceNumberingResolutionRepository } from "./infrastructure/prisma-invoice-numbering-resolution.repository";
 import { PrismaCompanyReaderRepository } from "./infrastructure/prisma-company-reader.repository";
 import { NodeForgeCertificateLoader } from "./infrastructure/node-forge-certificate-loader";
@@ -12,22 +14,31 @@ import { DianSoapClient } from "./infrastructure/dian-soap-client";
 import { GenerateElectronicInvoiceUseCase } from "./application/use-cases/generate-electronic-invoice.use-case";
 import { GenerateElectronicCreditNoteUseCase } from "./application/use-cases/generate-electronic-credit-note.use-case";
 import { GenerateElectronicDebitNoteUseCase } from "./application/use-cases/generate-electronic-debit-note.use-case";
+import { GenerateElectronicSupportDocumentUseCase } from "./application/use-cases/generate-electronic-support-document.use-case";
 import { CreateNumberingResolutionUseCase } from "./application/use-cases/create-numbering-resolution.use-case";
 import { ListNumberingResolutionsUseCase } from "./application/use-cases/list-numbering-resolutions.use-case";
 import { GetElectronicInvoiceUseCase } from "./application/use-cases/get-electronic-invoice.use-case";
 import { GetElectronicCreditNoteUseCase } from "./application/use-cases/get-electronic-credit-note.use-case";
 import { GetElectronicDebitNoteUseCase } from "./application/use-cases/get-electronic-debit-note.use-case";
+import { GetElectronicSupportDocumentUseCase } from "./application/use-cases/get-electronic-support-document.use-case";
 import { ResubmitElectronicInvoiceUseCase } from "./application/use-cases/resubmit-electronic-invoice.use-case";
 import { ResubmitElectronicCreditNoteUseCase } from "./application/use-cases/resubmit-electronic-credit-note.use-case";
 import { ResubmitElectronicDebitNoteUseCase } from "./application/use-cases/resubmit-electronic-debit-note.use-case";
+import { ResubmitElectronicSupportDocumentUseCase } from "./application/use-cases/resubmit-electronic-support-document.use-case";
 import { PollDianSubmissionsUseCase } from "./application/use-cases/poll-dian-submissions.use-case";
 import { ElectronicInvoicingController } from "./interfaces/electronic-invoicing.controller";
 
 const electronicInvoiceRepo = new PrismaElectronicInvoiceRepository();
 const electronicCreditNoteRepo = new PrismaElectronicCreditNoteRepository();
 const electronicDebitNoteRepo = new PrismaElectronicDebitNoteRepository();
+const electronicSupportDocumentRepo = new PrismaElectronicSupportDocumentRepository();
 const numberingResolutionRepo = new PrismaInvoiceNumberingResolutionRepository();
 const companyReader = new PrismaCompanyReaderRepository();
+// Instancia propia, no importada de suppliers.container.ts: ese container importa
+// generateElectronicSupportDocumentUseCase de aqui, importar en la otra direccion crearia un
+// ciclo de modulos. PrismaSupplierRepository no tiene estado propio, instanciarla dos veces es
+// seguro (misma logica que ya usan otros repos de este container).
+const supplierRepo = new PrismaSupplierRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 const certificateLoader = new NodeForgeCertificateLoader();
 const xmlSigner = new XadesXmlSigner();
@@ -51,6 +62,13 @@ const resubmitDebitNoteUseCase = new ResubmitElectronicDebitNoteUseCase(
   xmlSigner,
   auditService
 );
+const getSupportDocumentUseCase = new GetElectronicSupportDocumentUseCase(electronicSupportDocumentRepo);
+const resubmitSupportDocumentUseCase = new ResubmitElectronicSupportDocumentUseCase(
+  electronicSupportDocumentRepo,
+  certificateLoader,
+  xmlSigner,
+  auditService
+);
 
 export const electronicInvoicingController = new ElectronicInvoicingController(
   createResolutionUseCase,
@@ -60,7 +78,9 @@ export const electronicInvoicingController = new ElectronicInvoicingController(
   getCreditNoteUseCase,
   resubmitCreditNoteUseCase,
   getDebitNoteUseCase,
-  resubmitDebitNoteUseCase
+  resubmitDebitNoteUseCase,
+  getSupportDocumentUseCase,
+  resubmitSupportDocumentUseCase
 );
 
 /** Usado por sale.container.ts para generar el CUFE/XML local (y firmar si hay certificado
@@ -97,6 +117,17 @@ export const generateElectronicDebitNoteUseCase = new GenerateElectronicDebitNot
   xmlSigner
 );
 
+/** Usado por suppliers.container.ts para generar el CUDS/XML local (y firmar si hay certificado
+ * configurado) al registrar una compra a un proveedor no obligado a facturar. */
+export const generateElectronicSupportDocumentUseCase = new GenerateElectronicSupportDocumentUseCase(
+  electronicSupportDocumentRepo,
+  companyReader,
+  supplierRepo,
+  auditService,
+  certificateLoader,
+  xmlSigner
+);
+
 /** Usado por server.ts para arrancar el poller de envio/consulta de estado a la DIAN (una
  * instancia por tipo de documento -- ver dian-submission-poller.ts). */
 export const pollDianSubmissionsUseCase = new PollDianSubmissionsUseCase(
@@ -119,4 +150,11 @@ export const pollDianDebitNoteSubmissionsUseCase = new PollDianSubmissionsUseCas
   auditService,
   "DebitNote",
   "Nota debito electronica"
+);
+export const pollDianSupportDocumentSubmissionsUseCase = new PollDianSubmissionsUseCase(
+  electronicSupportDocumentRepo,
+  dianClient,
+  auditService,
+  "Purchase",
+  "Documento soporte electronico"
 );

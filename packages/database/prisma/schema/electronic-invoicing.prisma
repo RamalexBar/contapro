@@ -8,6 +8,7 @@ enum DianDocumentType {
   FACTURA_VENTA
   NOTA_CREDITO
   NOTA_DEBITO
+  DOCUMENTO_SOPORTE
 }
 
 enum ElectronicInvoiceStatus {
@@ -37,9 +38,10 @@ model InvoiceNumberingResolution {
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
 
-  invoices    ElectronicInvoice[]
-  creditNotes ElectronicCreditNote[]
-  debitNotes  ElectronicDebitNote[]
+  invoices         ElectronicInvoice[]
+  creditNotes      ElectronicCreditNote[]
+  debitNotes       ElectronicDebitNote[]
+  supportDocuments ElectronicSupportDocument[]
 
   @@unique([companyId, documentType, prefix])
   @@index([companyId, branchId, documentType, isActive])
@@ -160,4 +162,47 @@ model ElectronicDebitNote {
   @@index([companyId, branchId, createdAt])
   @@index([companyId, status])
   @@map("electronic_debit_notes")
+}
+
+/// Documento soporte electronico: lo genera la propia empresa (como comprador) cuando compra a
+/// un Supplier con isObligatedToInvoice=false (persona natural/vendedor informal que no puede
+/// expedir su propia factura electronica). A diferencia de las notas, no referencia ningun otro
+/// documento -- es el documento original de esa compra. ADVERTENCIA: el esquema XML de este tipo
+/// de documento es la parte MENOS verificada de todo el modulo (ver README y el aviso de
+/// cabecera en application/ubl-support-document-xml-builder.ts).
+model ElectronicSupportDocument {
+  id                     String                  @id @default(uuid())
+  companyId              String
+  branchId               String
+  purchaseId             String                  @unique
+  purchase               Purchase                @relation(fields: [purchaseId], references: [id])
+  numberingResolutionId  String
+  numberingResolution    InvoiceNumberingResolution @relation(fields: [numberingResolutionId], references: [id])
+  prefix                 String
+  number                 Int
+  fullNumber             String
+  cuds                   String
+  issueDate              DateTime
+  supplierDocumentType   String
+  supplierDocumentNumber String
+  supplierName           String
+  subtotal               Decimal                 @db.Decimal(14, 2)
+  taxTotal               Decimal                 @db.Decimal(14, 2)
+  total                  Decimal                 @db.Decimal(14, 2)
+  environment            String
+  xmlContent             String                  @db.Text
+  status                 ElectronicInvoiceStatus @default(GENERATED)
+  createdAt              DateTime                @default(now())
+
+  signedXmlContent String?   @db.Text
+  dianTrackingId   String?
+  dianResponseXml  String?   @db.Text
+  rejectionReason  String?
+  submittedAt      DateTime?
+  respondedAt      DateTime?
+
+  @@unique([companyId, prefix, number])
+  @@index([companyId, branchId, createdAt])
+  @@index([companyId, status])
+  @@map("electronic_support_documents")
 }

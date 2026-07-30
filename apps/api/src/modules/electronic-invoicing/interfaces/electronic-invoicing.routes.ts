@@ -64,3 +64,19 @@ electronicInvoicingRouter.post(
   requirePermission("electronic-invoicing.manage"),
   electronicInvoicingController.resubmitDebitNote
 );
+
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/purchases/:purchaseId",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getBySupportDocument
+);
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/purchases/:purchaseId/xml",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getXmlBySupportDocument
+);
+electronicInvoicingRouter.post(
+  "/electronic-invoicing/purchases/:purchaseId/resubmit",
+  requirePermission("electronic-invoicing.manage"),
+  electronicInvoicingController.resubmitSupportDocument
+);

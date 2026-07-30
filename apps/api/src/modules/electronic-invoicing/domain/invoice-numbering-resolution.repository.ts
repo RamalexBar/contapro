@@ -1,4 +1,4 @@
-export type DianDocumentType = "FACTURA_VENTA" | "NOTA_CREDITO" | "NOTA_DEBITO";
+export type DianDocumentType = "FACTURA_VENTA" | "NOTA_CREDITO" | "NOTA_DEBITO" | "DOCUMENTO_SOPORTE";
 
 export interface CreateNumberingResolutionData {
   branchId?: string | null;
