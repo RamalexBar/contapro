@@ -9,6 +9,7 @@ import type {
 function toRecord(row: {
   id: string;
   branchId: string | null;
+  documentType: string;
   resolutionNumber: string;
   prefix: string;
   rangeFrom: number;
@@ -21,6 +22,7 @@ function toRecord(row: {
   return {
     id: row.id,
     branchId: row.branchId,
+    documentType: row.documentType as NumberingResolutionRecord["documentType"],
     resolutionNumber: row.resolutionNumber,
     prefix: row.prefix,
     rangeFrom: row.rangeFrom,
@@ -39,6 +41,7 @@ export class PrismaInvoiceNumberingResolutionRepository implements IInvoiceNumbe
       data: {
         companyId,
         branchId: data.branchId ?? null,
+        documentType: data.documentType ?? "FACTURA_VENTA",
         resolutionNumber: data.resolutionNumber,
         prefix: data.prefix,
         rangeFrom: data.rangeFrom,

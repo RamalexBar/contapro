@@ -2,13 +2,23 @@ import type { NextFunction, Request, Response } from "express";
 import type { CreateNumberingResolutionUseCase } from "../application/use-cases/create-numbering-resolution.use-case";
 import type { ListNumberingResolutionsUseCase } from "../application/use-cases/list-numbering-resolutions.use-case";
 import type { GetElectronicInvoiceUseCase } from "../application/use-cases/get-electronic-invoice.use-case";
+import type { ResubmitElectronicInvoiceUseCase } from "../application/use-cases/resubmit-electronic-invoice.use-case";
+import type { GetElectronicCreditNoteUseCase } from "../application/use-cases/get-electronic-credit-note.use-case";
+import type { ResubmitElectronicCreditNoteUseCase } from "../application/use-cases/resubmit-electronic-credit-note.use-case";
+import type { GetElectronicDebitNoteUseCase } from "../application/use-cases/get-electronic-debit-note.use-case";
+import type { ResubmitElectronicDebitNoteUseCase } from "../application/use-cases/resubmit-electronic-debit-note.use-case";
 import { createNumberingResolutionSchema } from "./electronic-invoicing.validators";
 
 export class ElectronicInvoicingController {
   constructor(
     private readonly createResolutionUseCase: CreateNumberingResolutionUseCase,
     private readonly listResolutionsUseCase: ListNumberingResolutionsUseCase,
-    private readonly getInvoiceUseCase: GetElectronicInvoiceUseCase
+    private readonly getInvoiceUseCase: GetElectronicInvoiceUseCase,
+    private readonly resubmitUseCase: ResubmitElectronicInvoiceUseCase,
+    private readonly getCreditNoteUseCase: GetElectronicCreditNoteUseCase,
+    private readonly resubmitCreditNoteUseCase: ResubmitElectronicCreditNoteUseCase,
+    private readonly getDebitNoteUseCase: GetElectronicDebitNoteUseCase,
+    private readonly resubmitDebitNoteUseCase: ResubmitElectronicDebitNoteUseCase
   ) {}
 
   createResolution = async (req: Request, res: Response, next: NextFunction) => {
@@ -31,7 +41,7 @@ export class ElectronicInvoicingController {
   getBySale = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const invoice = await this.getInvoiceUseCase.execute(req.params.saleId);
-      const { xmlContent: _xmlContent, ...metadata } = invoice;
+      const { xmlContent: _xmlContent, signedXmlContent: _signedXmlContent, ...metadata } = invoice;
       res.json(metadata);
     } catch (err) {
       next(err);
@@ -41,7 +51,72 @@ export class ElectronicInvoicingController {
   getXmlBySale = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const invoice = await this.getInvoiceUseCase.execute(req.params.saleId);
-      res.type("application/xml").send(invoice.xmlContent);
+      res.type("application/xml").send(invoice.signedXmlContent ?? invoice.xmlContent);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resubmit = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.resubmitUseCase.execute(req.params.saleId);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getByCreditNote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const note = await this.getCreditNoteUseCase.execute(req.params.creditNoteId);
+      const { xmlContent: _xmlContent, signedXmlContent: _signedXmlContent, ...metadata } = note;
+      res.json(metadata);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getXmlByCreditNote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const note = await this.getCreditNoteUseCase.execute(req.params.creditNoteId);
+      res.type("application/xml").send(note.signedXmlContent ?? note.xmlContent);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resubmitCreditNote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.resubmitCreditNoteUseCase.execute(req.params.creditNoteId);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getByDebitNote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const note = await this.getDebitNoteUseCase.execute(req.params.debitNoteId);
+      const { xmlContent: _xmlContent, signedXmlContent: _signedXmlContent, ...metadata } = note;
+      res.json(metadata);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getXmlByDebitNote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const note = await this.getDebitNoteUseCase.execute(req.params.debitNoteId);
+      res.type("application/xml").send(note.signedXmlContent ?? note.xmlContent);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resubmitDebitNote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.resubmitDebitNoteUseCase.execute(req.params.debitNoteId);
+      res.status(204).send();
     } catch (err) {
       next(err);
     }

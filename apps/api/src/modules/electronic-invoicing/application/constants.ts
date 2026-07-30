@@ -11,3 +11,13 @@ export const DIAN_GENERIC_FINAL_CONSUMER = {
   documentNumber: "222222222222",
   name: "Consumidor final",
 } as const;
+
+/**
+ * Codigos DIAN de tipo de nota (para el CUDE, ver cude-generator.ts). VALORES SIN VERIFICAR
+ * contra el Anexo Tecnico DIAN vigente -- los mas comunmente citados para nota credito/debito,
+ * aislados aqui para poder corregirlos despues sin tocar ningun call site.
+ */
+export const DIAN_NOTE_TYPE_CODE = {
+  CREDIT: "91",
+  DEBIT: "92",
+} as const;

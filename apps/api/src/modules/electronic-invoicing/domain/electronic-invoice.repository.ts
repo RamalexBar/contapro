@@ -1,3 +1,5 @@
+import type { IElectronicDocumentSubmissionRepository } from "./electronic-document-submission.repository";
+
 export interface GenerateElectronicInvoiceData {
   saleId: string;
   branchId: string;
@@ -26,9 +28,12 @@ export interface ElectronicInvoiceRecord {
 
 export interface ElectronicInvoiceWithXml extends ElectronicInvoiceRecord {
   xmlContent: string;
+  signedXmlContent: string | null;
+  dianTrackingId: string | null;
+  rejectionReason: string | null;
 }
 
-export interface IElectronicInvoiceRepository {
+export interface IElectronicInvoiceRepository extends IElectronicDocumentSubmissionRepository {
   /**
    * Reclama atomicamente el siguiente numero de la resolucion DIAN vigente para branchId
    * (o la resolucion "toda la empresa", branchId null, si no hay una especifica de sucursal)

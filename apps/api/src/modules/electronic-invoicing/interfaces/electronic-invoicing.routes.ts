@@ -27,3 +27,40 @@ electronicInvoicingRouter.get(
   requirePermission("electronic-invoicing.read"),
   electronicInvoicingController.getXmlBySale
 );
+electronicInvoicingRouter.post(
+  "/electronic-invoicing/sales/:saleId/resubmit",
+  requirePermission("electronic-invoicing.manage"),
+  electronicInvoicingController.resubmit
+);
+
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/credit-notes/:creditNoteId",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getByCreditNote
+);
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/credit-notes/:creditNoteId/xml",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getXmlByCreditNote
+);
+electronicInvoicingRouter.post(
+  "/electronic-invoicing/credit-notes/:creditNoteId/resubmit",
+  requirePermission("electronic-invoicing.manage"),
+  electronicInvoicingController.resubmitCreditNote
+);
+
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/debit-notes/:debitNoteId",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getByDebitNote
+);
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/debit-notes/:debitNoteId/xml",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getXmlByDebitNote
+);
+electronicInvoicingRouter.post(
+  "/electronic-invoicing/debit-notes/:debitNoteId/resubmit",
+  requirePermission("electronic-invoicing.manage"),
+  electronicInvoicingController.resubmitDebitNote
+);

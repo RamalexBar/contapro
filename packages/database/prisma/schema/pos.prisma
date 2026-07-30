@@ -180,6 +180,11 @@ model CreditNote {
   amount     Decimal  @db.Decimal(14, 2)
   status     String   @default("ISSUED")
   createdAt  DateTime @default(now())
+  // Preparado para facturacion electronica (DIAN, ver electronic-invoicing.prisma):
+  cude       String?
+  xmlUrl     String?
+
+  electronicCreditNote ElectronicCreditNote?
 
   @@index([companyId, branchId])
   @@map("credit_notes")
@@ -195,6 +200,11 @@ model DebitNote {
   amount     Decimal  @db.Decimal(14, 2)
   status     String   @default("ISSUED")
   createdAt  DateTime @default(now())
+  // Preparado para facturacion electronica (DIAN, ver electronic-invoicing.prisma):
+  cude       String?
+  xmlUrl     String?
+
+  electronicDebitNote ElectronicDebitNote?
 
   @@index([companyId, branchId])
   @@map("debit_notes")

@@ -39,3 +39,9 @@ export class ConflictError extends AppError {
     super(message, 409, "CONFLICT");
   }
 }
+
+export class CertificateError extends AppError {
+  constructor(message: string) {
+    super(message, 500, "CERTIFICATE_ERROR");
+  }
+}

@@ -14,6 +14,8 @@
     "@erp/database": "workspace:*",
     "@erp/shared-types": "workspace:*",
     "@erp/shared-utils": "workspace:*",
+    "@xmldom/xmldom": "^0.9.10",
+    "adm-zip": "^0.6.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -22,6 +24,10 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "node-forge": "^1.4.0",
+    "xadesjs": "^2.6.8",
+    "xml-core": "^1.2.6",
+    "xpath": "^0.0.34",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -32,6 +38,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.9.0",
+    "@types/node-forge": "^1.3.14",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vitest": "^2.1.5"

@@ -19,6 +19,13 @@ const envSchema = z.object({
   DIAN_SOFTWARE_ID: z.string().default(""),
   DIAN_SOFTWARE_PIN: z.string().default(""),
   DIAN_TECHNICAL_KEY: z.string().default(""),
+  // Firma XAdES + envio SOAP (ver modules/electronic-invoicing/README.md): vacio por defecto
+  // = firma deshabilitada, se sigue generando CUFE/XML local igual que sin estas 3 variables.
+  DIAN_CERTIFICATE_PATH: z.string().default(""),
+  DIAN_CERTIFICATE_PASSWORD: z.string().default(""),
+  // URL del servicio SOAP de la DIAN -- SIN VERIFICAR, no se precarga una URL de la DIAN por
+  // defecto (ver dian-soap-client.ts). Vacio = el envio real fallará (esperado sin credenciales).
+  DIAN_SOAP_ENDPOINT: z.string().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);

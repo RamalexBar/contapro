@@ -1,21 +1,32 @@
 // Facturacion electronica DIAN (Colombia) — ver apps/api/src/modules/electronic-invoicing/README.md
-// Esta iteracion solo genera CUFE + XML localmente. Firma XAdES y envio SOAP a la DIAN
-// quedan pendientes de credenciales reales de habilitacion.
+// Genera CUFE/CUDE + XML localmente siempre (facturas, notas credito, notas debito). Si hay
+// certificado configurado (DIAN_CERTIFICATE_PATH), tambien firma XAdES y encola el envio SOAP a
+// la DIAN -- sin verificar contra la DIAN real todavia (sin credenciales de habilitacion reales
+// aun), ver README del modulo.
+
+enum DianDocumentType {
+  FACTURA_VENTA
+  NOTA_CREDITO
+  NOTA_DEBITO
+}
 
 enum ElectronicInvoiceStatus {
-  GENERATED // unico estado usado en esta iteracion (CUFE + XML generados localmente)
-  PENDING_SIGNATURE // reservado: firma XAdES pendiente (iteracion futura)
-  PENDING_SUBMISSION // reservado: envio SOAP a la DIAN pendiente (iteracion futura)
-  ACCEPTED // reservado: la DIAN acepto el documento
-  REJECTED // reservado: la DIAN rechazo el documento
+  GENERATED // CUFE/CUDE + XML generados localmente
+  PENDING_SIGNATURE // reservado: firma XAdES pendiente (la firma es sincrona, no se usa hoy)
+  PENDING_SUBMISSION // firmado, encolado/enviado, esperando respuesta de la DIAN
+  ACCEPTED // la DIAN acepto el documento
+  REJECTED // la DIAN rechazo el documento
 }
 
 /// Rango de numeracion autorizado por la DIAN ("resolucion de facturacion"), independiente
-/// del consecutivo interno Sale.number (ticket POS por sucursal, no debe tocarse).
+/// del consecutivo interno Sale.number (ticket POS por sucursal, no debe tocarse). Una empresa
+/// puede tener una resolucion vigente por cada documentType (factura, nota credito, nota debito
+/// tienen resoluciones DIAN separadas en la vida real).
 model InvoiceNumberingResolution {
-  id               String   @id @default(uuid())
+  id               String           @id @default(uuid())
   companyId        String
   branchId         String? // null = aplica a todas las sucursales de la empresa
+  documentType     DianDocumentType @default(FACTURA_VENTA)
   resolutionNumber String // numero de resolucion otorgado por la DIAN (dato administrativo)
   prefix           String // ej. "SETP"
   rangeFrom        Int
@@ -26,10 +37,12 @@ model InvoiceNumberingResolution {
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
 
-  invoices ElectronicInvoice[]
+  invoices    ElectronicInvoice[]
+  creditNotes ElectronicCreditNote[]
+  debitNotes  ElectronicDebitNote[]
 
-  @@unique([companyId, prefix])
-  @@index([companyId, branchId, isActive])
+  @@unique([companyId, documentType, prefix])
+  @@index([companyId, branchId, documentType, isActive])
   @@map("invoice_numbering_resolutions")
 }
 
@@ -56,10 +69,95 @@ model ElectronicInvoice {
   total                  Decimal                 @db.Decimal(14, 2)
   environment            String // snapshot de DIAN_ENVIRONMENT al generar (HABILITACION|PRODUCCION)
   xmlContent              String                  @db.Text
-  status                 ElectronicInvoiceStatus @default(GENERATED)
+  status                 ElectronicInvoiceStatus      @default(GENERATED)
   createdAt              DateTime                @default(now())
+
+  // ---- Firma XAdES + envio DIAN (ver README: no verificado contra la DIAN real todavia) ----
+  signedXmlContent String?   @db.Text
+  dianTrackingId   String?
+  dianResponseXml  String?   @db.Text
+  rejectionReason  String?
+  submittedAt      DateTime?
+  respondedAt      DateTime?
 
   @@unique([companyId, prefix, number])
   @@index([companyId, branchId, createdAt])
+  @@index([companyId, status])
   @@map("electronic_invoices")
+}
+
+/// Un registro por nota credito facturada electronicamente. referenceCufe es el CUFE de la
+/// factura original que la nota afecta (obtenido de ElectronicInvoice.cufe via CreditNote.saleId
+/// -- si la venta referenciada no tiene factura electronica todavia, no se genera CUDE).
+model ElectronicCreditNote {
+  id                     String                  @id @default(uuid())
+  companyId              String
+  branchId               String
+  creditNoteId           String                  @unique
+  creditNote             CreditNote              @relation(fields: [creditNoteId], references: [id])
+  numberingResolutionId  String
+  numberingResolution    InvoiceNumberingResolution @relation(fields: [numberingResolutionId], references: [id])
+  prefix                 String
+  number                 Int
+  fullNumber             String
+  cude                   String
+  referenceCufe          String // CUFE de la factura original referenciada
+  issueDate              DateTime
+  customerDocumentType   String
+  customerDocumentNumber String
+  customerName           String
+  amount                 Decimal                 @db.Decimal(14, 2)
+  environment            String
+  xmlContent             String                  @db.Text
+  status                 ElectronicInvoiceStatus      @default(GENERATED)
+  createdAt              DateTime                @default(now())
+
+  signedXmlContent String?   @db.Text
+  dianTrackingId   String?
+  dianResponseXml  String?   @db.Text
+  rejectionReason  String?
+  submittedAt      DateTime?
+  respondedAt      DateTime?
+
+  @@unique([companyId, prefix, number])
+  @@index([companyId, branchId, createdAt])
+  @@index([companyId, status])
+  @@map("electronic_credit_notes")
+}
+
+/// Analogo a ElectronicCreditNote para notas debito.
+model ElectronicDebitNote {
+  id                     String                  @id @default(uuid())
+  companyId              String
+  branchId               String
+  debitNoteId            String                  @unique
+  debitNote              DebitNote               @relation(fields: [debitNoteId], references: [id])
+  numberingResolutionId  String
+  numberingResolution    InvoiceNumberingResolution @relation(fields: [numberingResolutionId], references: [id])
+  prefix                 String
+  number                 Int
+  fullNumber             String
+  cude                   String
+  referenceCufe          String
+  issueDate              DateTime
+  customerDocumentType   String
+  customerDocumentNumber String
+  customerName           String
+  amount                 Decimal                 @db.Decimal(14, 2)
+  environment            String
+  xmlContent             String                  @db.Text
+  status                 ElectronicInvoiceStatus      @default(GENERATED)
+  createdAt              DateTime                @default(now())
+
+  signedXmlContent String?   @db.Text
+  dianTrackingId   String?
+  dianResponseXml  String?   @db.Text
+  rejectionReason  String?
+  submittedAt      DateTime?
+  respondedAt      DateTime?
+
+  @@unique([companyId, prefix, number])
+  @@index([companyId, branchId, createdAt])
+  @@index([companyId, status])
+  @@map("electronic_debit_notes")
 }

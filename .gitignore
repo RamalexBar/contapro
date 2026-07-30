@@ -24,3 +24,8 @@ apps/mobile/node_modules/
 # SQLite local
 *.sqlite
 *.sqlite3
+
+# Certificados DIAN (nunca deben commitearse)
+*.p12
+*.pfx
+/certs/

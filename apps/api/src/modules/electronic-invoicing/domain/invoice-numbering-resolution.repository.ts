@@ -1,5 +1,8 @@
+export type DianDocumentType = "FACTURA_VENTA" | "NOTA_CREDITO" | "NOTA_DEBITO";
+
 export interface CreateNumberingResolutionData {
   branchId?: string | null;
+  documentType?: DianDocumentType;
   resolutionNumber: string;
   prefix: string;
   rangeFrom: number;
@@ -11,6 +14,7 @@ export interface CreateNumberingResolutionData {
 export interface NumberingResolutionRecord {
   id: string;
   branchId: string | null;
+  documentType: DianDocumentType;
   resolutionNumber: string;
   prefix: string;
   rangeFrom: number;

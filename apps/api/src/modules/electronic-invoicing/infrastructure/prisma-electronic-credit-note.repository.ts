@@ -2,11 +2,11 @@ import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { ConflictError } from "../../../shared/errors/app-error";
 import type {
-  ElectronicInvoiceRecord,
-  ElectronicInvoiceWithXml,
-  GenerateElectronicInvoiceData,
-  IElectronicInvoiceRepository,
-} from "../domain/electronic-invoice.repository";
+  ElectronicCreditNoteRecord,
+  ElectronicCreditNoteWithXml,
+  GenerateElectronicCreditNoteData,
+  IElectronicCreditNoteRepository,
+} from "../domain/electronic-credit-note.repository";
 import type {
   ElectronicDocumentAwaitingStatus,
   ElectronicDocumentPendingSubmission,
@@ -15,45 +15,44 @@ import { computeNextInvoiceNumber } from "../application/numbering-claim";
 
 function toRecord(row: {
   id: string;
-  saleId: string;
+  creditNoteId: string;
   branchId: string;
   prefix: string;
   number: number;
   fullNumber: string;
-  cufe: string;
+  cude: string;
   issueDate: Date;
   status: string;
   createdAt: Date;
-}): ElectronicInvoiceRecord {
+}): ElectronicCreditNoteRecord {
   return {
     id: row.id,
-    saleId: row.saleId,
+    creditNoteId: row.creditNoteId,
     branchId: row.branchId,
     prefix: row.prefix,
     number: row.number,
     fullNumber: row.fullNumber,
-    cufe: row.cufe,
+    cude: row.cude,
     issueDate: row.issueDate,
     status: row.status,
     createdAt: row.createdAt,
   };
 }
 
-export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepository {
+/** Analogo a PrismaElectronicInvoiceRepository, para notas credito. */
+export class PrismaElectronicCreditNoteRepository implements IElectronicCreditNoteRepository {
   async claimNumberAndGenerate(
-    data: GenerateElectronicInvoiceData,
-    build: (fullNumber: string, prefix: string, number: number) => { cufe: string; xmlContent: string }
-  ): Promise<ElectronicInvoiceRecord> {
+    data: GenerateElectronicCreditNoteData,
+    build: (fullNumber: string, prefix: string, number: number) => { cude: string; xmlContent: string }
+  ): Promise<ElectronicCreditNoteRecord> {
     const companyId = getTenantContext().companyId;
     const now = new Date();
 
     const row = await prisma.$transaction(async (tx) => {
-      // Prefiere una resolucion especifica de la sucursal sobre una "toda la empresa"
-      // (branchId null); dentro de cada grupo, la mas reciente por si hay varias vigentes.
       const resolution = await tx.invoiceNumberingResolution.findFirst({
         where: {
           companyId,
-          documentType: "FACTURA_VENTA",
+          documentType: "NOTA_CREDITO",
           isActive: true,
           validFrom: { lte: now },
           validUntil: { gte: now },
@@ -63,7 +62,7 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
       });
 
       if (!resolution) {
-        throw new ConflictError("No hay una resolucion de numeracion DIAN vigente para esta sucursal");
+        throw new ConflictError("No hay una resolucion de numeracion DIAN vigente para notas credito en esta sucursal");
       }
 
       const { number, fullNumber } = computeNextInvoiceNumber(resolution);
@@ -73,43 +72,42 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
         data: { currentNumber: { increment: 1 } },
       });
 
-      const { cufe, xmlContent } = build(fullNumber, resolution.prefix, number);
+      const { cude, xmlContent } = build(fullNumber, resolution.prefix, number);
 
-      const invoice = await tx.electronicInvoice.create({
+      const note = await tx.electronicCreditNote.create({
         data: {
           companyId,
           branchId: data.branchId,
-          saleId: data.saleId,
+          creditNoteId: data.creditNoteId,
           numberingResolutionId: resolution.id,
           prefix: resolution.prefix,
           number,
           fullNumber,
-          cufe,
+          cude,
+          referenceCufe: data.referenceCufe,
           issueDate: data.issueDate,
           customerDocumentType: data.customerDocumentType,
           customerDocumentNumber: data.customerDocumentNumber,
           customerName: data.customerName,
-          subtotal: data.subtotal,
-          taxTotal: data.taxTotal,
-          total: data.total,
+          amount: data.amount,
           environment: data.environment,
           xmlContent,
         },
       });
 
-      await tx.sale.update({
-        where: { id: data.saleId },
-        data: { cufe, invoiceXmlUrl: `/api/electronic-invoicing/sales/${data.saleId}/xml` },
+      await tx.creditNote.update({
+        where: { id: data.creditNoteId },
+        data: { cude, xmlUrl: `/api/electronic-invoicing/credit-notes/${data.creditNoteId}/xml` },
       });
 
-      return invoice;
+      return note;
     });
 
     return toRecord(row);
   }
 
-  async findBySaleId(saleId: string): Promise<ElectronicInvoiceWithXml | null> {
-    const row = await prisma.electronicInvoice.findFirst({ where: { saleId } });
+  async findByCreditNoteId(creditNoteId: string): Promise<ElectronicCreditNoteWithXml | null> {
+    const row = await prisma.electronicCreditNote.findFirst({ where: { creditNoteId } });
     if (!row) return null;
     return {
       ...toRecord(row),
@@ -121,42 +119,42 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
   }
 
   async markSigned(id: string, signedXmlContent: string): Promise<void> {
-    await prisma.electronicInvoice.update({
+    await prisma.electronicCreditNote.update({
       where: { id },
       data: { signedXmlContent, status: "PENDING_SUBMISSION" },
     });
   }
 
   async markSubmitted(id: string, trackingId: string): Promise<void> {
-    await prisma.electronicInvoice.update({
+    await prisma.electronicCreditNote.update({
       where: { id },
       data: { dianTrackingId: trackingId, submittedAt: new Date() },
     });
   }
 
   async markAccepted(id: string, responseXml: string): Promise<void> {
-    await prisma.electronicInvoice.update({
+    await prisma.electronicCreditNote.update({
       where: { id },
       data: { status: "ACCEPTED", dianResponseXml: responseXml, respondedAt: new Date() },
     });
   }
 
   async markRejected(id: string, responseXml: string, reason: string): Promise<void> {
-    await prisma.electronicInvoice.update({
+    await prisma.electronicCreditNote.update({
       where: { id },
       data: { status: "REJECTED", dianResponseXml: responseXml, rejectionReason: reason, respondedAt: new Date() },
     });
   }
 
   async findPendingSubmission(limit: number): Promise<ElectronicDocumentPendingSubmission[]> {
-    const rows = await prisma.electronicInvoice.findMany({
+    const rows = await prisma.electronicCreditNote.findMany({
       where: { status: "PENDING_SUBMISSION", dianTrackingId: null },
       take: limit,
       orderBy: { createdAt: "asc" },
     });
     return rows.map((row) => ({
       id: row.id,
-      sourceEntityId: row.saleId,
+      sourceEntityId: row.creditNoteId,
       fullNumber: row.fullNumber,
       status: row.status,
       signedXmlContent: row.signedXmlContent,
@@ -164,14 +162,14 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
   }
 
   async findAwaitingStatus(limit: number): Promise<ElectronicDocumentAwaitingStatus[]> {
-    const rows = await prisma.electronicInvoice.findMany({
+    const rows = await prisma.electronicCreditNote.findMany({
       where: { status: "PENDING_SUBMISSION", dianTrackingId: { not: null } },
       take: limit,
       orderBy: { submittedAt: "asc" },
     });
     return rows.map((row) => ({
       id: row.id,
-      sourceEntityId: row.saleId,
+      sourceEntityId: row.creditNoteId,
       fullNumber: row.fullNumber,
       status: row.status,
       dianTrackingId: row.dianTrackingId as string,
