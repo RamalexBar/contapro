@@ -51,6 +51,10 @@ const TENANT_MODELS = new Set([
   "SyncOutbox",
   "InvoiceNumberingResolution",
   "ElectronicInvoice",
+  "ElectronicCreditNote",
+  "ElectronicDebitNote",
+  "ElectronicSupportDocument",
+  "ElectronicPayroll",
 ]);
 
 const MULTI_ROW_READ_OPS = new Set(["findMany", "findFirst", "findFirstOrThrow", "count", "aggregate", "groupBy"]);

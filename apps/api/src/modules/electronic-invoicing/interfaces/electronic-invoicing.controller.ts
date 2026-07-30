@@ -9,6 +9,8 @@ import type { GetElectronicDebitNoteUseCase } from "../application/use-cases/get
 import type { ResubmitElectronicDebitNoteUseCase } from "../application/use-cases/resubmit-electronic-debit-note.use-case";
 import type { GetElectronicSupportDocumentUseCase } from "../application/use-cases/get-electronic-support-document.use-case";
 import type { ResubmitElectronicSupportDocumentUseCase } from "../application/use-cases/resubmit-electronic-support-document.use-case";
+import type { GetElectronicPayrollUseCase } from "../application/use-cases/get-electronic-payroll.use-case";
+import type { ResubmitElectronicPayrollUseCase } from "../application/use-cases/resubmit-electronic-payroll.use-case";
 import { createNumberingResolutionSchema } from "./electronic-invoicing.validators";
 
 export class ElectronicInvoicingController {
@@ -22,7 +24,9 @@ export class ElectronicInvoicingController {
     private readonly getDebitNoteUseCase: GetElectronicDebitNoteUseCase,
     private readonly resubmitDebitNoteUseCase: ResubmitElectronicDebitNoteUseCase,
     private readonly getSupportDocumentUseCase: GetElectronicSupportDocumentUseCase,
-    private readonly resubmitSupportDocumentUseCase: ResubmitElectronicSupportDocumentUseCase
+    private readonly resubmitSupportDocumentUseCase: ResubmitElectronicSupportDocumentUseCase,
+    private readonly getPayrollUseCase: GetElectronicPayrollUseCase,
+    private readonly resubmitPayrollUseCase: ResubmitElectronicPayrollUseCase
   ) {}
 
   createResolution = async (req: Request, res: Response, next: NextFunction) => {
@@ -148,6 +152,34 @@ export class ElectronicInvoicingController {
   resubmitSupportDocument = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.resubmitSupportDocumentUseCase.execute(req.params.purchaseId);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getByPayrollDetail = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const doc = await this.getPayrollUseCase.execute(req.params.payrollDetailId);
+      const { xmlContent: _xmlContent, signedXmlContent: _signedXmlContent, ...metadata } = doc;
+      res.json(metadata);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getXmlByPayrollDetail = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const doc = await this.getPayrollUseCase.execute(req.params.payrollDetailId);
+      res.type("application/xml").send(doc.signedXmlContent ?? doc.xmlContent);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resubmitPayrollDetail = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.resubmitPayrollUseCase.execute(req.params.payrollDetailId);
       res.status(204).send();
     } catch (err) {
       next(err);

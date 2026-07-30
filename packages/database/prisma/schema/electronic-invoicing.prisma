@@ -206,3 +206,45 @@ model ElectronicSupportDocument {
   @@index([companyId, status])
   @@map("electronic_support_documents")
 }
+
+/// Nomina electronica DIAN (Resolucion 000013 de 2021) -- ESTRUCTURALMENTE DISTINTA a los otros
+/// 4 tipos de documento de este archivo: esquema XML propio (no UBL), codigo unico CUNE (no
+/// CUFE/CUDE/CUDS), servicio SOAP DIAN separado (ver dian-nomina-soap-client.ts). La DIAN genera
+/// un documento POR EMPLEADO POR PERIODO, por eso esta enlazado a PayrollDetail (no a Payroll).
+/// Sin InvoiceNumberingResolution: la nomina electronica no usa rango autorizado por la DIAN
+/// (entendimiento general, SIN VERIFICAR) -- el numero sale de Company.payrollElectronicSequence,
+/// un contador atomico simple. ESTA ES LA PARTE MAS ESPECULATIVA DE TODO EL MODULO -- ver README.
+model ElectronicPayroll {
+  id              String                  @id @default(uuid())
+  companyId       String
+  branchId        String
+  payrollDetailId String                  @unique
+  payrollDetail   PayrollDetail           @relation(fields: [payrollDetailId], references: [id])
+  prefix          String?
+  number          Int
+  fullNumber      String
+  cune            String
+  issueDate       DateTime
+  employeeDocumentType   String
+  employeeDocumentNumber String
+  employeeName           String
+  grossTotal      Decimal                 @db.Decimal(14, 2)
+  totalDeductions Decimal                 @db.Decimal(14, 2)
+  netPay          Decimal                 @db.Decimal(14, 2)
+  environment     String
+  xmlContent      String                  @db.Text
+  status          ElectronicInvoiceStatus @default(GENERATED)
+  createdAt       DateTime                @default(now())
+
+  signedXmlContent String?   @db.Text
+  dianTrackingId   String?
+  dianResponseXml  String?   @db.Text
+  rejectionReason  String?
+  submittedAt      DateTime?
+  respondedAt      DateTime?
+
+  @@unique([companyId, fullNumber])
+  @@index([companyId, branchId, createdAt])
+  @@index([companyId, status])
+  @@map("electronic_payrolls")
+}

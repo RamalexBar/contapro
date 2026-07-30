@@ -80,3 +80,19 @@ electronicInvoicingRouter.post(
   requirePermission("electronic-invoicing.manage"),
   electronicInvoicingController.resubmitSupportDocument
 );
+
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/payroll-details/:payrollDetailId",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getByPayrollDetail
+);
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/payroll-details/:payrollDetailId/xml",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getXmlByPayrollDetail
+);
+electronicInvoicingRouter.post(
+  "/electronic-invoicing/payroll-details/:payrollDetailId/resubmit",
+  requirePermission("electronic-invoicing.manage"),
+  electronicInvoicingController.resubmitPayrollDetail
+);

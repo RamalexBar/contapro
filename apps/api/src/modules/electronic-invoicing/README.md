@@ -1,17 +1,19 @@
 # Modulo: Facturacion electronica DIAN
 
-Estado: **generacion local de CUFE/CUDE/CUDS (SHA-384) y XML tipo UBL por cada venta completada,
-cada nota credito/debito que referencia una venta ya facturada, y cada compra a un proveedor no
-obligado a facturar electronicamente, con numeracion DIAN real (resolucion/rango/consecutivo por
-tipo de documento) consumida atomicamente e independiente del consecutivo interno del POS. Si hay
-un certificado configurado (`DIAN_CERTIFICATE_PATH`), tambien firma el XML con XAdES y lo encola
-para envio SOAP a la DIAN (poller en proceso, uno por tipo de documento). Sin certificado
-configurado (el estado por defecto), el comportamiento es identico al de antes: solo
-CUFE/CUDE/CUDS + XML local, sin firma ni envio. El envio real a la DIAN NO esta verificado contra
-su servicio real todavia (no hay credenciales de habilitacion reales, ver "Limitaciones e items
-sin verificar"). **El documento soporte (compras) es la parte MENOS verificada de todo el
-modulo** — su esquema XML tiene mucha menos documentacion publica que factura/notas, ver mas
-abajo.
+Estado: **generacion local de CUFE/CUDE/CUDS/CUNE (SHA-384) y XML por cada venta completada, cada
+nota credito/debito que referencia una venta ya facturada, cada compra a un proveedor no obligado
+a facturar electronicamente, y cada empleado de cada nomina aprobada, con numeracion DIAN real
+(resolucion/rango/consecutivo por tipo de documento, salvo nomina — ver punto 12) consumida
+atomicamente e independiente del consecutivo interno del POS. Si hay un certificado configurado
+(`DIAN_CERTIFICATE_PATH`), tambien firma el XML con XAdES y lo encola para envio SOAP a la DIAN
+(poller en proceso, uno por tipo de documento). Sin certificado configurado (el estado por
+defecto), el comportamiento es identico al de antes: solo CUFE/CUDE/CUDS/CUNE + XML local, sin
+firma ni envio. El envio real a la DIAN NO esta verificado contra su servicio real todavia (no hay
+credenciales de habilitacion reales, ver "Limitaciones e items sin verificar"). **La nomina
+electronica es, con diferencia, la parte MENOS verificada de todo el modulo** — esquema XML propio
+(no UBL) sin contrastar contra el Anexo Tecnico, servicio SOAP distinto al de facturacion sin
+confirmar ni en nombre, ver punto 12 y las limitaciones al final. El documento soporte (compras)
+es la segunda parte menos verificada, ver mas abajo.
 
 ## Modelos (`packages/database/prisma/schema/electronic-invoicing.prisma`)
 
@@ -33,6 +35,12 @@ abajo.
   `cufe`/`cude` y **sin** campo de referencia (a diferencia de las notas, el documento soporte
   no afecta un documento previo — es el documento original de esa compra). Enlazado 1:1 a
   `Purchase`.
+- `ElectronicPayroll` — nomina electronica, **estructuralmente distinta** a los otros 4 (ver punto
+  12): `cune` en vez de `cufe`/`cude`/`cuds`, sin `numberingResolutionId` (usa
+  `Company.payrollElectronicSequence`, un contador simple, no una resolucion DIAN — sin verificar
+  que esto sea correcto), y enlazado 1:1 a `PayrollDetail` (el registro **por empleado**, no a
+  `Payroll` que es el periodo completo) porque la DIAN exige un documento por empleado por
+  periodo.
 
 ## Implementado
 
@@ -107,8 +115,29 @@ abajo.
     actuando en nombre del proveedor que no puede facturar). Compras contra proveedores sin
     marcar (el caso comun, default `true`) no generan nada. Reusa la misma infraestructura de
     firma/envio/reenvio que facturas y notas. Endpoints:
-    `GET/POST /electronic-invoicing/purchases/:purchaseId[...]`. **Esta es la parte menos
-    verificada de todo el modulo — ver limitaciones.**
+    `GET/POST /electronic-invoicing/purchases/:purchaseId[...]`. **Esta es la segunda parte menos
+    verificada de todo el modulo (despues de nomina) — ver limitaciones.**
+12. **Nomina electronica (CUNE)** — la Resolucion 000013 de 2021 define un tipo de documento DIAN
+    estructuralmente distinto a los 4 anteriores (todos UBL, mismo servicio DIAN): esquema XML
+    **propio, no UBL**, codigo unico **CUNE** (no CUFE/CUDE/CUDS), y un **servicio web DIAN
+    separado**. `Employee` gano `middleName`/`secondLastName`/`workerType`/`workerSubtype`
+    (campos que la DIAN exige y que no existian). Al aprobar una nomina (`ApprovePayrollUseCase`,
+    despues de contabilizarla — ese paso sigue bloqueante, sin cambios), se itera cada
+    `PayrollDetail` (un empleado) y se llama a `GenerateElectronicPayrollUseCase` por cada uno, en
+    su propio try/catch — un empleado fallando no frena a los demas ni bloquea la aprobacion
+    (`ELECTRONIC_PAYROLL_GENERATION_FAILED` si falla). Genera el CUNE
+    (`application/cune-generator.ts`, con pruebas — la formula de concatenacion es, de los 4
+    generadores, la que menos documentacion publica tiene para contrastar) y el XML
+    (`application/dian-payroll-xml-builder.ts`, **no UBL**, estructura best-effort con bloques
+    `Empleador`/`Trabajador`/`Periodo`/`Devengados`/`Deducciones`/`ComprobanteTotal` — tratar como
+    placeholder mas aun que el de documento soporte). La retencion en la fuente se envia fija en
+    `0.00`: el motor de calculo de nomina actual no la calcula, no se inventa un valor. El envio
+    usa `DianNominaSoapClient` (`infrastructure/dian-nomina-soap-client.ts`), una clase separada
+    de `DianSoapClient` con su propio endpoint (`DIAN_NOMINA_SOAP_ENDPOINT`) porque es un servicio
+    DIAN distinto — ni siquiera los nombres de operacion (`SendNominaAsync`/`GetStatusNomina`)
+    estan confirmados publicamente, a diferencia del de facturacion. Todo lo demas (firma XAdES,
+    maquina de estados, poller, reenvio manual) reusa el motor generico existente sin cambios.
+    Endpoints: `GET/POST /electronic-invoicing/payroll-details/:payrollDetailId[...]`.
 
 ## Como probar localmente sin credenciales DIAN
 
@@ -170,3 +199,27 @@ credenciales de habilitacion reales.
      porque `Supplier` no distingue tipo de documento — un proveedor persona natural
      probablemente deberia llevar cedula (CC), no NIT. Sin verificar/sin campo dedicado todavia.
 9. PDF de representacion grafica (RIDE) sigue sin implementar para ningun tipo de documento.
+10. **Nomina electronica (CUNE) — la parte MAS especulativa de todo el modulo**:
+    - El **esquema XML** en `application/dian-payroll-xml-builder.ts` es una estructura best-effort
+      propia, **sin contrastar contra el XSD/Anexo Tecnico real** de la Resolucion 000013 de 2021
+      (que es mucho menos publico que el de UBL de factura/notas). Tratar como placeholder.
+    - El orden de concatenacion del CUNE (`application/cune-generator.ts`) tiene aun **menos**
+      documentacion publica disponible para contrastar que CUFE/CUDE/CUDS.
+    - `DianNominaSoapClient` asume un servicio DIAN separado del de facturacion, pero ni el
+      endpoint ni los nombres de operacion (`SendNominaAsync`/`GetStatusNomina`) estan confirmados
+      publicamente — a diferencia de `dian-soap-client.ts`, donde al menos el patron
+      `SendBillAsync`/`GetStatusZip` es razonablemente citado. Sin prueba automatizada, mismo
+      criterio que el cliente SOAP de facturacion.
+    - **Numeracion sin resolucion DIAN**: se asume (entendimiento general, **sin verificar en
+      este codigo**) que la nomina electronica no requiere un rango autorizado por la DIAN como
+      si lo requiere facturacion, y se usa un contador simple (`Company.payrollElectronicSequence`)
+      en su lugar. Si esto es incorrecto, hay que migrar nomina a usar
+      `InvoiceNumberingResolution` como los demas tipos de documento.
+    - **Retencion en la fuente**: el motor de calculo de nomina (`payroll-calculator.ts`) no
+      calcula retencion en la fuente, por lo que el nodo correspondiente en el XML se envia fijo
+      en `0.00`. No se implemento un calculo nuevo para no inventar una formula sin verificar.
+    - `workerType`/`workerSubtype` en `Employee` tienen valores por defecto (`"01"`/`"00"`) sin
+      verificar que sean los codigos DIAN correctos para el caso general.
+    - `Company.municipalityCode` (codigo DANE del lugar de trabajo) es opcional y no se captura
+      hoy en ningun formulario — el XML lo omite si no esta configurado. Ademas se asume una sola
+      sede para todos los empleados, sin per-empleado.

@@ -26,6 +26,9 @@ const envSchema = z.object({
   // URL del servicio SOAP de la DIAN -- SIN VERIFICAR, no se precarga una URL de la DIAN por
   // defecto (ver dian-soap-client.ts). Vacio = el envio real fallará (esperado sin credenciales).
   DIAN_SOAP_ENDPOINT: z.string().default(""),
+  // Nomina electronica usa un servicio DIAN SEPARADO al de facturacion -- ver
+  // dian-nomina-soap-client.ts. SIN VERIFICAR (mas incluso que DIAN_SOAP_ENDPOINT).
+  DIAN_NOMINA_SOAP_ENDPOINT: z.string().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);

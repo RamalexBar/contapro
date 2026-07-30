@@ -18,6 +18,10 @@ type EmployeeRow = {
   documentNumber: string;
   firstName: string;
   lastName: string;
+  middleName: string | null;
+  secondLastName: string | null;
+  workerType: string;
+  workerSubtype: string;
   birthDate: Date | null;
   address: string | null;
   phone: string | null;
@@ -52,6 +56,10 @@ export class PrismaEmployeeRepository implements IEmployeeRepository {
           documentNumber: data.documentNumber,
           firstName: data.firstName,
           lastName: data.lastName,
+          middleName: data.middleName,
+          secondLastName: data.secondLastName,
+          workerType: data.workerType,
+          workerSubtype: data.workerSubtype,
           birthDate: data.birthDate,
           address: data.address,
           phone: data.phone,

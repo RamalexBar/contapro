@@ -13,6 +13,11 @@ model Company {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // Preparado para nomina electronica DIAN (ver electronic-invoicing.prisma). municipalityCode
+  // SIN VERIFICAR: simplificacion de "una sola sede" para todos los empleados, ver README.
+  municipalityCode          String? // codigo DANE del lugar de trabajo por defecto
+  payrollElectronicSequence Int     @default(0)
+  payrollElectronicPrefix   String?
 
   branches      Branch[]
   users         User[]

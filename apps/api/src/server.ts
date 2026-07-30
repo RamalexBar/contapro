@@ -4,6 +4,7 @@ import { startDianSubmissionPoller } from "./modules/electronic-invoicing/infras
 import {
   pollDianCreditNoteSubmissionsUseCase,
   pollDianDebitNoteSubmissionsUseCase,
+  pollDianPayrollSubmissionsUseCase,
   pollDianSubmissionsUseCase,
   pollDianSupportDocumentSubmissionsUseCase,
 } from "./modules/electronic-invoicing/electronic-invoicing.container";
@@ -18,5 +19,6 @@ if (env.DIAN_CERTIFICATE_PATH) {
     pollDianCreditNoteSubmissionsUseCase,
     pollDianDebitNoteSubmissionsUseCase,
     pollDianSupportDocumentSubmissionsUseCase,
+    pollDianPayrollSubmissionsUseCase,
   ]);
 }

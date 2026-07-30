@@ -63,8 +63,11 @@ export type AuditAction =
   | "ELECTRONIC_SUPPORT_DOCUMENT_GENERATED"
   | "ELECTRONIC_SUPPORT_DOCUMENT_GENERATION_FAILED"
   | "ELECTRONIC_SUPPORT_DOCUMENT_SIGNING_FAILED"
-  // Compartidos por los 4 tipos de documento (factura/nota credito/nota debito/documento
-  // soporte) -- entityType/entityId del registro de auditoria ya distinguen cual es cual.
+  | "ELECTRONIC_PAYROLL_GENERATED"
+  | "ELECTRONIC_PAYROLL_GENERATION_FAILED"
+  | "ELECTRONIC_PAYROLL_SIGNING_FAILED"
+  // Compartidos por los 5 tipos de documento (factura/nota credito/nota debito/documento
+  // soporte/nomina) -- entityType/entityId del registro de auditoria ya distinguen cual es cual.
   | "ELECTRONIC_DOCUMENT_SUBMITTED"
   | "ELECTRONIC_DOCUMENT_ACCEPTED"
   | "ELECTRONIC_DOCUMENT_REJECTED";

@@ -21,3 +21,16 @@ export const DIAN_NOTE_TYPE_CODE = {
   CREDIT: "91",
   DEBIT: "92",
 } as const;
+
+/**
+ * Mapeo de Employee.contractType (valores internos del sistema) al codigo DIAN de tipo de
+ * contrato para nomina electronica. VALORES SIN VERIFICAR contra el Anexo Tecnico de la
+ * Resolucion 000013 de 2021 -- los mas comunmente citados, aislados aqui para poder corregirlos
+ * despues sin tocar ningun call site. Default "1" si el contractType no tiene mapeo conocido.
+ */
+export const DIAN_CONTRACT_TYPE_CODE: Record<string, string> = {
+  FIXED_TERM: "2",
+  INDEFINITE: "1",
+  SERVICE: "3",
+  LEARNING: "4",
+};

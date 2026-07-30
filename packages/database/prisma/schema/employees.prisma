@@ -28,6 +28,12 @@ model Employee {
   bankName          String?
   bankAccountNumber String?
   createdAt         DateTime  @default(now())
+  // Preparado para nomina electronica DIAN (ver electronic-invoicing.prisma). Valores por
+  // defecto de workerType/workerSubtype SIN VERIFICAR contra el Anexo Tecnico -- ver README.
+  middleName        String? // segundo nombre / otros nombres
+  secondLastName    String? // segundo apellido
+  workerType        String  @default("01") // tipo de trabajador DIAN
+  workerSubtype     String  @default("00") // subtipo trabajador DIAN
 
   timeEntries    TimeEntry[]
   vacations      Vacation[]

@@ -7,6 +7,10 @@ export interface EmployeeRecord {
   documentNumber: string;
   firstName: string;
   lastName: string;
+  middleName: string | null;
+  secondLastName: string | null;
+  workerType: string;
+  workerSubtype: string;
   birthDate: Date | null;
   address: string | null;
   phone: string | null;
@@ -31,6 +35,10 @@ export interface CreateEmployeeData {
   documentNumber: string;
   firstName: string;
   lastName: string;
+  middleName?: string;
+  secondLastName?: string;
+  workerType?: string;
+  workerSubtype?: string;
   birthDate?: Date;
   address?: string;
   phone?: string;
@@ -50,6 +58,10 @@ export interface CreateEmployeeData {
 export interface UpdateEmployeeData {
   firstName?: string;
   lastName?: string;
+  middleName?: string;
+  secondLastName?: string;
+  workerType?: string;
+  workerSubtype?: string;
   birthDate?: Date;
   address?: string;
   phone?: string;

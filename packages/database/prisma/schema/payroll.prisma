@@ -83,9 +83,13 @@ model PayrollDetail {
   netPay            Decimal  @db.Decimal(14, 2) @default(0)
   employerCostTotal Decimal  @db.Decimal(14, 2) @default(0)
   status            String   @default("DRAFT")
+  // Preparado para nomina electronica DIAN (ver electronic-invoicing.prisma):
+  cune              String?
+  xmlUrl            String?
 
-  items   PayrollItem[]
-  payslip PayslipDocument?
+  items             PayrollItem[]
+  payslip           PayslipDocument?
+  electronicPayroll ElectronicPayroll?
 
   @@index([payrollId])
   @@map("payroll_details")
