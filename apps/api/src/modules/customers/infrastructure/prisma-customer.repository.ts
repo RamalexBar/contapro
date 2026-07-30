@@ -1,5 +1,6 @@
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
+import { NotFoundError } from "../../../shared/errors/app-error";
 import type { CreateCustomerData, CustomerRecord, ICustomerRepository } from "../domain/customer.repository";
 
 function toRecord(row: {
@@ -46,5 +47,11 @@ export class PrismaCustomerRepository implements ICustomerRepository {
       take: 100,
     });
     return rows.map(toRecord);
+  }
+
+  async findByIdOrThrow(id: string): Promise<CustomerRecord> {
+    const row = await prisma.customer.findFirst({ where: { id, companyId: getTenantContext().companyId } });
+    if (!row) throw new NotFoundError("Customer", id);
+    return toRecord(row);
   }
 }

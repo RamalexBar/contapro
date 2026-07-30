@@ -38,6 +38,7 @@ export interface SaleRecord {
   companyId: string;
   branchId: string;
   number: number;
+  customerId: string | null;
   sellerUserId: string;
   status: SaleStatus;
   paymentStatus: string;
@@ -45,6 +46,9 @@ export interface SaleRecord {
   discountTotal: number;
   taxTotal: number;
   total: number;
+  cufe: string | null;
+  cude: string | null;
+  invoiceXmlUrl: string | null;
   createdAt: Date;
   items: Array<{
     id: string;
@@ -52,6 +56,8 @@ export interface SaleRecord {
     quantity: number;
     unitPrice: number;
     discountPercent: number;
+    taxPercent: number;
+    taxAmount: number;
     total: number;
     requiresDiscountAuthorization: boolean;
     discountAuthorizationId: string | null;

@@ -65,6 +65,9 @@ export const PERMISSIONS = [
 
   { code: "suppliers.manage", module: "suppliers", description: "Crear proveedores y registrar compras" },
   { code: "suppliers.read", module: "suppliers", description: "Consultar proveedores y compras registradas" },
+
+  { code: "electronic-invoicing.manage", module: "electronic-invoicing", description: "Administrar resoluciones de numeracion DIAN" },
+  { code: "electronic-invoicing.read", module: "electronic-invoicing", description: "Consultar facturas electronicas generadas" },
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];
@@ -91,6 +94,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "accounting.read",
     "suppliers.manage",
     "suppliers.read",
+    "electronic-invoicing.manage",
+    "electronic-invoicing.read",
   ],
   SUPERVISOR: [
     "product.create",
@@ -130,6 +135,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "timeoff.read",
     "suppliers.manage",
     "suppliers.read",
+    "electronic-invoicing.manage",
+    "electronic-invoicing.read",
   ],
   CAJERO: [
     // Explicitamente SIN product.price.update / product.cost.update / product.barcode.update / product.delete

@@ -39,8 +39,9 @@ model Sale {
   cancelledAt   DateTime?
   createdAt     DateTime      @default(now())
 
-  items    SaleItem[]
-  payments SalePayment[]
+  items             SaleItem[]
+  payments          SalePayment[]
+  electronicInvoice ElectronicInvoice?
 
   @@unique([branchId, number])
   @@index([companyId, branchId, createdAt])

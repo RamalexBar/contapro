@@ -1,0 +1,65 @@
+// Facturacion electronica DIAN (Colombia) — ver apps/api/src/modules/electronic-invoicing/README.md
+// Esta iteracion solo genera CUFE + XML localmente. Firma XAdES y envio SOAP a la DIAN
+// quedan pendientes de credenciales reales de habilitacion.
+
+enum ElectronicInvoiceStatus {
+  GENERATED // unico estado usado en esta iteracion (CUFE + XML generados localmente)
+  PENDING_SIGNATURE // reservado: firma XAdES pendiente (iteracion futura)
+  PENDING_SUBMISSION // reservado: envio SOAP a la DIAN pendiente (iteracion futura)
+  ACCEPTED // reservado: la DIAN acepto el documento
+  REJECTED // reservado: la DIAN rechazo el documento
+}
+
+/// Rango de numeracion autorizado por la DIAN ("resolucion de facturacion"), independiente
+/// del consecutivo interno Sale.number (ticket POS por sucursal, no debe tocarse).
+model InvoiceNumberingResolution {
+  id               String   @id @default(uuid())
+  companyId        String
+  branchId         String? // null = aplica a todas las sucursales de la empresa
+  resolutionNumber String // numero de resolucion otorgado por la DIAN (dato administrativo)
+  prefix           String // ej. "SETP"
+  rangeFrom        Int
+  rangeTo          Int
+  currentNumber    Int      @default(0) // ultimo numero entregado; 0 = ninguno entregado aun
+  validFrom        DateTime
+  validUntil       DateTime
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  invoices ElectronicInvoice[]
+
+  @@unique([companyId, prefix])
+  @@index([companyId, branchId, isActive])
+  @@map("invoice_numbering_resolutions")
+}
+
+/// Un registro por venta facturada electronicamente. El XML completo se guarda en xmlContent
+/// (sin storage de objetos configurado aun, ver README del modulo).
+model ElectronicInvoice {
+  id                     String                  @id @default(uuid())
+  companyId              String
+  branchId               String
+  saleId                 String                  @unique
+  sale                   Sale                    @relation(fields: [saleId], references: [id])
+  numberingResolutionId  String
+  numberingResolution    InvoiceNumberingResolution @relation(fields: [numberingResolutionId], references: [id])
+  prefix                 String
+  number                 Int
+  fullNumber             String // prefix + number, ej "SETP990000001"
+  cufe                   String
+  issueDate              DateTime
+  customerDocumentType   String
+  customerDocumentNumber String
+  customerName           String
+  subtotal               Decimal                 @db.Decimal(14, 2)
+  taxTotal               Decimal                 @db.Decimal(14, 2)
+  total                  Decimal                 @db.Decimal(14, 2)
+  environment            String // snapshot de DIAN_ENVIRONMENT al generar (HABILITACION|PRODUCCION)
+  xmlContent              String                  @db.Text
+  status                 ElectronicInvoiceStatus @default(GENERATED)
+  createdAt              DateTime                @default(now())
+
+  @@unique([companyId, prefix, number])
+  @@index([companyId, branchId, createdAt])
+  @@map("electronic_invoices")
+}

@@ -3,9 +3,11 @@ import { getTenantContext } from "../../../../../shared/context/request-context"
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "../../../../../shared/errors/app-error";
 import type { AuditService } from "../../../../audit/application/audit.service";
 import type { PostSaleJournalEntryUseCase } from "../../../../accounting/application/use-cases/post-sale-journal-entry.use-case";
+import type { GenerateElectronicInvoiceUseCase } from "../../../../electronic-invoicing/application/use-cases/generate-electronic-invoice.use-case";
 import type { IUserRepository } from "../../../../auth/domain/user.repository";
 import { verifySecret } from "../../../../auth/infrastructure/password-hasher.service";
 import { prisma } from "../../../../../shared/prisma/prisma-client";
+import type { IProductRepository } from "../../../../inventory/product/domain/product.repository";
 import type { ISaleRepository, SaleRecord } from "../../domain/sale.repository";
 
 /**
@@ -18,6 +20,8 @@ export class AuthorizeDiscountUseCase {
     private readonly saleRepo: ISaleRepository,
     private readonly userRepo: IUserRepository,
     private readonly postSaleJournalEntry: PostSaleJournalEntryUseCase,
+    private readonly generateElectronicInvoice: GenerateElectronicInvoiceUseCase,
+    private readonly productRepo: IProductRepository,
     private readonly audit: AuditService
   ) {}
 
@@ -78,6 +82,43 @@ export class AuthorizeDiscountUseCase {
         total: updatedSale.total,
         payments: updatedSale.payments,
       });
+
+      try {
+        const items = await Promise.all(
+          updatedSale.items.map(async (saleItem) => {
+            const product = await this.productRepo.findByIdOrThrow(saleItem.productId);
+            return {
+              description: product.toProps.name,
+              quantity: saleItem.quantity,
+              unitPrice: saleItem.unitPrice,
+              taxPercent: saleItem.taxPercent,
+              taxAmount: saleItem.taxAmount,
+              total: saleItem.total,
+            };
+          })
+        );
+
+        await this.generateElectronicInvoice.execute({
+          saleId: updatedSale.id,
+          branchId: updatedSale.branchId,
+          customerId: updatedSale.customerId,
+          issueDate: updatedSale.createdAt,
+          subtotal: updatedSale.subtotal,
+          taxTotal: updatedSale.taxTotal,
+          total: updatedSale.total,
+          items,
+        });
+      } catch (err) {
+        // Mismo criterio que create-sale.use-case.ts: no bloquear la venta si falla la
+        // facturacion electronica local.
+        await this.audit.record({
+          action: "ELECTRONIC_INVOICE_GENERATION_FAILED",
+          entityType: "Sale",
+          entityId: updatedSale.id,
+          description: `No se pudo generar la factura electronica de la venta #${updatedSale.number}: ${(err as Error).message}`,
+          metadata: {},
+        });
+      }
     }
 
     await this.audit.record({

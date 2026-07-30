@@ -21,4 +21,5 @@ export interface CustomerRecord {
 export interface ICustomerRepository {
   create(data: CreateCustomerData): Promise<CustomerRecord>;
   list(search?: string): Promise<CustomerRecord[]>;
+  findByIdOrThrow(id: string): Promise<CustomerRecord>;
 }

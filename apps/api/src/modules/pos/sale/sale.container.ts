@@ -2,6 +2,7 @@ import { PrismaAuditLogRepository } from "../../audit/infrastructure/prisma-audi
 import { AuditService } from "../../audit/application/audit.service";
 import { PrismaUserRepository } from "../../auth/infrastructure/prisma-user.repository";
 import { postSaleJournalEntryUseCase } from "../../accounting/accounting.container";
+import { generateElectronicInvoiceUseCase } from "../../electronic-invoicing/electronic-invoicing.container";
 import { productRepo } from "../../inventory/product/product.container";
 import { PrismaSaleRepository } from "./infrastructure/prisma-sale.repository";
 import { PrismaDiscountLimitRepository } from "./infrastructure/prisma-discount-limit.repository";
@@ -18,8 +19,22 @@ const userRepo = new PrismaUserRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
 export const saleController = new SaleController(
-  new CreateSaleUseCase(saleRepo, productRepo, discountLimitRepo, postSaleJournalEntryUseCase, auditService),
-  new AuthorizeDiscountUseCase(saleRepo, userRepo, postSaleJournalEntryUseCase, auditService),
+  new CreateSaleUseCase(
+    saleRepo,
+    productRepo,
+    discountLimitRepo,
+    postSaleJournalEntryUseCase,
+    generateElectronicInvoiceUseCase,
+    auditService
+  ),
+  new AuthorizeDiscountUseCase(
+    saleRepo,
+    userRepo,
+    postSaleJournalEntryUseCase,
+    generateElectronicInvoiceUseCase,
+    productRepo,
+    auditService
+  ),
   new CancelSaleUseCase(saleRepo, auditService),
   new GetSaleUseCase(saleRepo),
   new ListSalesUseCase(saleRepo)

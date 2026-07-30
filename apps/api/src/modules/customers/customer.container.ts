@@ -5,3 +5,6 @@ import { CustomerController } from "./interfaces/customer.controller";
 
 const repo = new PrismaCustomerRepository();
 export const customerController = new CustomerController(new CreateCustomerUseCase(repo), new ListCustomersUseCase(repo));
+
+/** Usado por electronic-invoicing.container.ts para leer los datos del cliente al facturar. */
+export const customerRepo = repo;

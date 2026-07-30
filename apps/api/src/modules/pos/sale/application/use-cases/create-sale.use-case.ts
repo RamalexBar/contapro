@@ -4,6 +4,7 @@ import { getTenantContext } from "../../../../../shared/context/request-context"
 import { ValidationError } from "../../../../../shared/errors/app-error";
 import type { AuditService } from "../../../../audit/application/audit.service";
 import type { PostSaleJournalEntryUseCase } from "../../../../accounting/application/use-cases/post-sale-journal-entry.use-case";
+import type { GenerateElectronicInvoiceUseCase } from "../../../../electronic-invoicing/application/use-cases/generate-electronic-invoice.use-case";
 import type { IProductRepository } from "../../../../inventory/product/domain/product.repository";
 import type { ComputedSaleItem, ISaleRepository, SaleRecord } from "../../domain/sale.repository";
 import type { IDiscountLimitRepository } from "../../domain/discount-limit.repository";
@@ -22,6 +23,7 @@ export class CreateSaleUseCase {
     private readonly productRepo: IProductRepository,
     private readonly discountLimitRepo: IDiscountLimitRepository,
     private readonly postSaleJournalEntry: PostSaleJournalEntryUseCase,
+    private readonly generateElectronicInvoice: GenerateElectronicInvoiceUseCase,
     private readonly audit: AuditService
   ) {}
 
@@ -39,9 +41,11 @@ export class CreateSaleUseCase {
     let needsAuthorization = false;
 
     const computedItems: ComputedSaleItem[] = [];
+    const productNames: string[] = [];
     for (const item of input.items) {
       const product = await this.productRepo.findByIdOrThrow(item.productId);
       const props = product.toProps;
+      productNames.push(props.name);
 
       const lineSubtotal = round2(props.currentPrice * item.quantity);
       const discountAmount = round2(lineSubtotal - applyDiscount(lineSubtotal, item.discountPercent));
@@ -120,6 +124,37 @@ export class CreateSaleUseCase {
         total: sale.total,
         payments: sale.payments,
       });
+
+      try {
+        await this.generateElectronicInvoice.execute({
+          saleId: sale.id,
+          branchId: sale.branchId,
+          customerId: input.customerId ?? null,
+          issueDate: sale.createdAt,
+          subtotal: sale.subtotal,
+          taxTotal: sale.taxTotal,
+          total: sale.total,
+          items: computedItems.map((item, i) => ({
+            description: productNames[i],
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            taxPercent: item.taxPercent,
+            taxAmount: item.taxAmount,
+            total: item.total,
+          })),
+        });
+      } catch (err) {
+        // No bloquear la venta si falla la facturacion electronica local (ver README del
+        // modulo): se audita el fallo y la venta queda COMPLETED sin CUFE, recuperable
+        // manualmente despues (mismo criterio que la contabilizacion automatica arriba).
+        await this.audit.record({
+          action: "ELECTRONIC_INVOICE_GENERATION_FAILED",
+          entityType: "Sale",
+          entityId: sale.id,
+          description: `No se pudo generar la factura electronica de la venta #${sale.number}: ${(err as Error).message}`,
+          metadata: {},
+        });
+      }
     }
 
     return sale;
