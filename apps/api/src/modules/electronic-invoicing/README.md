@@ -138,6 +138,24 @@ es la segunda parte menos verificada, ver mas abajo.
     estan confirmados publicamente, a diferencia del de facturacion. Todo lo demas (firma XAdES,
     maquina de estados, poller, reenvio manual) reusa el motor generico existente sin cambios.
     Endpoints: `GET/POST /electronic-invoicing/payroll-details/:payrollDetailId[...]`.
+13. **RIDE (representacion grafica en PDF)** — los 5 tipos de documento ahora tienen un endpoint
+    `GET .../{sales/:saleId, credit-notes/:creditNoteId, debit-notes/:debitNoteId,
+    purchases/:purchaseId, payroll-details/:payrollDetailId}/pdf` que devuelve un PDF (`pdfkit`,
+    Node puro, sin navegador headless — mismo criterio que el resto del modulo de no depender de
+    runtimes pesados). Un solo layout compartido
+    (`infrastructure/pdfkit-ride-renderer.ts`) sirve a los 5 tipos; cada uno tiene su propia
+    funcion adaptadora en `application/ride-data-mapper.ts`
+    (`mapInvoiceToRideData`/`mapNoteToRideData`/`mapSupportDocumentToRideData`/
+    `mapPayrollToRideData`). El emisor, la contraparte (comprador/proveedor/trabajador), los
+    totales y las lineas **se parsean del `xmlContent` ya guardado** en vez de volver a consultar
+    `Sale`/`Purchase`/`Product` — los tipos de dominio `Electronic*Record` son deliberadamente
+    minimos (numero, codigo unico, estado) y no duplican esos datos, así que el XML es la unica
+    fuente disponible sin acoplar este modulo a otros (`application/xml-document-extractor.ts`,
+    con pruebas). Sin logo de empresa en esta version (evita I/O de red durante el render). Con
+    `DIAN_ENVIRONMENT=HABILITACION` (el default) el PDF lleva una marca de agua diagonal
+    "HABILITACION - NO VALIDO COMO DOCUMENTO FISCAL". **Ver limitaciones**: el formato del QR y el
+    layout en si no estan validados contra el Anexo Tecnico DIAN vigente, y el documento soporte
+    no tiene desglose de lineas (hereda el hueco de su XML, ver punto 8).
 
 ## Como probar localmente sin credenciales DIAN
 
@@ -198,7 +216,16 @@ credenciales de habilitacion reales.
    - El `documentType` del proveedor se asume siempre `"NIT"` (`GenerateElectronicSupportDocumentUseCase`)
      porque `Supplier` no distingue tipo de documento — un proveedor persona natural
      probablemente deberia llevar cedula (CC), no NIT. Sin verificar/sin campo dedicado todavia.
-9. PDF de representacion grafica (RIDE) sigue sin implementar para ningun tipo de documento.
+9. **RIDE (PDF)**: implementado para los 5 tipos (ver punto 13 de "Implementado"), pero:
+   - El **contenido del QR** (`NumFac|FecFac|NitFac|ValFac|<codigo unico>`, ver
+     `ride-data-mapper.ts`) es un formato best-effort **sin verificar** contra el que exige el
+     Anexo Tecnico DIAN — que ademas espera que el QR apunte a una URL de consulta publica
+     (`catalogo-vpfe.dian.gov.co` o similar) que no existe sin credenciales de produccion reales.
+   - El **layout en si** (que campos van donde, tamaños, orden) es una interpretacion propia de lo
+     que suele mostrar un RIDE, no una plantilla oficial de la DIAN.
+   - El documento soporte no tiene desglose de lineas en su PDF porque su XML tampoco las tiene
+     (ver punto 8 — hueco preexistente del builder, no ampliado por este RIDE).
+   - No se descarga/embebe el logo de la empresa (`Company.logoUrl` existe pero no se usa aqui).
 10. **Nomina electronica (CUNE) — la parte MAS especulativa de todo el modulo**:
     - El **esquema XML** en `application/dian-payroll-xml-builder.ts` es una estructura best-effort
       propia, **sin contrastar contra el XSD/Anexo Tecnico real** de la Resolucion 000013 de 2021

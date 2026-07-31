@@ -27,6 +27,11 @@ electronicInvoicingRouter.get(
   requirePermission("electronic-invoicing.read"),
   electronicInvoicingController.getXmlBySale
 );
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/sales/:saleId/pdf",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getPdfBySale
+);
 electronicInvoicingRouter.post(
   "/electronic-invoicing/sales/:saleId/resubmit",
   requirePermission("electronic-invoicing.manage"),
@@ -42,6 +47,11 @@ electronicInvoicingRouter.get(
   "/electronic-invoicing/credit-notes/:creditNoteId/xml",
   requirePermission("electronic-invoicing.read"),
   electronicInvoicingController.getXmlByCreditNote
+);
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/credit-notes/:creditNoteId/pdf",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getPdfByCreditNote
 );
 electronicInvoicingRouter.post(
   "/electronic-invoicing/credit-notes/:creditNoteId/resubmit",
@@ -59,6 +69,11 @@ electronicInvoicingRouter.get(
   requirePermission("electronic-invoicing.read"),
   electronicInvoicingController.getXmlByDebitNote
 );
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/debit-notes/:debitNoteId/pdf",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getPdfByDebitNote
+);
 electronicInvoicingRouter.post(
   "/electronic-invoicing/debit-notes/:debitNoteId/resubmit",
   requirePermission("electronic-invoicing.manage"),
@@ -75,6 +90,11 @@ electronicInvoicingRouter.get(
   requirePermission("electronic-invoicing.read"),
   electronicInvoicingController.getXmlBySupportDocument
 );
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/purchases/:purchaseId/pdf",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getPdfBySupportDocument
+);
 electronicInvoicingRouter.post(
   "/electronic-invoicing/purchases/:purchaseId/resubmit",
   requirePermission("electronic-invoicing.manage"),
@@ -90,6 +110,11 @@ electronicInvoicingRouter.get(
   "/electronic-invoicing/payroll-details/:payrollDetailId/xml",
   requirePermission("electronic-invoicing.read"),
   electronicInvoicingController.getXmlByPayrollDetail
+);
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/payroll-details/:payrollDetailId/pdf",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getPdfByPayrollDetail
 );
 electronicInvoicingRouter.post(
   "/electronic-invoicing/payroll-details/:payrollDetailId/resubmit",

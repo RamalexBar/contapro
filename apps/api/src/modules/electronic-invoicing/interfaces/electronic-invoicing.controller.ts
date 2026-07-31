@@ -11,6 +11,8 @@ import type { GetElectronicSupportDocumentUseCase } from "../application/use-cas
 import type { ResubmitElectronicSupportDocumentUseCase } from "../application/use-cases/resubmit-electronic-support-document.use-case";
 import type { GetElectronicPayrollUseCase } from "../application/use-cases/get-electronic-payroll.use-case";
 import type { ResubmitElectronicPayrollUseCase } from "../application/use-cases/resubmit-electronic-payroll.use-case";
+import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSupportDocumentToRideData } from "../application/ride-data-mapper";
+import { renderRidePdf } from "../infrastructure/pdfkit-ride-renderer";
 import { createNumberingResolutionSchema } from "./electronic-invoicing.validators";
 
 export class ElectronicInvoicingController {
@@ -181,6 +183,59 @@ export class ElectronicInvoicingController {
     try {
       await this.resubmitPayrollUseCase.execute(req.params.payrollDetailId);
       res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ---- RIDE (representacion grafica en PDF), ver application/ride-data-mapper.ts +
+  // infrastructure/pdfkit-ride-renderer.ts. Reusa el mismo Get*UseCase que ya sirve el XML. ----
+
+  getPdfBySale = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const invoice = await this.getInvoiceUseCase.execute(req.params.saleId);
+      const pdf = await renderRidePdf(mapInvoiceToRideData(invoice));
+      res.type("application/pdf").send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPdfByCreditNote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const note = await this.getCreditNoteUseCase.execute(req.params.creditNoteId);
+      const pdf = await renderRidePdf(mapNoteToRideData(note, "CREDIT"));
+      res.type("application/pdf").send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPdfByDebitNote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const note = await this.getDebitNoteUseCase.execute(req.params.debitNoteId);
+      const pdf = await renderRidePdf(mapNoteToRideData(note, "DEBIT"));
+      res.type("application/pdf").send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPdfBySupportDocument = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const doc = await this.getSupportDocumentUseCase.execute(req.params.purchaseId);
+      const pdf = await renderRidePdf(mapSupportDocumentToRideData(doc));
+      res.type("application/pdf").send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPdfByPayrollDetail = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const doc = await this.getPayrollUseCase.execute(req.params.payrollDetailId);
+      const pdf = await renderRidePdf(mapPayrollToRideData(doc));
+      res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
     }
