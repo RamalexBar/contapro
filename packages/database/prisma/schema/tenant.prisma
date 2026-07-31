@@ -122,3 +122,17 @@ model SubscriptionReminderLog {
   @@unique([subscriptionId, daysBeforeDue])
   @@map("subscription_reminder_logs")
 }
+
+/// Operador de la plataforma (no pertenece a ninguna Company) -- autenticacion completamente
+/// separada de User (ver modules/saas-admin/README.md): JWT propio (JWT_PLATFORM_ADMIN_SECRET),
+/// sin AsyncLocalStorage/tenant context, repos via basePrisma. Sin relacion a Company/Role/User.
+model PlatformAdmin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@map("platform_admins")
+}

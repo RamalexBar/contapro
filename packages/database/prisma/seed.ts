@@ -40,7 +40,20 @@ async function main() {
       }
     }
 
-    // ---- Plan + Empresa + Sucursal ----
+    // ---- Planes (panel administrador SaaS) ----
+    await tx.plan.upsert({
+      where: { code: "TRIAL" },
+      create: {
+        code: "TRIAL",
+        name: "Prueba gratuita",
+        priceMonthly: 0,
+        priceYearly: 0,
+        maxBranches: 1,
+        maxUsers: 3,
+        features: { pos: true, inventory: true, cash: true, payroll: false, accounting: false },
+      },
+      update: {},
+    });
     const plan = await tx.plan.upsert({
       where: { code: "BASICO" },
       create: {
@@ -54,6 +67,21 @@ async function main() {
       },
       update: {},
     });
+    await tx.plan.upsert({
+      where: { code: "PRO" },
+      create: {
+        code: "PRO",
+        name: "Plan Pro",
+        priceMonthly: 99900,
+        priceYearly: 999000,
+        maxBranches: 10,
+        maxUsers: 50,
+        features: { pos: true, inventory: true, cash: true, payroll: true, accounting: true },
+      },
+      update: {},
+    });
+
+    // ---- Empresa + Sucursal ----
 
     const company = await tx.company.upsert({
       where: { nit: "900123456-7" },
@@ -288,11 +316,23 @@ async function main() {
       },
       update: {},
     });
+
+    // ---- Administrador de plataforma (panel SaaS, autenticacion separada de User) ----
+    await tx.platformAdmin.upsert({
+      where: { email: "platform@demo.com" },
+      create: {
+        email: "platform@demo.com",
+        passwordHash,
+        fullName: "Operador Plataforma",
+      },
+      update: {},
+    });
   });
 
   console.log("Seed completado.");
   console.log(`  Admin  -> admin@demo.com / ${DEMO_PASSWORD}`);
   console.log(`  Cajero -> cajero@demo.com / ${DEMO_PASSWORD} (limite descuento 5%, PIN 1234)`);
+  console.log(`  Platform admin -> platform@demo.com / ${DEMO_PASSWORD} (POST /api/admin/auth/login)`);
 }
 
 main()

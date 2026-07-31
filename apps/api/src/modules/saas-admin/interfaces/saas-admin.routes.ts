@@ -1,14 +1,26 @@
 import { Router } from "express";
-import { notImplemented } from "../../../shared/middlewares/not-implemented.middleware";
+import { requirePlatformAdmin } from "../../../shared/middlewares/require-platform-admin.middleware";
+import { saasAdminController } from "../saas-admin.container";
 
 // NOTA: este router NO usa tenantContextMiddleware -- el panel de administrador SaaS es
-// transversal a todas las empresas y requerira su propio mecanismo de autenticacion de
-// "super-admin de plataforma" (distinto del JWT por empresa). Queda documentado para cuando
-// se implemente el modulo.
+// transversal a todas las empresas, protegido por requirePlatformAdmin (JWT con secreto propio,
+// ver shared/middlewares/require-platform-admin.middleware.ts y config/env.ts).
 export const saasAdminRouter = Router();
 
-const stub = notImplemented("saas-admin");
-saasAdminRouter.all("/admin/companies", stub);
-saasAdminRouter.all("/admin/plans", stub);
-saasAdminRouter.all("/admin/subscriptions", stub);
-saasAdminRouter.all("/admin/payments", stub);
+saasAdminRouter.post("/admin/auth/login", saasAdminController.login);
+
+saasAdminRouter.post("/admin/plans", requirePlatformAdmin, saasAdminController.createPlan);
+saasAdminRouter.get("/admin/plans", requirePlatformAdmin, saasAdminController.listPlans);
+saasAdminRouter.patch("/admin/plans/:id", requirePlatformAdmin, saasAdminController.updatePlan);
+
+saasAdminRouter.post("/admin/subscriptions", requirePlatformAdmin, saasAdminController.createSubscription);
+saasAdminRouter.get("/admin/subscriptions", requirePlatformAdmin, saasAdminController.listSubscriptions);
+saasAdminRouter.get("/admin/subscriptions/:id", requirePlatformAdmin, saasAdminController.getSubscription);
+saasAdminRouter.post(
+  "/admin/subscriptions/:id/payments",
+  requirePlatformAdmin,
+  saasAdminController.registerSubscriptionPayment
+);
+
+saasAdminRouter.get("/admin/companies", requirePlatformAdmin, saasAdminController.listCompanies);
+saasAdminRouter.get("/admin/dashboard", requirePlatformAdmin, saasAdminController.getDashboard);

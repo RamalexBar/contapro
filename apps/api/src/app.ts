@@ -43,6 +43,13 @@ app.get("/health", (_req, res) => res.json({ status: "ok", env: env.NODE_ENV }))
 
 // ---- Modulos funcionales ----
 app.use("/api", authRouter);
+// saas-admin va ANTES de cualquier router tenant-scoped: cada router de abajo hace
+// `.use(tenantContextMiddleware)` sin path, que intercepta CUALQUIER request que le llegue
+// (no solo sus propias rutas) y devuelve 401 antes de que Express siga probando routers
+// posteriores. Como /admin/* nunca es tenant-scoped (autenticacion de plataforma separada, ver
+// shared/middlewares/require-platform-admin.middleware.ts), tiene que montarse antes de que un
+// router tenant-scoped tenga la oportunidad de interceptarlo.
+app.use("/api", saasAdminRouter);
 app.use("/api", rbacRouter);
 app.use("/api", categoryRouter);
 app.use("/api", brandRouter);
@@ -64,7 +71,6 @@ app.use("/api", suppliersRouter);
 app.use("/api", electronicInvoicingRouter);
 
 // ---- Modulos stub (501, ver docs/ALCANCE.md) ----
-app.use("/api", saasAdminRouter);
 app.use("/api", syncRouter);
 
 app.use((req, res) => {

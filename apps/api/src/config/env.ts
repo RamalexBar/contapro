@@ -9,6 +9,11 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(10),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
+  // Secreto SEPARADO del de usuarios de empresa (JWT_ACCESS_SECRET) -- un token de plataforma
+  // (PlatformAdmin, ver modules/saas-admin/README.md) nunca debe poder reusarse como token de
+  // empresa ni viceversa.
+  JWT_PLATFORM_ADMIN_SECRET: z.string().min(10),
+  JWT_PLATFORM_ADMIN_EXPIRES_IN: z.string().default("8h"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 
   // ---- Facturacion electronica DIAN (ver modules/electronic-invoicing/README.md) ----
