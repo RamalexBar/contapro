@@ -19,15 +19,22 @@ model SyncOutbox {
   id             String    @id @default(uuid())
   companyId      String
   branchId       String
+  // Id generado por el cliente al encolar el evento localmente (ver apps/mobile/src/lib/sync) --
+  // clave de idempotencia: reenviar el mismo push (ej. la respuesta anterior se perdio por la
+  // red) no debe crear un segundo Sale. Unico por empresa, no globalmente (dos empresas podrian
+  // generar el mismo uuid en teoria, aunque es astronomicamente improbable).
+  clientEventId  String
   entityType     String    // "Sale", "CashMovement", "StockMovement", ...
-  entityId       String
+  entityId       String?   // null hasta que el evento se procese con exito (PENDING/ERROR)
   operation      String    // CREATE, UPDATE, DELETE
   payload        Json
   originDeviceId String?
   status         String    @default("PENDING") // PENDING, SYNCED, CONFLICT, ERROR
+  errorMessage   String?
   createdAt      DateTime  @default(now())
   syncedAt       DateTime?
 
+  @@unique([companyId, clientEventId])
   @@index([companyId, status])
   @@map("sync_outbox")
 }

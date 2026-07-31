@@ -18,15 +18,19 @@ const discountLimitRepo = new PrismaDiscountLimitRepository();
 const userRepo = new PrismaUserRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
+/** Usado tambien por sync.container.ts para reproducir ventas encoladas offline (mismo caso de
+ * uso que POST /sales, ver push-sync-events.use-case.ts). */
+export const createSaleUseCase = new CreateSaleUseCase(
+  saleRepo,
+  productRepo,
+  discountLimitRepo,
+  postSaleJournalEntryUseCase,
+  generateElectronicInvoiceUseCase,
+  auditService
+);
+
 export const saleController = new SaleController(
-  new CreateSaleUseCase(
-    saleRepo,
-    productRepo,
-    discountLimitRepo,
-    postSaleJournalEntryUseCase,
-    generateElectronicInvoiceUseCase,
-    auditService
-  ),
+  createSaleUseCase,
   new AuthorizeDiscountUseCase(
     saleRepo,
     userRepo,

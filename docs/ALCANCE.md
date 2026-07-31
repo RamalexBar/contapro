@@ -26,28 +26,23 @@ la base de datos.
 | **Proveedores / Compras (iteración 3, 10, 13 y 16)** | CRUD de proveedores; orden de compra (crear → enviar → recibir parcial/total); recepción de mercancía con impacto real en inventario (stock por sucursal, lotes si el producto los rastrea, y **recálculo real de costo promedio ponderado** de `Product.currentCost` — primer código que efectivamente lo calcula, antes ningún flujo de entrada de stock lo hacía); registro directo de factura de compra (`Purchase` + `AccountPayable`, contabilización automática); abonos a cuentas por pagar con su propio comprobante contable; cancelación de una compra **con o sin abonos** (iteración 16: si ya tiene abonos, primero los reversa — `SupplierPayment.status` nuevo, `REGISTERED`/`REVERSED` — y anula el comprobante contable de cada uno vía `IJournalEntryRepository.findBySource`, antes de cancelar la compra misma). Orden de compra/recepción y factura **no se enlazan entre sí** (flujos paralelos por diseño). **FIFO real** (iteración 16, en el módulo POS): al completar una venta, si el producto usa `costMethod = FIFO` y `tracksBatches`, se consumen los `Batch` en orden de entrada (más antiguo primero) y el `StockMovement` de salida guarda el costo real ponderado de los lotes consumidos (antes se guardaba el precio de venta como costo, para todos los métodos) — `Product.currentCost` queda en el costo del lote más antiguo que quede disponible. UI web (proveedores, órdenes de compra) agregada en la iteración 13. Ver `apps/api/src/modules/suppliers/README.md` para el detalle y lo pendiente (Kardex, `StockMovement` por lote, Devoluciones no restaura lotes) |
 | **Facturación electrónica DIAN (iteración 4-8, sin UI web todavía)** | Generación local de CUFE/CUDE/CUDS/CUNE (SHA-384) y XML por cada venta completada, cada nota crédito/débito que referencia una venta ya facturada, cada compra a un proveedor marcado como no obligado a facturar electrónicamente (documento soporte), **y cada empleado de cada nómina aprobada (nómina electrónica)**, con numeración DIAN (prefijo/rango/consecutivo atómico por tipo de documento; nómina usa un contador simple propio, sin resolución — ver README) separada del consecutivo interno del POS. Ventas sin cliente usan un identificador genérico de "consumidor final" (constante aislada, pendiente de verificar contra el Anexo Técnico). Firma XAdES-BES (certificado PKCS#12, probada con certificado autofirmado) y envío asíncrono a la DIAN (un poller en proceso por tipo de documento, dos servicios SOAP distintos: uno para factura/notas/documento soporte y otro para nómina) implementados pero **no verificados contra el servicio real de la DIAN** — faltan credenciales de habilitación para probarlos end-to-end. La nómina electrónica es, con diferencia, la parte menos verificada de todo el módulo: esquema XML propio no-UBL sin contrastar contra el Anexo Técnico, servicio SOAP separado sin confirmar ni en nombre, sin retención en la fuente calculada. **RIDE (representación gráfica en PDF)** implementado para los 5 tipos de documento (`GET .../pdf`, `pdfkit`, un solo layout compartido) parseando el XML ya guardado — formato del QR y layout sin verificar contra el Anexo Técnico. Ver `apps/api/src/modules/electronic-invoicing/README.md` para la lista completa de detalles sin verificar |
 | **Panel administrador SaaS (iteración 12, 13 y 17)** | Autenticación de plataforma **separada** de la de usuarios de empresa (`PlatformAdmin`, JWT con secreto propio, sin tenant context — ver `apps/api/src/modules/saas-admin/README.md`). CRUD de planes y suscripciones, cobro/renovación (`calculateNextPeriodEnd` desde la fecha de vencimiento **original**, nunca desde la fecha del pago), vista de empresas con su suscripción, dashboard agregado (conteo por estado, próximas a vencer, ingresos del mes). Al registrar una empresa se crea automáticamente una suscripción `TRIALING` de 30 días (valor asumido, el spec no especifica la duración exacta). Poller en proceso (1h) que envía un recordatorio **real por correo** (iteración 17: `IReminderNotifier` / `ResendEmailNotifier`, vía `fetch` directo a la API de Resend, sin SDK) en 8/5/3/1/0 días antes del vencimiento y pasa automáticamente a `GRACE_PERIOD`/`SUSPENDED` según corresponda. `SubscriptionReminderLog` solo se registra si el envío tuvo éxito — un fallo (o `RESEND_API_KEY` sin configurar) deja el recordatorio pendiente para el siguiente ciclo, sin perderlo. **No probado end-to-end contra Resend real** (mismo aviso que la integración DIAN) ni contra WhatsApp (requiere verificación de negocio en Meta, fuera de alcance). UI web (login de plataforma, dashboard, planes, suscripciones, empresas) agregada en la iteración 13 |
+| **Sincronización offline (móvil, iteración 18)** | Patrón *outbox* real para ventas: `POST /sync/push` (idempotente por `clientEventId`, reusa `CreateSaleUseCase` — el mismo caso de uso de `POST /sales` — sin lógica de negocio duplicada) y `GET /sync/pull` (catálogo de productos cambiado desde el último pull). Conflictos reales (mismo `clientEventId`, payload distinto) quedan en `SyncConflictLog`. **Bug real encontrado y corregido**: Postgres JSONB no preserva el orden de las claves del payload, así que comparar con `JSON.stringify` plano daba falsos conflictos en reintentos idénticos — se usa una comparación con orden de claves normalizado. Cliente móvil (`apps/mobile`): `POSScreen` ahora lee siempre de `products_cache` local (offline-first, no directo de la API), cola `sales_outbox` con id generado localmente, motor de sync (`pull`/`push`/intervalo cada 30s mientras la app está abierta) y botón manual "Sincronizar". Solo `Sale` está soportado como entidad sincronizable (`CashMovement`/`StockMovement` quedan modelados en el schema pero sin UI ni tabla local todavía). Deliberadamente **sin `@react-native-community/netinfo`** (detección real de reconexión) — no hay forma de verificar en este entorno que un módulo nativo enlace correctamente sin dispositivo/emulador; el intervalo de 30s logra el mismo resultado práctico con un retraso acotado. Verificado en vivo contra el servidor de desarrollo (push nuevo, retry idempotente, conflicto, error de producto inexistente, pull). Ver `apps/api/src/modules/sync/README.md` |
 
-## 🧱 Modelado en Prisma, con rutas stub (`501 Not Implemented`) documentadas
+## 🧱 Ya no quedan módulos "stub" (`501 Not Implemented`)
 
-Cada uno de estos módulos tiene su `schema.prisma` completo y un `README.md` propio en
-`apps/api/src/modules/<modulo>/README.md` con el detalle de lo que falta implementar:
-
-- **Contabilidad (resto)**: cierre de período (`FinancialPeriod`).
-- **Nómina Colombia (resto)**: generación de PDF del desprendible, reportes mensual/anual
-  consolidados, deducciones detalladas (libranzas/embargos).
-- **Sincronización offline**: patrón *outbox* (`SyncOutbox`, `SyncDevice`, `SyncConflictLog`) para que
-  la app móvil funcione sin internet y sincronice al reconectar — el scaffold de SQLite existe en
-  `apps/mobile`, pero el motor de sincronización aún no está implementado.
-- **Costeo FIFO (consumo)**: `Batch` ya se puebla al recibir mercancía (ver Proveedores/Compras
-  arriba) y `Product.costMethod` ya se usa para elegir la fórmula de costo al recibir (promedio
-  ponderado real o "último costo"), pero el **consumo FIFO real** (agotar lotes en orden de
-  entrada al vender) sigue sin implementar — mientras `costMethod = FIFO`, se calcula igual que
-  `AVERAGE`. `Kardex` (historial de saldos) sigue sin poblarse, preparado para reportes futuros.
+Hasta la iteración 13, cuatro huecos seguían modelados en Prisma sin lógica de negocio real
+(contabilidad: cierre de período; nómina: PDF del desprendible; proveedores/POS: consumo FIFO
+real; sync: motor de sincronización). Las iteraciones 14-18 cerraron los cuatro — ver sus filas
+en la tabla de arriba y los README de cada módulo para el detalle. `Kardex` (historial de saldos
+por producto) sigue sin poblarse: el modelo existe, preparado, pero es trabajo de reportes aparte
+de lo que cubrió cualquiera de estas iteraciones.
 
 ## 📱 Móvil (Expo)
 
-Solo scaffold: navegación, pantallas de login/POS/dashboard consumiendo la misma API REST, y
-`expo-sqlite` inicializado con un esquema mínimo de caché. Sin lógica de sincronización todavía.
+Navegación, pantallas de login/POS/dashboard consumiendo la misma API REST. POS con
+sincronización offline real para ventas (iteración 18, ver fila "Sincronización offline" arriba y
+`apps/api/src/modules/sync/README.md`) — el resto de la app (dashboard, futuras pantallas de
+caja/inventario) sigue siendo solo scaffold, sin cache local ni cola offline propia todavía.
 
 ## Próximos pasos sugeridos (por orden de valor de negocio)
 
@@ -64,7 +59,9 @@ Solo scaffold: navegación, pantallas de login/POS/dashboard consumiendo la mism
    ~~UI web del panel~~ — implementada en la iteración 13 (ver punto 14). ~~Envío real de
    recordatorios~~ — implementado en la iteración 17 para correo (ver punto 18); WhatsApp queda
    fuera de alcance (requiere verificación de negocio en Meta).
-5. Sincronización offline completa en móvil.
+5. ~~Sincronización offline completa en móvil~~ — implementado para ventas en la iteración 18
+   (ver punto 19). Queda: `CashMovement`/`StockMovement` como entidades sincronizables (sin UI ni
+   tabla local todavía), NetInfo real, persistencia de sesión en el móvil.
 6. ~~Vacaciones/permisos/ausencias/incapacidades~~ — implementado.
 7. ~~Calendario de festivos colombianos~~ — implementado.
 8. ~~Facturación electrónica: firma XAdES + envío asíncrono a la DIAN~~ — implementado en la
@@ -121,3 +118,14 @@ Solo scaffold: navegación, pantallas de login/POS/dashboard consumiendo la mism
     real contra una cuenta de Resend de verdad **no está probado** (mismo aviso que la integración
     DIAN). WhatsApp no se implementó — requiere verificación de negocio en Meta y plantillas
     pre-aprobadas, fuera de alcance de este trabajo.
+19. ~~Sincronización offline en móvil~~ — implementado en la iteración 18 para ventas (ver punto
+    5): `POST /sync/push` (idempotente por `clientEventId`, reusa `CreateSaleUseCase`) y
+    `GET /sync/pull` (catálogo de productos). Encontrado y corregido un bug real: Postgres JSONB
+    no preserva el orden de las claves del payload, así que comparar con `JSON.stringify` plano
+    daba falsos conflictos en reintentos idénticos del mismo evento — se corrigió con una
+    comparación de orden de claves normalizado. `POSScreen` (móvil) ahora lee siempre de
+    `products_cache` local en vez de la API en vivo (offline-first de verdad, no solo "falla y
+    reintenta"). Deliberadamente sin `@react-native-community/netinfo` (no verificable en este
+    entorno sin dispositivo/emulador) — un intervalo de 30s cubre el mismo caso de uso. Ver
+    `apps/api/src/modules/sync/README.md` para el detalle y lo que sigue pendiente
+    (`CashMovement`/`StockMovement` sincronizables, NetInfo real, persistencia de sesión móvil).
