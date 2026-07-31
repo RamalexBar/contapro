@@ -23,17 +23,14 @@ la base de datos.
 | **Control de horarios** | Marcación de entrada/salida (`TimeEntry`), consulta por empleado/rango de fechas — alimenta el motor de nómina. Vacaciones y permisos con flujo de aprobación `REQUESTED` → `APPROVED`/`REJECTED`, incapacidades (`SUBMITTED` → `APPROVED`/`REJECTED`), y registro de ausencias justificadas/injustificadas (sin flujo de aprobación, las registra un supervisor) |
 | **Nómina Colombia (iteración 2)** | Parámetros legales por año (`PayrollParameter`, tabla global), ciclo de vida de período (`DRAFT` → `CALCULATED` → `APPROVED` → `PAID`), motor de liquidación real: salario prorrateado, auxilio de transporte, horas extra/recargos desde `TimeEntry` (recargo dominical/festivo con **calendario de festivos colombianos calculado algorítmicamente**, `packages/shared-utils/src/colombian-holidays.ts`), deducciones de ley, aportes patronales y provisiones. Desprendible como JSON (`PayslipDocument.summaryJson`). Al aprobar un período genera y postea automáticamente su comprobante contable (ver Contabilidad). Ver `apps/api/src/modules/payroll/README.md` para las limitaciones conocidas (PDF) |
 | **Contabilidad (iteración 3, sin UI web todavía)** | Plan de cuentas (CRUD, jerárquico), comprobantes manuales (crear/postear/anular con validación de partida doble), libro mayor, Balance General y Estado de Resultados. Contabilización automática al completar una venta, registrar una compra y aprobar una nómina (mismas cuentas estándar creadas solas, cuenta de IVA neteada entre venta/compra). Ver `apps/api/src/modules/accounting/README.md` para lo pendiente (flujo de caja, conciliación bancaria) |
-| **Proveedores / Compras (mínimo, iteración 3, sin UI web todavía)** | CRUD básico de proveedores y registro directo de una factura de compra (`Purchase` + `AccountPayable`), sin pasar por orden de compra ni recepción de mercancía. Dispara la contabilización automática de la compra. Ver `apps/api/src/modules/suppliers/README.md` para lo pendiente (orden de compra, recepción con impacto en inventario, abonos) |
-| **Facturación electrónica DIAN (iteración 4-8, sin UI web todavía)** | Generación local de CUFE/CUDE/CUDS/CUNE (SHA-384) y XML por cada venta completada, cada nota crédito/débito que referencia una venta ya facturada, cada compra a un proveedor marcado como no obligado a facturar electrónicamente (documento soporte), **y cada empleado de cada nómina aprobada (nómina electrónica)**, con numeración DIAN (prefijo/rango/consecutivo atómico por tipo de documento; nómina usa un contador simple propio, sin resolución — ver README) separada del consecutivo interno del POS. Ventas sin cliente usan un identificador genérico de "consumidor final" (constante aislada, pendiente de verificar contra el Anexo Técnico). Firma XAdES-BES (certificado PKCS#12, probada con certificado autofirmado) y envío asíncrono a la DIAN (un poller en proceso por tipo de documento, dos servicios SOAP distintos: uno para factura/notas/documento soporte y otro para nómina) implementados pero **no verificados contra el servicio real de la DIAN** — faltan credenciales de habilitación para probarlos end-to-end. La nómina electrónica es, con diferencia, la parte menos verificada de todo el módulo: esquema XML propio no-UBL sin contrastar contra el Anexo Técnico, servicio SOAP separado sin confirmar ni en nombre, sin retención en la fuente calculada. Ver `apps/api/src/modules/electronic-invoicing/README.md` para la lista completa de detalles sin verificar |
+| **Proveedores / Compras (iteración 3 y 10, sin UI web todavía)** | CRUD de proveedores; orden de compra (crear → enviar → recibir parcial/total); recepción de mercancía con impacto real en inventario (stock por sucursal, lotes si el producto los rastrea, y **recálculo real de costo promedio ponderado** de `Product.currentCost` — primer código que efectivamente lo calcula, antes ningún flujo de entrada de stock lo hacía); registro directo de factura de compra (`Purchase` + `AccountPayable`, contabilización automática); abonos a cuentas por pagar con su propio comprobante contable; cancelación de una compra sin abonos todavía (anula el comprobante). Orden de compra/recepción y factura **no se enlazan entre sí** (flujos paralelos por diseño). FIFO real (consumo por lotes en las ventas) sigue sin implementar — se calcula como promedio mientras tanto. Ver `apps/api/src/modules/suppliers/README.md` para el detalle y lo pendiente (reversar abonos para cancelar, consumo FIFO, Kardex) |
+| **Facturación electrónica DIAN (iteración 4-8, sin UI web todavía)** | Generación local de CUFE/CUDE/CUDS/CUNE (SHA-384) y XML por cada venta completada, cada nota crédito/débito que referencia una venta ya facturada, cada compra a un proveedor marcado como no obligado a facturar electrónicamente (documento soporte), **y cada empleado de cada nómina aprobada (nómina electrónica)**, con numeración DIAN (prefijo/rango/consecutivo atómico por tipo de documento; nómina usa un contador simple propio, sin resolución — ver README) separada del consecutivo interno del POS. Ventas sin cliente usan un identificador genérico de "consumidor final" (constante aislada, pendiente de verificar contra el Anexo Técnico). Firma XAdES-BES (certificado PKCS#12, probada con certificado autofirmado) y envío asíncrono a la DIAN (un poller en proceso por tipo de documento, dos servicios SOAP distintos: uno para factura/notas/documento soporte y otro para nómina) implementados pero **no verificados contra el servicio real de la DIAN** — faltan credenciales de habilitación para probarlos end-to-end. La nómina electrónica es, con diferencia, la parte menos verificada de todo el módulo: esquema XML propio no-UBL sin contrastar contra el Anexo Técnico, servicio SOAP separado sin confirmar ni en nombre, sin retención en la fuente calculada. **RIDE (representación gráfica en PDF)** implementado para los 5 tipos de documento (`GET .../pdf`, `pdfkit`, un solo layout compartido) parseando el XML ya guardado — formato del QR y layout sin verificar contra el Anexo Técnico. Ver `apps/api/src/modules/electronic-invoicing/README.md` para la lista completa de detalles sin verificar |
 
 ## 🧱 Modelado en Prisma, con rutas stub (`501 Not Implemented`) documentadas
 
 Cada uno de estos módulos tiene su `schema.prisma` completo y un `README.md` propio en
 `apps/api/src/modules/<modulo>/README.md` con el detalle de lo que falta implementar:
 
-- **Proveedores / Compras (resto)**: orden de compra, recepción de mercancía (con impacto real en
-  inventario/costeo), abonos a cuentas por pagar. El registro mínimo de compra ya es funcional,
-  ver tabla de arriba.
 - **Contabilidad (resto)**: flujo de caja, conciliación bancaria.
 - **Nómina Colombia (resto)**: generación de PDF del desprendible, reportes mensual/anual
   consolidados, deducciones detalladas (libranzas/embargos).
@@ -43,8 +40,11 @@ Cada uno de estos módulos tiene su `schema.prisma` completo y un `README.md` pr
 - **Sincronización offline**: patrón *outbox* (`SyncOutbox`, `SyncDevice`, `SyncConflictLog`) para que
   la app móvil funcione sin internet y sincronice al reconectar — el scaffold de SQLite existe en
   `apps/mobile`, pero el motor de sincronización aún no está implementado.
-- **Lotes/vencimientos y costeo FIFO**: los modelos (`Batch`, `Kardex`, `Product.costMethod`) están
-  listos; el cálculo FIFO real queda pendiente (hoy se soporta costo promedio).
+- **Costeo FIFO (consumo)**: `Batch` ya se puebla al recibir mercancía (ver Proveedores/Compras
+  arriba) y `Product.costMethod` ya se usa para elegir la fórmula de costo al recibir (promedio
+  ponderado real o "último costo"), pero el **consumo FIFO real** (agotar lotes en orden de
+  entrada al vender) sigue sin implementar — mientras `costMethod = FIFO`, se calcula igual que
+  `AVERAGE`. `Kardex` (historial de saldos) sigue sin poblarse, preparado para reportes futuros.
 
 ## 📱 Móvil (Expo)
 
@@ -57,8 +57,9 @@ Solo scaffold: navegación, pantallas de login/POS/dashboard consumiendo la mism
    desprendible.
 2. ~~Contabilidad (comprobantes automáticos desde ventas/compras/nómina + libros)~~ — implementado
    en la iteración 3. Queda: flujo de caja, conciliación bancaria.
-3. Proveedores/compras: orden de compra y recepción de mercancía con impacto real en inventario
-   (el registro mínimo de la factura ya es funcional, ver iteración 3).
+3. ~~Proveedores/compras: orden de compra y recepción de mercancía con impacto real en
+   inventario~~ — implementado en la iteración 10 (junto con abonos y cancelación). Queda:
+   reversar abonos para poder cancelar una compra con pagos, y consumo FIFO real.
 4. Panel administrador SaaS (cobro de suscripciones real).
 5. Sincronización offline completa en móvil.
 6. ~~Vacaciones/permisos/ausencias/incapacidades~~ — implementado.
@@ -69,3 +70,9 @@ Solo scaffold: navegación, pantallas de login/POS/dashboard consumiendo la mism
 9. ~~Facturación electrónica: notas crédito/débito, documento soporte y nómina electrónica~~ —
    implementado en las iteraciones 6-8, mismas limitaciones de verificación contra la DIAN real
    que el punto anterior (nómina es la parte menos verificada de las cuatro).
+10. ~~Facturación electrónica: RIDE (PDF)~~ — implementado en la iteración 9 para los 5 tipos de
+    documento; formato del QR y layout sin verificar contra el Anexo Técnico (ver iteración 4-8
+    arriba). Con esto, el punto 1 (nómina: PDF del desprendible) sigue pendiente por separado —
+    el RIDE es la representación del comprobante DIAN, no el desprendible interno de nómina.
+11. ~~Proveedores/compras: abonos a cuentas por pagar y cancelación de compras~~ — implementado
+    en la iteración 10 junto con orden de compra/recepción (ver punto 3).

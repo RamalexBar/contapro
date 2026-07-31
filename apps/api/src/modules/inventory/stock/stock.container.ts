@@ -9,6 +9,10 @@ import { StockController } from "./interfaces/stock.controller";
 const repo = new PrismaStockMovementRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
+/** Usado por suppliers.container.ts para el impacto en inventario de una recepcion de
+ * mercancia (ReceiveGoodsUseCase). */
+export const stockRepo = repo;
+
 export const stockController = new StockController(
   new RegisterStockEntryUseCase(repo, auditService),
   new AdjustStockUseCase(repo, auditService),

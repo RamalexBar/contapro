@@ -31,9 +31,16 @@ implementados. Flujo de caja y conciliacion bancaria pendientes.**
    - `PostPurchaseJournalEntryUseCase` — compra registrada (`CreatePurchaseUseCase` en
      `modules/suppliers`): debito Inventario + IVA descontable (misma cuenta 2408, que el PUC
      colombiano netea entre IVA generado y descontable), credito Proveedores nacionales.
-4. Libro mayor, Balance General y Estado de Resultados
+   - `PostSupplierPaymentJournalEntryUseCase` — abono a una cuenta por pagar
+     (`RegisterSupplierPaymentUseCase` en `modules/suppliers`): debito Proveedores nacionales,
+     credito Caja general (metodo `CASH`) o Bancos (cualquier otro metodo).
+4. Anulacion de un comprobante desde otro modulo: `VoidJournalEntryUseCase` (generico, ya
+   existia) ahora se exporta desde `accounting.container.ts` como `voidJournalEntryUseCase` para
+   que `CancelPurchaseUseCase` (`modules/suppliers`) pueda anular el comprobante de una compra
+   cancelada.
+5. Libro mayor, Balance General y Estado de Resultados
    (`AccountingReportsService`), derivados de las lineas de comprobantes `POSTED`.
-5. Auditoria: `ACCOUNT_CREATED`, `JOURNAL_ENTRY_CREATED`, `JOURNAL_ENTRY_POSTED`,
+6. Auditoria: `ACCOUNT_CREATED`, `JOURNAL_ENTRY_CREATED`, `JOURNAL_ENTRY_POSTED`,
    `JOURNAL_ENTRY_VOIDED`.
 
 ## Que falta implementar
@@ -42,8 +49,6 @@ implementados. Flujo de caja y conciliacion bancaria pendientes.**
 2. Flujo de caja: derivado de `CashMovement` + `BankTransaction`.
 3. Conciliacion bancaria: emparejar `BankTransaction` con `JournalEntryLine` (o registrar
    diferencias) y cerrar el periodo (`FinancialPeriod.status = CLOSED`).
-4. Comprobante de abono a proveedor (`SupplierPayment`) y de anulacion de compra — ver
-   `modules/suppliers/README.md`.
 
 Las rutas de flujo de caja y conciliacion bancaria siguen devolviendo `501 Not Implemented`
 (ver `interfaces/accounting.routes.ts`).

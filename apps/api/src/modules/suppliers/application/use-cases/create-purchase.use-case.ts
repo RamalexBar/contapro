@@ -37,7 +37,7 @@ export class CreatePurchaseUseCase {
       description: `Compra registrada: factura ${purchase.invoiceNumber} por ${purchase.total}`,
     });
 
-    await this.postPurchaseJournalEntry.execute({
+    const journalEntry = await this.postPurchaseJournalEntry.execute({
       purchaseId: purchase.id,
       branchId: purchase.branchId,
       date: purchase.createdAt,
@@ -46,6 +46,10 @@ export class CreatePurchaseUseCase {
       taxTotal: purchase.taxTotal,
       total: purchase.total,
     });
+    if (journalEntry) {
+      await this.purchaseRepo.setJournalEntryId(purchase.id, journalEntry.id);
+      purchase.journalEntryId = journalEntry.id;
+    }
 
     if (!supplier.isObligatedToInvoice) {
       // El proveedor no puede expedir su propia factura electronica -- la empresa, como

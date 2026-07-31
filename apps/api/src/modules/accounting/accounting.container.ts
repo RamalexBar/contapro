@@ -10,6 +10,7 @@ import { VoidJournalEntryUseCase } from "./application/use-cases/void-journal-en
 import { PostPayrollJournalEntryUseCase } from "./application/use-cases/post-payroll-journal-entry.use-case";
 import { PostSaleJournalEntryUseCase } from "./application/use-cases/post-sale-journal-entry.use-case";
 import { PostPurchaseJournalEntryUseCase } from "./application/use-cases/post-purchase-journal-entry.use-case";
+import { PostSupplierPaymentJournalEntryUseCase } from "./application/use-cases/post-supplier-payment-journal-entry.use-case";
 import { AccountingController } from "./interfaces/accounting.controller";
 
 const accountRepo = new PrismaChartOfAccountsRepository();
@@ -20,7 +21,10 @@ const reports = new AccountingReportsService(journalRepo, accountRepo);
 const createAccountUseCase = new CreateAccountUseCase(accountRepo, auditService);
 const createEntryUseCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, auditService);
 const postEntryUseCase = new PostJournalEntryUseCase(journalRepo, auditService);
-const voidEntryUseCase = new VoidJournalEntryUseCase(journalRepo, auditService);
+
+/** Usado tambien por suppliers.container.ts (CancelPurchaseUseCase) para anular el comprobante de
+ * una compra cancelada -- operacion generica, no especifica de ningun modulo. */
+export const voidJournalEntryUseCase = new VoidJournalEntryUseCase(journalRepo, auditService);
 
 export const accountingController = new AccountingController(
   accountRepo,
@@ -29,7 +33,7 @@ export const accountingController = new AccountingController(
   createAccountUseCase,
   createEntryUseCase,
   postEntryUseCase,
-  voidEntryUseCase
+  voidJournalEntryUseCase
 );
 
 /** Usado por payroll.container.ts para generar el comprobante de nomina al aprobar un periodo. */
@@ -44,6 +48,13 @@ export const postSaleJournalEntryUseCase = new PostSaleJournalEntryUseCase(accou
 
 /** Usado por suppliers.container.ts para contabilizar una compra al registrarse. */
 export const postPurchaseJournalEntryUseCase = new PostPurchaseJournalEntryUseCase(
+  accountRepo,
+  createEntryUseCase,
+  postEntryUseCase
+);
+
+/** Usado por suppliers.container.ts para contabilizar un abono a proveedor. */
+export const postSupplierPaymentJournalEntryUseCase = new PostSupplierPaymentJournalEntryUseCase(
   accountRepo,
   createEntryUseCase,
   postEntryUseCase

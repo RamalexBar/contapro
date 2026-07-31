@@ -1,7 +1,7 @@
 import { prisma } from "../../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { ValidationError } from "../../../../shared/errors/app-error";
-import type { IStockRepository, StockMovementRecord } from "../domain/stock.repository";
+import type { IStockRepository, ReceiveGoodsItem, StockMovementRecord } from "../domain/stock.repository";
 
 function toRecord(row: {
   id: string;
@@ -114,5 +114,77 @@ export class PrismaStockMovementRepository implements IStockRepository {
     const stock = await prisma.productBranchStock.findFirst({ where: { productId, branchId } });
     if (!stock) return null;
     return { quantity: Number(stock.quantity), minStock: Number(stock.minStock), maxStock: Number(stock.maxStock) };
+  }
+
+  async receiveGoods(items: ReceiveGoodsItem[], referenceType: string, referenceId: string, userId: string): Promise<StockMovementRecord[]> {
+    const companyId = getTenantContext().companyId;
+
+    return prisma.$transaction(async (tx) => {
+      const movements: StockMovementRecord[] = [];
+
+      // Se procesa en secuencia (no Promise.all) para que, si el mismo producto aparece dos
+      // veces en la misma recepcion (ej. dos lotes distintos), el promedio ponderado de la
+      // segunda linea ya considere la cantidad/costo actualizados por la primera.
+      for (const item of items) {
+        const product = await tx.product.findFirstOrThrow({ where: { id: item.productId } });
+
+        // Se lee ANTES de sumar la cantidad recibida, para poder ponderar el promedio contra las
+        // existencias previas (en TODAS las sucursales -- Product.currentCost es un solo valor
+        // por toda la empresa, no por sucursal).
+        const priorTotal = await tx.productBranchStock.aggregate({
+          where: { productId: item.productId },
+          _sum: { quantity: true },
+        });
+        const priorQty = Number(priorTotal._sum.quantity ?? 0);
+
+        await tx.productBranchStock.upsert({
+          where: { productId_branchId: { productId: item.productId, branchId: item.branchId } },
+          create: { companyId, productId: item.productId, branchId: item.branchId, quantity: item.quantity },
+          update: { quantity: { increment: item.quantity } },
+        });
+
+        if (product.tracksBatches) {
+          await tx.batch.create({
+            data: {
+              companyId,
+              productId: item.productId,
+              branchId: item.branchId,
+              batchNumber: item.batchNumber ?? `LOTE-${Date.now()}`,
+              expirationDate: item.expirationDate,
+              quantity: item.quantity,
+              costAtEntry: item.unitCost,
+            },
+          });
+        }
+
+        const movement = await tx.stockMovement.create({
+          data: {
+            companyId,
+            branchId: item.branchId,
+            productId: item.productId,
+            type: "PURCHASE_IN",
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            referenceType,
+            referenceId,
+            createdByUserId: userId,
+          },
+        });
+        movements.push(toRecord(movement));
+
+        // FIFO no tiene consumo real implementado todavia (ver README de suppliers) -- se calcula
+        // igual que AVERAGE mientras tanto, en vez de inventar una formula sin verificar.
+        const newCost =
+          product.costMethod === "LAST"
+            ? item.unitCost
+            : priorQty + item.quantity > 0
+              ? (priorQty * Number(product.currentCost) + item.quantity * item.unitCost) / (priorQty + item.quantity)
+              : item.unitCost;
+
+        await tx.product.update({ where: { id: item.productId }, data: { currentCost: newCost } });
+      }
+
+      return movements;
+    });
   }
 }

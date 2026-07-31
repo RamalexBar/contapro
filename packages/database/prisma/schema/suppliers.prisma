@@ -94,6 +94,11 @@ model Purchase {
   // Preparado para documento soporte electronico (DIAN, ver electronic-invoicing.prisma):
   cuds          String?
   xmlUrl        String?
+  // Id del JournalEntry que la contabilizo (ver post-purchase-journal-entry.use-case.ts) -- se
+  // guarda para poder anularlo via VoidJournalEntryUseCase si la compra se cancela
+  // (CancelPurchaseUseCase, suppliers). Null si la contabilizacion fallo o no dejo comprobante
+  // (total = 0).
+  journalEntryId String?
 
   accountsPayable AccountPayable[]
   electronicSupportDocument ElectronicSupportDocument?
@@ -111,7 +116,7 @@ model AccountPayable {
   amount     Decimal  @db.Decimal(14, 2)
   balance    Decimal  @db.Decimal(14, 2)
   dueDate    DateTime
-  status     String   @default("PENDING") // PENDING, PARTIAL, PAID, OVERDUE
+  status     String   @default("PENDING") // PENDING, PARTIAL, PAID, OVERDUE, CANCELLED
 
   payments SupplierPayment[]
 

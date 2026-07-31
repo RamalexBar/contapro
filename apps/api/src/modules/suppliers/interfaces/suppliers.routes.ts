@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { tenantContextMiddleware } from "../../../shared/middlewares/tenant-context.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
-import { notImplemented } from "../../../shared/middlewares/not-implemented.middleware";
 import { suppliersController } from "../suppliers.container";
 
 export const suppliersRouter = Router();
@@ -11,10 +10,16 @@ suppliersRouter.get("/suppliers", requirePermission("suppliers.read"), suppliers
 suppliersRouter.post("/suppliers", requirePermission("suppliers.manage"), suppliersController.createSupplier);
 
 suppliersRouter.post("/purchases", requirePermission("suppliers.manage"), suppliersController.createPurchase);
+suppliersRouter.post("/purchases/:id/cancel", requirePermission("suppliers.manage"), suppliersController.cancelPurchase);
 
-// Orden de compra, recepcion de mercancia y abonos a cuentas por pagar: aun no implementado,
-// ver README.md de este modulo.
-const stub = notImplemented("suppliers");
-suppliersRouter.all("/purchase-orders", stub);
-suppliersRouter.all("/goods-receipts", stub);
-suppliersRouter.all("/accounts-payable", stub);
+suppliersRouter.post("/purchase-orders", requirePermission("suppliers.manage"), suppliersController.createPurchaseOrder);
+suppliersRouter.get("/purchase-orders", requirePermission("suppliers.read"), suppliersController.listPurchaseOrders);
+suppliersRouter.get("/purchase-orders/:id", requirePermission("suppliers.read"), suppliersController.getPurchaseOrder);
+suppliersRouter.post("/purchase-orders/:id/send", requirePermission("suppliers.manage"), suppliersController.sendPurchaseOrder);
+
+suppliersRouter.post("/goods-receipts", requirePermission("suppliers.manage"), suppliersController.receiveGoods);
+suppliersRouter.get("/goods-receipts", requirePermission("suppliers.read"), suppliersController.listGoodsReceipts);
+suppliersRouter.get("/goods-receipts/:id", requirePermission("suppliers.read"), suppliersController.getGoodsReceipt);
+
+suppliersRouter.get("/accounts-payable", requirePermission("suppliers.read"), suppliersController.listAccountsPayable);
+suppliersRouter.post("/accounts-payable/:id/payments", requirePermission("suppliers.manage"), suppliersController.registerSupplierPayment);

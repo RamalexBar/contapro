@@ -13,6 +13,7 @@ type PurchaseRow = {
   total: unknown;
   status: string;
   createdAt: Date;
+  journalEntryId: string | null;
   accountsPayable: { id: string; dueDate: Date }[];
 };
 
@@ -30,6 +31,7 @@ function toRecord(row: PurchaseRow): PurchaseRecord {
     createdAt: row.createdAt,
     accountPayableId: accountPayable.id,
     dueDate: accountPayable.dueDate,
+    journalEntryId: row.journalEntryId,
   };
 }
 
@@ -85,5 +87,22 @@ export class PrismaPurchaseRepository implements IPurchaseRepository {
       skip: filters.skip ?? 0,
     });
     return rows.map(toRecord);
+  }
+
+  async setJournalEntryId(id: string, journalEntryId: string): Promise<void> {
+    // findFirst (via findByIdOrThrow) queda auto-scopeado por tenant.extension.ts; el update por
+    // id que sigue no -- se confirma pertenencia al tenant primero.
+    await this.findByIdOrThrow(id);
+    await prisma.purchase.update({ where: { id }, data: { journalEntryId } });
+  }
+
+  async cancel(id: string): Promise<PurchaseRecord> {
+    await this.findByIdOrThrow(id);
+    const row = await prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.update({ where: { id }, data: { status: "CANCELLED" } });
+      await tx.accountPayable.updateMany({ where: { purchaseId: id }, data: { status: "CANCELLED" } });
+      return tx.purchase.findFirstOrThrow({ where: { id: purchase.id }, include: PURCHASE_INCLUDE });
+    });
+    return toRecord(row);
   }
 }
