@@ -7,7 +7,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "lint": "eslint src App.tsx --ext .ts,.tsx"
   },
   "dependencies": {
     "@erp/shared-types": "workspace:*",
@@ -25,6 +26,9 @@
   },
   "devDependencies": {
     "@erp/config": "workspace:*",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
     "@babel/core": "^7.25.2",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",

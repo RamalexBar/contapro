@@ -4,7 +4,6 @@ import { applyDiscount, calculateTax, formatCOP, round2 } from "@erp/shared-util
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
-import { Input } from "../../../components/ui/Input";
 import { listProducts } from "../../inventory/api/product.api";
 import { getActiveSession, listCashRegisters } from "../../cash/api/cash.api";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";

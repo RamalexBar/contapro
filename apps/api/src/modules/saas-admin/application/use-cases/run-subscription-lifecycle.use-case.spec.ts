@@ -3,10 +3,8 @@ import { AuditService } from "../../../audit/application/audit.service";
 import type { AuditLogEntry, CreateAuditLogInput, IAuditLogRepository } from "../../../audit/domain/audit-log.repository";
 import type { IReminderNotifier, SubscriptionReminderNotification } from "../../domain/reminder-notifier";
 import type {
-  ApplyPaymentData,
   ApplyPaymentResult,
   CompanyWithSubscriptionRecord,
-  CreateSubscriptionData,
   ISubscriptionRepository,
   SaasDashboardStats,
   SubscriptionForLifecycleCheck,

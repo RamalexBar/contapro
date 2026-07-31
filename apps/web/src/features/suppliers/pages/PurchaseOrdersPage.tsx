@@ -4,7 +4,6 @@ import { formatCOP } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
-import { Input } from "../../../components/ui/Input";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listSuppliers, type SupplierRecord } from "../api/supplier.api";
 import { listProducts, type ProductListItem } from "../../inventory/api/product.api";

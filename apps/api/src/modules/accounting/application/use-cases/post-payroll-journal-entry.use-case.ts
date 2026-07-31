@@ -1,6 +1,6 @@
 import { round2 } from "@erp/shared-utils";
 import type { IChartOfAccountsRepository } from "../../domain/chart-of-accounts.repository";
-import type { IJournalEntryRepository, JournalEntryRecord } from "../../domain/journal-entry.repository";
+import type { JournalEntryRecord } from "../../domain/journal-entry.repository";
 import { CreateJournalEntryUseCase } from "./create-journal-entry.use-case";
 import { PostJournalEntryUseCase } from "./post-journal-entry.use-case";
 
