@@ -80,6 +80,9 @@ class FakeJournalEntryRepository implements IJournalEntryRepository {
   async hasDraftEntriesInPeriod(year: number, month: number): Promise<boolean> {
     return this.draftMonthsWithEntries.has(`${year}-${month}`);
   }
+  async findBySource(sourceType: string, sourceId: string): Promise<JournalEntryRecord | null> {
+    return this.entries.find((e) => e.sourceType === sourceType && e.sourceId === sourceId) ?? null;
+  }
 }
 
 class FakeChartOfAccountsRepository implements IChartOfAccountsRepository {

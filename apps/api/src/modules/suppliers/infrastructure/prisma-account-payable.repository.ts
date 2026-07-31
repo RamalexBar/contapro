@@ -1,6 +1,12 @@
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { NotFoundError, ValidationError } from "../../../shared/errors/app-error";
-import type { AccountPayableRecord, IAccountPayableRepository, RegisterPaymentResult } from "../domain/account-payable.repository";
+import type {
+  AccountPayableRecord,
+  IAccountPayableRepository,
+  RegisterPaymentResult,
+  ReversePaymentsResult,
+  SupplierPaymentRecord,
+} from "../domain/account-payable.repository";
 
 type AccountPayableRow = {
   id: string;
@@ -27,6 +33,24 @@ function toRecord(row: AccountPayableRow): AccountPayableRecord {
 }
 
 const INCLUDE = { purchase: { select: { branchId: true } } } as const;
+
+function toPaymentRecord(row: {
+  id: string;
+  accountPayableId: string;
+  amount: unknown;
+  method: string;
+  status: string;
+  paidAt: Date;
+}): SupplierPaymentRecord {
+  return {
+    id: row.id,
+    accountPayableId: row.accountPayableId,
+    amount: Number(row.amount),
+    method: row.method,
+    status: row.status as "REGISTERED" | "REVERSED",
+    paidAt: row.paidAt,
+  };
+}
 
 export class PrismaAccountPayableRepository implements IAccountPayableRepository {
   async list(filter?: { status?: string }): Promise<AccountPayableRecord[]> {
@@ -71,14 +95,38 @@ export class PrismaAccountPayableRepository implements IAccountPayableRepository
       });
 
       return {
-        payment: {
-          id: payment.id,
-          accountPayableId: payment.accountPayableId,
-          amount: Number(payment.amount),
-          method: payment.method,
-          paidAt: payment.paidAt,
-        },
+        payment: toPaymentRecord(payment),
         accountPayable: toRecord(updated),
+      };
+    });
+  }
+
+  async reverseAllPayments(accountPayableId: string): Promise<ReversePaymentsResult> {
+    return prisma.$transaction(async (tx) => {
+      const current = await tx.accountPayable.findFirst({ where: { id: accountPayableId }, include: INCLUDE });
+      if (!current) throw new NotFoundError("AccountPayable", accountPayableId);
+
+      const activePayments = await tx.supplierPayment.findMany({
+        where: { accountPayableId, status: "REGISTERED" },
+      });
+      if (activePayments.length === 0) {
+        return { accountPayable: toRecord(current), reversedPayments: [] };
+      }
+
+      await tx.supplierPayment.updateMany({
+        where: { id: { in: activePayments.map((p) => p.id) } },
+        data: { status: "REVERSED" },
+      });
+
+      const updated = await tx.accountPayable.update({
+        where: { id: accountPayableId },
+        data: { balance: current.amount, status: "PENDING" },
+        include: INCLUDE,
+      });
+
+      return {
+        accountPayable: toRecord(updated),
+        reversedPayments: activePayments.map((p) => toPaymentRecord({ ...p, status: "REVERSED" })),
       };
     });
   }

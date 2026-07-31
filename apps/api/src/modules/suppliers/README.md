@@ -3,7 +3,8 @@
 Estado: **CRUD de proveedores, orden de compra (crear -> enviar -> recibir parcial/total),
 recepcion de mercancia con impacto real en inventario (stock, lotes, costo), registro directo de
 factura de compra (con contabilizacion automatica), abonos a cuentas por pagar (con su propio
-comprobante contable) y cancelacion de una compra sin abonos, todo implementado.**
+comprobante contable, reversables al cancelar) y cancelacion de una compra con o sin abonos, todo
+implementado. Consumo FIFO real (modulo POS) documentado abajo.
 
 ## Modelos (`packages/database/prisma/schema/suppliers.prisma`)
 
@@ -32,10 +33,9 @@ comprobante contable) y cancelacion de una compra sin abonos, todo implementado.
    debito Inventario + IVA descontable, credito Proveedores nacionales. Guarda el id del
    comprobante en `Purchase.journalEntryId`.
 3. `POST /purchases/:id/cancel`: marca la compra y su `AccountPayable` como `CANCELLED` y anula
-   el comprobante contable (`VoidJournalEntryUseCase`, generico, reusado tal cual). **Alcance
-   recortado a proposito**: solo permite cancelar si la cuenta por pagar todavia no tiene abonos
-   (`balance === amount`) — si ya tiene abonos, responde `409 CONFLICT` y no hace nada; reversar
-   abonos parciales es un problema mas grande, no implementado.
+   el comprobante contable (`VoidJournalEntryUseCase`, generico, reusado tal cual). Si la cuenta
+   por pagar ya tiene abonos (iteracion 16), primero los reversa (ver punto 6.1) antes de
+   cancelar la compra.
 4. Orden de compra: `POST /purchase-orders` (crea en `DRAFT`, total calculado del lado del
    servidor sumando `quantity*unitCost` por item — a diferencia de `Purchase`, que refleja una
    factura externa con su propio total a reconciliar), `GET /purchase-orders`,
@@ -53,10 +53,11 @@ comprobante contable) y cancelacion de una compra sin abonos, todo implementado.
        sucursal) — `(cantidadPrevia*costoActual + cantidadRecibida*costoRecibido) /
        (cantidadPrevia+cantidadRecibida)`.
      - `LAST`: se fija al costo del ultimo recibo, sin ponderar.
-     - `FIFO`: **no tiene consumo real implementado** (eso requeriria cambios del lado de las
-       VENTAS — consumir lotes en orden de entrada — fuera de alcance de este modulo). Mientras
-       tanto se calcula igual que `AVERAGE`, para no inventar una formula sin verificar. Ver
-       tambien `docs/ALCANCE.md`.
+     - `FIFO`: el calculo de ENTRADA (este paso, al recibir mercancia) se sigue haciendo igual
+       que `AVERAGE` a proposito -- `Product.currentCost` es un valor agregado usado tambien
+       fuera de FIFO (transferencias, ajustes), no tiene sentido que sea "el costo del proximo
+       lote" hasta que efectivamente se consuma. El consumo real (agotar lotes en orden de
+       entrada al vender) esta en el modulo POS, ver punto 8 mas abajo.
    - **Hallazgo corregido**: antes de este trabajo, ninguna entrada de stock (ni siquiera la
      entrada manual, `RegisterStockEntryUseCase`) actualizaba `Product.currentCost` — el campo
      solo se movia a mano via `UpdateProductPriceUseCase`. Este es el primer codigo que calcula
@@ -78,14 +79,51 @@ comprobante contable) y cancelacion de una compra sin abonos, todo implementado.
    nacionales, credito Caja general (metodo `CASH`) o Bancos (cualquier otro metodo).
 7. Auditoria: `SUPPLIER_CREATED`, `PURCHASE_REGISTERED`, `PURCHASE_ORDER_CREATED`,
    `PURCHASE_ORDER_SENT`, `GOODS_RECEIPT_REGISTERED`, `SUPPLIER_PAYMENT_REGISTERED`,
-   `PURCHASE_CANCELLED`.
+   `PURCHASE_CANCELLED`, `SUPPLIER_PAYMENT_REVERSED` (iteracion 16).
+8. UI web (proveedores, compras, ordenes de compra) agregada en la iteracion 13.
+9. **Reversar abonos al cancelar una compra** (iteracion 16, `cancel-purchase.use-case.ts`):
+   `SupplierPayment` ahora tiene `status` (`REGISTERED`/`REVERSED`, migracion
+   `20260731203916_add_supplier_payment_status`). Si `AccountPayable.balance !== amount` al
+   cancelar, `IAccountPayableRepository.reverseAllPayments` marca `REVERSED` todos los abonos
+   activos y restaura `balance = amount` / `status = PENDING` en una transaccion; luego, por
+   cada abono reversado, se busca su comprobante contable via el nuevo
+   `IJournalEntryRepository.findBySource("SupplierPayment", paymentId)` (los abonos no guardaban
+   el id del comprobante como si lo hace `Purchase.journalEntryId`, asi que se ubica por
+   `sourceType`/`sourceId`, igual que ya hacia `PostSupplierPaymentJournalEntryUseCase` al
+   crearlo) y se anula con `VoidJournalEntryUseCase`. No reversa dinero real de caja/banco, solo
+   anula los comprobantes -- igual alcance que ya tenia la cancelacion del comprobante de la
+   compra misma.
+
+## Consumo FIFO real (iteracion 16, `modules/pos/sale`)
+
+`PrismaSaleRepository.applyCompletionSideEffects` (unico punto donde una venta completada
+descuenta stock, ya sea al crearse `COMPLETED` de entrada o al autorizarse el ultimo descuento
+pendiente) ahora distingue por producto:
+
+- Si `Product.costMethod === "FIFO"` **y** `Product.tracksBatches`: consume los `Batch` del
+  producto/sucursal en orden de entrada (`createdAt` asc) hasta cubrir la cantidad vendida,
+  decrementando cada lote tocado. El `StockMovement` `SALE_OUT` de esa linea de venta guarda el
+  **costo real ponderado** de los lotes consumidos (antes se guardaba `item.unitPrice` -- el
+  precio de venta, no el costo -- para TODOS los metodos de costeo; ese comportamiento previo
+  sigue igual para `AVERAGE`/`LAST`, solo se corrigio para `FIFO`). Actualiza
+  `Product.currentCost` al costo del lote mas antiguo que quede disponible tras el consumo (el
+  "proximo costo a vender" bajo FIFO); si no queda ninguno, lo deja igual.
+- Si no hay lotes suficientes para cubrir toda la cantidad (drift entre `Batch` y
+  `ProductBranchStock` por ajustes/transferencias que no tocan `Batch`), el remanente se valora
+  al ultimo `Product.currentCost` conocido en vez de bloquear la venta.
+- Sin `tracksBatches` (aunque `costMethod = FIFO`), no hay datos de lote para trabajar -- se
+  mantiene el comportamiento anterior sin cambios.
+- Una sola linea de `StockMovement` por item de venta (costo ya promediado), no una por lote
+  consumido.
+- **No se reversa** el consumo de lotes si la venta se anula despues (`CancelSaleUseCase`) --
+  misma limitacion ya documentada ahi: el modulo de Devoluciones es el que ajusta stock
+  explicitamente, y tampoco es batch-aware todavia.
 
 ## Que falta implementar
 
-1. Reversar abonos parciales para poder cancelar una compra que ya tiene pagos (hoy responde
-   `409 CONFLICT`).
-2. Consumo FIFO real (orden de las ventas) — `Batch`/`Kardex`/`Product.costMethod` ya soportan el
-   dato de entrada por lote, pero nada lo consume en orden todavia.
-3. Poblar `Kardex` (historial de saldos) — el modelo existe, preparado, sin usar todavia; no era
-   parte del checklist de este trabajo (recepcion de mercancia), es trabajo de reportes aparte.
-4. UI web (este modulo, como Contabilidad, solo tiene API por ahora).
+1. Poblar `Kardex` (historial de saldos) — el modelo existe, preparado, sin usar todavia; no era
+   parte del checklist de este trabajo, es trabajo de reportes aparte.
+2. `StockMovement` por lote consumido en una venta FIFO (para trazabilidad fina) -- hoy es una
+   sola linea agregada por item de venta.
+3. Devoluciones (`Return`) no restaura lotes especificos al recibir mercancia de vuelta -- sigue
+   la misma limitacion que ya tenia antes de este trabajo.

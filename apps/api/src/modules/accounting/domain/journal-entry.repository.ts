@@ -57,4 +57,8 @@ export interface IJournalEntryRepository {
   listPostedLines(filter: { from?: Date; to?: Date; accountId?: string }): Promise<PostedLineAggregate[]>;
   /** Para bloquear el cierre de un periodo con comprobantes sin publicar/anular pendientes. */
   hasDraftEntriesInPeriod(year: number, month: number): Promise<boolean>;
+  /** Encuentra el comprobante generado automaticamente para un hecho economico dado (ej. un
+   * SupplierPayment especifico), para poder anularlo -- ver sourceType/sourceId en
+   * Post*JournalEntryUseCase. null si nunca se genero (ej. contabilizacion en monto cero). */
+  findBySource(sourceType: string, sourceId: string): Promise<JournalEntryRecord | null>;
 }

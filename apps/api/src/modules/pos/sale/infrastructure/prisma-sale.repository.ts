@@ -159,6 +159,16 @@ export class PrismaSaleRepository implements ISaleRepository {
 
     for (const item of items) {
       const quantity = Number(item.quantity);
+
+      const product = await tx.product.findFirst({
+        where: { id: item.productId },
+        select: { costMethod: true, tracksBatches: true, currentCost: true },
+      });
+      const useFifo = product?.costMethod === "FIFO" && product?.tracksBatches;
+      const unitCost = useFifo
+        ? await this.consumeFifoBatches(tx, item.productId, branchId, quantity, Number(product.currentCost))
+        : Number(item.unitPrice);
+
       await tx.productBranchStock.updateMany({
         where: { productId: item.productId, branchId },
         data: { quantity: { decrement: quantity } },
@@ -170,7 +180,7 @@ export class PrismaSaleRepository implements ISaleRepository {
           productId: item.productId,
           type: "SALE_OUT",
           quantity,
-          unitCost: item.unitPrice,
+          unitCost,
           referenceType: "Sale",
           referenceId: saleId,
           createdByUserId: sellerUserId,
@@ -191,5 +201,60 @@ export class PrismaSaleRepository implements ISaleRepository {
         },
       });
     }
+  }
+
+  /**
+   * Consumo FIFO real: agota los Batch del producto/sucursal en orden de entrada (`createdAt`
+   * asc) hasta cubrir `quantity`, devolviendo el costo unitario ponderado real de lo vendido
+   * (antes se usaba item.unitPrice -- el precio de venta, no el costo -- como unitCost del
+   * StockMovement para TODOS los metodos de costeo; para FIFO ahora se usa el costo real de los
+   * lotes consumidos). Actualiza Product.currentCost al costo del lote mas antiguo que quede
+   * disponible tras el consumo (el "proximo costo a vender" bajo FIFO), sin tocarlo si no queda
+   * ninguno.
+   *
+   * Si Batch no alcanza a cubrir toda la cantidad (drift frente a ProductBranchStock por ajustes
+   * o transferencias que no tocan Batch -- ver limitacion ya documentada en el modulo de
+   * inventario), el remanente se valora al ultimo currentCost conocido en vez de bloquear la
+   * venta. No crea un StockMovement por lote consumido (una sola linea por item de venta, con el
+   * costo ya promediado) ni reversa el consumo si la venta se anula despues -- ver limitacion ya
+   * documentada de CancelSaleUseCase (el modulo de Devoluciones es el que ajusta stock).
+   */
+  private async consumeFifoBatches(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx: any,
+    productId: string,
+    branchId: string,
+    quantity: number,
+    fallbackCost: number
+  ): Promise<number> {
+    const batches = await tx.batch.findMany({
+      where: { productId, branchId, quantity: { gt: 0 } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    let remaining = quantity;
+    let totalCost = 0;
+    for (const batch of batches) {
+      if (remaining <= 0) break;
+      const batchQty = Number(batch.quantity);
+      const consumeQty = Math.min(remaining, batchQty);
+      await tx.batch.update({ where: { id: batch.id }, data: { quantity: { decrement: consumeQty } } });
+      totalCost += consumeQty * Number(batch.costAtEntry);
+      remaining -= consumeQty;
+    }
+
+    if (remaining > 0) {
+      totalCost += remaining * fallbackCost;
+    }
+
+    const nextBatch = await tx.batch.findFirst({
+      where: { productId, branchId, quantity: { gt: 0 } },
+      orderBy: { createdAt: "asc" },
+    });
+    if (nextBatch) {
+      await tx.product.update({ where: { id: productId }, data: { currentCost: nextBatch.costAtEntry } });
+    }
+
+    return quantity > 0 ? totalCost / quantity : fallbackCost;
   }
 }

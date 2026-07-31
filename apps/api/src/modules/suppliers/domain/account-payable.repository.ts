@@ -16,12 +16,18 @@ export interface SupplierPaymentRecord {
   accountPayableId: string;
   amount: number;
   method: string;
+  status: "REGISTERED" | "REVERSED";
   paidAt: Date;
 }
 
 export interface RegisterPaymentResult {
   payment: SupplierPaymentRecord;
   accountPayable: AccountPayableRecord;
+}
+
+export interface ReversePaymentsResult {
+  accountPayable: AccountPayableRecord;
+  reversedPayments: SupplierPaymentRecord[];
 }
 
 export interface IAccountPayableRepository {
@@ -31,4 +37,10 @@ export interface IAccountPayableRepository {
    * PrismaStockMovementRepository.adjust() usa para no dejar el inventario en negativo), para
    * que dos abonos concurrentes no puedan sobregirar el saldo. */
   registerPayment(accountPayableId: string, amount: number, method: string, userId: string): Promise<RegisterPaymentResult>;
+  /** Marca REVERSED todos los abonos REGISTERED de la cuenta y restaura balance=amount,
+   * status=PENDING -- usado por CancelPurchaseUseCase para poder cancelar una compra que ya
+   * tiene abonos. No toca los comprobantes contables de cada abono, eso lo hace el caller
+   * (necesita VoidJournalEntryUseCase, de otro modulo). No-op (retorna reversedPayments: [])
+   * si no hay abonos activos. */
+  reverseAllPayments(accountPayableId: string): Promise<ReversePaymentsResult>;
 }

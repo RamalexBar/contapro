@@ -130,6 +130,7 @@ model SupplierPayment {
   accountPayable   AccountPayable @relation(fields: [accountPayableId], references: [id])
   amount           Decimal        @db.Decimal(14, 2)
   method           String
+  status           String         @default("REGISTERED") // REGISTERED, REVERSED
   paidAt           DateTime       @default(now())
   createdByUserId  String
 

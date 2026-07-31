@@ -1,6 +1,11 @@
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
 import { postPurchaseJournalEntryUseCase, postSupplierPaymentJournalEntryUseCase, voidJournalEntryUseCase } from "../accounting/accounting.container";
+// Instancia propia, no importada de accounting.container.ts (que no la exporta): mismo criterio
+// ya usado con PrismaCashSessionRepository en accounting.container.ts / PrismaSupplierRepository
+// en electronic-invoicing.container.ts -- el repositorio no tiene estado propio, instanciarlo dos
+// veces es seguro.
+import { PrismaJournalEntryRepository } from "../accounting/infrastructure/prisma-journal-entry.repository";
 import { generateElectronicSupportDocumentUseCase } from "../electronic-invoicing/electronic-invoicing.container";
 import { stockRepo } from "../inventory/stock/stock.container";
 import { PrismaSupplierRepository } from "./infrastructure/prisma-supplier.repository";
@@ -29,6 +34,7 @@ const purchaseRepo = new PrismaPurchaseRepository();
 const purchaseOrderRepo = new PrismaPurchaseOrderRepository();
 const goodsReceiptRepo = new PrismaGoodsReceiptRepository();
 const accountPayableRepo = new PrismaAccountPayableRepository();
+const journalRepo = new PrismaJournalEntryRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
 export const suppliersController = new SuppliersController(
@@ -51,5 +57,5 @@ export const suppliersController = new SuppliersController(
   new GetGoodsReceiptUseCase(goodsReceiptRepo),
   new ListAccountsPayableUseCase(accountPayableRepo),
   new RegisterSupplierPaymentUseCase(accountPayableRepo, supplierRepo, postSupplierPaymentJournalEntryUseCase, auditService),
-  new CancelPurchaseUseCase(purchaseRepo, accountPayableRepo, voidJournalEntryUseCase, auditService)
+  new CancelPurchaseUseCase(purchaseRepo, accountPayableRepo, journalRepo, voidJournalEntryUseCase, auditService)
 );

@@ -129,6 +129,15 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
     }));
   }
 
+  async findBySource(sourceType: string, sourceId: string): Promise<JournalEntryRecord | null> {
+    const companyId = getTenantContext().companyId;
+    const row = await prisma.journalEntry.findFirst({
+      where: { companyId, sourceType, sourceId },
+      include: { lines: true },
+    });
+    return row ? toRecord(row) : null;
+  }
+
   async hasDraftEntriesInPeriod(year: number, month: number): Promise<boolean> {
     const companyId = getTenantContext().companyId;
     const start = new Date(Date.UTC(year, month - 1, 1));
