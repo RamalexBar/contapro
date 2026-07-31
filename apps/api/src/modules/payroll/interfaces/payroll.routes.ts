@@ -17,3 +17,4 @@ payrollRouter.post("/payrolls/:id/approve", requirePermission("payroll.approve")
 payrollRouter.post("/payrolls/:id/pay", requirePermission("payroll.pay"), payrollController.pay);
 
 payrollRouter.get("/payslips/:id", requirePermission("payroll.read"), payrollController.getPayslip);
+payrollRouter.get("/payslips/:id/pdf", requirePermission("payroll.read"), payrollController.getPayslipPdf);

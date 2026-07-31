@@ -12,6 +12,7 @@ import {
   calculatePayroll,
   createPayroll,
   createPayrollParameter,
+  downloadPayslipPdf,
   getPayroll,
   listPayrollParameters,
   listPayrolls,
@@ -142,6 +143,10 @@ export function PayrollPage() {
   const payMutation = useMutation({
     mutationFn: (id: string) => payPayroll(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payrolls"] }),
+  });
+  const downloadPayslipMutation = useMutation({
+    mutationFn: ({ payslipId, fileName }: { payslipId: string; fileName: string }) =>
+      downloadPayslipPdf(payslipId, fileName),
   });
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -525,6 +530,7 @@ export function PayrollPage() {
                             <th>Deducciones</th>
                             <th>Neto a pagar</th>
                             <th>Costo empleador</th>
+                            <th></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -535,6 +541,22 @@ export function PayrollPage() {
                               <td>{formatCOP(detail.totalDeductions)}</td>
                               <td className="font-semibold">{formatCOP(detail.netPay)}</td>
                               <td>{formatCOP(detail.employerCostTotal)}</td>
+                              <td className="text-right">
+                                {detail.payslip && (
+                                  <Button
+                                    variant="secondary"
+                                    disabled={downloadPayslipMutation.isPending}
+                                    onClick={() =>
+                                      downloadPayslipMutation.mutate({
+                                        payslipId: detail.payslip!.id,
+                                        fileName: `desprendible-${(employeeNames.get(detail.employeeId) ?? detail.employeeId).replace(/\s+/g, "-")}-${payroll.month}-${payroll.year}.pdf`,
+                                      })
+                                    }
+                                  >
+                                    Desprendible PDF
+                                  </Button>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

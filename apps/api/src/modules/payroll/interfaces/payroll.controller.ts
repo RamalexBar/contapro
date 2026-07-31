@@ -7,11 +7,18 @@ import type { CalculatePayrollUseCase } from "../application/use-cases/calculate
 import type { ApprovePayrollUseCase } from "../application/use-cases/approve-payroll.use-case";
 import type { PayPayrollUseCase } from "../application/use-cases/pay-payroll.use-case";
 import type { IPayrollRepository } from "../domain/payroll.repository";
+import type { IEmployeeRepository } from "../../employees/domain/employee.repository";
+import type { ICompanyReader } from "../domain/company-reader.repository";
+import { mapToPayslipPdfData } from "../application/payslip-data-mapper";
+import { renderPayslipPdf } from "../infrastructure/pdfkit-payslip-renderer";
 import { createPayrollParameterSchema, createPayrollSchema } from "./payroll.validators";
+import { getTenantContext } from "../../../shared/context/request-context";
 
 export class PayrollController {
   constructor(
     private readonly payrollRepo: IPayrollRepository,
+    private readonly employeeRepo: IEmployeeRepository,
+    private readonly companyReader: ICompanyReader,
     private readonly createParameterUseCase: CreatePayrollParameterUseCase,
     private readonly listParametersUseCase: ListPayrollParametersUseCase,
     private readonly createPayrollUseCase: CreatePayrollUseCase,
@@ -68,6 +75,21 @@ export class PayrollController {
   getPayslip = async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(await this.payrollRepo.findPayslipByIdOrThrow(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPayslipPdf = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const payslip = await this.payrollRepo.findPayslipByIdOrThrow(req.params.id);
+      const employeeId = (payslip.summaryJson as { employeeId: string }).employeeId;
+      const [employee, company] = await Promise.all([
+        this.employeeRepo.findByIdOrThrow(employeeId),
+        this.companyReader.findByIdOrThrow(getTenantContext().companyId),
+      ]);
+      const pdf = await renderPayslipPdf(mapToPayslipPdfData(payslip, employee, company));
+      res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
     }

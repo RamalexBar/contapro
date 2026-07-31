@@ -53,12 +53,24 @@ multi-tenant de esas consultas se hace a mano via la relacion (`payrollDetail.pa
 `employee.companyId`) en los repositorios de infraestructura — ver comentarios en
 `prisma-payroll.repository.ts` y `prisma-timetracking.repository.ts`.
 
+## PDF del desprendible (iteracion 14)
+
+`GET /payslips/:id/pdf` genera el PDF del desprendible de pago (documento interno para el
+empleado) al vuelo desde `PayslipDocument.summaryJson` + `Employee` + `Company` — no se persiste
+en storage (`PayslipDocument.fileUrl` sigue sin usarse, mismo patron que el RIDE de facturacion
+electronica: se regenera en cada request en vez de cachearse). Ver
+`application/payslip-data-mapper.ts` y `infrastructure/pdfkit-payslip-renderer.ts`.
+
+**No confundir con el RIDE de nomina electronica DIAN** (`GET
+/electronic-invoicing/payroll-details/:payrollDetailId/pdf`, ver
+`modules/electronic-invoicing/README.md`): ese es el comprobante fiscal ante la DIAN (requiere que
+la nomina se haya enviado electronicamente), este es el comprobante que recibe el empleado y
+existe para cualquier periodo calculado, sin depender de facturacion electronica.
+
 ## Que sigue sin implementar
 
-1. **PDF del desprendible** — `PayslipDocument.fileUrl` existe mas no se genera; hoy solo
-   `summaryJson`.
-2. **Integracion contable**: al aprobar una nomina, generar el `JournalEntry` correspondiente
-   (gasto de nomina, pasivos laborales, retenciones) — `modules/accounting` es 100% stub, se
-   implementa cuando se aborde ese modulo.
-3. **Deducciones detalladas** (libranzas/embargos) — hoy no hay conceptos automaticos para esto.
-4. **Reportes** mensual/anual consolidados.
+1. **Deducciones detalladas** (libranzas/embargos) — hoy no hay conceptos automaticos para esto.
+2. **Reportes** mensual/anual consolidados.
+
+(La integracion contable al aprobar una nomina, item pendiente historicamente en esta lista, ya
+esta implementada — ver `approve-payroll.use-case.ts` y `modules/accounting`.)

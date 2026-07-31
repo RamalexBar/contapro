@@ -1,5 +1,6 @@
 import type { CreatePayrollInput, CreatePayrollParameterInput } from "@erp/shared-types";
-import { apiFetch } from "../../../lib/api-client";
+import { apiFetch, BASE_URL } from "../../../lib/api-client";
+import { useAuthStore } from "../../auth/hooks/useAuthStore";
 
 export interface PayrollParameterRecord {
   id: string;
@@ -97,4 +98,21 @@ export function approvePayroll(id: string): Promise<PayrollRecord> {
 
 export function payPayroll(id: string): Promise<PayrollRecord> {
   return apiFetch(`/payrolls/${id}/pay`, { method: "POST" });
+}
+
+export async function downloadPayslipPdf(payslipId: string, fileName: string): Promise<void> {
+  const { accessToken } = useAuthStore.getState();
+  const res = await fetch(`${BASE_URL}/payslips/${payslipId}/pdf`, {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  if (!res.ok) throw new Error("No se pudo descargar el desprendible");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
