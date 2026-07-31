@@ -6,13 +6,15 @@ World Office y Siesa, construido con Clean Architecture, principios SOLID y dise
 para escalar a miles de clientes bajo modalidad SaaS.
 
 > Este repositorio arrancó como **iteración 1** (scaffold completo del monorepo + módulos core
-> funcionales), en la **iteración 2** se implementó Nómina Colombia (motor de liquidación real,
-> ver `apps/api/src/modules/payroll/README.md`) junto con Empleados (CRUD) y Control de horarios
-> (marcación de entrada/salida), y en la **iteración 3** se implementó Contabilidad (plan de
-> cuentas, comprobantes, contabilización automática de nómina/venta/compra, reportes) y un
-> registro mínimo de Proveedores/Compras (ver `apps/api/src/modules/accounting/README.md` y
-> `apps/api/src/modules/suppliers/README.md`). Ver [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el
-> detalle de qué está implementado y qué queda modelado (Prisma) para siguientes iteraciones.
+> funcionales) y avanzó módulo por módulo hasta la **iteración 18**: Nómina Colombia (motor de
+> liquidación + PDF del desprendible), Contabilidad (plan de cuentas, comprobantes automáticos,
+> reportes, cierre de período), Proveedores/Compras (orden de compra, recepción con FIFO real,
+> abonos reversables), Facturación electrónica DIAN (los 5 tipos de documento + RIDE), Panel
+> administrador SaaS (cobro de suscripciones + recordatorios reales por correo) y Sincronización
+> offline en el móvil (ventas). Todos los módulos de negocio tienen API + UI web salvo
+> Facturación electrónica (solo API). Ver [`CLAUDE.md`](./CLAUDE.md) para un resumen orientado a
+> trabajar con Claude Code y [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el detalle completo,
+> módulo por módulo e iteración por iteración.
 
 ## Contenido
 
@@ -23,7 +25,7 @@ para escalar a miles de clientes bajo modalidad SaaS.
 - [Arranque local](#arranque-local)
 - [Scripts disponibles](#scripts-disponibles)
 - [Solución de problemas](#solución-de-problemas)
-- [Estado de verificación de esta sesión](#estado-de-verificación-de-esta-sesión)
+- [Estado de verificación](#estado-de-verificación)
 - [Documentación](#documentación)
 
 ## Stack
@@ -45,7 +47,7 @@ contapro/
 ├── apps/
 │   ├── api/        # Backend Express + TS (Clean Architecture por módulo)
 │   ├── web/        # Frontend React + Vite + TS + Tailwind
-│   └── mobile/     # App React Native (Expo) - scaffold
+│   └── mobile/     # App React Native (Expo) - POS con sincronizacion offline real
 ├── packages/
 │   ├── database/     # Prisma schema (todos los dominios) + seed
 │   ├── shared-types/  # DTOs y esquemas zod compartidos
@@ -97,9 +99,10 @@ cp .env.example apps/api/.env
 cp .env.example packages/database/.env
 cp .env.example apps/web/.env   # apps/web solo usa VITE_API_BASE_URL
 
-# 6. Migraciones + seed (crea la empresa demo "Minimarket La Esquina", 2 empleados demo y los
-#    parametros de nomina 2026 de ejemplo)
-pnpm db:migrate --name init
+# 6. Migraciones (aplica las 11 migraciones existentes) + seed (crea la empresa demo
+#    "Minimarket La Esquina", 2 empleados demo, parametros de nomina 2026 de ejemplo y el
+#    operador de plataforma del panel SaaS)
+pnpm db:migrate
 pnpm db:seed
 
 # 7. Levantar backend y frontend (en dos terminales, o con `pnpm dev` desde la raíz)
@@ -107,14 +110,12 @@ pnpm --filter @erp/api dev     # http://localhost:4000
 pnpm --filter @erp/web dev     # http://localhost:5173
 ```
 
-> Si ya habías corrido `pnpm db:migrate --name init` en una clonación anterior a la iteración 2
-> (antes de que existiera `PayrollParameter.monthlyHoursDivisor`), corre
-> `pnpm db:migrate --name add_payroll_hours_divisor` para traer tu base de datos al día.
+Credenciales del seed: `admin@demo.com` / `Demo1234!` (Administrador), `cajero@demo.com` /
+`Demo1234!` (Cajero, límite de descuento 5%, PIN `1234`) y `platform@demo.com` / `Demo1234!`
+(panel administrador SaaS, `POST /api/admin/auth/login`, separado de los usuarios de empresa).
 
-Credenciales del seed: `admin@demo.com` / `Demo1234!` (Administrador) y `cajero@demo.com` / `Demo1234!`
-(Cajero, límite de descuento 5%, PIN `1234`).
-
-Para la app móvil (scaffold, ver [alcance](./docs/ALCANCE.md#-móvil-expo)):
+Para la app móvil (POS con sincronización offline real, ver
+[`apps/api/src/modules/sync/README.md`](./apps/api/src/modules/sync/README.md)):
 
 ```bash
 pnpm --filter @erp/mobile start
@@ -154,38 +155,45 @@ También puedes apuntar a un solo paquete con `pnpm --filter @erp/<nombre> <scri
 - **`Environment variable not found: DATABASE_URL`** al correr comandos de Prisma: falta crear
   `packages/database/.env` (paso 5 de [Arranque local](#arranque-local)); Prisma solo lee el `.env`
   del mismo directorio que `prisma/schema`, no el de la raíz del repo.
+- **`EADDRINUSE` en el puerto 4000 tras varios reinicios de la API**: `tsx watch` a veces deja un
+  proceso huérfano ocupando el puerto en Windows. Cierra el proceso que lo tiene abierto (`netstat
+  -ano | findstr :4000` en PowerShell, o el Administrador de tareas) y vuelve a correr
+  `pnpm --filter @erp/api dev`.
+- **La API no arranca, se queja de `JWT_PLATFORM_ADMIN_SECRET`**: esa variable es obligatoria (sin
+  valor por defecto) desde que existe el panel administrador SaaS — revisa que `apps/api/.env`
+  tenga todas las variables de `.env.example` (paso 5), no solo las de la iteración 1.
 
-## Estado de verificación de esta sesión
+## Estado de verificación
 
-**Iteraciones 1 y 2**: verificadas por `tsc --noEmit` y `prisma generate` sin errores en todo el
-monorepo. En esas sesiones no había Docker/PostgreSQL disponibles, así que los flujos end-to-end
-quedaron pendientes de correr contra una base real.
+Cada iteración (1 a 18) se verificó con `tsc --noEmit` + `vitest run` en todo el monorepo y,
+salvo cuando no había Docker/Postgres disponible (iteraciones 1 y 2), también en vivo contra una
+base real: login, flujo end-to-end del módulo nuevo, y revisión de la respuesta/estado en base de
+datos — no solo compilación. Ejemplos recientes: cierre de período contable probado abriendo y
+cerrando periodos con comprobantes en distintos estados; reversar abonos a proveedores probado
+cancelando una compra con pagos ya registrados y confirmando que el comprobante de cada abono
+quedó anulado; sincronización offline móvil probada con pushes idempotentes, conflictos reales y
+errores de datos inválidos contra `POST /sync/push`/`GET /sync/pull`.
 
-**Iteración 3** (Contabilidad + Proveedores/Compras minimo): con Docker ya disponible en esta
-máquina, se levantó Postgres real (`docker compose up -d`), se corrieron las migraciones y el seed,
-y se probó en vivo contra la API (no solo compilación):
+Dos límites conocidos de verificación, documentados donde corresponde en vez de reportarse como
+"probado":
 
-- ✅ Login (`admin@demo.com`) devuelve JWT con los permisos `accounting.*`/`suppliers.*` sembrados.
-- ✅ Venta completa (`POST /api/sales`, pago CASH) genera y postea automáticamente el comprobante:
-  débito Caja, crédito Ingresos por ventas + IVA generado.
-- ✅ Proveedor + compra (`POST /api/suppliers`, `POST /api/purchases`) genera y postea el
-  comprobante: débito Inventario + IVA descontable, crédito Proveedores nacionales.
-- ✅ Venta y compra netean correctamente en la misma cuenta de IVA (2408) — confirmado en el libro
-  mayor (`GET /api/reports/ledger/:accountId`).
-- ✅ Balance General (`GET /api/reports/balance-sheet`) cuadra: activos = pasivos + patrimonio.
+- **Facturación electrónica DIAN**: la generación local de CUFE/XML/firma XAdES está probada, pero
+  el envío real al servicio SOAP de la DIAN **no** — faltan credenciales de habilitación reales
+  (ver `apps/api/src/modules/electronic-invoicing/README.md`).
+- **App móvil**: sin emulador/dispositivo disponible en el entorno de desarrollo de este trabajo,
+  el motor de sincronización se verificó con `tsc --noEmit` y probando el backend que consume
+  (`POST /sync/push`/`GET /sync/pull`) en vivo, pero no se probó en runtime dentro de la app.
 
-Pendiente de verificar por ti:
-
-- Probar la app web (`http://localhost:5173`) en el navegador — la API ya quedó confirmada
-  funcionando correctamente para los flujos que consume el front (empleados, vacaciones/permisos,
-  incapacidades, ausencias, refresh de sesión).
-- Flujo end-to-end de nómina: `POST /employees` → `POST /time-entries/clock-in` +
-  `/clock-out` → `POST /payrolls` → `POST /payrolls/:id/calculate` → `approve` (ahora también
-  contabiliza automáticamente, ver `apps/api/src/modules/accounting/README.md`) → `pay`.
+Ver [`CLAUDE.md`](./CLAUDE.md) (sección "Resumen de lo implementado en esta sesión") para el
+resumen de las iteraciones más recientes y [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el detalle
+de verificación de cada módulo.
 
 ## Documentación
 
-- [`docs/ALCANCE.md`](./docs/ALCANCE.md) — qué módulos están funcionales vs. modelados (stub).
+- [`CLAUDE.md`](./CLAUDE.md) — guía de orientación (comandos, convenciones, gotchas de este
+  entorno) y resumen de las iteraciones más recientes.
+- [`docs/ALCANCE.md`](./docs/ALCANCE.md) — qué módulos están funcionales, módulo por módulo e
+  iteración por iteración.
 - [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md) — decisiones de arquitectura y convenciones.
-- Cada módulo stub del backend (`apps/api/src/modules/<modulo>/README.md`) documenta su alcance
-  planeado y los modelos Prisma ya preparados para implementarlo.
+- Cada módulo del backend (`apps/api/src/modules/<modulo>/README.md`) documenta su alcance real:
+  qué está implementado, qué falta y limitaciones conocidas.
