@@ -1,8 +1,8 @@
 # Modulo: Panel Administrador SaaS
 
 Estado: **implementado.** Autenticacion de plataforma separada, CRUD de planes y suscripciones,
-cobro/renovacion, vista de empresas, dashboard agregado, y poller de recordatorios/vencimiento/
-suspension automatica.
+cobro/renovacion, vista de empresas, dashboard agregado, poller de recordatorios/vencimiento/
+suspension automatica (con envio real por correo), y UI web (`apps/web/src/features/platform-admin`).
 
 ## Modelos (`packages/database/prisma/schema/tenant.prisma`)
 
@@ -54,20 +54,46 @@ El panel es transversal a todas las empresas: no usa `tenantContextMiddleware` (
    dias, ingresos confirmados del mes.
 6. **Recordatorios y suspension automatica** (`RunSubscriptionLifecycleUseCase` +
    `infrastructure/subscription-lifecycle-poller.ts`, arrancado siempre desde `server.ts`,
-   intervalo de 1 hora): genera un `SubscriptionReminderLog` en 8/5/3/1/0 dias antes del
-   vencimiento, pasa a `GRACE_PERIOD` lo vencido (`graceEndsAt = currentPeriodEnd + 2 dias`,
-   `calculateGraceEndsAt`) y a `SUSPENDED` lo que supero el periodo de gracia (sin borrar
-   informacion). **El envio real del recordatorio (correo/WhatsApp) NO esta implementado** — no
-   hay ningun proveedor de email/mensajeria integrado en el codebase todavia; se genera el
-   registro (`channel: "EMAIL"`) como rastro de que "el recordatorio debia enviarse", mismo
-   criterio que la firma/envio DIAN: la logica de negocio esta completa, la integracion externa
-   real no.
+   intervalo de 1 hora): envia un recordatorio real por correo en 8/5/3/1/0 dias antes del
+   vencimiento (iteracion 17, ver seccion dedicada abajo), pasa a `GRACE_PERIOD` lo vencido
+   (`graceEndsAt = currentPeriodEnd + 2 dias`, `calculateGraceEndsAt`) y a `SUSPENDED` lo que
+   supero el periodo de gracia (sin borrar informacion).
 7. Auditoria (donde hay `companyId` valido — no aplica a `Plan`): `SUBSCRIPTION_CREATED`,
-   `SUBSCRIPTION_PAYMENT_REGISTERED`, `SUBSCRIPTION_STATUS_CHANGED`.
+   `SUBSCRIPTION_PAYMENT_REGISTERED`, `SUBSCRIPTION_STATUS_CHANGED`, `SUBSCRIPTION_REMINDER_SENT`,
+   `SUBSCRIPTION_REMINDER_FAILED`.
+
+## Envio real de recordatorios (iteracion 17)
+
+`IReminderNotifier` (`domain/reminder-notifier.ts`) es el puerto que arma y envia el correo;
+`ResendEmailNotifier` (`infrastructure/resend-email-notifier.ts`) es la implementacion real, via
+`fetch` directo a la API de Resend (sin SDK, mismo criterio que `dian-soap-client.ts`).
+
+- **NO PROBADO end-to-end contra Resend real** — mismo aviso que la integracion DIAN: el formato
+  del payload y el codigo de respuesta siguen la documentacion publica de Resend al momento de
+  escribir esto, pero nadie confirmo la entrega real con una cuenta de Resend de verdad.
+- `RESEND_API_KEY` vacio por defecto (`config/env.ts`) = envio deshabilitado. Verificado en este
+  entorno: sin la key, `ResendEmailNotifier.send` lanza con un mensaje claro
+  (`RESEND_API_KEY no esta configurado`) y el tick del poller **no se cae** (se captura en
+  `RunSubscriptionLifecycleUseCase`, mismo patron que `PollDianSubmissionsUseCase`).
+- **`SubscriptionReminderLog` solo se crea si el envio tuvo exito** — antes se creaba
+  incondicionalmente (el registro significaba "se debia enviar"; ahora `sentAt` significa "se
+  envio"). Un fallo del proveedor (o la key sin configurar) deja el recordatorio SIN registrar,
+  asi que el siguiente ciclo del poller (1 hora despues) reintenta automaticamente en vez de
+  perderlo silenciosamente.
+- Cada intento queda auditado: `SUBSCRIPTION_REMINDER_SENT` si se envio, `SUBSCRIPTION_REMINDER_FAILED`
+  con el mensaje de error si no.
+- `ISubscriptionRepository.listForLifecycleCheck` ahora incluye `companyName`/`companyEmail`/
+  `planName` (antes solo devolvia el `Subscription` sin datos de empresa) — el notifier los
+  necesita para armar el asunto/cuerpo del correo.
+- **WhatsApp no se implemento** (`SubscriptionReminderLog.channel` sigue soportando el valor
+  `"WHATSAPP"` en el schema, pero nada lo genera): la API de WhatsApp Business requiere
+  verificacion de negocio en Meta y plantillas de mensaje pre-aprobadas, un proceso externo que no
+  se puede completar dentro de este trabajo. `IReminderNotifier` esta diseñado para que agregar
+  un segundo canal sea una implementacion nueva del mismo puerto, no un rediseño.
 
 ## Que falta implementar
 
-1. Envio real de recordatorios (proveedor de email/WhatsApp) — ver punto 6 arriba.
+1. Envio real de recordatorios por WhatsApp — ver aviso arriba (bloqueado por verificacion de
+   negocio en Meta, no es un problema de codigo).
 2. Actualizaciones automaticas de `apps/web`/`apps/mobile` ("Nueva version disponible") — fuera
    del alcance de este backend, responsabilidad de Service Worker / Expo OTA updates.
-3. UI web del panel (hoy solo API).

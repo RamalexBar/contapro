@@ -34,6 +34,13 @@ const envSchema = z.object({
   // Nomina electronica usa un servicio DIAN SEPARADO al de facturacion -- ver
   // dian-nomina-soap-client.ts. SIN VERIFICAR (mas incluso que DIAN_SOAP_ENDPOINT).
   DIAN_NOMINA_SOAP_ENDPOINT: z.string().default(""),
+
+  // ---- Recordatorios de vencimiento de suscripcion (ver modules/saas-admin/README.md) ----
+  // Vacio por defecto = envio real deshabilitado (RunSubscriptionLifecycleUseCase no marca el
+  // recordatorio como enviado y lo reintenta en el siguiente ciclo del poller), mismo criterio
+  // que las variables DIAN_* de arriba.
+  RESEND_API_KEY: z.string().default(""),
+  RESEND_FROM_EMAIL: z.string().default("no-reply@erp-saas.demo"),
 });
 
 const parsed = envSchema.safeParse(process.env);

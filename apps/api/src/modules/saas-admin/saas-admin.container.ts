@@ -3,6 +3,7 @@ import { AuditService } from "../audit/application/audit.service";
 import { PrismaPlatformAdminRepository } from "./infrastructure/prisma-platform-admin.repository";
 import { PrismaPlanRepository } from "./infrastructure/prisma-plan.repository";
 import { PrismaSubscriptionRepository } from "./infrastructure/prisma-subscription.repository";
+import { ResendEmailNotifier } from "./infrastructure/resend-email-notifier";
 import { LoginPlatformAdminUseCase } from "./application/use-cases/login-platform-admin.use-case";
 import { CreatePlanUseCase } from "./application/use-cases/create-plan.use-case";
 import { ListPlansUseCase } from "./application/use-cases/list-plans.use-case";
@@ -35,4 +36,8 @@ export const saasAdminController = new SaasAdminController(
 );
 
 /** Usado por server.ts para arrancar el poller de recordatorios/vencimientos/suspension. */
-export const runSubscriptionLifecycleUseCase = new RunSubscriptionLifecycleUseCase(subscriptionRepo, auditService);
+export const runSubscriptionLifecycleUseCase = new RunSubscriptionLifecycleUseCase(
+  subscriptionRepo,
+  new ResendEmailNotifier(),
+  auditService
+);

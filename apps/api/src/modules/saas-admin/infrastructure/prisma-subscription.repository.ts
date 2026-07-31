@@ -7,6 +7,7 @@ import type {
   CreateSubscriptionData,
   ISubscriptionRepository,
   SaasDashboardStats,
+  SubscriptionForLifecycleCheck,
   SubscriptionPaymentRecord,
   SubscriptionRecord,
   SubscriptionStatus,
@@ -143,9 +144,17 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
     return { subscription: toRecord(result.subscription), payment: toPaymentRecord(result.payment) };
   }
 
-  async listForLifecycleCheck(): Promise<SubscriptionRecord[]> {
-    const rows = await basePrisma.subscription.findMany({ where: { status: { in: LIFECYCLE_STATUSES } } });
-    return rows.map(toRecord);
+  async listForLifecycleCheck(): Promise<SubscriptionForLifecycleCheck[]> {
+    const rows = await basePrisma.subscription.findMany({
+      where: { status: { in: LIFECYCLE_STATUSES } },
+      include: { company: { select: { name: true, email: true } }, plan: { select: { name: true } } },
+    });
+    return rows.map((row) => ({
+      ...toRecord(row),
+      companyName: row.company.name,
+      companyEmail: row.company.email,
+      planName: row.plan.name,
+    }));
   }
 
   async hasReminderLog(subscriptionId: string, daysBeforeDue: number): Promise<boolean> {

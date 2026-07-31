@@ -28,6 +28,12 @@ export interface SubscriptionWithDetails extends SubscriptionRecord {
   planCode: string;
 }
 
+export interface SubscriptionForLifecycleCheck extends SubscriptionRecord {
+  companyName: string;
+  companyEmail: string;
+  planName: string;
+}
+
 export interface SubscriptionPaymentRecord {
   id: string;
   subscriptionId: string;
@@ -82,8 +88,10 @@ export interface ISubscriptionRepository {
    * graceEndsAt, vuelve el status a ACTIVE -- todo en una transaccion. */
   applyPayment(id: string, data: ApplyPaymentData): Promise<ApplyPaymentResult>;
   /** Usado por RunSubscriptionLifecycleUseCase -- suscripciones en estados que necesitan
-   * revision diaria (TRIALING/ACTIVE/GRACE_PERIOD; SUSPENDED/CANCELLED ya no cambian solas). */
-  listForLifecycleCheck(): Promise<SubscriptionRecord[]>;
+   * revision diaria (TRIALING/ACTIVE/GRACE_PERIOD; SUSPENDED/CANCELLED ya no cambian solas).
+   * Incluye datos de empresa/plan (companyName/companyEmail/planName) porque el recordatorio
+   * real (IReminderNotifier) los necesita para armar el mensaje. */
+  listForLifecycleCheck(): Promise<SubscriptionForLifecycleCheck[]>;
   /** @@unique([subscriptionId, daysBeforeDue]) evita duplicados a nivel DB, pero se consulta
    * antes para no depender de capturar el error de duplicado. */
   hasReminderLog(subscriptionId: string, daysBeforeDue: number): Promise<boolean>;
