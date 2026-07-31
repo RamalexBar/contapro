@@ -13,8 +13,12 @@ import type { MatchBankReconciliationItemUseCase } from "../application/use-case
 import type { CloseBankReconciliationUseCase } from "../application/use-cases/close-bank-reconciliation.use-case";
 import type { GetBankReconciliationUseCase } from "../application/use-cases/get-bank-reconciliation.use-case";
 import type { ListBankReconciliationsUseCase } from "../application/use-cases/list-bank-reconciliations.use-case";
+import type { CloseFinancialPeriodUseCase } from "../application/use-cases/close-financial-period.use-case";
+import type { ReopenFinancialPeriodUseCase } from "../application/use-cases/reopen-financial-period.use-case";
 import type { IChartOfAccountsRepository } from "../domain/chart-of-accounts.repository";
 import type { IJournalEntryRepository } from "../domain/journal-entry.repository";
+import type { IFinancialPeriodRepository } from "../domain/financial-period.repository";
+import { ValidationError } from "../../../shared/errors/app-error";
 import {
   createAccountSchema,
   createBankAccountSchema,
@@ -28,6 +32,7 @@ export class AccountingController {
   constructor(
     private readonly accountRepo: IChartOfAccountsRepository,
     private readonly journalRepo: IJournalEntryRepository,
+    private readonly periodRepo: IFinancialPeriodRepository,
     private readonly reports: AccountingReportsService,
     private readonly createAccountUseCase: CreateAccountUseCase,
     private readonly createEntryUseCase: CreateJournalEntryUseCase,
@@ -41,7 +46,9 @@ export class AccountingController {
     private readonly matchBankReconciliationItemUseCase: MatchBankReconciliationItemUseCase,
     private readonly closeBankReconciliationUseCase: CloseBankReconciliationUseCase,
     private readonly getBankReconciliationUseCase: GetBankReconciliationUseCase,
-    private readonly listBankReconciliationsUseCase: ListBankReconciliationsUseCase
+    private readonly listBankReconciliationsUseCase: ListBankReconciliationsUseCase,
+    private readonly closeFinancialPeriodUseCase: CloseFinancialPeriodUseCase,
+    private readonly reopenFinancialPeriodUseCase: ReopenFinancialPeriodUseCase
   ) {}
 
   listAccounts = async (_req: Request, res: Response, next: NextFunction) => {
@@ -217,4 +224,40 @@ export class AccountingController {
       next(err);
     }
   };
+
+  listFinancialPeriods = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const year = typeof req.query.year === "string" ? Number(req.query.year) : undefined;
+      res.json({ data: await this.periodRepo.list(year) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  closeFinancialPeriod = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { year, month } = parsePeriodParams(req.params);
+      res.json(await this.closeFinancialPeriodUseCase.execute(year, month));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  reopenFinancialPeriod = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { year, month } = parsePeriodParams(req.params);
+      res.json(await this.reopenFinancialPeriodUseCase.execute(year, month));
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+function parsePeriodParams(params: Record<string, string>): { year: number; month: number } {
+  const year = Number(params.year);
+  const month = Number(params.month);
+  if (!Number.isInteger(year) || !Number.isInteger(month)) {
+    throw new ValidationError("Año/mes invalidos");
+  }
+  return { year, month };
 }

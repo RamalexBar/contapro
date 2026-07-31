@@ -94,3 +94,19 @@ accountingRouter.post(
   requirePermission("accounting.manage"),
   accountingController.closeBankReconciliation
 );
+
+accountingRouter.get(
+  "/financial-periods",
+  requirePermission("accounting.read"),
+  accountingController.listFinancialPeriods
+);
+accountingRouter.post(
+  "/financial-periods/:year/:month/close",
+  requirePermission("accounting.manage"),
+  accountingController.closeFinancialPeriod
+);
+accountingRouter.post(
+  "/financial-periods/:year/:month/reopen",
+  requirePermission("accounting.manage"),
+  accountingController.reopenFinancialPeriod
+);

@@ -55,4 +55,6 @@ export interface IJournalEntryRepository {
   updateStatus(id: string, status: string, postedAt?: Date): Promise<JournalEntryRecord>;
   /** Lineas de comprobantes POSTED, para libro mayor y reportes financieros. */
   listPostedLines(filter: { from?: Date; to?: Date; accountId?: string }): Promise<PostedLineAggregate[]>;
+  /** Para bloquear el cierre de un periodo con comprobantes sin publicar/anular pendientes. */
+  hasDraftEntriesInPeriod(year: number, month: number): Promise<boolean>;
 }

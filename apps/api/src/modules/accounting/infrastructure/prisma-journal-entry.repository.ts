@@ -128,4 +128,14 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
       description: r.description,
     }));
   }
+
+  async hasDraftEntriesInPeriod(year: number, month: number): Promise<boolean> {
+    const companyId = getTenantContext().companyId;
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    const count = await prisma.journalEntry.count({
+      where: { companyId, status: "DRAFT", date: { gte: start, lt: end } },
+    });
+    return count > 0;
+  }
 }

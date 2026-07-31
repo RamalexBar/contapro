@@ -1,23 +1,37 @@
 import { round2 } from "@erp/shared-utils";
 import { getTenantContext } from "../../../../shared/context/request-context";
-import { ValidationError } from "../../../../shared/errors/app-error";
+import { ConflictError, ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IChartOfAccountsRepository } from "../../domain/chart-of-accounts.repository";
+import type { IFinancialPeriodRepository } from "../../domain/financial-period.repository";
 import type { CreateJournalEntryData, IJournalEntryRepository, JournalEntryRecord } from "../../domain/journal-entry.repository";
 
 export type CreateJournalEntryInput = Omit<CreateJournalEntryData, "createdByUserId">;
 
-/** Un comprobante manual siempre nace en DRAFT; se publica aparte con PostJournalEntryUseCase. */
+/**
+ * Un comprobante manual siempre nace en DRAFT; se publica aparte con PostJournalEntryUseCase.
+ * Punto unico de creacion de comprobantes (manuales Y automaticos desde venta/compra/nomina/abono/
+ * ajuste de caja, ver accounting.container.ts) -- por eso el bloqueo de periodo cerrado vive aqui
+ * y no en cada Post*JournalEntryUseCase por separado.
+ */
 export class CreateJournalEntryUseCase {
   constructor(
     private readonly journalRepo: IJournalEntryRepository,
     private readonly accountRepo: IChartOfAccountsRepository,
+    private readonly periodRepo: IFinancialPeriodRepository,
     private readonly audit: AuditService
   ) {}
 
   async execute(input: CreateJournalEntryInput): Promise<JournalEntryRecord> {
     if (input.lines.length < 2) {
       throw new ValidationError("Un comprobante necesita al menos dos movimientos");
+    }
+
+    const closedPeriod = await this.periodRepo.findClosed(input.date.getUTCFullYear(), input.date.getUTCMonth() + 1);
+    if (closedPeriod) {
+      throw new ConflictError(
+        `El periodo contable ${closedPeriod.month}/${closedPeriod.year} esta cerrado, no se pueden crear comprobantes con fecha dentro de ese periodo`
+      );
     }
 
     const totalDebit = round2(input.lines.reduce((sum, l) => sum + l.debit, 0));

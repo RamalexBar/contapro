@@ -7,6 +7,7 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import {
   type AccountType,
+  closeFinancialPeriod,
   createAccount,
   createEntry,
   getBalanceSheet,
@@ -15,7 +16,9 @@ import {
   getLedger,
   listAccounts,
   listEntries,
+  listFinancialPeriods,
   postEntry,
+  reopenFinancialPeriod,
   voidEntry,
 } from "../api/accounting.api";
 
@@ -27,7 +30,7 @@ const ACCOUNT_TYPES: { value: AccountType; label: string }[] = [
   { value: "EXPENSE", label: "Gasto" },
 ];
 
-type Section = "accounts" | "entries" | "reports";
+type Section = "accounts" | "entries" | "reports" | "periods";
 type ReportTab = "balance" | "income" | "cashflow" | "ledger";
 
 function formatLocalDate(d: Date): string {
@@ -505,6 +508,106 @@ function ReportsSection() {
   );
 }
 
+const MONTH_LABELS = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+function PeriodsSection() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["accounting", "financial-periods"], queryFn: () => listFinancialPeriods() });
+
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+
+  const closeMutation = useMutation({
+    mutationFn: () => closeFinancialPeriod(year, month),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounting", "financial-periods"] }),
+  });
+  const reopenMutation = useMutation({
+    mutationFn: (period: { year: number; month: number }) => reopenFinancialPeriod(period.year, period.month),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounting", "financial-periods"] }),
+  });
+
+  return (
+    <>
+      <Card className="mb-6">
+        <h2 className="mb-3 text-sm font-semibold text-gray-700">Cerrar periodo contable</h2>
+        <p className="mb-3 text-sm text-gray-500">
+          Al cerrar un periodo no se podran crear ni contabilizar comprobantes (manuales o automaticos) con fecha
+          dentro de ese mes. Requiere que todos los comprobantes del mes esten publicados o anulados.
+        </p>
+        <form
+          className="flex items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            closeMutation.mutate();
+          }}
+        >
+          <Input label="Año" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} required />
+          <div>
+            <label className="mb-1 block text-sm text-gray-600">Mes</label>
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+            >
+              {MONTH_LABELS.map((label, i) => (
+                <option key={label} value={i + 1}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button type="submit" disabled={closeMutation.isPending}>
+            Cerrar periodo
+          </Button>
+        </form>
+        {closeMutation.isError && <p className="mt-2 text-sm text-red-600">{(closeMutation.error as Error).message}</p>}
+      </Card>
+
+      <Card>
+        <h2 className="mb-3 text-sm font-semibold text-gray-700">Historial de periodos</h2>
+        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="py-2">Periodo</th>
+              <th>Estado</th>
+              <th>Cerrado el</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data?.data.map((p) => (
+              <tr key={p.id} className="border-b border-gray-100">
+                <td className="py-2">
+                  {MONTH_LABELS[p.month - 1]} {p.year}
+                </td>
+                <td>{p.status === "CLOSED" ? "Cerrado" : "Abierto"}</td>
+                <td>{p.closedAt ? p.closedAt.slice(0, 10) : "-"}</td>
+                <td className="text-right">
+                  {p.status === "CLOSED" && (
+                    <Button
+                      variant="secondary"
+                      disabled={reopenMutation.isPending}
+                      onClick={() => reopenMutation.mutate({ year: p.year, month: p.month })}
+                    >
+                      Reabrir
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay periodos cerrados todavia.</p>}
+      </Card>
+    </>
+  );
+}
+
 export function AccountingPage() {
   const [section, setSection] = useState<Section>("accounts");
 
@@ -521,11 +624,15 @@ export function AccountingPage() {
         <Button variant={section === "reports" ? "primary" : "secondary"} onClick={() => setSection("reports")}>
           Reportes
         </Button>
+        <Button variant={section === "periods" ? "primary" : "secondary"} onClick={() => setSection("periods")}>
+          Cierre de periodo
+        </Button>
       </div>
 
       {section === "accounts" && <AccountsSection />}
       {section === "entries" && <EntriesSection />}
       {section === "reports" && <ReportsSection />}
+      {section === "periods" && <PeriodsSection />}
     </AppLayout>
   );
 }

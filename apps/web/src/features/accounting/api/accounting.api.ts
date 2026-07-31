@@ -156,3 +156,23 @@ export function getLedger(accountId: string, from?: string, to?: string): Promis
   const query = params.toString();
   return apiFetch(`/reports/ledger/${accountId}${query ? `?${query}` : ""}`);
 }
+
+export interface FinancialPeriodRecord {
+  id: string;
+  year: number;
+  month: number;
+  status: "OPEN" | "CLOSED";
+  closedAt: string | null;
+}
+
+export function listFinancialPeriods(year?: number): Promise<{ data: FinancialPeriodRecord[] }> {
+  return apiFetch(`/financial-periods${year ? `?year=${year}` : ""}`);
+}
+
+export function closeFinancialPeriod(year: number, month: number): Promise<FinancialPeriodRecord> {
+  return apiFetch(`/financial-periods/${year}/${month}/close`, { method: "POST" });
+}
+
+export function reopenFinancialPeriod(year: number, month: number): Promise<FinancialPeriodRecord> {
+  return apiFetch(`/financial-periods/${year}/${month}/reopen`, { method: "POST" });
+}

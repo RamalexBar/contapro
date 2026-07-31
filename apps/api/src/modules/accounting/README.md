@@ -2,16 +2,15 @@
 
 Estado: **plan de cuentas, comprobantes, contabilizacion automatica de nomina/venta/compra/abono a
 proveedor/ajuste de caja, reportes (libro mayor, Balance General, Estado de Resultados, flujo de
-caja) y conciliacion bancaria manual, todo implementado.**
+caja), conciliacion bancaria manual y cierre de periodo, todo implementado.**
 
 ## Modelos (`packages/database/prisma/schema/accounting.prisma`)
 
 - `ChartOfAccounts` — plan de cuentas jerarquico (`AccountType`: ASSET/LIABILITY/EQUITY/INCOME/EXPENSE).
 - `JournalEntry` + `JournalEntryLine` — comprobantes (libro diario), con `sourceType`/`sourceId`
   para trazar el origen (venta, compra, nomina, abono, ajuste de caja, ajuste manual).
-- `FinancialPeriod` — control de periodos abiertos/cerrados por mes. **Sigue sin uso** — cerrar un
-  periodo (bloquear comprobantes nuevos en ese mes) es un concepto mas grande e independiente de
-  la conciliacion bancaria, no implementado en este trabajo (ver "Que falta implementar").
+- `FinancialPeriod` — control de periodos abiertos/cerrados por mes (iteracion 15, ver punto 8 mas
+  abajo).
 - `BankAccount`, `BankTransaction`, `BankReconciliation` + `BankReconciliationItem` — conciliacion
   bancaria.
 
@@ -73,14 +72,30 @@ caja) y conciliacion bancaria manual, todo implementado.**
    - `GET /bank-reconciliations`, `GET /bank-reconciliations/:id`.
 7. Auditoria: `ACCOUNT_CREATED`, `JOURNAL_ENTRY_CREATED`, `JOURNAL_ENTRY_POSTED`,
    `JOURNAL_ENTRY_VOIDED`, `BANK_ACCOUNT_CREATED`, `BANK_TRANSACTION_REGISTERED`,
-   `BANK_RECONCILIATION_STARTED`, `BANK_RECONCILIATION_ITEM_MATCHED`, `BANK_RECONCILIATION_CLOSED`.
+   `BANK_RECONCILIATION_STARTED`, `BANK_RECONCILIATION_ITEM_MATCHED`, `BANK_RECONCILIATION_CLOSED`,
+   `FINANCIAL_PERIOD_CLOSED`, `FINANCIAL_PERIOD_REOPENED`.
+8. **Cierre de periodo** (`FinancialPeriod`, iteracion 15):
+   - `POST /financial-periods/:year/:month/close` — exige que no existan comprobantes `DRAFT` con
+     fecha dentro de ese mes (deben publicarse o anularse primero). Crea/actualiza la fila
+     `FinancialPeriod` a `CLOSED`.
+   - `POST /financial-periods/:year/:month/reopen` — vuelve a `OPEN` (correccion puntual); falla
+     si el periodo nunca se cerro.
+   - `GET /financial-periods?year=` — historial (solo aparecen periodos que se cerraron alguna
+     vez; un mes sin fila esta implicitamente `OPEN`).
+   - El bloqueo real vive en `CreateJournalEntryUseCase` (punto unico de creacion de comprobantes,
+     tanto manuales como los automaticos de venta/compra/nomina/abono/ajuste de caja): rechaza
+     con `409 CONFLICT` cualquier comprobante nuevo con `date` dentro de un periodo `CLOSED`.
+   - **No genera asiento de cierre** (traslado de ingresos/gastos a una cuenta de utilidades
+     retenidas) — el Balance General ya calcula la utilidad acumulada dinamicamente hasta la
+     fecha de corte (`AccountingReportsService.getBalanceSheet`), asi que "cerrar" aqui es un
+     bloqueo de edicion sobre el periodo, no un cierre contable formal de libros.
+   - No exige que las cuentas bancarias de la empresa esten conciliadas para ese mes (a
+     diferencia de lo que se especulaba antes de implementarlo) — se dejo como una validacion
+     mas simple y explicita (sin drafts pendientes) para no acoplar el cierre a que la empresa
+     use conciliacion bancaria en absoluto.
 
 ## Que falta implementar
 
-1. **Cierre de periodo** (`FinancialPeriod.status = CLOSED`): bloquear creacion de comprobantes en
-   un mes cerrado, probablemente exigiendo que todas las cuentas bancarias de la empresa esten
-   conciliadas para ese mes. Deliberadamente fuera de este trabajo — es un concepto mayor e
-   independiente de la conciliacion bancaria en si.
-2. Auto-sugerencia de matches en la conciliacion bancaria (por monto/fecha) — hoy es 100% manual.
-3. Flujo de caja como Estado de Flujo de Efectivo formal (metodo indirecto desde el Estado de
+1. Auto-sugerencia de matches en la conciliacion bancaria (por monto/fecha) — hoy es 100% manual.
+2. Flujo de caja como Estado de Flujo de Efectivo formal (metodo indirecto desde el Estado de
    Resultados) — hoy es un resumen directo simplificado.

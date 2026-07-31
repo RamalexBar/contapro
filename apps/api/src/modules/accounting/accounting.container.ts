@@ -7,6 +7,7 @@ import { AuditService } from "../audit/application/audit.service";
 import { PrismaCashSessionRepository } from "../cash/cash-session/infrastructure/prisma-cash-session.repository";
 import { PrismaChartOfAccountsRepository } from "./infrastructure/prisma-chart-of-accounts.repository";
 import { PrismaJournalEntryRepository } from "./infrastructure/prisma-journal-entry.repository";
+import { PrismaFinancialPeriodRepository } from "./infrastructure/prisma-financial-period.repository";
 import { PrismaBankAccountRepository } from "./infrastructure/prisma-bank-account.repository";
 import { PrismaBankTransactionRepository } from "./infrastructure/prisma-bank-transaction.repository";
 import { PrismaBankReconciliationRepository } from "./infrastructure/prisma-bank-reconciliation.repository";
@@ -29,6 +30,8 @@ import { MatchBankReconciliationItemUseCase } from "./application/use-cases/matc
 import { CloseBankReconciliationUseCase } from "./application/use-cases/close-bank-reconciliation.use-case";
 import { GetBankReconciliationUseCase } from "./application/use-cases/get-bank-reconciliation.use-case";
 import { ListBankReconciliationsUseCase } from "./application/use-cases/list-bank-reconciliations.use-case";
+import { CloseFinancialPeriodUseCase } from "./application/use-cases/close-financial-period.use-case";
+import { ReopenFinancialPeriodUseCase } from "./application/use-cases/reopen-financial-period.use-case";
 import { AccountingController } from "./interfaces/accounting.controller";
 
 const accountRepo = new PrismaChartOfAccountsRepository();
@@ -37,11 +40,12 @@ const cashSessionRepo = new PrismaCashSessionRepository();
 const bankAccountRepo = new PrismaBankAccountRepository();
 const bankTransactionRepo = new PrismaBankTransactionRepository();
 const bankReconciliationRepo = new PrismaBankReconciliationRepository();
+const financialPeriodRepo = new PrismaFinancialPeriodRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessionRepo, bankTransactionRepo);
 
 const createAccountUseCase = new CreateAccountUseCase(accountRepo, auditService);
-const createEntryUseCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, auditService);
+const createEntryUseCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, financialPeriodRepo, auditService);
 const postEntryUseCase = new PostJournalEntryUseCase(journalRepo, auditService);
 
 /** Usado tambien por suppliers.container.ts (CancelPurchaseUseCase) para anular el comprobante de
@@ -51,6 +55,7 @@ export const voidJournalEntryUseCase = new VoidJournalEntryUseCase(journalRepo, 
 export const accountingController = new AccountingController(
   accountRepo,
   journalRepo,
+  financialPeriodRepo,
   reports,
   createAccountUseCase,
   createEntryUseCase,
@@ -64,7 +69,9 @@ export const accountingController = new AccountingController(
   new MatchBankReconciliationItemUseCase(bankReconciliationRepo, auditService),
   new CloseBankReconciliationUseCase(bankReconciliationRepo, auditService),
   new GetBankReconciliationUseCase(bankReconciliationRepo),
-  new ListBankReconciliationsUseCase(bankReconciliationRepo)
+  new ListBankReconciliationsUseCase(bankReconciliationRepo),
+  new CloseFinancialPeriodUseCase(financialPeriodRepo, journalRepo, auditService),
+  new ReopenFinancialPeriodUseCase(financialPeriodRepo, auditService)
 );
 
 /** Usado por payroll.container.ts para generar el comprobante de nomina al aprobar un periodo. */
