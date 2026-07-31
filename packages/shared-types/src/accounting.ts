@@ -25,3 +25,37 @@ export const createJournalEntrySchema = z.object({
   lines: z.array(journalEntryLineSchema).min(2),
 });
 export type CreateJournalEntryInput = z.infer<typeof createJournalEntrySchema>;
+
+export const createBankAccountSchema = z.object({
+  bankName: z.string().min(1),
+  accountNumber: z.string().min(1),
+  accountType: z.string().min(1),
+});
+export type CreateBankAccountInput = z.infer<typeof createBankAccountSchema>;
+
+export const registerBankTransactionSchema = z.object({
+  date: z.coerce.date(),
+  description: z.string().min(1),
+  amount: z.number().positive(),
+  type: z.enum(["DEBIT", "CREDIT"]),
+});
+export type RegisterBankTransactionInput = z.infer<typeof registerBankTransactionSchema>;
+
+export const startBankReconciliationSchema = z.object({
+  bankAccountId: z.string().uuid(),
+  periodStart: z.coerce.date(),
+  periodEnd: z.coerce.date(),
+  statementBalance: z.number(),
+  bookBalance: z.number(),
+});
+export type StartBankReconciliationInput = z.infer<typeof startBankReconciliationSchema>;
+
+export const matchBankReconciliationItemSchema = z
+  .object({
+    bankTransactionId: z.string().uuid().optional(),
+    journalEntryLineId: z.string().uuid().optional(),
+  })
+  .refine((data) => data.bankTransactionId || data.journalEntryLineId, {
+    message: "Debes indicar bankTransactionId y/o journalEntryLineId",
+  });
+export type MatchBankReconciliationItemInput = z.infer<typeof matchBankReconciliationItemSchema>;

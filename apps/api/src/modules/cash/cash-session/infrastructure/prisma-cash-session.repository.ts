@@ -119,4 +119,14 @@ export class PrismaCashSessionRepository implements ICashSessionRepository {
     }
     return net;
   }
+
+  async sumMovementsByType(from: Date, to: Date): Promise<Array<{ type: string; total: number }>> {
+    const companyId = getTenantContext().companyId;
+    const grouped = await prisma.cashMovement.groupBy({
+      by: ["type"],
+      where: { createdAt: { gte: from, lte: to }, cashSession: { companyId } },
+      _sum: { amount: true },
+    });
+    return grouped.map((g) => ({ type: g.type, total: Number(g._sum.amount ?? 0) }));
+  }
 }

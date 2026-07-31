@@ -26,4 +26,7 @@ export interface ICashSessionRepository {
   ): Promise<CashSessionRecord>;
   registerMovement(cashSessionId: string, type: string, amount: number, concept: string, userId: string): Promise<void>;
   sumMovements(cashSessionId: string): Promise<number>;
+  /** Usado por AccountingReportsService.getCashFlow -- agregado por companyId via la relacion a
+   * CashSession (CashMovement no tiene columna companyId propia). */
+  sumMovementsByType(from: Date, to: Date): Promise<Array<{ type: string; total: number }>>;
 }

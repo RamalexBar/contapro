@@ -1,5 +1,6 @@
 import { PrismaAuditLogRepository } from "../../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../../audit/application/audit.service";
+import { postCashSessionAdjustmentJournalEntryUseCase } from "../../accounting/accounting.container";
 import { PrismaCashSessionRepository } from "./infrastructure/prisma-cash-session.repository";
 import { OpenCashSessionUseCase } from "./application/use-cases/open-session.use-case";
 import { CloseCashSessionUseCase } from "./application/use-cases/close-session.use-case";
@@ -12,7 +13,7 @@ const auditService = new AuditService(new PrismaAuditLogRepository());
 
 export const cashSessionController = new CashSessionController(
   new OpenCashSessionUseCase(repo, auditService),
-  new CloseCashSessionUseCase(repo, auditService),
+  new CloseCashSessionUseCase(repo, postCashSessionAdjustmentJournalEntryUseCase, auditService),
   new GetActiveSessionUseCase(repo),
   new RegisterCashMovementUseCase(repo, auditService)
 );

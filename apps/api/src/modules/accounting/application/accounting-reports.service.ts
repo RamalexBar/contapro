@@ -1,6 +1,8 @@
 import { round2 } from "@erp/shared-utils";
 import type { IChartOfAccountsRepository } from "../domain/chart-of-accounts.repository";
 import type { IJournalEntryRepository } from "../domain/journal-entry.repository";
+import type { IBankTransactionRepository } from "../domain/bank-transaction.repository";
+import type { ICashSessionRepository } from "../../cash/cash-session/domain/cash-session.repository";
 
 export interface AccountBalance {
   accountId: string;
@@ -40,6 +42,28 @@ export interface LedgerEntry {
   runningBalance: number;
 }
 
+export interface CashFlowLine {
+  type: string;
+  total: number;
+}
+
+export interface CashFlowReport {
+  from: string;
+  to: string;
+  cash: CashFlowLine[];
+  totalCashIn: number;
+  totalCashOut: number;
+  netCash: number;
+  bank: CashFlowLine[];
+  totalBankIn: number;
+  totalBankOut: number;
+  netBank: number;
+  netCashFlow: number;
+}
+
+const CASH_INFLOW_TYPES = new Set(["SALE_IN", "INCOME", "DEPOSIT"]);
+const BANK_INFLOW_TYPE = "CREDIT";
+
 /**
  * Balance General y Estado de Resultados derivados del libro mayor (JournalEntryLine de
  * comprobantes POSTED), agrupados por tipo de cuenta (AccountType). El Balance General incluye
@@ -49,7 +73,9 @@ export interface LedgerEntry {
 export class AccountingReportsService {
   constructor(
     private readonly journalRepo: IJournalEntryRepository,
-    private readonly accountRepo: IChartOfAccountsRepository
+    private readonly accountRepo: IChartOfAccountsRepository,
+    private readonly cashSessionRepo: ICashSessionRepository,
+    private readonly bankTransactionRepo: IBankTransactionRepository
   ) {}
 
   async getBalanceSheet(asOf: Date): Promise<BalanceSheet> {
@@ -143,6 +169,51 @@ export class AccountingReportsService {
         runningBalance: round2(running),
       };
     });
+  }
+
+  /**
+   * Flujo de caja simplificado: entradas/salidas de CashMovement (SALE_IN/INCOME/DEPOSIT =
+   * entrada, EXPENSE/WITHDRAWAL = salida) y de BankTransaction (CREDIT = entrada, DEBIT = salida
+   * -- ver aviso en domain/bank-transaction.repository.ts). No es un Estado de Flujo de Efectivo
+   * formal (metodo indirecto desde el Estado de Resultados) -- es un resumen directo de
+   * movimientos de caja/banco en el periodo.
+   */
+  async getCashFlow(from: Date, to: Date): Promise<CashFlowReport> {
+    const [cashLines, bankLines] = await Promise.all([
+      this.cashSessionRepo.sumMovementsByType(from, to),
+      this.bankTransactionRepo.sumByType(from, to),
+    ]);
+
+    let totalCashIn = 0;
+    let totalCashOut = 0;
+    for (const line of cashLines) {
+      if (CASH_INFLOW_TYPES.has(line.type)) totalCashIn += line.total;
+      else totalCashOut += line.total;
+    }
+
+    let totalBankIn = 0;
+    let totalBankOut = 0;
+    for (const line of bankLines) {
+      if (line.type === BANK_INFLOW_TYPE) totalBankIn += line.total;
+      else totalBankOut += line.total;
+    }
+
+    const netCash = round2(totalCashIn - totalCashOut);
+    const netBank = round2(totalBankIn - totalBankOut);
+
+    return {
+      from: from.toISOString(),
+      to: to.toISOString(),
+      cash: cashLines.map((l) => ({ type: l.type, total: round2(l.total) })),
+      totalCashIn: round2(totalCashIn),
+      totalCashOut: round2(totalCashOut),
+      netCash,
+      bank: bankLines.map((l) => ({ type: l.type, total: round2(l.total) })),
+      totalBankIn: round2(totalBankIn),
+      totalBankOut: round2(totalBankOut),
+      netBank,
+      netCashFlow: round2(netCash + netBank),
+    };
   }
 
   private aggregateByAccount(lines: { accountId: string; debit: number; credit: number }[]) {

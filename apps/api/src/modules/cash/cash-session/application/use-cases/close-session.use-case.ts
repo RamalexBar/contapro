@@ -1,11 +1,18 @@
 import type { CloseCashSessionInput } from "@erp/shared-types";
 import { getTenantContext } from "../../../../../shared/context/request-context";
 import type { AuditService } from "../../../../audit/application/audit.service";
+import type { PostCashSessionAdjustmentJournalEntryUseCase } from "../../../../accounting/application/use-cases/post-cash-session-adjustment-journal-entry.use-case";
 import type { CashSessionRecord, ICashSessionRepository } from "../../domain/cash-session.repository";
 
-/** Registra hora de cierre, dinero final y la DIFERENCIA (arqueo) respecto a lo esperado. */
+/** Registra hora de cierre, dinero final y la DIFERENCIA (arqueo) respecto a lo esperado. Si hay
+ * diferencia, la contabiliza (sobrante/faltante) -- sin try/catch, mismo criterio que el resto de
+ * comprobantes: es dinero real, no un efecto secundario que se pueda degradar. */
 export class CloseCashSessionUseCase {
-  constructor(private readonly repo: ICashSessionRepository, private readonly audit: AuditService) {}
+  constructor(
+    private readonly repo: ICashSessionRepository,
+    private readonly postCashSessionAdjustmentJournalEntry: PostCashSessionAdjustmentJournalEntryUseCase,
+    private readonly audit: AuditService
+  ) {}
 
   async execute(sessionId: string, input: CloseCashSessionInput): Promise<CashSessionRecord> {
     const userId = getTenantContext().userId;
@@ -22,6 +29,15 @@ export class CloseCashSessionUseCase {
         difference: session.difference,
       },
     });
+
+    if (session.difference) {
+      await this.postCashSessionAdjustmentJournalEntry.execute({
+        cashSessionId: session.id,
+        branchId: session.branchId,
+        date: session.closedAt ?? new Date(),
+        difference: session.difference,
+      });
+    }
 
     return session;
   }

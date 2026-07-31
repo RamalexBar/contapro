@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { tenantContextMiddleware } from "../../../shared/middlewares/tenant-context.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
-import { notImplemented } from "../../../shared/middlewares/not-implemented.middleware";
 import { accountingController } from "../accounting.container";
 
 export const accountingRouter = Router();
@@ -51,8 +50,47 @@ accountingRouter.get(
   requirePermission("accounting.read"),
   accountingController.getLedger
 );
+accountingRouter.get(
+  "/reports/cash-flow",
+  requirePermission("accounting.read"),
+  accountingController.getCashFlow
+);
 
-// Flujo de caja y conciliacion bancaria: aun no implementado, ver README.md del modulo.
-const stub = notImplemented("accounting");
-accountingRouter.all("/reports/cash-flow", stub);
-accountingRouter.all("/bank-reconciliations", stub);
+accountingRouter.post("/bank-accounts", requirePermission("accounting.manage"), accountingController.createBankAccount);
+accountingRouter.get("/bank-accounts", requirePermission("accounting.read"), accountingController.listBankAccounts);
+accountingRouter.post(
+  "/bank-accounts/:id/transactions",
+  requirePermission("accounting.manage"),
+  accountingController.registerBankTransaction
+);
+accountingRouter.get(
+  "/bank-accounts/:id/transactions",
+  requirePermission("accounting.read"),
+  accountingController.listBankTransactions
+);
+
+accountingRouter.post(
+  "/bank-reconciliations",
+  requirePermission("accounting.manage"),
+  accountingController.startBankReconciliation
+);
+accountingRouter.get(
+  "/bank-reconciliations",
+  requirePermission("accounting.read"),
+  accountingController.listBankReconciliations
+);
+accountingRouter.get(
+  "/bank-reconciliations/:id",
+  requirePermission("accounting.read"),
+  accountingController.getBankReconciliation
+);
+accountingRouter.post(
+  "/bank-reconciliations/:id/match",
+  requirePermission("accounting.manage"),
+  accountingController.matchBankReconciliationItem
+);
+accountingRouter.post(
+  "/bank-reconciliations/:id/close",
+  requirePermission("accounting.manage"),
+  accountingController.closeBankReconciliation
+);
