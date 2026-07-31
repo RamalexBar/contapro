@@ -34,7 +34,7 @@ implementado. Consumo FIFO real (modulo POS) documentado abajo.
    comprobante en `Purchase.journalEntryId`.
 3. `POST /purchases/:id/cancel`: marca la compra y su `AccountPayable` como `CANCELLED` y anula
    el comprobante contable (`VoidJournalEntryUseCase`, generico, reusado tal cual). Si la cuenta
-   por pagar ya tiene abonos (iteracion 16), primero los reversa (ver punto 6.1) antes de
+   por pagar ya tiene abonos (iteracion 16), primero los reversa (ver punto 9) antes de
    cancelar la compra.
 4. Orden de compra: `POST /purchase-orders` (crea en `DRAFT`, total calculado del lado del
    servidor sumando `quantity*unitCost` por item — a diferencia de `Purchase`, que refleja una

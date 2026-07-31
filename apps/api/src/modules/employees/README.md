@@ -20,7 +20,9 @@ Todas las mutaciones quedan auditadas (`EMPLOYEE_CREATED`, `EMPLOYEE_UPDATED`,
 - `modules/timetracking`: usa `IEmployeeRepository.findByIdOrThrow` / `findByUserId` para
   resolver la sucursal del empleado y validar que un usuario solo marque su propia entrada/salida.
 - `modules/payroll`: usa `IEmployeeRepository.listActiveForPeriod` para saber que empleados
-  liquidar en un periodo (considera `hireDate`/`terminationDate`).
+  liquidar en un periodo (considera `hireDate`/`terminationDate`), y `findByIdOrThrow` para traer
+  los datos del empleado (documento, cargo, tipo de contrato) al generar el PDF del desprendible
+  de pago (`GET /payslips/:id/pdf`, ver `modules/payroll/README.md`).
 
 ## Pendiente (no implementado en esta iteracion)
 

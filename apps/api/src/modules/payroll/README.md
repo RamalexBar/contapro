@@ -26,6 +26,8 @@ empresas — no hace falta tocar codigo para actualizar la legislacion de un añ
 - `POST /payrolls/:id/approve` — `CALCULATED` -> `APPROVED`. Permiso `payroll.approve`.
 - `POST /payrolls/:id/pay` — `APPROVED` -> `PAID`. Permiso `payroll.pay`.
 - `GET /payslips/:id` — desprendible individual (JSON, ver mas abajo). Permiso `payroll.read`.
+- `GET /payslips/:id/pdf` — el mismo desprendible en PDF (ver "PDF del desprendible" mas abajo).
+  Permiso `payroll.read`.
 
 ## Motor de liquidacion (`application/payroll-calculator.ts` + `calculate-payroll.use-case.ts`)
 

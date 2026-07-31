@@ -137,7 +137,11 @@ es la segunda parte menos verificada, ver mas abajo.
     DIAN distinto — ni siquiera los nombres de operacion (`SendNominaAsync`/`GetStatusNomina`)
     estan confirmados publicamente, a diferencia del de facturacion. Todo lo demas (firma XAdES,
     maquina de estados, poller, reenvio manual) reusa el motor generico existente sin cambios.
-    Endpoints: `GET/POST /electronic-invoicing/payroll-details/:payrollDetailId[...]`.
+    Endpoints: `GET/POST /electronic-invoicing/payroll-details/:payrollDetailId[...]`. **No
+    confundir con el desprendible de pago** (`GET /payslips/:id/pdf`, `modules/payroll`,
+    iteracion 14): ese es el comprobante interno que recibe el empleado y funciona para cualquier
+    periodo calculado, sin depender de que la nomina se haya facturado electronicamente ante la
+    DIAN; el RIDE de aqui (punto 13) es el comprobante fiscal, solo existe si el CUNE se genero.
 13. **RIDE (representacion grafica en PDF)** — los 5 tipos de documento ahora tienen un endpoint
     `GET .../{sales/:saleId, credit-notes/:creditNoteId, debit-notes/:debitNoteId,
     purchases/:purchaseId, payroll-details/:payrollDetailId}/pdf` que devuelve un PDF (`pdfkit`,
