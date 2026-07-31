@@ -10,6 +10,7 @@ suppliersRouter.get("/suppliers", requirePermission("suppliers.read"), suppliers
 suppliersRouter.post("/suppliers", requirePermission("suppliers.manage"), suppliersController.createSupplier);
 
 suppliersRouter.post("/purchases", requirePermission("suppliers.manage"), suppliersController.createPurchase);
+suppliersRouter.get("/purchases", requirePermission("suppliers.read"), suppliersController.listPurchases);
 suppliersRouter.post("/purchases/:id/cancel", requirePermission("suppliers.manage"), suppliersController.cancelPurchase);
 
 suppliersRouter.post("/purchase-orders", requirePermission("suppliers.manage"), suppliersController.createPurchaseOrder);

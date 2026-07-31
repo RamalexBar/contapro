@@ -11,6 +11,7 @@ import { PrismaAccountPayableRepository } from "./infrastructure/prisma-account-
 import { CreateSupplierUseCase } from "./application/use-cases/create-supplier.use-case";
 import { ListSuppliersUseCase } from "./application/use-cases/list-suppliers.use-case";
 import { CreatePurchaseUseCase } from "./application/use-cases/create-purchase.use-case";
+import { ListPurchasesUseCase } from "./application/use-cases/list-purchases.use-case";
 import { CreatePurchaseOrderUseCase } from "./application/use-cases/create-purchase-order.use-case";
 import { SendPurchaseOrderUseCase } from "./application/use-cases/send-purchase-order.use-case";
 import { ListPurchaseOrdersUseCase } from "./application/use-cases/list-purchase-orders.use-case";
@@ -40,6 +41,7 @@ export const suppliersController = new SuppliersController(
     generateElectronicSupportDocumentUseCase,
     auditService
   ),
+  new ListPurchasesUseCase(purchaseRepo),
   new CreatePurchaseOrderUseCase(purchaseOrderRepo, auditService),
   new SendPurchaseOrderUseCase(purchaseOrderRepo, auditService),
   new ListPurchaseOrdersUseCase(purchaseOrderRepo),

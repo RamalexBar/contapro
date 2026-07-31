@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { CreateSupplierUseCase } from "../application/use-cases/create-supplier.use-case";
 import type { ListSuppliersUseCase } from "../application/use-cases/list-suppliers.use-case";
 import type { CreatePurchaseUseCase } from "../application/use-cases/create-purchase.use-case";
+import type { ListPurchasesUseCase } from "../application/use-cases/list-purchases.use-case";
 import type { CreatePurchaseOrderUseCase } from "../application/use-cases/create-purchase-order.use-case";
 import type { SendPurchaseOrderUseCase } from "../application/use-cases/send-purchase-order.use-case";
 import type { ListPurchaseOrdersUseCase } from "../application/use-cases/list-purchase-orders.use-case";
@@ -25,6 +26,7 @@ export class SuppliersController {
     private readonly createSupplierUseCase: CreateSupplierUseCase,
     private readonly listSuppliersUseCase: ListSuppliersUseCase,
     private readonly createPurchaseUseCase: CreatePurchaseUseCase,
+    private readonly listPurchasesUseCase: ListPurchasesUseCase,
     private readonly createPurchaseOrderUseCase: CreatePurchaseOrderUseCase,
     private readonly sendPurchaseOrderUseCase: SendPurchaseOrderUseCase,
     private readonly listPurchaseOrdersUseCase: ListPurchaseOrdersUseCase,
@@ -59,6 +61,14 @@ export class SuppliersController {
     try {
       const body = createPurchaseSchema.parse(req.body);
       res.status(201).json(await this.createPurchaseUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listPurchases = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await this.listPurchasesUseCase.execute() });
     } catch (err) {
       next(err);
     }

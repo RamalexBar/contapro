@@ -12,6 +12,16 @@ import { RbacPage } from "../features/rbac/pages/RbacPage";
 import { CustomerListPage } from "../features/customers/pages/CustomerListPage";
 import { AuditLogPage } from "../features/audit/pages/AuditLogPage";
 import { QuotesAndNotesPage } from "../features/pos/pages/QuotesAndNotesPage";
+import { AccountingPage } from "../features/accounting/pages/AccountingPage";
+import { BankingPage } from "../features/accounting/pages/BankingPage";
+import { SuppliersPage } from "../features/suppliers/pages/SuppliersPage";
+import { PurchaseOrdersPage } from "../features/suppliers/pages/PurchaseOrdersPage";
+import { PlatformAdminLoginPage } from "../features/platform-admin/pages/PlatformAdminLoginPage";
+import { PlatformDashboardPage } from "../features/platform-admin/pages/PlatformDashboardPage";
+import { PlansPage } from "../features/platform-admin/pages/PlansPage";
+import { SubscriptionsPage } from "../features/platform-admin/pages/SubscriptionsPage";
+import { CompaniesPage } from "../features/platform-admin/pages/CompaniesPage";
+import { PlatformProtectedRoute } from "../features/platform-admin/routes/PlatformProtectedRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -111,6 +121,71 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <QuotesAndNotesPage />
       </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/accounting",
+    element: (
+      <ProtectedRoute>
+        <AccountingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/accounting/banks",
+    element: (
+      <ProtectedRoute>
+        <BankingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/suppliers",
+    element: (
+      <ProtectedRoute>
+        <SuppliersPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/purchase-orders",
+    element: (
+      <ProtectedRoute>
+        <PurchaseOrdersPage />
+      </ProtectedRoute>
+    ),
+  },
+  { path: "/admin/login", element: <PlatformAdminLoginPage /> },
+  {
+    path: "/admin",
+    element: (
+      <PlatformProtectedRoute>
+        <PlatformDashboardPage />
+      </PlatformProtectedRoute>
+    ),
+  },
+  {
+    path: "/admin/plans",
+    element: (
+      <PlatformProtectedRoute>
+        <PlansPage />
+      </PlatformProtectedRoute>
+    ),
+  },
+  {
+    path: "/admin/subscriptions",
+    element: (
+      <PlatformProtectedRoute>
+        <SubscriptionsPage />
+      </PlatformProtectedRoute>
+    ),
+  },
+  {
+    path: "/admin/companies",
+    element: (
+      <PlatformProtectedRoute>
+        <CompaniesPage />
+      </PlatformProtectedRoute>
     ),
   },
 ]);

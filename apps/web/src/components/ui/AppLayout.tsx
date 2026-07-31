@@ -20,6 +20,10 @@ const NAV_ITEMS = [
     label: "Cotizaciones",
     permissions: ["quote.create", "creditnote.create", "debitnote.create", "sale.read"],
   },
+  { to: "/accounting", label: "Contabilidad", permissions: ["accounting.read"] },
+  { to: "/accounting/banks", label: "Bancos", permissions: ["accounting.read"] },
+  { to: "/suppliers", label: "Proveedores", permissions: ["suppliers.read"] },
+  { to: "/purchase-orders", label: "Ordenes de compra", permissions: ["suppliers.read"] },
 ];
 
 export function AppLayout({ children }: PropsWithChildren) {
