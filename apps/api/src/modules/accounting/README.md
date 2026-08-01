@@ -2,7 +2,8 @@
 
 Estado: **plan de cuentas, comprobantes, contabilizacion automatica de nomina/venta/compra/abono a
 proveedor/ajuste de caja, reportes (libro mayor, Balance General, Estado de Resultados, flujo de
-caja), conciliacion bancaria manual y cierre de periodo, todo implementado.**
+caja), conciliacion bancaria (manual, con sugerencia de matches) y cierre de periodo, todo
+implementado.**
 
 ## Modelos (`packages/database/prisma/schema/accounting.prisma`)
 
@@ -55,7 +56,7 @@ caja), conciliacion bancaria manual y cierre de periodo, todo implementado.**
      defina). **No es un Estado de Flujo de Efectivo formal** (metodo indirecto desde el Estado
      de Resultados) — es un resumen directo de movimientos de caja/banco en el periodo, mucho mas
      simple. `GET /reports/cash-flow?from=&to=`.
-6. Conciliacion bancaria (manual, sin auto-match por monto/fecha):
+6. Conciliacion bancaria (manual, con sugerencia de matches por monto/fecha — iteracion 20):
    - `POST /bank-accounts`, `GET /bank-accounts` — alta/listado de cuentas bancarias.
    - `POST /bank-accounts/:id/transactions`, `GET /bank-accounts/:id/transactions` — alta manual
      de una linea de extracto (no hay integracion real con ningun banco) y su listado.
@@ -63,8 +64,19 @@ caja), conciliacion bancaria manual y cierre de periodo, todo implementado.**
      periodo; recibe `statementBalance` (saldo del extracto) y `bookBalance` (saldo segun libros)
      **como datos de entrada, no derivados del libro mayor** — no hay ningun enlace en el schema
      entre `BankAccount` y una cuenta especifica de `ChartOfAccounts`.
+   - `GET /bank-reconciliations/:id/suggested-matches` (iteracion 20,
+     `SuggestBankReconciliationMatchesUseCase`) — compara cada `BankTransaction` sin conciliar de
+     la cuenta contra las lineas de comprobantes `POSTED` de la empresa dentro de una ventana de
+     ±5 dias del periodo de la conciliacion, por **monto exacto** (no hay forma de filtrar por
+     cuenta contable, ver punto anterior). `confidence: "EXACT"` si ademas la fecha coincide
+     exactamente, `"PROBABLE"` si esta dentro de la ventana. Heuristica greedy (una linea no se
+     sugiere dos veces; ver comentario en el caso de uso) — es de solo lectura, no crea ningun
+     `BankReconciliationItem`, el usuario confirma cada sugerencia con el endpoint de match de
+     abajo. Excluye transacciones ya `reconciled` y lineas ya usadas en cualquier conciliacion
+     `matched: true` de la empresa.
    - `POST /bank-reconciliations/:id/match` — el usuario elige que `BankTransaction` corresponde
-     a que `JournalEntryLine` (ambos opcionales/independientes); crea el
+     a que `JournalEntryLine` (ambos opcionales/independientes, tipicamente a partir de una
+     sugerencia de arriba, pero tambien se puede llamar a mano); crea el
      `BankReconciliationItem` y marca `BankTransaction.reconciled = true` si aplica.
    - `POST /bank-reconciliations/:id/close` — `IN_PROGRESS -> COMPLETED`. **No exige que la
      diferencia sea cero** — la diferencia final (`statementBalance - bookBalance`) queda visible
@@ -96,6 +108,5 @@ caja), conciliacion bancaria manual y cierre de periodo, todo implementado.**
 
 ## Que falta implementar
 
-1. Auto-sugerencia de matches en la conciliacion bancaria (por monto/fecha) — hoy es 100% manual.
-2. Flujo de caja como Estado de Flujo de Efectivo formal (metodo indirecto desde el Estado de
+1. Flujo de caja como Estado de Flujo de Efectivo formal (metodo indirecto desde el Estado de
    Resultados) — hoy es un resumen directo simplificado.

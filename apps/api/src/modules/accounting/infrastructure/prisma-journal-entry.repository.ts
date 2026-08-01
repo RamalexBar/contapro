@@ -119,6 +119,7 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
       orderBy: { journalEntry: { date: "asc" } },
     });
     return rows.map((r) => ({
+      id: r.id,
       accountId: r.accountId,
       debit: Number(r.debit),
       credit: Number(r.credit),

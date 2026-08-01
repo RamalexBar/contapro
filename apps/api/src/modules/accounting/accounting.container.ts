@@ -30,6 +30,7 @@ import { MatchBankReconciliationItemUseCase } from "./application/use-cases/matc
 import { CloseBankReconciliationUseCase } from "./application/use-cases/close-bank-reconciliation.use-case";
 import { GetBankReconciliationUseCase } from "./application/use-cases/get-bank-reconciliation.use-case";
 import { ListBankReconciliationsUseCase } from "./application/use-cases/list-bank-reconciliations.use-case";
+import { SuggestBankReconciliationMatchesUseCase } from "./application/use-cases/suggest-bank-reconciliation-matches.use-case";
 import { CloseFinancialPeriodUseCase } from "./application/use-cases/close-financial-period.use-case";
 import { ReopenFinancialPeriodUseCase } from "./application/use-cases/reopen-financial-period.use-case";
 import { AccountingController } from "./interfaces/accounting.controller";
@@ -70,6 +71,7 @@ export const accountingController = new AccountingController(
   new CloseBankReconciliationUseCase(bankReconciliationRepo, auditService),
   new GetBankReconciliationUseCase(bankReconciliationRepo),
   new ListBankReconciliationsUseCase(bankReconciliationRepo),
+  new SuggestBankReconciliationMatchesUseCase(bankReconciliationRepo, bankTransactionRepo, journalRepo),
   new CloseFinancialPeriodUseCase(financialPeriodRepo, journalRepo, auditService),
   new ReopenFinancialPeriodUseCase(financialPeriodRepo, auditService)
 );

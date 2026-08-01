@@ -112,4 +112,13 @@ export class PrismaBankReconciliationRepository implements IBankReconciliationRe
     await prisma.bankReconciliation.update({ where: { id: reconciliationId }, data: { status: "COMPLETED" } });
     return this.findByIdOrThrow(reconciliationId);
   }
+
+  async listMatchedJournalEntryLineIds(): Promise<string[]> {
+    const companyId = getTenantContext().companyId;
+    const rows = await prisma.bankReconciliationItem.findMany({
+      where: { matched: true, journalEntryLineId: { not: null }, reconciliation: { bankAccount: { companyId } } },
+      select: { journalEntryLineId: true },
+    });
+    return rows.map((r) => r.journalEntryLineId).filter((id): id is string => id !== null);
+  }
 }

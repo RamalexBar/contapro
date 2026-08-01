@@ -13,6 +13,7 @@ import type { MatchBankReconciliationItemUseCase } from "../application/use-case
 import type { CloseBankReconciliationUseCase } from "../application/use-cases/close-bank-reconciliation.use-case";
 import type { GetBankReconciliationUseCase } from "../application/use-cases/get-bank-reconciliation.use-case";
 import type { ListBankReconciliationsUseCase } from "../application/use-cases/list-bank-reconciliations.use-case";
+import type { SuggestBankReconciliationMatchesUseCase } from "../application/use-cases/suggest-bank-reconciliation-matches.use-case";
 import type { CloseFinancialPeriodUseCase } from "../application/use-cases/close-financial-period.use-case";
 import type { ReopenFinancialPeriodUseCase } from "../application/use-cases/reopen-financial-period.use-case";
 import type { IChartOfAccountsRepository } from "../domain/chart-of-accounts.repository";
@@ -47,6 +48,7 @@ export class AccountingController {
     private readonly closeBankReconciliationUseCase: CloseBankReconciliationUseCase,
     private readonly getBankReconciliationUseCase: GetBankReconciliationUseCase,
     private readonly listBankReconciliationsUseCase: ListBankReconciliationsUseCase,
+    private readonly suggestBankReconciliationMatchesUseCase: SuggestBankReconciliationMatchesUseCase,
     private readonly closeFinancialPeriodUseCase: CloseFinancialPeriodUseCase,
     private readonly reopenFinancialPeriodUseCase: ReopenFinancialPeriodUseCase
   ) {}
@@ -212,6 +214,14 @@ export class AccountingController {
     try {
       const body = matchBankReconciliationItemSchema.parse(req.body);
       res.status(201).json(await this.matchBankReconciliationItemUseCase.execute(req.params.id, body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  suggestBankReconciliationMatches = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await this.suggestBankReconciliationMatchesUseCase.execute(req.params.id) });
     } catch (err) {
       next(err);
     }

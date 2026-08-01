@@ -84,6 +84,11 @@ accountingRouter.get(
   requirePermission("accounting.read"),
   accountingController.getBankReconciliation
 );
+accountingRouter.get(
+  "/bank-reconciliations/:id/suggested-matches",
+  requirePermission("accounting.read"),
+  accountingController.suggestBankReconciliationMatches
+);
 accountingRouter.post(
   "/bank-reconciliations/:id/match",
   requirePermission("accounting.manage"),

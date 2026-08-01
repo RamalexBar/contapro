@@ -39,6 +39,7 @@ export interface CreateJournalEntryData {
 }
 
 export interface PostedLineAggregate {
+  id: string;
   accountId: string;
   debit: number;
   credit: number;

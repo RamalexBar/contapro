@@ -42,4 +42,8 @@ export interface IBankReconciliationRepository {
   /** IN_PROGRESS -> COMPLETED. No exige diferencia cero -- la diferencia final queda visible en
    * la respuesta para que el usuario decida (statementBalance vs bookBalance). */
   close(reconciliationId: string): Promise<BankReconciliationRecord>;
+  /** journalEntryLineId de todos los items ya emparejados (matched=true) de cualquier
+   * conciliacion de la empresa -- usado por el sugeridor de matches para no re-ofrecer una linea
+   * que ya quedo conciliada en otra sesion. */
+  listMatchedJournalEntryLineIds(): Promise<string[]>;
 }
