@@ -9,3 +9,4 @@ stockRouter.use(tenantContextMiddleware);
 stockRouter.post("/stock/entries", requirePermission("stock.entry.create"), stockController.registerEntry);
 stockRouter.post("/stock/adjustments", requirePermission("stock.adjust"), stockController.adjust);
 stockRouter.post("/stock/transfers", requirePermission("stock.transfer"), stockController.transfer);
+stockRouter.get("/kardex", requirePermission("product.read"), stockController.listKardex);

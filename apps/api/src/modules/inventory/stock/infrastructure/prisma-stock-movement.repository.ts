@@ -2,6 +2,7 @@ import { prisma } from "../../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { ValidationError } from "../../../../shared/errors/app-error";
 import type { IStockRepository, ReceiveGoodsItem, StockMovementRecord } from "../domain/stock.repository";
+import { recordKardexEntry } from "./kardex-writer";
 
 function toRecord(row: {
   id: string;
@@ -35,6 +36,7 @@ export class PrismaStockMovementRepository implements IStockRepository {
       const movement = await tx.stockMovement.create({
         data: { companyId, branchId, productId, type: "PURCHASE_IN", quantity, unitCost, createdByUserId: userId },
       });
+      await recordKardexEntry(tx, { branchId, productId, movementId: movement.id });
       return toRecord(movement);
     });
   }
@@ -66,6 +68,7 @@ export class PrismaStockMovementRepository implements IStockRepository {
           createdByUserId: userId,
         },
       });
+      await recordKardexEntry(tx, { branchId, productId, movementId: movement.id });
       void reason; // el motivo se registra en AuditLog desde el caso de uso, no en StockMovement
       return toRecord(movement);
     });
@@ -101,12 +104,17 @@ export class PrismaStockMovementRepository implements IStockRepository {
         },
       });
 
-      await tx.stockMovement.createMany({
-        data: [
-          { companyId, branchId: fromBranchId, productId, type: "TRANSFER_OUT", quantity, unitCost, createdByUserId: userId },
-          { companyId, branchId: toBranchId, productId, type: "TRANSFER_IN", quantity, unitCost, createdByUserId: userId },
-        ],
+      // create() en vez de createMany() -- se necesita el id de cada movimiento para su fila de
+      // Kardex correspondiente (createMany() de Prisma no devuelve los registros creados).
+      const outMovement = await tx.stockMovement.create({
+        data: { companyId, branchId: fromBranchId, productId, type: "TRANSFER_OUT", quantity, unitCost, createdByUserId: userId },
       });
+      await recordKardexEntry(tx, { branchId: fromBranchId, productId, movementId: outMovement.id });
+
+      const inMovement = await tx.stockMovement.create({
+        data: { companyId, branchId: toBranchId, productId, type: "TRANSFER_IN", quantity, unitCost, createdByUserId: userId },
+      });
+      await recordKardexEntry(tx, { branchId: toBranchId, productId, movementId: inMovement.id });
     });
   }
 
@@ -182,6 +190,9 @@ export class PrismaStockMovementRepository implements IStockRepository {
               : item.unitCost;
 
         await tx.product.update({ where: { id: item.productId }, data: { currentCost: newCost } });
+        // Despues de actualizar currentCost, para que la fila de Kardex refleje el promedio
+        // ponderado ya recalculado con esta entrada, no el anterior.
+        await recordKardexEntry(tx, { branchId: item.branchId, productId: item.productId, movementId: movement.id });
       }
 
       return movements;

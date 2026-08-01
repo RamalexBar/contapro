@@ -2,6 +2,7 @@ import { prisma } from "../../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { NotFoundError } from "../../../../shared/errors/app-error";
 import type { CreateSaleData, ISaleRepository, SaleRecord } from "../domain/sale.repository";
+import { recordKardexEntry } from "../../../inventory/stock/infrastructure/kardex-writer";
 
 function toRecord(row: any): SaleRecord {
   return {
@@ -173,7 +174,7 @@ export class PrismaSaleRepository implements ISaleRepository {
         where: { productId: item.productId, branchId },
         data: { quantity: { decrement: quantity } },
       });
-      await tx.stockMovement.create({
+      const movement = await tx.stockMovement.create({
         data: {
           companyId,
           branchId,
@@ -186,6 +187,7 @@ export class PrismaSaleRepository implements ISaleRepository {
           createdByUserId: sellerUserId,
         },
       });
+      await recordKardexEntry(tx, { branchId, productId: item.productId, movementId: movement.id });
     }
 
     if (cashSessionId) {

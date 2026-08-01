@@ -2,13 +2,15 @@ import type { NextFunction, Request, Response } from "express";
 import type { RegisterStockEntryUseCase } from "../application/use-cases/register-stock-entry.use-case";
 import type { AdjustStockUseCase } from "../application/use-cases/adjust-stock.use-case";
 import type { TransferStockUseCase } from "../application/use-cases/transfer-stock.use-case";
-import { stockAdjustSchema, stockEntrySchema, transferStockSchema } from "./stock.validators";
+import type { ListKardexUseCase } from "../application/use-cases/list-kardex.use-case";
+import { listKardexQuerySchema, stockAdjustSchema, stockEntrySchema, transferStockSchema } from "./stock.validators";
 
 export class StockController {
   constructor(
     private readonly registerEntryUseCase: RegisterStockEntryUseCase,
     private readonly adjustUseCase: AdjustStockUseCase,
-    private readonly transferUseCase: TransferStockUseCase
+    private readonly transferUseCase: TransferStockUseCase,
+    private readonly listKardexUseCase: ListKardexUseCase
   ) {}
 
   registerEntry = async (req: Request, res: Response, next: NextFunction) => {
@@ -34,6 +36,15 @@ export class StockController {
       const body = transferStockSchema.parse(req.body);
       await this.transferUseCase.execute(body);
       res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listKardex = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const query = listKardexQuerySchema.parse(req.query);
+      res.json({ data: await this.listKardexUseCase.execute(query) });
     } catch (err) {
       next(err);
     }

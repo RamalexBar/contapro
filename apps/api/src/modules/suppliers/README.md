@@ -119,11 +119,41 @@ pendiente) ahora distingue por producto:
   misma limitacion ya documentada ahi: el modulo de Devoluciones es el que ajusta stock
   explicitamente, y tampoco es batch-aware todavia.
 
+## Kardex (historial de saldos, iteracion 21, `modules/inventory/stock`)
+
+El modelo `Kardex` vivia sin usar en el schema desde el scaffold inicial. Ahora cada
+`StockMovement` que se crea en el sistema (los 6 puntos de escritura: entrada manual
+`RegisterStockEntryUseCase`, ajuste `AdjustStockUseCase`, traslado `TransferStockUseCase` (dos
+movimientos, uno por sucursal), recepcion de mercancia `receiveGoods` (este README, punto 5), alta
+de producto con stock inicial (`modules/inventory/product`) y venta completada (`modules/pos/sale`,
+`SALE_OUT`) — genera tambien su fila de `Kardex`, dentro de la MISMA transaccion Prisma que crea el
+movimiento (`kardex-writer.ts`, funcion compartida `recordKardexEntry`).
+
+- `GET /kardex?productId=&branchId=&from=&to=` (permiso `product.read`, reusado -- es un reporte
+  de solo lectura sobre un producto, no una accion nueva que necesite su propio permiso).
+- Cada fila guarda el saldo **resultante** del movimiento: `balanceQty` (saldo de
+  `ProductBranchStock` de esa sucursal/producto despues del movimiento), `averageCost` (una foto
+  de `Product.currentCost` en ese momento -- costo promedio ponderado, unico por empresa, no por
+  sucursal) y `balanceCost = balanceQty * averageCost`. La respuesta tambien incluye
+  `movementType`/`movementQuantity` (resueltos con una segunda consulta contra `StockMovement`,
+  ya que `Kardex.movementId` es una referencia suelta, sin relacion de Prisma) para que cada fila
+  tenga contexto de que la origino.
+- **Simplificacion deliberada**: `averageCost` no se recalcula un promedio nuevo en cada fila,
+  simplemente refleja `Product.currentCost` en ese instante. Para movimientos que ya recalculan
+  ese campo (recepcion de mercancia con `costMethod = AVERAGE`, consumo FIFO en una venta) el
+  Kardex queda exacto; para los que no lo tocan (entrada manual, ajustes, traslados) la fila
+  refleja el costo que ya tenia el producto, igual que el resto de la app ya asume en esos flujos
+  -- no se invento una formula de promedio por sucursal que no existe en ningun otro lado del
+  codebase.
+- Verificado en vivo end-to-end: entrada manual, ajuste negativo, recepcion de mercancia
+  (confirmando el nuevo promedio ponderado recalculado), venta, filtro por fecha (`from`), y
+  permiso (`product.read`, ya lo tiene CAJERO). El traslado entre sucursales se revisó por
+  lectura de código (mismo patrón que los demás sitios, ya verificados) pero no se probó en vivo
+  porque los datos de la empresa demo solo tienen una sucursal.
+
 ## Que falta implementar
 
-1. Poblar `Kardex` (historial de saldos) — el modelo existe, preparado, sin usar todavia; no era
-   parte del checklist de este trabajo, es trabajo de reportes aparte.
-2. `StockMovement` por lote consumido en una venta FIFO (para trazabilidad fina) -- hoy es una
+1. `StockMovement` por lote consumido en una venta FIFO (para trazabilidad fina) -- hoy es una
    sola linea agregada por item de venta.
-3. Devoluciones (`Return`) no restaura lotes especificos al recibir mercancia de vuelta -- sigue
+2. Devoluciones (`Return`) no restaura lotes especificos al recibir mercancia de vuelta -- sigue
    la misma limitacion que ya tenia antes de este trabajo.

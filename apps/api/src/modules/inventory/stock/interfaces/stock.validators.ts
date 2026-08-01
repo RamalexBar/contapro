@@ -8,3 +8,10 @@ export const transferStockSchema = z.object({
   toBranchId: z.string().uuid(),
   quantity: z.number().positive(),
 });
+
+export const listKardexQuerySchema = z.object({
+  productId: z.string().uuid(),
+  branchId: z.string().uuid().optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});

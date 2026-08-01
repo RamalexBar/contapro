@@ -4,6 +4,7 @@ import { getTenantContext } from "../../../../shared/context/request-context";
 import { ConflictError, NotFoundError } from "../../../../shared/errors/app-error";
 import { Product } from "../domain/product.entity";
 import type { CreateProductData, IProductRepository, ProductListItem } from "../domain/product.repository";
+import { recordKardexEntry } from "../../stock/infrastructure/kardex-writer";
 
 type ProductRow = {
   id: string;
@@ -73,7 +74,7 @@ export class PrismaProductRepository implements IProductRepository {
         });
 
         if (data.initialStock > 0) {
-          await tx.stockMovement.create({
+          const movement = await tx.stockMovement.create({
             data: {
               companyId,
               branchId: data.branchId,
@@ -85,6 +86,7 @@ export class PrismaProductRepository implements IProductRepository {
               createdByUserId: getTenantContext().userId,
             },
           });
+          await recordKardexEntry(tx, { branchId: data.branchId, productId: product.id, movementId: movement.id });
         }
 
         return product;
