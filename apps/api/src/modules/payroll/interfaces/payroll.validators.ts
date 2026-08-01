@@ -1,1 +1,1 @@
-export { createPayrollParameterSchema, createPayrollSchema } from "@erp/shared-types";
+export { createPayrollDeductionSchema, createPayrollParameterSchema, createPayrollSchema } from "@erp/shared-types";

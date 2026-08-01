@@ -59,6 +59,7 @@ export const PERMISSIONS = [
   { code: "payroll.calculate", module: "payroll", description: "Calcular/recalcular una nomina" },
   { code: "payroll.approve", module: "payroll", description: "Aprobar una nomina calculada" },
   { code: "payroll.pay", module: "payroll", description: "Marcar una nomina aprobada como pagada" },
+  { code: "payroll.deduction.manage", module: "payroll", description: "Registrar y cancelar libranzas/embargos de un empleado" },
 
   { code: "accounting.manage", module: "accounting", description: "Administrar plan de cuentas y comprobantes contables" },
   { code: "accounting.read", module: "accounting", description: "Consultar plan de cuentas, comprobantes y reportes financieros" },
@@ -90,6 +91,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "payroll.calculate",
     "payroll.approve",
     "payroll.pay",
+    "payroll.deduction.manage",
     "accounting.manage",
     "accounting.read",
     "suppliers.manage",

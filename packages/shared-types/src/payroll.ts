@@ -41,3 +41,21 @@ export const createPayrollSchema = z.object({
   endDate: z.coerce.date(),
 });
 export type CreatePayrollInput = z.infer<typeof createPayrollSchema>;
+
+/**
+ * Deduccion recurrente de un empleado (libranza/embargo), aplicada automaticamente en cada
+ * periodo mientras este ACTIVE. `amountPerPeriod` es la cuota exacta acordada/ordenada -- no se
+ * calcula ningun tope legal de embargabilidad, se registra el monto ya definido externamente
+ * (credito o auto judicial). `totalAmount` es opcional: si se da, la deduccion se agota sola
+ * cuando el saldo llega a 0; si no, es indefinida hasta que alguien la cancele manualmente
+ * (tipico de un embargo sin monto total conocido de antemano).
+ */
+export const createPayrollDeductionSchema = z.object({
+  employeeId: z.string().uuid(),
+  type: z.enum(["LOAN_DEDUCTION", "GARNISHMENT"]),
+  description: z.string().min(1),
+  amountPerPeriod: z.number().positive(),
+  totalAmount: z.number().positive().optional(),
+  startDate: z.coerce.date(),
+});
+export type CreatePayrollDeductionInput = z.infer<typeof createPayrollDeductionSchema>;

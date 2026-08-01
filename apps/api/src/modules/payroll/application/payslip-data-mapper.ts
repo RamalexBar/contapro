@@ -16,7 +16,12 @@ interface PayrollSummaryJson {
     sundaySurcharge?: number;
     total?: number;
   };
-  deducciones?: { health?: number; pension?: number; total?: number };
+  deducciones?: {
+    health?: number;
+    pension?: number;
+    adicionales?: Array<{ id: string; type: string; description: string; amount: number }>;
+    total?: number;
+  };
   netPay?: number;
 }
 
@@ -92,7 +97,13 @@ export function mapToPayslipPdfData(
     daysWorked: summary.daysWorked ?? 0,
     earnings: toLines(summary.devengados, EARNING_LABELS),
     grossTotal: summary.devengados?.total ?? 0,
-    deductions: toLines(summary.deducciones, DEDUCTION_LABELS),
+    deductions: [
+      ...toLines({ health: summary.deducciones?.health, pension: summary.deducciones?.pension }, DEDUCTION_LABELS),
+      ...(summary.deducciones?.adicionales ?? []).map((d) => ({
+        label: d.type === "LOAN_DEDUCTION" ? `Libranza: ${d.description}` : `Embargo: ${d.description}`,
+        amount: d.amount,
+      })),
+    ],
     totalDeductions: summary.deducciones?.total ?? 0,
     netPay: summary.netPay ?? 0,
     generatedAt: payslip.generatedAt,

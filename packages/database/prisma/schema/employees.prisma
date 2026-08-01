@@ -35,12 +35,13 @@ model Employee {
   workerType        String  @default("01") // tipo de trabajador DIAN
   workerSubtype     String  @default("00") // subtipo trabajador DIAN
 
-  timeEntries    TimeEntry[]
-  vacations      Vacation[]
-  leaves         LeavePermission[]
-  absences       Absence[]
-  sickLeaves     SickLeave[]
-  payrollDetails PayrollDetail[]
+  timeEntries       TimeEntry[]
+  vacations         Vacation[]
+  leaves            LeavePermission[]
+  absences          Absence[]
+  sickLeaves        SickLeave[]
+  payrollDetails    PayrollDetail[]
+  payrollDeductions PayrollDeduction[]
 
   @@unique([companyId, documentNumber])
   @@index([companyId, branchId])

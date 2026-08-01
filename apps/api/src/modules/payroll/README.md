@@ -28,6 +28,9 @@ empresas — no hace falta tocar codigo para actualizar la legislacion de un añ
 - `GET /payslips/:id` — desprendible individual (JSON, ver mas abajo). Permiso `payroll.read`.
 - `GET /payslips/:id/pdf` — el mismo desprendible en PDF (ver "PDF del desprendible" mas abajo).
   Permiso `payroll.read`.
+- `POST /payroll-deductions`, `GET /payroll-deductions`, `POST /payroll-deductions/:id/cancel` —
+  libranzas/embargos recurrentes (ver "Deducciones recurrentes" mas abajo). Permiso
+  `payroll.deduction.manage` (crear/cancelar) / `payroll.read` (listar).
 
 ## Motor de liquidacion (`application/payroll-calculator.ts` + `calculate-payroll.use-case.ts`)
 
@@ -69,10 +72,36 @@ electronica: se regenera en cada request en vez de cachearse). Ver
 la nomina se haya enviado electronicamente), este es el comprobante que recibe el empleado y
 existe para cualquier periodo calculado, sin depender de facturacion electronica.
 
+## Deducciones recurrentes: libranzas y embargos (iteracion 19)
+
+`PayrollDeduction` (`domain/payroll-deduction.repository.ts`,
+`infrastructure/prisma-payroll-deduction.repository.ts`) registra una deduccion recurrente por
+empleado (`type`: `LOAN_DEDUCTION` libranza o `GARNISHMENT` embargo) con una cuota fija
+(`amountPerPeriod`) que se aplica automaticamente en **cada** periodo mientras este `ACTIVE`.
+`totalAmount`/`remainingBalance` son opcionales: si se dan, la deduccion se agota sola (pasa a
+`COMPLETED` cuando el saldo llega a 0); si no, es indefinida hasta que alguien la cancele con
+`POST /payroll-deductions/:id/cancel` (tipico de un embargo sin monto total conocido de antemano).
+
+**Importante — esto NO calcula ningun tope legal de embargabilidad.** `amountPerPeriod` es la
+cuota ya definida externamente (el credito o el auto judicial); el sistema no conoce ni aplica las
+reglas del CST sobre que porcentaje del salario es embargable. Lo unico que hace
+`payroll-calculator.ts` es una **salvaguarda de integridad de datos**: si la suma de deducciones
+adicionales activas superaria el `netPay` del periodo (antes de estas deducciones), se recortan en
+orden hasta que `netPay` llegue a 0 (nunca negativo) — no es un limite legal, es solo para que la
+liquidacion no produzca un pago neto negativo.
+
+Igual que con la nomina electronica, la aplicacion real de una deduccion (decrementar
+`remainingBalance`, marcar `COMPLETED` al llegar a 0) ocurre en **aprobar** (`approve-payroll.use-
+case.ts`), no en calcular: calcular es idempotente/re-ejecutable (recalcular una nomina `CALCULATED`
+vuelve a mostrar la cuota completa sin gastar saldo), aprobar es el punto sin retorno donde ya se
+generaron los asientos contables y (si aplica) la nomina electronica DIAN.
+
+Las lineas de `LOAN_DEDUCTION`/`GARNISHMENT` aplicadas aparecen tambien en el desprendible en PDF
+del empleado (`summaryJson.deducciones.adicionales`, ver `payslip-data-mapper.ts`).
+
 ## Que sigue sin implementar
 
-1. **Deducciones detalladas** (libranzas/embargos) — hoy no hay conceptos automaticos para esto.
-2. **Reportes** mensual/anual consolidados.
+1. **Reportes** mensual/anual consolidados.
 
 (La integracion contable al aprobar una nomina, item pendiente historicamente en esta lista, ya
 esta implementada — ver `approve-payroll.use-case.ts` y `modules/accounting`.)

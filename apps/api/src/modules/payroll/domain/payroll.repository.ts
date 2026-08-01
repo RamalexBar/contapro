@@ -19,6 +19,7 @@ export interface PayrollItemRecord {
   quantity: number | null;
   rate: number | null;
   amount: number;
+  payrollDeductionId: string | null;
 }
 
 export interface PayrollDetailRecord {
@@ -60,6 +61,9 @@ export interface PayrollItemCalc {
   quantity?: number;
   rate?: number;
   amount: number;
+  /** Presente si el item viene de una PayrollDeduction (libranza/embargo) -- ver
+   * applyPeriodAmount en payroll-deduction.repository.ts. */
+  payrollDeductionId?: string;
 }
 
 export interface EmployeeCalculationResult {

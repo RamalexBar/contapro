@@ -1,6 +1,7 @@
 import { COMPANY_TIMEZONE, isColombianHoliday, round2 } from "@erp/shared-utils";
 import type { EmployeeRecord } from "../../employees/domain/employee.repository";
 import type { TimeEntryRecord } from "../../timetracking/domain/timetracking.repository";
+import type { PayrollDeductionRecord } from "../domain/payroll-deduction.repository";
 import type { PayrollParameterRecord } from "../domain/payroll-parameter.repository";
 import type { EmployeeCalculationResult, PayrollItemCalc } from "../domain/payroll.repository";
 
@@ -100,7 +101,8 @@ export function calculateEmployeePayroll(
   parameter: PayrollParameterRecord,
   timeEntries: TimeEntryRecord[],
   periodStart: Date,
-  periodEnd: Date
+  periodEnd: Date,
+  activeDeductions: PayrollDeductionRecord[] = []
 ): EmployeeCalculationResult {
   const daysWorked = daysWorkedInPeriod(periodStart, periodEnd, employee.hireDate, employee.terminationDate);
   const proration = daysWorked / DAYS_IN_PAYROLL_MONTH;
@@ -159,7 +161,31 @@ export function calculateEmployeePayroll(
   const pensionEmployee = round2(salarialBase * (parameter.pensionEmployeePercent / 100));
   items.push({ conceptCode: "HEALTH_EMPLOYEE", rate: parameter.healthEmployeePercent, amount: healthEmployee });
   items.push({ conceptCode: "PENSION_EMPLOYEE", rate: parameter.pensionEmployeePercent, amount: pensionEmployee });
-  const totalDeductions = round2(healthEmployee + pensionEmployee);
+  const legalDeductions = round2(healthEmployee + pensionEmployee);
+  const netPayBeforeAdditionalDeductions = round2(grossTotal - legalDeductions);
+
+  // Libranzas/embargos (PayrollDeduction, ver domain/payroll-deduction.repository.ts): se aplican
+  // en orden, cada una topada por lo que quede de netPay -- NO es un calculo del limite legal de
+  // embargabilidad (eso depende del tipo de acreencia y no se infiere aqui sin verificar la norma
+  // vigente, ver README), es solo una salvaguarda para que netPay nunca quede negativo. El monto
+  // real deducido (que puede ser menor al programado si no alcanzo netPay) es el que se resta de
+  // PayrollDeduction.remainingBalance al aprobar el periodo, no el monto programado.
+  let remainingNetPay = netPayBeforeAdditionalDeductions;
+  const additionalDeductions: Array<{ id: string; type: string; description: string; amount: number }> = [];
+  for (const deduction of activeDeductions) {
+    if (remainingNetPay <= 0) break;
+    const scheduled = deduction.remainingBalance !== null
+      ? Math.min(deduction.amountPerPeriod, deduction.remainingBalance)
+      : deduction.amountPerPeriod;
+    const applied = round2(Math.min(scheduled, remainingNetPay));
+    if (applied <= 0) continue;
+    items.push({ conceptCode: deduction.type, amount: applied, payrollDeductionId: deduction.id });
+    additionalDeductions.push({ id: deduction.id, type: deduction.type, description: deduction.description, amount: applied });
+    remainingNetPay = round2(remainingNetPay - applied);
+  }
+  const additionalDeductionsTotal = round2(additionalDeductions.reduce((sum, d) => sum + d.amount, 0));
+
+  const totalDeductions = round2(legalDeductions + additionalDeductionsTotal);
   const netPay = round2(grossTotal - totalDeductions);
 
   const arlPercent = employee.arlRiskLevel ? parameter.arlPercentByRiskLevel[employee.arlRiskLevel] ?? 0 : 0;
@@ -210,7 +236,12 @@ export function calculateEmployeePayroll(
         sundaySurcharge: sundaySurchargeAmount,
         total: grossTotal,
       },
-      deducciones: { health: healthEmployee, pension: pensionEmployee, total: totalDeductions },
+      deducciones: {
+        health: healthEmployee,
+        pension: pensionEmployee,
+        adicionales: additionalDeductions,
+        total: totalDeductions,
+      },
       netPay,
       aportesPatronales: { health: healthEmployer, pension: pensionEmployer, arl, ccf, icbf, sena },
       provisiones: { severance, severanceInterest, serviceBonus, vacation },

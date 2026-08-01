@@ -2,11 +2,15 @@ import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { PostPayrollJournalEntryUseCase } from "../../../accounting/application/use-cases/post-payroll-journal-entry.use-case";
 import type { GenerateElectronicPayrollUseCase } from "../../../electronic-invoicing/application/use-cases/generate-electronic-payroll.use-case";
+import type { IPayrollDeductionRepository } from "../../domain/payroll-deduction.repository";
 import type { IPayrollRepository, PayrollRecord } from "../../domain/payroll.repository";
+
+const DEDUCTION_CONCEPT_CODES = new Set(["LOAN_DEDUCTION", "GARNISHMENT"]);
 
 export class ApprovePayrollUseCase {
   constructor(
     private readonly repo: IPayrollRepository,
+    private readonly deductionRepo: IPayrollDeductionRepository,
     private readonly postPayrollJournalEntry: PostPayrollJournalEntryUseCase,
     private readonly generateElectronicPayroll: GenerateElectronicPayrollUseCase,
     private readonly audit: AuditService
@@ -28,6 +32,19 @@ export class ApprovePayrollUseCase {
     });
 
     const withDetails = await this.repo.findWithDetailsOrThrow(id);
+
+    // Descuenta el saldo de cada libranza/embargo aplicado (ver PayrollDeduction.applyPeriodAmount)
+    // -- se hace AQUI, no al calcular, porque calcular es re-ejecutable (recalcular sobreescribe
+    // el detalle anterior) y descontar ahi duplicaria el saldo en cada recalculo. Aprobar es el
+    // punto sin retorno del periodo, igual que la contabilizacion y la nomina electronica de abajo.
+    for (const detail of withDetails.details) {
+      for (const item of detail.items) {
+        if (item.payrollDeductionId && DEDUCTION_CONCEPT_CODES.has(item.conceptCode)) {
+          await this.deductionRepo.applyPeriodAmount(item.payrollDeductionId, item.amount);
+        }
+      }
+    }
+
     await this.postPayrollJournalEntry.execute({
       payrollId: updated.id,
       year: updated.year,

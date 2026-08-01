@@ -63,6 +63,7 @@ export class PrismaPayrollRepository implements IPayrollRepository {
           quantity: item.quantity ? Number(item.quantity) : null,
           rate: item.rate ? Number(item.rate) : null,
           amount: Number(item.amount),
+          payrollDeductionId: item.payrollDeductionId,
         })),
         payslip: detail.payslip
           ? {
@@ -134,6 +135,7 @@ export class PrismaPayrollRepository implements IPayrollRepository {
               quantity: item.quantity,
               rate: item.rate,
               amount: item.amount,
+              payrollDeductionId: item.payrollDeductionId,
             })),
           });
         }

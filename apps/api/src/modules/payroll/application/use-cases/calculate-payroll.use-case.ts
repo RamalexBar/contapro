@@ -2,6 +2,7 @@ import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IEmployeeRepository } from "../../../employees/domain/employee.repository";
 import type { ITimeTrackingRepository } from "../../../timetracking/domain/timetracking.repository";
+import type { IPayrollDeductionRepository } from "../../domain/payroll-deduction.repository";
 import type { IPayrollParameterRepository } from "../../domain/payroll-parameter.repository";
 import type { EmployeeCalculationResult, IPayrollRepository, PayrollRecord } from "../../domain/payroll.repository";
 import { calculateEmployeePayroll } from "../payroll-calculator";
@@ -14,6 +15,7 @@ export class CalculatePayrollUseCase {
     private readonly employeeRepo: IEmployeeRepository,
     private readonly timeTrackingRepo: ITimeTrackingRepository,
     private readonly parameterRepo: IPayrollParameterRepository,
+    private readonly deductionRepo: IPayrollDeductionRepository,
     private readonly audit: AuditService
   ) {}
 
@@ -31,7 +33,10 @@ export class CalculatePayrollUseCase {
     const results: EmployeeCalculationResult[] = [];
     for (const employee of employees) {
       const timeEntries = await this.timeTrackingRepo.listClosedForPeriod(employee.id, payroll.startDate, payroll.endDate);
-      results.push(calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate));
+      const activeDeductions = await this.deductionRepo.listActiveForEmployee(employee.id);
+      results.push(
+        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions)
+      );
     }
 
     await this.payrollRepo.saveCalculationResults(payroll.id, results);

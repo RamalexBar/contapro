@@ -96,15 +96,50 @@ model PayrollDetail {
 }
 
 model PayrollItem {
-  id              String        @id @default(uuid())
-  payrollDetailId String
-  payrollDetail   PayrollDetail @relation(fields: [payrollDetailId], references: [id])
-  conceptCode     String
-  quantity        Decimal?      @db.Decimal(14, 4)
-  rate            Decimal?      @db.Decimal(14, 4)
-  amount          Decimal       @db.Decimal(14, 2)
+  id                 String            @id @default(uuid())
+  payrollDetailId    String
+  payrollDetail      PayrollDetail     @relation(fields: [payrollDetailId], references: [id])
+  conceptCode        String
+  quantity           Decimal?          @db.Decimal(14, 4)
+  rate               Decimal?          @db.Decimal(14, 4)
+  amount             Decimal           @db.Decimal(14, 2)
+  // Si el item viene de una PayrollDeduction (libranza/embargo, ver mas abajo), se guarda aqui
+  // para poder descontar remainingBalance al aprobar el periodo sin tener que volver a calcular.
+  payrollDeductionId String?
+  payrollDeduction   PayrollDeduction? @relation(fields: [payrollDeductionId], references: [id])
 
   @@map("payroll_items")
+}
+
+/// Deduccion recurrente asignada a un empleado (libranza/embargo), aplicada automaticamente en
+/// cada periodo mientras este ACTIVE. Ver apps/api/src/modules/payroll/README.md.
+model PayrollDeduction {
+  id               String    @id @default(uuid())
+  companyId        String
+  employeeId       String
+  employee         Employee  @relation(fields: [employeeId], references: [id])
+  type             String    // LOAN_DEDUCTION (libranza), GARNISHMENT (embargo)
+  description      String
+  // Cuota fija por periodo -- se registra el monto exacto acordado (credito) u ordenado (embargo
+  // judicial), no se calcula ningun tope legal automaticamente (ver README: el limite legal de
+  // embargabilidad depende del tipo de acreencia y no se infiere aqui sin verificar la norma
+  // vigente contra cada caso).
+  amountPerPeriod  Decimal   @db.Decimal(14, 2)
+  // Null = indefinido (tipico de un embargo sin monto total conocido de antemano). Si tiene
+  // valor, remainingBalance baja cada vez que se aprueba un periodo que la aplico, y la
+  // deduccion pasa a COMPLETED sola cuando llega a 0.
+  totalAmount      Decimal?  @db.Decimal(14, 2)
+  remainingBalance Decimal?  @db.Decimal(14, 2)
+  status           String    @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  startDate        DateTime
+  createdByUserId  String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  items PayrollItem[]
+
+  @@index([companyId, employeeId, status])
+  @@map("payroll_deductions")
 }
 
 model PayslipDocument {

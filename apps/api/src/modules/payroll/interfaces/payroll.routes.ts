@@ -18,3 +18,11 @@ payrollRouter.post("/payrolls/:id/pay", requirePermission("payroll.pay"), payrol
 
 payrollRouter.get("/payslips/:id", requirePermission("payroll.read"), payrollController.getPayslip);
 payrollRouter.get("/payslips/:id/pdf", requirePermission("payroll.read"), payrollController.getPayslipPdf);
+
+payrollRouter.post("/payroll-deductions", requirePermission("payroll.deduction.manage"), payrollController.createDeduction);
+payrollRouter.get("/payroll-deductions", requirePermission("payroll.read"), payrollController.listDeductions);
+payrollRouter.post(
+  "/payroll-deductions/:id/cancel",
+  requirePermission("payroll.deduction.manage"),
+  payrollController.cancelDeduction
+);
