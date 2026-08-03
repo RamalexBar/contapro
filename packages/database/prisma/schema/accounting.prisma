@@ -34,7 +34,7 @@ model JournalEntry {
   number          Int
   date            DateTime
   description     String
-  type            String    // MANUAL, SALE, PURCHASE, PAYROLL, ADJUSTMENT
+  type            String    // MANUAL, SALE, RETURN, PURCHASE, PAYROLL, ADJUSTMENT
   sourceType      String?
   sourceId        String?
   status          String    @default("DRAFT") // DRAFT, POSTED, VOID

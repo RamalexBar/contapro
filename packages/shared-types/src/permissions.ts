@@ -28,6 +28,7 @@ export const PERMISSIONS = [
   { code: "quote.create", module: "pos", description: "Crear cotizaciones" },
   { code: "creditnote.create", module: "pos", description: "Emitir notas credito" },
   { code: "debitnote.create", module: "pos", description: "Emitir notas debito" },
+  { code: "return.create", module: "pos", description: "Registrar devoluciones de venta" },
 
   { code: "customer.read", module: "customers", description: "Ver clientes" },
   { code: "customer.manage", module: "customers", description: "Crear/editar clientes" },
@@ -118,6 +119,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "quote.create",
     "creditnote.create",
     "debitnote.create",
+    "return.create",
     "customer.read",
     "customer.manage",
     "cash.session.open",

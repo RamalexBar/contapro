@@ -11,7 +11,7 @@ export interface JournalEntryRecord {
   number: number;
   date: Date;
   description: string;
-  type: string; // MANUAL, SALE, PURCHASE, PAYROLL, ADJUSTMENT
+  type: string; // MANUAL, SALE, RETURN, PURCHASE, PAYROLL, ADJUSTMENT
   sourceType: string | null;
   sourceId: string | null;
   status: string; // DRAFT, POSTED, VOID

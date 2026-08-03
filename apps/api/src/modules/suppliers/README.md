@@ -155,5 +155,9 @@ movimiento (`kardex-writer.ts`, funcion compartida `recordKardexEntry`).
 
 1. `StockMovement` por lote consumido en una venta FIFO (para trazabilidad fina) -- hoy es una
    sola linea agregada por item de venta.
-2. Devoluciones (`Return`) no restaura lotes especificos al recibir mercancia de vuelta -- sigue
-   la misma limitacion que ya tenia antes de este trabajo.
+2. ~~Devoluciones (`Return`) no restaura lotes especificos al recibir mercancia de vuelta~~ --
+   implementado en la iteracion 22 (`modules/pos/return`, ver su README): ahora existe el modulo
+   completo (antes no existia en absoluto, a pesar de que este README y `cancel-sale.use-case.ts`
+   lo mencionaban como si ya funcionara). Restaura stock y contabiliza, pero por la limitacion del
+   punto 1 de aqui arriba, siempre crea un **lote nuevo** en vez de reinsertar en el lote FIFO
+   original consumido -- sigue ligado a que se resuelva el punto 1.

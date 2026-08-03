@@ -14,7 +14,7 @@ la base de datos.
 | **Auth** | Registro de empresa, login, refresh token, logout, JWT (access+refresh) |
 | **RBAC** | Roles de sistema (Administrador, Propietario, Contador, Supervisor, Cajero, Empleado), permisos por rol, permisos individuales (override), matriz de permisos |
 | **Inventario** | Categorías, marcas, productos, códigos de barras, presentaciones, stock por sucursal (mín/máx), movimientos de stock (entradas/salidas/ajustes) |
-| **POS / Facturación** | Venta rápida con carrito, cotizaciones, notas crédito/débito, **autorización de descuento por PIN/contraseña** cuando un cajero supera su límite configurado |
+| **POS / Facturación** | Venta rápida con carrito, cotizaciones, notas crédito/débito, **autorización de descuento por PIN/contraseña** cuando un cajero supera su límite configurado. **Devoluciones** (`Return`, iteración 22, `modules/pos/return`): registra una devolución parcial/total sobre una venta `COMPLETED`/`RETURNED_PARTIAL`, valida contra lo ya devuelto antes (dentro de la misma transacción, evita sobregiro concurrente), restaura stock (lote nuevo si el producto rastrea lotes — no reinserta en el lote FIFO original consumido, ver limitación en `suppliers/README.md`) y contabiliza el reverso de la venta (`PostReturnJournalEntryUseCase`, permite elegir el medio de reembolso independiente del medio de pago original). Sin UI web todavía |
 | **Caja** | Apertura/cierre de caja asociada a un empleado, arqueo (conteo de denominaciones), diferencias, movimientos (ingresos/egresos/retiros/consignaciones) |
 | **Auditoría** | Registro inmutable (solo `INSERT`) de cambios de precio/costo/código de barras, creación/eliminación de productos, ventas anuladas, devoluciones, apertura/cierre de caja, cambios de permisos/usuarios, login/logout, intentos fallidos, autorización de descuentos |
 | **Dashboard** | Ventas del día, productos más vendidos, productos con stock bajo, caja activa |
@@ -176,3 +176,27 @@ caja/inventario) sigue siendo solo scaffold, sin cache local ni cola offline pro
     ajuste, recepción con recálculo de promedio ponderado confirmado, venta, filtro por fecha, y
     permisos); el traslado entre sucursales se verificó por lectura de código, no en vivo, porque
     la empresa demo solo tiene una sucursal.
+23. ~~Proveedores: Devoluciones no restaura lotes~~ — implementado en la iteración 22
+    (`modules/pos/return`). El módulo de Devoluciones (`Return`/`ReturnItem`) estaba modelado en
+    Prisma desde el scaffold inicial (junto con `SaleStatus.RETURNED_PARTIAL`/`RETURNED_FULL`,
+    `StockMovementType.RETURN_IN`/`RETURN_OUT` y `AuditAction.RETURN_CREATED`) pero no existía en
+    absoluto — `cancel-sale.use-case.ts` y `suppliers/README.md` lo referenciaban como si ya
+    restaurara stock, documentación adelantada a código que nunca se escribió. Ahora
+    `POST /returns` (permiso nuevo `return.create`, no otorgado a CAJERO por defecto, mismo
+    criterio que `sale.cancel`) registra una devolución parcial/total sobre una venta
+    `COMPLETED`/`RETURNED_PARTIAL`: valida contra lo ya devuelto antes (dentro de la misma
+    transacción Prisma, evita sobregiro concurrente, mismo criterio que
+    `RegisterSupplierPaymentUseCase`), restaura stock por item (`StockMovement RETURN_IN` +
+    `Kardex`, lote nuevo si el producto rastrea lotes — no reinserta en el lote FIFO original
+    consumido, sigue ligado al punto 1 de `suppliers/README.md` que sigue pendiente), permite
+    marcar un item como no restockeable (mercancía dañada, sin efecto de inventario pero sí cuenta
+    para el tope de cantidad devuelta), actualiza `Sale.status`
+    (`RETURNED_PARTIAL`/`RETURNED_FULL`), y contabiliza el reverso (`PostReturnJournalEntryUseCase`,
+    espejo de `PostSaleJournalEntryUseCase`, con `refundMethod` explícito en vez de reconstruir la
+    mezcla de pagos original). Sin `CashMovement` automático ni UI web todavía (backend + tests
+    únicamente esta iteración). Verificado en vivo end-to-end: devolución parcial y total sobre una
+    venta de dos productos (uno con `tracksBatches`/`FIFO`), exceso de cantidad rechazado (422),
+    doble devolución tras `RETURNED_FULL` rechazada, item no restockeado sin efecto de inventario,
+    lote nuevo creado con el costo correcto, comprobantes contables balanceados y `POSTED` para los
+    tres `refundMethod` (`CASH`→Caja, `TRANSFER`→Bancos, `CREDIT_TO_ACCOUNT`→Clientes), bloqueo por
+    permisos (`CAJERO` recibe 403 en `POST /returns`, sí puede `GET /returns`).

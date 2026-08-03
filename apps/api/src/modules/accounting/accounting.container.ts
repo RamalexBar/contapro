@@ -18,6 +18,7 @@ import { PostJournalEntryUseCase } from "./application/use-cases/post-journal-en
 import { VoidJournalEntryUseCase } from "./application/use-cases/void-journal-entry.use-case";
 import { PostPayrollJournalEntryUseCase } from "./application/use-cases/post-payroll-journal-entry.use-case";
 import { PostSaleJournalEntryUseCase } from "./application/use-cases/post-sale-journal-entry.use-case";
+import { PostReturnJournalEntryUseCase } from "./application/use-cases/post-return-journal-entry.use-case";
 import { PostPurchaseJournalEntryUseCase } from "./application/use-cases/post-purchase-journal-entry.use-case";
 import { PostSupplierPaymentJournalEntryUseCase } from "./application/use-cases/post-supplier-payment-journal-entry.use-case";
 import { PostCashSessionAdjustmentJournalEntryUseCase } from "./application/use-cases/post-cash-session-adjustment-journal-entry.use-case";
@@ -85,6 +86,9 @@ export const postPayrollJournalEntryUseCase = new PostPayrollJournalEntryUseCase
 
 /** Usado por sale.container.ts para contabilizar una venta al completarse. */
 export const postSaleJournalEntryUseCase = new PostSaleJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
+
+/** Usado por return.container.ts para contabilizar una devolucion al registrarse. */
+export const postReturnJournalEntryUseCase = new PostReturnJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
 
 /** Usado por suppliers.container.ts para contabilizar una compra al registrarse. */
 export const postPurchaseJournalEntryUseCase = new PostPurchaseJournalEntryUseCase(
