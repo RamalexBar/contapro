@@ -106,14 +106,22 @@ export class PrismaReturnRepository implements IReturnRepository {
 
         const product = await tx.product.findFirst({ where: { id: item.productId } });
 
-        // Se reusa el costo real con el que salio en la venta (StockMovement SALE_OUT original),
-        // no Product.currentCost actual -- puede haber cambiado desde entonces por compras
-        // posteriores. Fallback a currentCost si no se encuentra (no deberia pasar para una
+        // Se reusa el costo real con el que salio en la venta (StockMovement(s) SALE_OUT
+        // originales), no Product.currentCost actual -- puede haber cambiado desde entonces por
+        // compras posteriores. Bajo FIFO una venta puede haber generado varias lineas SALE_OUT
+        // para el mismo producto (una por lote consumido, ver `consumeFifoBatches` en
+        // PrismaSaleRepository) -- se promedia ponderado por cantidad, no se toma solo la
+        // primera. Fallback a currentCost si no se encuentra ninguna (no deberia pasar para una
         // venta COMPLETED, defensivo).
-        const originalSaleMovement = await tx.stockMovement.findFirst({
+        const originalSaleMovements = await tx.stockMovement.findMany({
           where: { referenceType: "Sale", referenceId: data.saleId, productId: item.productId, type: "SALE_OUT" },
         });
-        const unitCost = Number(originalSaleMovement?.unitCost ?? product?.currentCost ?? 0);
+        const originalQty = originalSaleMovements.reduce((sum: number, m: { quantity: unknown }) => sum + Number(m.quantity), 0);
+        const originalCost = originalSaleMovements.reduce(
+          (sum: number, m: { quantity: unknown; unitCost: unknown }) => sum + Number(m.quantity) * Number(m.unitCost),
+          0
+        );
+        const unitCost = originalQty > 0 ? originalCost / originalQty : Number(product?.currentCost ?? 0);
 
         await tx.productBranchStock.upsert({
           where: { productId_branchId: { productId: item.productId, branchId: data.branchId } },

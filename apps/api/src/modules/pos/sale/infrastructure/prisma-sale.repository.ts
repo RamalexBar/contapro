@@ -166,28 +166,35 @@ export class PrismaSaleRepository implements ISaleRepository {
         select: { costMethod: true, tracksBatches: true, currentCost: true },
       });
       const useFifo = product?.costMethod === "FIFO" && product?.tracksBatches;
-      const unitCost = useFifo
-        ? await this.consumeFifoBatches(tx, item.productId, branchId, quantity, Number(product.currentCost))
-        : Number(item.unitPrice);
 
-      await tx.productBranchStock.updateMany({
-        where: { productId: item.productId, branchId },
-        data: { quantity: { decrement: quantity } },
-      });
-      const movement = await tx.stockMovement.create({
-        data: {
-          companyId,
-          branchId,
-          productId: item.productId,
-          type: "SALE_OUT",
-          quantity,
-          unitCost,
-          referenceType: "Sale",
-          referenceId: saleId,
-          createdByUserId: sellerUserId,
-        },
-      });
-      await recordKardexEntry(tx, { branchId, productId: item.productId, movementId: movement.id });
+      // Bajo FIFO se genera una linea de StockMovement (y su Kardex) POR LOTE realmente
+      // consumido, no una sola linea agregada por item -- para trazabilidad fina (que lote
+      // exacto salio en esta venta). Sin FIFO/tracksBatches, un solo segmento igual que antes.
+      const segments = useFifo
+        ? await this.consumeFifoBatches(tx, item.productId, branchId, quantity, Number(product.currentCost))
+        : [{ batchId: null, quantity, unitCost: Number(item.unitPrice) }];
+
+      for (const segment of segments) {
+        await tx.productBranchStock.updateMany({
+          where: { productId: item.productId, branchId },
+          data: { quantity: { decrement: segment.quantity } },
+        });
+        const movement = await tx.stockMovement.create({
+          data: {
+            companyId,
+            branchId,
+            productId: item.productId,
+            batchId: segment.batchId,
+            type: "SALE_OUT",
+            quantity: segment.quantity,
+            unitCost: segment.unitCost,
+            referenceType: "Sale",
+            referenceId: saleId,
+            createdByUserId: sellerUserId,
+          },
+        });
+        await recordKardexEntry(tx, { branchId, productId: item.productId, movementId: movement.id });
+      }
     }
 
     if (cashSessionId) {
@@ -207,19 +214,22 @@ export class PrismaSaleRepository implements ISaleRepository {
 
   /**
    * Consumo FIFO real: agota los Batch del producto/sucursal en orden de entrada (`createdAt`
-   * asc) hasta cubrir `quantity`, devolviendo el costo unitario ponderado real de lo vendido
-   * (antes se usaba item.unitPrice -- el precio de venta, no el costo -- como unitCost del
-   * StockMovement para TODOS los metodos de costeo; para FIFO ahora se usa el costo real de los
-   * lotes consumidos). Actualiza Product.currentCost al costo del lote mas antiguo que quede
-   * disponible tras el consumo (el "proximo costo a vender" bajo FIFO), sin tocarlo si no queda
-   * ninguno.
+   * asc) hasta cubrir `quantity`, devolviendo un segmento por cada lote realmente consumido (con
+   * su `batchId` y el costo real de ESE lote, `costAtEntry`) -- antes se devolvia un solo costo
+   * unitario ponderado y el llamador creaba una unica linea de StockMovement por item de venta,
+   * sin importar cuantos lotes distintos se hubieran tocado; ahora cada segmento se convierte en
+   * su propia linea de StockMovement (ver `applyCompletionSideEffects`), para trazabilidad fina
+   * de que lote exacto salio en la venta (iteracion 23, ver `suppliers/README.md` punto 1).
+   *
+   * Actualiza Product.currentCost al costo del lote mas antiguo que quede disponible tras el
+   * consumo (el "proximo costo a vender" bajo FIFO), sin tocarlo si no queda ninguno.
    *
    * Si Batch no alcanza a cubrir toda la cantidad (drift frente a ProductBranchStock por ajustes
    * o transferencias que no tocan Batch -- ver limitacion ya documentada en el modulo de
-   * inventario), el remanente se valora al ultimo currentCost conocido en vez de bloquear la
-   * venta. No crea un StockMovement por lote consumido (una sola linea por item de venta, con el
-   * costo ya promediado) ni reversa el consumo si la venta se anula despues -- ver limitacion ya
-   * documentada de CancelSaleUseCase (el modulo de Devoluciones es el que ajusta stock).
+   * inventario), el remanente se devuelve como un segmento con `batchId: null` valorado al ultimo
+   * currentCost conocido, en vez de bloquear la venta. No reversa el consumo si la venta se anula
+   * despues -- ver limitacion ya documentada de CancelSaleUseCase (el modulo de Devoluciones es
+   * el que ajusta stock).
    */
   private async consumeFifoBatches(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -228,25 +238,25 @@ export class PrismaSaleRepository implements ISaleRepository {
     branchId: string,
     quantity: number,
     fallbackCost: number
-  ): Promise<number> {
+  ): Promise<Array<{ batchId: string | null; quantity: number; unitCost: number }>> {
     const batches = await tx.batch.findMany({
       where: { productId, branchId, quantity: { gt: 0 } },
       orderBy: { createdAt: "asc" },
     });
 
+    const segments: Array<{ batchId: string | null; quantity: number; unitCost: number }> = [];
     let remaining = quantity;
-    let totalCost = 0;
     for (const batch of batches) {
       if (remaining <= 0) break;
       const batchQty = Number(batch.quantity);
       const consumeQty = Math.min(remaining, batchQty);
       await tx.batch.update({ where: { id: batch.id }, data: { quantity: { decrement: consumeQty } } });
-      totalCost += consumeQty * Number(batch.costAtEntry);
+      segments.push({ batchId: batch.id, quantity: consumeQty, unitCost: Number(batch.costAtEntry) });
       remaining -= consumeQty;
     }
 
     if (remaining > 0) {
-      totalCost += remaining * fallbackCost;
+      segments.push({ batchId: null, quantity: remaining, unitCost: fallbackCost });
     }
 
     const nextBatch = await tx.batch.findFirst({
@@ -257,6 +267,6 @@ export class PrismaSaleRepository implements ISaleRepository {
       await tx.product.update({ where: { id: productId }, data: { currentCost: nextBatch.costAtEntry } });
     }
 
-    return quantity > 0 ? totalCost / quantity : fallbackCost;
+    return segments;
   }
 }

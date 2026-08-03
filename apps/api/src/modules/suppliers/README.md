@@ -110,14 +110,28 @@ pendiente) ahora distingue por producto:
   "proximo costo a vender" bajo FIFO); si no queda ninguno, lo deja igual.
 - Si no hay lotes suficientes para cubrir toda la cantidad (drift entre `Batch` y
   `ProductBranchStock` por ajustes/transferencias que no tocan `Batch`), el remanente se valora
-  al ultimo `Product.currentCost` conocido en vez de bloquear la venta.
+  al ultimo `Product.currentCost` conocido en vez de bloquear la venta -- este remanente tambien
+  genera su propio segmento/linea (ver punto siguiente), con `batchId: null`.
 - Sin `tracksBatches` (aunque `costMethod = FIFO`), no hay datos de lote para trabajar -- se
-  mantiene el comportamiento anterior sin cambios.
-- Una sola linea de `StockMovement` por item de venta (costo ya promediado), no una por lote
-  consumido.
+  mantiene el comportamiento anterior sin cambios (una sola linea, `batchId: null`).
+- **Una linea de `StockMovement` (y su `Kardex`) por cada lote realmente consumido** (iteracion
+  23, antes una sola linea agregada por item de venta): `consumeFifoBatches` devuelve un arreglo
+  de segmentos (`{ batchId, quantity, unitCost }`, uno por `Batch` tocado en orden de entrada, mas
+  el remanente sin lote si aplica) en vez de un solo costo ponderado; `applyCompletionSideEffects`
+  crea un `StockMovement` (con `batchId` real) y decrementa `ProductBranchStock` por cada segmento,
+  en vez de una decrementacion agregada + una sola linea. `Kardex` queda con saldo verdaderamente
+  decreciente por cada lote consumido de una misma venta, no una sola foto del saldo final.
+  **Efecto secundario que hubo que corregir**: el modulo de Devoluciones (`modules/pos/return`)
+  buscaba el costo original de la venta con `stockMovement.findFirst` sobre
+  `referenceType/referenceId/productId` -- con esta iteracion una venta FIFO puede generar varias
+  lineas `SALE_OUT` para el mismo producto, asi que `findFirst` podia devolver el costo de un solo
+  lote en vez del promedio real; se cambio a `findMany` + promedio ponderado por cantidad (ver
+  `PrismaReturnRepository.create`). Verificado en vivo que una devolucion sobre una venta que
+  consumio 3 lotes distintos (1@1000 + 2@1200 + 1@1500 = 4 unidades) reingresa al costo promedio
+  correcto (1225), no al costo de un solo lote.
 - **No se reversa** el consumo de lotes si la venta se anula despues (`CancelSaleUseCase`) --
   misma limitacion ya documentada ahi: el modulo de Devoluciones es el que ajusta stock
-  explicitamente, y tampoco es batch-aware todavia.
+  explicitamente.
 
 ## Kardex (historial de saldos, iteracion 21, `modules/inventory/stock`)
 
@@ -153,11 +167,17 @@ movimiento (`kardex-writer.ts`, funcion compartida `recordKardexEntry`).
 
 ## Que falta implementar
 
-1. `StockMovement` por lote consumido en una venta FIFO (para trazabilidad fina) -- hoy es una
-   sola linea agregada por item de venta.
+1. ~~`StockMovement` por lote consumido en una venta FIFO (para trazabilidad fina)~~ --
+   implementado en la iteracion 23 (ver seccion "Consumo FIFO real" arriba): cada lote consumido
+   en una venta ahora genera su propia linea de `StockMovement`/`Kardex`. Sigue pendiente: `Return`
+   sigue creando un lote nuevo en vez de reinsertar en el lote FIFO original exacto -- esto ya es
+   posible en principio (ahora se sabe que lote salio en cada linea), pero no se implemento en
+   esta iteracion porque una devolucion puede mezclar cantidades de varios `SaleItem`/lineas de
+   venta distintas y reconstruir "a que lote exacto vuelve cada unidad devuelta" es una regla de
+   negocio propia (ej. Ultimo Entra Primero Sale al devolver vs. reinsertar en el lote de origen)
+   que no estaba definida en el alcance original.
 2. ~~Devoluciones (`Return`) no restaura lotes especificos al recibir mercancia de vuelta~~ --
    implementado en la iteracion 22 (`modules/pos/return`, ver su README): ahora existe el modulo
    completo (antes no existia en absoluto, a pesar de que este README y `cancel-sale.use-case.ts`
-   lo mencionaban como si ya funcionara). Restaura stock y contabiliza, pero por la limitacion del
-   punto 1 de aqui arriba, siempre crea un **lote nuevo** en vez de reinsertar en el lote FIFO
-   original consumido -- sigue ligado a que se resuelva el punto 1.
+   lo mencionaban como si ya funcionara). Restaura stock y contabiliza, pero crea un **lote
+   nuevo** en vez de reinsertar en el lote FIFO original consumido (ver punto 1).

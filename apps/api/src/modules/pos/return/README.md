@@ -26,12 +26,15 @@ una devolucion sobre una venta `COMPLETED` o `RETURNED_PARTIAL`:
    - Por cada item con `restockedToBranch = true` (el item es revendible): incrementa
      `ProductBranchStock`, crea `StockMovement` tipo `RETURN_IN` referenciando la devolucion, y si
      `Product.tracksBatches`, crea un **`Batch` nuevo** (no reinserta en el lote FIFO original
-     consumido -- `SaleItem`/`StockMovement` no guardan a nivel de linea que lote especifico se
-     vendio, limitacion ya documentada en `suppliers/README.md` punto 1, que sigue sin resolver).
-     El costo usado es el de la `StockMovement SALE_OUT` original de esa venta/producto (no
-     `Product.currentCost` actual, que pudo cambiar desde entonces por compras posteriores).
-     Tambien genera su fila de `Kardex` (`recordKardexEntry`, la misma funcion compartida que ya
-     usan `PrismaSaleRepository` y `receiveGoods`).
+     consumido -- reconstruir a que lote exacto vuelve cada unidad devuelta es una regla de
+     negocio propia sin definir en el alcance original, ver `suppliers/README.md` punto 1). El
+     costo usado es el **promedio ponderado por cantidad** de las `StockMovement SALE_OUT`
+     originales de esa venta/producto (no `Product.currentCost` actual, que pudo cambiar desde
+     entonces por compras posteriores) -- desde la iteracion 23 una venta FIFO puede generar
+     varias lineas `SALE_OUT` para el mismo producto (una por lote consumido), asi que se
+     promedian todas (`findMany`), no se toma solo la primera. Tambien genera su fila de `Kardex`
+     (`recordKardexEntry`, la misma funcion compartida que ya usan `PrismaSaleRepository` y
+     `receiveGoods`).
    - Items con `restockedToBranch = false` (mercancia danada/no vendible): sin ningun efecto de
      inventario, pero igual cuentan para el tope de cantidad ya devuelta (ya se reembolso al
      cliente, no puede devolverse otra vez).
