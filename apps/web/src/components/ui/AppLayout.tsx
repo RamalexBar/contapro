@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   {
     to: "/quotes-notes",
     label: "Cotizaciones",
-    permissions: ["quote.create", "creditnote.create", "debitnote.create", "sale.read"],
+    permissions: ["quote.create", "creditnote.create", "debitnote.create", "return.create", "sale.read"],
   },
   { to: "/accounting", label: "Contabilidad", permissions: ["accounting.read"] },
   { to: "/accounting/banks", label: "Bancos", permissions: ["accounting.read"] },

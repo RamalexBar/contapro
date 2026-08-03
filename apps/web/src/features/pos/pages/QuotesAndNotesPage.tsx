@@ -16,6 +16,10 @@ import {
   listDebitNotes,
   listQuotes,
 } from "../api/notes.api";
+import { getSale, listSales } from "../api/sale.api";
+import { createReturn, listReturns, type RefundMethod } from "../api/return.api";
+
+const RETURNABLE_SALE_STATUSES = new Set(["COMPLETED", "RETURNED_PARTIAL"]);
 
 interface QuoteLine {
   productId: string;
@@ -283,10 +287,203 @@ function NoteSection({
   );
 }
 
+function ReturnSection() {
+  const queryClient = useQueryClient();
+  const canCreate = useAuthStore((s) => s.hasPermission("return.create"));
+  const canRead = useAuthStore((s) => s.hasPermission("sale.read"));
+
+  const { data: sales } = useQuery({ queryKey: ["sales"], queryFn: listSales, enabled: canCreate });
+  const { data: products } = useQuery({ queryKey: ["products"], queryFn: () => listProducts(), enabled: canCreate });
+  const { data: allReturns } = useQuery({ queryKey: ["returns"], queryFn: () => listReturns(), enabled: canRead });
+
+  const [saleId, setSaleId] = useState("");
+  const [reason, setReason] = useState("");
+  const [refundMethod, setRefundMethod] = useState<RefundMethod>("CASH");
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [restock, setRestock] = useState<Record<string, boolean>>({});
+
+  const { data: sale } = useQuery({
+    queryKey: ["sale", saleId],
+    queryFn: () => getSale(saleId),
+    enabled: canCreate && Boolean(saleId),
+  });
+  const { data: saleReturns } = useQuery({
+    queryKey: ["returns", saleId],
+    queryFn: () => listReturns(saleId),
+    enabled: canCreate && Boolean(saleId),
+  });
+
+  const returnableSales = (sales?.data ?? []).filter((s) => RETURNABLE_SALE_STATUSES.has(s.status));
+  const productName = (id: string) => products?.data.find((p) => p.id === id)?.name ?? id;
+
+  const alreadyReturnedByItem = new Map<string, number>();
+  for (const ret of saleReturns?.data ?? []) {
+    for (const item of ret.items) {
+      alreadyReturnedByItem.set(item.saleItemId, (alreadyReturnedByItem.get(item.saleItemId) ?? 0) + item.quantity);
+    }
+  }
+
+  function selectSale(id: string) {
+    setSaleId(id);
+    setQuantities({});
+    setRestock({});
+  }
+
+  const hasItemsToReturn = Object.values(quantities).some((qty) => qty > 0);
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      createReturn({
+        saleId,
+        reason,
+        refundMethod,
+        items: Object.entries(quantities)
+          .filter(([, qty]) => qty > 0)
+          .map(([saleItemId, qty]) => ({ saleItemId, quantity: qty, restockedToBranch: restock[saleItemId] ?? true })),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["returns"] });
+      queryClient.invalidateQueries({ queryKey: ["returns", saleId] });
+      queryClient.invalidateQueries({ queryKey: ["sale", saleId] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      setReason("");
+      setQuantities({});
+      setRestock({});
+    },
+  });
+
+  return (
+    <Card className="mb-6">
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">Devoluciones</h2>
+      {canCreate && (
+        <div className="mb-4 space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-gray-700">Venta</span>
+            <select
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm sm:w-auto"
+              value={saleId}
+              onChange={(e) => selectSale(e.target.value)}
+            >
+              <option value="">Seleccionar venta...</option>
+              {returnableSales.map((s) => (
+                <option key={s.id} value={s.id}>
+                  Venta #{s.number} - {formatCOP(s.total)} - {s.status}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {sale && (
+            <>
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500">
+                    <th className="py-2">Producto</th>
+                    <th>Vendido</th>
+                    <th>Ya devuelto</th>
+                    <th>Cantidad a devolver</th>
+                    <th>Reponer a inventario</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sale.items.map((item) => {
+                    const alreadyReturned = alreadyReturnedByItem.get(item.id) ?? 0;
+                    const remaining = item.quantity - alreadyReturned;
+                    return (
+                      <tr key={item.id} className="border-b border-gray-100">
+                        <td className="py-2">{productName(item.productId)}</td>
+                        <td>{item.quantity}</td>
+                        <td>{alreadyReturned}</td>
+                        <td>
+                          <input
+                            type="number"
+                            min={0}
+                            max={remaining}
+                            disabled={remaining <= 0}
+                            value={quantities[item.id] ?? 0}
+                            className="w-20 rounded border border-gray-200 px-2 py-1 disabled:bg-gray-100"
+                            onChange={(e) =>
+                              setQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: Math.max(0, Math.min(Number(e.target.value), remaining)),
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={restock[item.id] ?? true}
+                            disabled={remaining <= 0}
+                            onChange={(e) => setRestock((prev) => ({ ...prev, [item.id]: e.target.checked }))}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div className="flex flex-wrap items-end gap-3">
+                <Input placeholder="Motivo" value={reason} onChange={(e) => setReason(e.target.value)} required />
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-gray-700">Medio de reembolso</span>
+                  <select
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    value={refundMethod}
+                    onChange={(e) => setRefundMethod(e.target.value as RefundMethod)}
+                  >
+                    <option value="CASH">Efectivo</option>
+                    <option value="CARD">Tarjeta</option>
+                    <option value="TRANSFER">Transferencia</option>
+                    <option value="CREDIT_TO_ACCOUNT">Abono a cuenta del cliente</option>
+                  </select>
+                </label>
+                <Button
+                  disabled={!hasItemsToReturn || !reason || createMutation.isPending}
+                  onClick={() => createMutation.mutate()}
+                >
+                  Registrar devolucion
+                </Button>
+              </div>
+              {createMutation.isError && (
+                <p className="text-sm text-red-600">{(createMutation.error as Error).message}</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {canRead && (
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="py-2">Motivo</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allReturns?.data.map((r) => (
+              <tr key={r.id} className="border-b border-gray-100">
+                <td className="py-2">{r.reason}</td>
+                <td>{formatCOP(r.total)}</td>
+                <td>{r.status}</td>
+                <td>{r.createdAt.slice(0, 10)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
+  );
+}
+
 export function QuotesAndNotesPage() {
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Cotizaciones y notas</h1>
+      <h1 className="mb-4 text-lg font-semibold">Cotizaciones, notas y devoluciones</h1>
       <QuoteSection />
       <NoteSection
         title="Notas credito"
@@ -302,6 +499,7 @@ export function QuotesAndNotesPage() {
         listFn={listDebitNotes}
         queryKey="debit-notes"
       />
+      <ReturnSection />
     </AppLayout>
   );
 }
