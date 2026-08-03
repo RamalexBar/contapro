@@ -5,14 +5,19 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(4000),
   DATABASE_URL: z.string().min(1),
-  JWT_ACCESS_SECRET: z.string().min(10),
-  JWT_REFRESH_SECRET: z.string().min(10),
+  // min(32): un secreto HS256 corto es fuerza-bruteable offline si se filtra algun token
+  // firmado. 10 caracteres (limite anterior) dejaba pasar secretos como "admin123456" sin que
+  // la validacion se quejara -- 32 no garantiza entropia real (un string de 32 caracteres
+  // repetidos tambien pasa), pero exige generar los secretos con un CSPRNG en vez de escribir
+  // algo corto a mano, ej.: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
   // Secreto SEPARADO del de usuarios de empresa (JWT_ACCESS_SECRET) -- un token de plataforma
   // (PlatformAdmin, ver modules/saas-admin/README.md) nunca debe poder reusarse como token de
   // empresa ni viceversa.
-  JWT_PLATFORM_ADMIN_SECRET: z.string().min(10),
+  JWT_PLATFORM_ADMIN_SECRET: z.string().min(32),
   JWT_PLATFORM_ADMIN_EXPIRES_IN: z.string().default("8h"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 

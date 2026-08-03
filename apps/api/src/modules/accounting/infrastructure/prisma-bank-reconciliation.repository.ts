@@ -85,7 +85,25 @@ export class PrismaBankReconciliationRepository implements IBankReconciliationRe
     if (!data.bankTransactionId && !data.journalEntryLineId) {
       throw new ValidationError("Debes indicar bankTransactionId y/o journalEntryLineId");
     }
+    const companyId = getTenantContext().companyId;
     await this.findByIdOrThrow(reconciliationId);
+
+    // BankTransaction/JournalEntryLine no tienen companyId propio (se aislan via su relacion,
+    // igual que BankReconciliation arriba) -- validar aqui, no solo confiar en que el llamador
+    // solo ofrezca ids del tenant, evita que un id ajeno adivinado/enumerado quede marcado como
+    // conciliado o referenciado en una conciliacion de otra empresa.
+    if (data.bankTransactionId) {
+      const transaction = await prisma.bankTransaction.findFirst({
+        where: { id: data.bankTransactionId, bankAccount: { companyId } },
+      });
+      if (!transaction) throw new NotFoundError("BankTransaction", data.bankTransactionId);
+    }
+    if (data.journalEntryLineId) {
+      const line = await prisma.journalEntryLine.findFirst({
+        where: { id: data.journalEntryLineId, journalEntry: { companyId } },
+      });
+      if (!line) throw new NotFoundError("JournalEntryLine", data.journalEntryLineId);
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.bankReconciliationItem.create({

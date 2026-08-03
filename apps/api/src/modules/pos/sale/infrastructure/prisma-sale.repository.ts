@@ -101,21 +101,39 @@ export class PrismaSaleRepository implements ISaleRepository {
 
   async authorizeItemDiscount(saleId: string, saleItemId: string, discountAuthorizationId: string): Promise<SaleRecord> {
     const row = await prisma.$transaction(async (tx) => {
+      // Sale esta en TENANT_MODELS (auto-scoped por findFirst) -- se valida ANTES de tocar el
+      // SaleItem, y se confirma que saleItemId realmente pertenece a esta venta. SaleItem no
+      // tiene companyId propio, asi que sin esto un saleItemId de otra empresa se actualizaria
+      // igual mientras el saleId propio fuera valido (defensa en profundidad: hoy el unico
+      // caller, AuthorizeDiscountUseCase, ya valida esto por su cuenta, pero el repositorio no
+      // deberia depender de que todo caller futuro repita la misma validacion).
+      const sale = await tx.sale.findFirst({ where: { id: saleId }, include: SALE_INCLUDE });
+      if (!sale) throw new NotFoundError("Sale", saleId);
+      if (!sale.items.some((item) => item.id === saleItemId)) {
+        throw new NotFoundError("SaleItem", saleItemId);
+      }
+
       await tx.saleItem.update({
         where: { id: saleItemId },
         data: { requiresDiscountAuthorization: false, discountAuthorizationId },
       });
 
-      const sale = await tx.sale.findFirst({ where: { id: saleId }, include: SALE_INCLUDE });
-      if (!sale) throw new NotFoundError("Sale", saleId);
-
-      const stillPending = sale.items.some((item) => item.requiresDiscountAuthorization);
-      if (!stillPending && sale.status === "PENDING_AUTHORIZATION") {
+      const updatedSale = await tx.sale.findFirstOrThrow({ where: { id: saleId }, include: SALE_INCLUDE });
+      const stillPending = updatedSale.items.some((item) => item.requiresDiscountAuthorization);
+      if (!stillPending && updatedSale.status === "PENDING_AUTHORIZATION") {
         await tx.sale.update({ where: { id: saleId }, data: { status: "COMPLETED" } });
-        await this.applyCompletionSideEffects(tx, sale.id, sale.branchId, sale.cashSessionId ?? undefined, sale.items, sale.total, sale.sellerUserId);
+        await this.applyCompletionSideEffects(
+          tx,
+          updatedSale.id,
+          updatedSale.branchId,
+          updatedSale.cashSessionId ?? undefined,
+          updatedSale.items,
+          updatedSale.total,
+          updatedSale.sellerUserId
+        );
         return tx.sale.findFirstOrThrow({ where: { id: saleId }, include: SALE_INCLUDE });
       }
-      return sale;
+      return updatedSale;
     });
     return toRecord(row);
   }

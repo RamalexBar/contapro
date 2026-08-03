@@ -86,8 +86,11 @@ export class PrismaElectronicPayrollRepository implements IElectronicPayrollRepo
         },
       });
 
-      await tx.payrollDetail.update({
-        where: { id: data.payrollDetailId },
+      // updateMany (no update): esta transaccion corre sobre basePrisma (sin la extension de
+      // tenant en absoluto, ver nota de clase arriba). PayrollDetail no tiene companyId propio
+      // (hijo de Payroll), se filtra via la relacion.
+      await tx.payrollDetail.updateMany({
+        where: { id: data.payrollDetailId, payroll: { companyId } },
         data: { cune, xmlUrl: `/api/electronic-invoicing/payroll-details/${data.payrollDetailId}/xml` },
       });
 
@@ -109,30 +112,37 @@ export class PrismaElectronicPayrollRepository implements IElectronicPayrollRepo
     };
   }
 
+  // updateMany (no update): sin scoping propio quedaria expuesto a un id de otra empresa. Estos
+  // 4 metodos siempre corren con TenantContext disponible (request HTTP o el contexto sintetico
+  // por empresa que establece dian-submission-poller.ts).
   async markSigned(id: string, signedXmlContent: string): Promise<void> {
-    await prisma.electronicPayroll.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicPayroll.updateMany({
+      where: { id, companyId },
       data: { signedXmlContent, status: "PENDING_SUBMISSION" },
     });
   }
 
   async markSubmitted(id: string, trackingId: string): Promise<void> {
-    await prisma.electronicPayroll.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicPayroll.updateMany({
+      where: { id, companyId },
       data: { dianTrackingId: trackingId, submittedAt: new Date() },
     });
   }
 
   async markAccepted(id: string, responseXml: string): Promise<void> {
-    await prisma.electronicPayroll.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicPayroll.updateMany({
+      where: { id, companyId },
       data: { status: "ACCEPTED", dianResponseXml: responseXml, respondedAt: new Date() },
     });
   }
 
   async markRejected(id: string, responseXml: string, reason: string): Promise<void> {
-    await prisma.electronicPayroll.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicPayroll.updateMany({
+      where: { id, companyId },
       data: { status: "REJECTED", dianResponseXml: responseXml, rejectionReason: reason, respondedAt: new Date() },
     });
   }

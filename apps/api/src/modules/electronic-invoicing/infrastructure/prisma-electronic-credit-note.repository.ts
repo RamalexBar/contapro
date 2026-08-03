@@ -95,8 +95,10 @@ export class PrismaElectronicCreditNoteRepository implements IElectronicCreditNo
         },
       });
 
-      await tx.creditNote.update({
-        where: { id: data.creditNoteId },
+      // updateMany (no update): CreditNote.update({where:{id}}) por si solo no queda scoped al
+      // tenant -- companyId ya esta disponible arriba, se agrega al where.
+      await tx.creditNote.updateMany({
+        where: { id: data.creditNoteId, companyId },
         data: { cude, xmlUrl: `/api/electronic-invoicing/credit-notes/${data.creditNoteId}/xml` },
       });
 
@@ -118,30 +120,37 @@ export class PrismaElectronicCreditNoteRepository implements IElectronicCreditNo
     };
   }
 
+  // updateMany (no update): sin scoping propio quedaria expuesto a un id de otra empresa. Estos
+  // 4 metodos siempre corren con TenantContext disponible (request HTTP o el contexto sintetico
+  // por empresa que establece dian-submission-poller.ts).
   async markSigned(id: string, signedXmlContent: string): Promise<void> {
-    await prisma.electronicCreditNote.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicCreditNote.updateMany({
+      where: { id, companyId },
       data: { signedXmlContent, status: "PENDING_SUBMISSION" },
     });
   }
 
   async markSubmitted(id: string, trackingId: string): Promise<void> {
-    await prisma.electronicCreditNote.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicCreditNote.updateMany({
+      where: { id, companyId },
       data: { dianTrackingId: trackingId, submittedAt: new Date() },
     });
   }
 
   async markAccepted(id: string, responseXml: string): Promise<void> {
-    await prisma.electronicCreditNote.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicCreditNote.updateMany({
+      where: { id, companyId },
       data: { status: "ACCEPTED", dianResponseXml: responseXml, respondedAt: new Date() },
     });
   }
 
   async markRejected(id: string, responseXml: string, reason: string): Promise<void> {
-    await prisma.electronicCreditNote.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicCreditNote.updateMany({
+      where: { id, companyId },
       data: { status: "REJECTED", dianResponseXml: responseXml, rejectionReason: reason, respondedAt: new Date() },
     });
   }

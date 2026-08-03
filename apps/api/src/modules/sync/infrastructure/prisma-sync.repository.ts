@@ -83,23 +83,29 @@ export class PrismaSyncRepository implements ISyncRepository {
     return toOutboxRecord(row);
   }
 
+  // updateMany (no update): SyncOutbox.update({where:{id}}) por si solo no queda scoped al
+  // tenant -- estos 3 metodos siempre corren dentro de una request HTTP autenticada (POST
+  // /sync/push), asi que getTenantContext() nunca lanza aqui.
   async markOutboxSynced(id: string, entityId: string): Promise<void> {
-    await prisma.syncOutbox.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.syncOutbox.updateMany({
+      where: { id, companyId },
       data: { status: "SYNCED", entityId, syncedAt: new Date(), errorMessage: null },
     });
   }
 
   async markOutboxError(id: string, message: string): Promise<void> {
-    await prisma.syncOutbox.update({
-      where: { id },
+    const companyId = getTenantContext().companyId;
+    await prisma.syncOutbox.updateMany({
+      where: { id, companyId },
       data: { status: "ERROR", errorMessage: message },
     });
   }
 
   async createConflictLog(outboxEventId: string, reason: string): Promise<void> {
+    const companyId = getTenantContext().companyId;
     await prisma.$transaction([
-      prisma.syncOutbox.update({ where: { id: outboxEventId }, data: { status: "CONFLICT" } }),
+      prisma.syncOutbox.updateMany({ where: { id: outboxEventId, companyId }, data: { status: "CONFLICT" } }),
       prisma.syncConflictLog.create({ data: { outboxEventId, conflictReason: reason } }),
     ]);
   }
