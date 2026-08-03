@@ -43,6 +43,18 @@ Navegación, pantallas de login/POS/dashboard consumiendo la misma API REST. POS
 sincronización offline real para ventas (iteración 18, ver fila "Sincronización offline" arriba y
 `apps/api/src/modules/sync/README.md`) — el resto de la app (dashboard, futuras pantallas de
 caja/inventario) sigue siendo solo scaffold, sin cache local ni cola offline propia todavía.
+**Sesión persistida** (iteración 24, `useAuthStore.ts`): antes el login se perdía en cada
+reinicio de la app (estado solo en memoria); ahora se persiste en `AsyncStorage`
+(`@react-native-async-storage/async-storage`, versión resuelta por `expo install` para SDK 51)
+via el middleware `persist` de zustand, mismo criterio que ya usa `apps/web` con `localStorage`.
+`RootNavigator` espera a que la hidratación termine (`hasHydrated`) antes de decidir la ruta
+inicial, y si hay una sesión guardada intenta refrescar el `accessToken` una vez al arrancar
+(dura 15 min, casi seguro vencido si la app llevaba rato cerrada) usando el `refreshToken` (dura
+30 días) — si el refresh falla, la sesión se limpia y manda a Login. `apiFetch` también reintenta
+una vez con refresh en cualquier `401`, mismo patrón que `apps/web/src/lib/api-client.ts`. Botón
+"Salir" agregado en el Dashboard para poder cerrar sesión desde la UI. Verificado únicamente con
+`tsc --noEmit` y `eslint` (sin emulador/dispositivo en este entorno, mismo criterio que el resto
+del móvil) — no se probó en runtime que la sesión sobreviva un reinicio real de la app.
 
 ## Próximos pasos sugeridos (por orden de valor de negocio)
 
@@ -62,8 +74,9 @@ caja/inventario) sigue siendo solo scaffold, sin cache local ni cola offline pro
    recordatorios~~ — implementado en la iteración 17 para correo (ver punto 18); WhatsApp queda
    fuera de alcance (requiere verificación de negocio en Meta).
 5. ~~Sincronización offline completa en móvil~~ — implementado para ventas en la iteración 18
-   (ver punto 19). Queda: `CashMovement`/`StockMovement` como entidades sincronizables (sin UI ni
-   tabla local todavía), NetInfo real, persistencia de sesión en el móvil.
+   (ver punto 19). ~~Persistencia de sesión en el móvil~~ — implementada en la iteración 24 (ver
+   punto 26). Queda: `CashMovement`/`StockMovement` como entidades sincronizables (sin UI ni tabla
+   local todavía), NetInfo real.
 6. ~~Vacaciones/permisos/ausencias/incapacidades~~ — implementado.
 7. ~~Calendario de festivos colombianos~~ — implementado.
 8. ~~Facturación electrónica: firma XAdES + envío asíncrono a la DIAN~~ — implementado en la
@@ -131,7 +144,8 @@ caja/inventario) sigue siendo solo scaffold, sin cache local ni cola offline pro
     reintenta"). Deliberadamente sin `@react-native-community/netinfo` (no verificable en este
     entorno sin dispositivo/emulador) — un intervalo de 30s cubre el mismo caso de uso. Ver
     `apps/api/src/modules/sync/README.md` para el detalle y lo que sigue pendiente
-    (`CashMovement`/`StockMovement` sincronizables, NetInfo real, persistencia de sesión móvil).
+    (`CashMovement`/`StockMovement` sincronizables, NetInfo real). Persistencia de sesión móvil
+    implementada en la iteración 24 (ver punto 26).
 20. ~~Nómina: deducciones detalladas (libranzas/embargos)~~ — implementado en la iteración 19 (ver
     punto 1). `PayrollDeduction` (nuevo modelo) registra una cuota fija recurrente por empleado
     (`LOAN_DEDUCTION`/`GARNISHMENT`), aplicada automáticamente en el cálculo de cada período
@@ -226,3 +240,11 @@ caja/inventario) sigue siendo solo scaffold, sin cache local ni cola offline pro
     currentCost` actualizado al lote restante, producto no-FIFO sigue generando una sola línea sin
     cambios, y devolución posterior de esa misma venta reingresando al costo promedio ponderado
     correcto (1225 = (1×1000 + 2×1200 + 1×1500) / 4).
+26. ~~Móvil: persistencia de sesión~~ — implementado en la iteración 24 (ver fila "Móvil (Expo)"
+    arriba para el detalle completo). Resumen: `useAuthStore` pasó de estado en memoria a
+    persistido en `AsyncStorage` vía el middleware `persist` de zustand; `RootNavigator` espera la
+    hidratación y refresca el `accessToken` proactivamente al arrancar usando el `refreshToken`
+    guardado; `apiFetch` también reintenta una vez con refresh en cualquier `401` (mismo patrón
+    que `apps/web`); botón "Salir" agregado en el Dashboard. Verificado con `tsc --noEmit` y
+    `eslint` únicamente — sin emulador/dispositivo en este entorno, no se probó en runtime que la
+    sesión sobreviva un reinicio real de la app.

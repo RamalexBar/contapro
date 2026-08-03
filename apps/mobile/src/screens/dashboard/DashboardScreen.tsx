@@ -1,19 +1,31 @@
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { DashboardMetrics } from "@erp/shared-types";
 import { formatCOP } from "@erp/shared-utils";
 import { apiFetch } from "../../lib/api-client";
+import { useAuthStore } from "../../store/useAuthStore";
 
-export function DashboardScreen() {
+export function DashboardScreen({ navigation }: { navigation: { replace: (name: string) => void } }) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const clearSession = useAuthStore((s) => s.clearSession);
 
   useEffect(() => {
     apiFetch<DashboardMetrics>("/dashboard/metrics").then(setMetrics).catch(() => setMetrics(null));
   }, []);
 
+  function handleLogout() {
+    clearSession();
+    navigation.replace("Login");
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Dashboard</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Dashboard</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Text style={styles.logout}>Salir</Text>
+        </TouchableOpacity>
+      </View>
       {!metrics && <Text>Cargando...</Text>}
       {metrics && (
         <>
@@ -39,7 +51,9 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9fafb" },
   content: { padding: 16 },
-  title: { fontSize: 20, fontWeight: "600", marginBottom: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  title: { fontSize: 20, fontWeight: "600" },
+  logout: { color: "#dc2626", fontWeight: "600" },
   card: { backgroundColor: "#fff", borderRadius: 8, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: "#e5e7eb" },
   cardLabel: { color: "#6b7280", fontSize: 13 },
   cardValue: { fontSize: 20, fontWeight: "600", marginTop: 4 },
