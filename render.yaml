@@ -4,7 +4,9 @@
 # de aplicar este blueprint, y como completar los secretos que a proposito no estan aqui).
 databases:
   - name: contapro-db
-    plan: starter
+    # "starter" (plan legacy) ya no se puede usar en bases de datos NUEVAS -- basic-256mb es el
+    # tier pago mas chico de la nomenclatura actual de Render, mismo costo aproximado (~USD 6-7/mes).
+    plan: basic-256mb
     databaseName: contapro
     user: contapro
 

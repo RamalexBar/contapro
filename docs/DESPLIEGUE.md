@@ -79,18 +79,14 @@ hace falta — es un upsert por email.)
    → debe crear la empresa con una suscripción `TRIALING` de 30 días contra el plan `TRIAL`.
 3. Entrar a `https://contapro-web.onrender.com` y loguearse con ese usuario.
 
-**Importante — esto todavía se prueba con `curl`, no hay pantalla de registro en la web.** La
-pieza que falta para que un cliente nuevo pueda "instalarse solo" (entrar a un link y crear su
-cuenta sin ayuda) es una pantalla pública de registro en `apps/web` que llame a
-`POST /auth/register-company`, y una pantalla de "Mi suscripción" donde la propia empresa pueda
-generar su link de pago Wompi sin que el operador de la plataforma lo genere a mano — hoy
-`POST /admin/subscriptions/:id/checkout` solo lo puede llamar un `PlatformAdmin`
-(`requirePlatformAdmin`), no la empresa misma. Ver el punto 4 de "Que falta implementar" en
-`apps/api/src/modules/saas-admin/README.md`.
+También podés probar directo desde la web (iteración 27): entrar a
+`https://contapro-web.onrender.com/register` para crear la empresa de prueba sin `curl`, y una vez
+logueado, `/billing` ("Mi suscripción") para generar el link de pago Wompi vos mismo, sin que el
+operador de la plataforma lo genere a mano (`modules/billing`, permiso `billing.manage`).
 
 ## Costos aproximados (Render, plan `starter`)
 
-- Postgres `starter`: ~USD 6-7/mes.
+- Postgres `basic-256mb` (Render ya no acepta el plan legacy `starter` en bases nuevas): ~USD 6-7/mes.
 - Web service `starter` (`contapro-api`): ~USD 6-7/mes.
 - Static site (`contapro-web`): gratis en Render (los sitios estáticos no cobran).
 
