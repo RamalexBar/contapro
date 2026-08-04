@@ -29,6 +29,7 @@ import { accountingRouter } from "./modules/accounting/interfaces/accounting.rou
 import { suppliersRouter } from "./modules/suppliers/interfaces/suppliers.routes";
 import { electronicInvoicingRouter } from "./modules/electronic-invoicing/interfaces/electronic-invoicing.routes";
 import { syncRouter } from "./modules/sync/interfaces/sync.routes";
+import { billingRouter } from "./modules/billing/interfaces/billing.routes";
 
 import { saasAdminRouter } from "./modules/saas-admin/interfaces/saas-admin.routes";
 
@@ -72,6 +73,7 @@ app.use("/api", accountingRouter);
 app.use("/api", suppliersRouter);
 app.use("/api", electronicInvoicingRouter);
 app.use("/api", syncRouter);
+app.use("/api", billingRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: "NOT_FOUND", message: `Ruta no encontrada: ${req.method} ${req.path}` });

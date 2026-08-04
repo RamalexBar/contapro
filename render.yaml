@@ -1,0 +1,109 @@
+# Blueprint de Render (render.com/docs/blueprint-spec) -- define los 3 servicios que necesita
+# Contapro en produccion. Uso: en Render, "New" -> "Blueprint" -> conectar este repo -> Render lee
+# este archivo solo. Ver docs/DESPLIEGUE.md para el paso a paso completo (que hacer ANTES/DESPUES
+# de aplicar este blueprint, y como completar los secretos que a proposito no estan aqui).
+databases:
+  - name: contapro-db
+    plan: starter
+    databaseName: contapro
+    user: contapro
+
+services:
+  # ---- Backend (Express + Prisma) ----
+  - type: web
+    name: contapro-api
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: .
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @erp/database run db:generate && pnpm --filter @erp/api run build
+    # Corre DESPUES del build pero ANTES de que la instancia nueva reciba trafico -- el lugar
+    # correcto para migraciones (prisma migrate deploy, no interactivo, seguro para producir).
+    preDeployCommand: pnpm --filter @erp/database exec prisma migrate deploy
+    startCommand: pnpm --filter @erp/api run start
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: contapro-db
+          property: connectionString
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      # generateValue: Render genera un secreto aleatorio criptografico al crear el servicio (no
+      # queda en este archivo/repo) -- cumple el minimo de 32 caracteres exigido en config/env.ts.
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_PLATFORM_ADMIN_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 30d
+      - key: JWT_PLATFORM_ADMIN_EXPIRES_IN
+        value: 8h
+      # Ajustar tras el primer deploy si Render le asigna una URL distinta a "contapro-web"
+      # (pasa si el nombre ya esta tomado por otra cuenta) -- ver docs/DESPLIEGUE.md paso 4.
+      - key: CORS_ORIGIN
+        value: https://contapro-web.onrender.com
+      # sync: false = "completar a mano en el dashboard de Render despues de crear el servicio",
+      # nunca en este archivo -- son secretos reales, no deben quedar en el repo. Vacio hasta
+      # completarse = mismo comportamiento ya documentado en config/env.ts (falla con mensaje
+      # claro, no un crash silencioso).
+      - key: DIAN_ENVIRONMENT
+        value: HABILITACION
+      - key: DIAN_SOFTWARE_ID
+        sync: false
+      - key: DIAN_SOFTWARE_PIN
+        sync: false
+      - key: DIAN_TECHNICAL_KEY
+        sync: false
+      - key: DIAN_CERTIFICATE_PATH
+        sync: false
+      - key: DIAN_CERTIFICATE_PASSWORD
+        sync: false
+      - key: DIAN_SOAP_ENDPOINT
+        sync: false
+      - key: DIAN_NOMINA_SOAP_ENDPOINT
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: no-reply@contapro.demo
+      - key: WOMPI_ENVIRONMENT
+        value: production
+      - key: WOMPI_PUBLIC_KEY
+        sync: false
+      - key: WOMPI_PRIVATE_KEY
+        sync: false
+      - key: WOMPI_INTEGRITY_SECRET
+        sync: false
+      - key: WOMPI_EVENTS_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: erp-assets
+
+  # ---- Frontend (Vite build, servido como sitio estatico) ----
+  - type: web
+    name: contapro-web
+    runtime: static
+    rootDir: .
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @erp/web run build
+    staticPublishPath: apps/web/dist
+    envVars:
+      # Ajustar tras el primer deploy si Render le asigna otra URL a "contapro-api".
+      - key: VITE_API_BASE_URL
+        value: https://contapro-api.onrender.com/api
+    routes:
+      # SPA: cualquier ruta que no sea un archivo estatico real cae a index.html -- sin esto,
+      # refrescar el navegador en /pos o /accounting da 404 (React Router nunca llega a manejarlo).
+      - type: rewrite
+        source: /*
+        destination: /index.html

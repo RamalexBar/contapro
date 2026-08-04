@@ -92,6 +92,15 @@ export interface ISubscriptionRepository {
   create(data: CreateSubscriptionData): Promise<SubscriptionRecord>;
   findByIdOrThrow(id: string): Promise<SubscriptionRecord>;
   findActiveByCompanyId(companyId: string): Promise<SubscriptionRecord | null>;
+  /** A diferencia de findActiveByCompanyId (filtra a TRIALING/ACTIVE/GRACE_PERIOD), esta trae la
+   * suscripcion mas reciente sin importar el status -- usado por la pantalla de "Mi suscripcion"
+   * (modules/billing) para poder mostrarle a la empresa que esta SUSPENDED/CANCELLED en vez de un
+   * 404 confuso cuando ya no tiene ninguna "activa". */
+  findLatestByCompanyId(companyId: string): Promise<SubscriptionRecord | null>;
+  /** Cambia el plan asignado a una suscripcion sin tocar status/currentPeriodEnd -- usado cuando
+   * una empresa en TRIAL elige por primera vez un plan pago, antes de generar el checkout para
+   * ese plan (modules/billing). No cobra nada por si solo. */
+  updatePlan(subscriptionId: string, planId: string): Promise<SubscriptionRecord>;
   list(filter?: { status?: SubscriptionStatus }): Promise<SubscriptionWithDetails[]>;
   updateStatus(id: string, status: SubscriptionStatus, graceEndsAt?: Date | null): Promise<SubscriptionRecord>;
   /** Crea el SubscriptionPayment (status CONFIRMED), actualiza currentPeriodEnd, limpia

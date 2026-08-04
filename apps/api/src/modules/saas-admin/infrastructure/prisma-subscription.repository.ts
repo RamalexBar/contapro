@@ -98,6 +98,20 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
     return row ? toRecord(row) : null;
   }
 
+  async findLatestByCompanyId(companyId: string): Promise<SubscriptionRecord | null> {
+    const row = await basePrisma.subscription.findFirst({
+      where: { companyId },
+      orderBy: { createdAt: "desc" },
+    });
+    return row ? toRecord(row) : null;
+  }
+
+  async updatePlan(subscriptionId: string, planId: string): Promise<SubscriptionRecord> {
+    await this.findByIdOrThrow(subscriptionId);
+    const row = await basePrisma.subscription.update({ where: { id: subscriptionId }, data: { planId } });
+    return toRecord(row);
+  }
+
   async list(filter?: { status?: SubscriptionStatus }): Promise<SubscriptionWithDetails[]> {
     const rows = await basePrisma.subscription.findMany({
       where: filter?.status ? { status: filter.status } : undefined,

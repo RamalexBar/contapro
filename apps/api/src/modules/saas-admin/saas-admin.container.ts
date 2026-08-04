@@ -21,10 +21,16 @@ import { ConfirmWompiPaymentUseCase } from "./application/use-cases/confirm-womp
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
 
 const platformAdminRepo = new PrismaPlatformAdminRepository();
-const planRepo = new PrismaPlanRepository();
-const subscriptionRepo = new PrismaSubscriptionRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
-const paymentGateway = new WompiPaymentGateway();
+
+/** Exportados (no solo locales): modules/billing los reusa para que la propia empresa pueda ver
+ * y pagar SU suscripcion, sin duplicar el acceso a Prisma ni la logica de CreateSubscriptionCheckoutUseCase
+ * -- mismo criterio que postSaleJournalEntryUseCase en accounting.container.ts. */
+export const planRepo = new PrismaPlanRepository();
+export const subscriptionRepo = new PrismaSubscriptionRepository();
+export const paymentGateway = new WompiPaymentGateway();
+
+export const createSubscriptionCheckoutUseCase = new CreateSubscriptionCheckoutUseCase(subscriptionRepo, planRepo, paymentGateway);
 
 export const saasAdminController = new SaasAdminController(
   new LoginPlatformAdminUseCase(platformAdminRepo),
@@ -37,7 +43,7 @@ export const saasAdminController = new SaasAdminController(
   new RegisterSubscriptionPaymentUseCase(subscriptionRepo, auditService),
   new ListCompaniesUseCase(subscriptionRepo),
   new GetSaasDashboardUseCase(subscriptionRepo),
-  new CreateSubscriptionCheckoutUseCase(subscriptionRepo, planRepo, paymentGateway),
+  createSubscriptionCheckoutUseCase,
   new ConfirmWompiPaymentUseCase(subscriptionRepo, paymentGateway, auditService)
 );
 

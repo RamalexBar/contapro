@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { to: "/accounting/banks", label: "Bancos", permissions: ["accounting.read"] },
   { to: "/suppliers", label: "Proveedores", permissions: ["suppliers.read"] },
   { to: "/purchase-orders", label: "Ordenes de compra", permissions: ["suppliers.read"] },
+  { to: "/billing", label: "Mi suscripcion", permissions: ["billing.manage"] },
 ];
 
 export function AppLayout({ children }: PropsWithChildren) {

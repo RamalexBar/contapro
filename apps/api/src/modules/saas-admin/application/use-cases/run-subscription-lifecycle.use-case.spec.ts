@@ -48,6 +48,12 @@ class FakeSubscriptionRepository implements ISubscriptionRepository {
   async findActiveByCompanyId(): Promise<SubscriptionRecord | null> {
     throw new Error("not implemented");
   }
+  async findLatestByCompanyId(): Promise<SubscriptionRecord | null> {
+    throw new Error("not implemented");
+  }
+  async updatePlan(): Promise<SubscriptionRecord> {
+    throw new Error("not implemented");
+  }
   async list(): Promise<SubscriptionWithDetails[]> {
     throw new Error("not implemented");
   }

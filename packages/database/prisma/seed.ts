@@ -1,11 +1,18 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS, SYSTEM_ROLES } from "@erp/shared-types";
+import { seedBase } from "./seed-base";
 
 const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = "Demo1234!";
 
+/**
+ * Seed de DESARROLLO/DEMO -- ademas de la infraestructura base (seedBase: permisos, roles,
+ * planes), crea una empresa de ejemplo con usuarios de contraseña PUBLICA conocida
+ * (Demo1234!) y un PlatformAdmin igual de publico. NUNCA correr esto contra una base de datos de
+ * produccion real -- para produccion usar `pnpm db:seed:production` (packages/database/prisma/
+ * seed-production.ts), que solo siembra seedBase.
+ */
 async function main() {
   console.log("Seed: creando empresa demo 'Minimarket La Esquina'...");
 
@@ -13,125 +20,8 @@ async function main() {
   const pinHash = await bcrypt.hash("1234", 10);
 
   await prisma.$transaction(async (tx) => {
-    // ---- Catalogo de permisos ----
-    for (const permission of PERMISSIONS) {
-      await tx.permission.upsert({
-        where: { code: permission.code },
-        create: permission,
-        update: { module: permission.module, description: permission.description },
-      });
-    }
-
-    // ---- Roles de sistema + sus permisos por defecto ----
-    for (const roleName of SYSTEM_ROLES) {
-      let role = await tx.role.findFirst({ where: { name: roleName, companyId: null } });
-      if (!role) {
-        role = await tx.role.create({ data: { name: roleName, isSystem: true, companyId: null } });
-      }
-
-      const permissionCodes = DEFAULT_ROLE_PERMISSIONS[roleName];
-      const permissions = await tx.permission.findMany({ where: { code: { in: permissionCodes } } });
-      for (const permission of permissions) {
-        await tx.rolePermission.upsert({
-          where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
-          create: { roleId: role.id, permissionId: permission.id },
-          update: {},
-        });
-      }
-    }
-
-    // ---- Planes (panel administrador SaaS) ----
-    // Precios reales de mercado investigados en 2026-08 contra Siigo/Alegra/World Office/Loggro
-    // (ver docs/PRECIOS.md): todo incluido, sin modulos separados -- ese es el diferencial contra
-    // la competencia, que factura POS/nomina/contabilidad como productos aparte. Por eso todos
-    // los planes pagos habilitan el mismo set de "features" (pos/inventory/cash/payroll/
-    // accounting = true); lo que diferencia un plan de otro es maxBranches/maxUsers, no
-    // funcionalidad bloqueada.
-    const FULL_FEATURES = { pos: true, inventory: true, cash: true, payroll: true, accounting: true };
-
-    await tx.plan.upsert({
-      where: { code: "TRIAL" },
-      create: {
-        code: "TRIAL",
-        name: "Prueba gratuita",
-        priceMonthly: 0,
-        priceYearly: 0,
-        maxBranches: 1,
-        maxUsers: 3,
-        features: FULL_FEATURES,
-      },
-      // update completo (no {}): un re-seed debe poder corregir datos de planes ya creados, no
-      // solo poblarlos la primera vez -- distinto del resto del seed (usuarios/productos demo)
-      // porque estos valores SI cambian con el tiempo (ajustes de precio de mercado).
-      update: {
-        name: "Prueba gratuita",
-        priceMonthly: 0,
-        priceYearly: 0,
-        maxBranches: 1,
-        maxUsers: 3,
-        features: FULL_FEATURES,
-      },
-    });
-    const plan = await tx.plan.upsert({
-      where: { code: "BASICO" },
-      create: {
-        code: "BASICO",
-        name: "Plan Emprendedor",
-        priceMonthly: 39900,
-        priceYearly: 430900,
-        maxBranches: 1,
-        maxUsers: 3,
-        features: FULL_FEATURES,
-      },
-      update: {
-        name: "Plan Emprendedor",
-        priceMonthly: 39900,
-        priceYearly: 430900,
-        maxBranches: 1,
-        maxUsers: 3,
-        features: FULL_FEATURES,
-      },
-    });
-    await tx.plan.upsert({
-      where: { code: "PYME" },
-      create: {
-        code: "PYME",
-        name: "Plan Pyme",
-        priceMonthly: 79900,
-        priceYearly: 862900,
-        maxBranches: 3,
-        maxUsers: 10,
-        features: FULL_FEATURES,
-      },
-      update: {
-        name: "Plan Pyme",
-        priceMonthly: 79900,
-        priceYearly: 862900,
-        maxBranches: 3,
-        maxUsers: 10,
-        features: FULL_FEATURES,
-      },
-    });
-    await tx.plan.upsert({
-      where: { code: "PRO" },
-      create: {
-        code: "PRO",
-        name: "Plan Plus",
-        priceMonthly: 149900,
-        priceYearly: 1618900,
-        maxBranches: 10,
-        maxUsers: 50,
-        features: FULL_FEATURES,
-      },
-      update: {
-        name: "Plan Plus",
-        priceMonthly: 149900,
-        priceYearly: 1618900,
-        maxBranches: 10,
-        maxUsers: 50,
-        features: FULL_FEATURES,
-      },
-    });
+    await seedBase(tx);
+    const plan = await tx.plan.findUniqueOrThrow({ where: { code: "BASICO" } });
 
     // ---- Empresa + Sucursal ----
 

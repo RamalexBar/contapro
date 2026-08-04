@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { LoginPage } from "../features/auth/pages/LoginPage";
+import { RegisterPage } from "../features/auth/pages/RegisterPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 import { ProductListPage } from "../features/inventory/pages/ProductListPage";
 import { POSPage } from "../features/pos/pages/POSPage";
@@ -16,6 +17,7 @@ import { AccountingPage } from "../features/accounting/pages/AccountingPage";
 import { BankingPage } from "../features/accounting/pages/BankingPage";
 import { SuppliersPage } from "../features/suppliers/pages/SuppliersPage";
 import { PurchaseOrdersPage } from "../features/suppliers/pages/PurchaseOrdersPage";
+import { BillingPage } from "../features/billing/pages/BillingPage";
 import { PlatformAdminLoginPage } from "../features/platform-admin/pages/PlatformAdminLoginPage";
 import { PlatformDashboardPage } from "../features/platform-admin/pages/PlatformDashboardPage";
 import { PlansPage } from "../features/platform-admin/pages/PlansPage";
@@ -27,6 +29,7 @@ import { ProtectedRoute } from "./ProtectedRoute";
 export const router = createBrowserRouter([
   { path: "/", element: <Navigate to="/dashboard" replace /> },
   { path: "/login", element: <LoginPage /> },
+  { path: "/register", element: <RegisterPage /> },
   {
     path: "/dashboard",
     element: (
@@ -152,6 +155,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <PurchaseOrdersPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/billing",
+    element: (
+      <ProtectedRoute>
+        <BillingPage />
       </ProtectedRoute>
     ),
   },

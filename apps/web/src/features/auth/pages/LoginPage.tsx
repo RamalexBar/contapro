@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Card } from "../../../components/ui/Card";
@@ -43,7 +43,13 @@ export function LoginPage() {
             {loading ? "Ingresando..." : "Ingresar"}
           </Button>
         </form>
-        <p className="mt-4 text-xs text-gray-400">
+        <p className="mt-4 text-center text-xs text-gray-500">
+          No tenes cuenta?{" "}
+          <Link to="/register" className="text-brand-700 hover:underline">
+            Crea una gratis
+          </Link>
+        </p>
+        <p className="mt-2 text-xs text-gray-400">
           Demo: admin@demo.com / cajero@demo.com — contraseña Demo1234!
         </p>
       </Card>

@@ -70,6 +70,8 @@ export const PERMISSIONS = [
 
   { code: "electronic-invoicing.manage", module: "electronic-invoicing", description: "Administrar resoluciones de numeracion DIAN" },
   { code: "electronic-invoicing.read", module: "electronic-invoicing", description: "Consultar facturas electronicas generadas" },
+
+  { code: "billing.manage", module: "billing", description: "Ver y pagar la suscripcion de la propia empresa" },
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];
@@ -99,6 +101,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "suppliers.read",
     "electronic-invoicing.manage",
     "electronic-invoicing.read",
+    "billing.manage",
   ],
   SUPERVISOR: [
     "product.create",
