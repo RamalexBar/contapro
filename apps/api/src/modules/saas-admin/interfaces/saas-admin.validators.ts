@@ -39,3 +39,37 @@ export const registerSubscriptionPaymentSchema = z.object({
   method: z.string().min(1),
   reference: z.string().optional(),
 });
+
+export const createSubscriptionCheckoutSchema = z.object({
+  customerEmail: z.string().email(),
+  redirectUrl: z.string().url().optional(),
+});
+
+/**
+ * Passthrough deliberado: el payload real de Wompi puede traer mas campos de los que este
+ * sistema usa (o cambiar con el tiempo) -- validar solo lo minimo necesario para procesar el
+ * evento evita rechazar webhooks legitimos por un campo nuevo no contemplado aqui.
+ */
+export const wompiWebhookSchema = z
+  .object({
+    event: z.string(),
+    data: z
+      .object({
+        transaction: z
+          .object({
+            id: z.string(),
+            status: z.string(),
+            reference: z.string(),
+            amount_in_cents: z.number(),
+          })
+          .passthrough(),
+      })
+      .passthrough(),
+    environment: z.string(),
+    timestamp: z.number(),
+    signature: z.object({
+      properties: z.array(z.string()),
+      checksum: z.string(),
+    }),
+  })
+  .passthrough();

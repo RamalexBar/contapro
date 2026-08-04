@@ -4,6 +4,7 @@ import { PrismaPlatformAdminRepository } from "./infrastructure/prisma-platform-
 import { PrismaPlanRepository } from "./infrastructure/prisma-plan.repository";
 import { PrismaSubscriptionRepository } from "./infrastructure/prisma-subscription.repository";
 import { ResendEmailNotifier } from "./infrastructure/resend-email-notifier";
+import { WompiPaymentGateway } from "./infrastructure/wompi-payment-gateway";
 import { LoginPlatformAdminUseCase } from "./application/use-cases/login-platform-admin.use-case";
 import { CreatePlanUseCase } from "./application/use-cases/create-plan.use-case";
 import { ListPlansUseCase } from "./application/use-cases/list-plans.use-case";
@@ -15,12 +16,15 @@ import { RegisterSubscriptionPaymentUseCase } from "./application/use-cases/regi
 import { ListCompaniesUseCase } from "./application/use-cases/list-companies.use-case";
 import { GetSaasDashboardUseCase } from "./application/use-cases/get-saas-dashboard.use-case";
 import { RunSubscriptionLifecycleUseCase } from "./application/use-cases/run-subscription-lifecycle.use-case";
+import { CreateSubscriptionCheckoutUseCase } from "./application/use-cases/create-subscription-checkout.use-case";
+import { ConfirmWompiPaymentUseCase } from "./application/use-cases/confirm-wompi-payment.use-case";
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
 
 const platformAdminRepo = new PrismaPlatformAdminRepository();
 const planRepo = new PrismaPlanRepository();
 const subscriptionRepo = new PrismaSubscriptionRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
+const paymentGateway = new WompiPaymentGateway();
 
 export const saasAdminController = new SaasAdminController(
   new LoginPlatformAdminUseCase(platformAdminRepo),
@@ -32,7 +36,9 @@ export const saasAdminController = new SaasAdminController(
   new GetSubscriptionUseCase(subscriptionRepo),
   new RegisterSubscriptionPaymentUseCase(subscriptionRepo, auditService),
   new ListCompaniesUseCase(subscriptionRepo),
-  new GetSaasDashboardUseCase(subscriptionRepo)
+  new GetSaasDashboardUseCase(subscriptionRepo),
+  new CreateSubscriptionCheckoutUseCase(subscriptionRepo, planRepo, paymentGateway),
+  new ConfirmWompiPaymentUseCase(subscriptionRepo, paymentGateway, auditService)
 );
 
 /** Usado por server.ts para arrancar el poller de recordatorios/vencimientos/suspension. */

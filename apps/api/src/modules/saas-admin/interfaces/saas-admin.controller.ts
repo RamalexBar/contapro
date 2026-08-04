@@ -9,13 +9,17 @@ import type { GetSubscriptionUseCase } from "../application/use-cases/get-subscr
 import type { RegisterSubscriptionPaymentUseCase } from "../application/use-cases/register-subscription-payment.use-case";
 import type { ListCompaniesUseCase } from "../application/use-cases/list-companies.use-case";
 import type { GetSaasDashboardUseCase } from "../application/use-cases/get-saas-dashboard.use-case";
+import type { CreateSubscriptionCheckoutUseCase } from "../application/use-cases/create-subscription-checkout.use-case";
+import type { ConfirmWompiPaymentUseCase } from "../application/use-cases/confirm-wompi-payment.use-case";
 import type { SubscriptionStatus } from "../domain/subscription.repository";
 import {
   createPlanSchema,
+  createSubscriptionCheckoutSchema,
   createSubscriptionSchema,
   loginPlatformAdminSchema,
   registerSubscriptionPaymentSchema,
   updatePlanSchema,
+  wompiWebhookSchema,
 } from "./saas-admin.validators";
 
 export class SaasAdminController {
@@ -29,7 +33,9 @@ export class SaasAdminController {
     private readonly getSubscriptionUseCase: GetSubscriptionUseCase,
     private readonly registerSubscriptionPaymentUseCase: RegisterSubscriptionPaymentUseCase,
     private readonly listCompaniesUseCase: ListCompaniesUseCase,
-    private readonly getSaasDashboardUseCase: GetSaasDashboardUseCase
+    private readonly getSaasDashboardUseCase: GetSaasDashboardUseCase,
+    private readonly createSubscriptionCheckoutUseCase: CreateSubscriptionCheckoutUseCase,
+    private readonly confirmWompiPaymentUseCase: ConfirmWompiPaymentUseCase
   ) {}
 
   login = async (req: Request, res: Response, next: NextFunction) => {
@@ -103,6 +109,30 @@ export class SaasAdminController {
           platformAdminId: res.locals.platformAdminId,
         })
       );
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createSubscriptionCheckout = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = createSubscriptionCheckoutSchema.parse(req.body);
+      res.status(201).json(await this.createSubscriptionCheckoutUseCase.execute({ subscriptionId: req.params.id, ...body }));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** Publica, sin requirePlatformAdmin -- la llama Wompi, no un usuario autenticado. La
+   * autenticidad se verifica adentro del caso de uso via la firma del evento (events secret), no
+   * con un JWT. Siempre responde 200 salvo error interno real (asi Wompi no reintenta
+   * eternamente eventos que nunca se van a poder procesar, ej. firma invalida o evento
+   * desconocido -- eso ya lo descarta el caso de uso en silencio). */
+  wompiWebhook = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const event = wompiWebhookSchema.parse(req.body);
+      await this.confirmWompiPaymentUseCase.execute(event);
+      res.status(200).json({ received: true });
     } catch (err) {
       next(err);
     }

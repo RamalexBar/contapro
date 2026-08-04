@@ -21,6 +21,14 @@ saasAdminRouter.post(
   requirePlatformAdmin,
   saasAdminController.registerSubscriptionPayment
 );
+saasAdminRouter.post(
+  "/admin/subscriptions/:id/checkout",
+  requirePlatformAdmin,
+  saasAdminController.createSubscriptionCheckout
+);
+
+// Publica a proposito -- la llama Wompi, no un usuario del panel (ver nota en el controller).
+saasAdminRouter.post("/admin/subscriptions/webhooks/wompi", saasAdminController.wompiWebhook);
 
 saasAdminRouter.get("/admin/companies", requirePlatformAdmin, saasAdminController.listCompanies);
 saasAdminRouter.get("/admin/dashboard", requirePlatformAdmin, saasAdminController.getDashboard);

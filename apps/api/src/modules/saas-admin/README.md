@@ -61,6 +61,57 @@ El panel es transversal a todas las empresas: no usa `tenantContextMiddleware` (
 7. Auditoria (donde hay `companyId` valido — no aplica a `Plan`): `SUBSCRIPTION_CREATED`,
    `SUBSCRIPTION_PAYMENT_REGISTERED`, `SUBSCRIPTION_STATUS_CHANGED`, `SUBSCRIPTION_REMINDER_SENT`,
    `SUBSCRIPTION_REMINDER_FAILED`.
+8. **Cobro real via Wompi/Bancolombia** (iteracion 25, ver seccion dedicada abajo):
+   `POST /admin/subscriptions/:id/checkout` genera un link de pago; el webhook
+   `POST /admin/subscriptions/webhooks/wompi` (publico, sin `requirePlatformAdmin`) confirma el
+   pago y renueva la suscripcion automaticamente, sin intervencion manual.
+
+## Cobro real de suscripciones via Wompi/Bancolombia (iteracion 25)
+
+`IPaymentGateway` (`domain/payment-gateway.ts`) es el puerto; `WompiPaymentGateway`
+(`infrastructure/wompi-payment-gateway.ts`) la implementacion real, sin SDK (mismo criterio que
+`dian-soap-client.ts`/`resend-email-notifier.ts`). El flujo elegido es **Web Checkout por
+redireccion** (no el Widget embebido ni tokenizacion de tarjeta): el backend nunca ve ni maneja
+datos de tarjeta, evitando alcance PCI-DSS.
+
+- `POST /admin/subscriptions/:id/checkout` (`{ customerEmail, redirectUrl? }`,
+  `CreateSubscriptionCheckoutUseCase`): el monto se deriva del plan segun `billingCycle`
+  (mensual/anual) — nunca del request, para que no se pueda manipular. Crea un
+  `SubscriptionPayment` en `PENDING` con una `reference` unica **por intento de cobro** (no por
+  suscripcion, permite reintentar tras un `DECLINED` sin chocar con nada), y devuelve la URL de
+  `checkout.wompi.co` ya firmada (`buildCheckoutUrl`, calculo 100% local — SHA256 de
+  `reference+amountInCents+"COP"+integritySecret`, sin separador, verificado byte a byte contra el
+  ejemplo oficial de `docs.wompi.co/en/docs/colombia/widget-checkout-web`, ver
+  `wompi-payment-gateway.spec.ts`).
+- `POST /admin/subscriptions/webhooks/wompi` (**publico**, sin `requirePlatformAdmin` — lo llama
+  Wompi, no un usuario del panel): `ConfirmWompiPaymentUseCase` verifica la firma del evento
+  (`verifyWebhookSignature`, SHA256 de los valores de `signature.properties` **en el orden que
+  trae el propio evento** + `timestamp` + events secret — nunca se asume un orden fijo, Wompi
+  documenta que puede variar) antes de tocar cualquier dato. Si la firma no verifica, si el evento
+  no es `transaction.updated`, o si no hay un `SubscriptionPayment` `PENDING` con esa `reference`
+  (proteccion contra doble aplicacion si Wompi reenvia el mismo webhook), se ignora en silencio
+  (siempre responde `200` igual, para no generar reintentos infinitos de un evento que nunca se va
+  a poder procesar). Si `APPROVED`: aplica el pago con el mismo calculo de vencimiento que
+  `RegisterSubscriptionPaymentUseCase` (`calculateNextPeriodEnd` desde `currentPeriodEnd`
+  **ORIGINAL**, no desde la fecha del pago). Si `DECLINED`/`ERROR`/`VOIDED`: marca el pago como
+  `FAILED`, no toca la suscripcion.
+- Vacios por defecto (`WOMPI_PUBLIC_KEY`/`WOMPI_INTEGRITY_SECRET`/`WOMPI_EVENTS_SECRET`,
+  `config/env.ts`) = generar un checkout falla con `ValidationError` clara (a diferencia de
+  `ResendEmailNotifier`/`IDianClient`, este metodo lo invoca directo un endpoint HTTP, asi que el
+  error tiene que llegarle al que hizo el request, no quedar como un `500` opaco).
+- **Verificado en vivo con llaves de sandbox reales** (no solo con fakes): `buildCheckoutUrl`
+  genero una URL que `checkout.wompi.co` acepto con `200` (firma de integridad confirmada contra
+  el servicio real, no solo contra el ejemplo de la documentacion); el flujo completo
+  checkout→webhook→confirmacion se probo contra Postgres real simulando un evento
+  `transaction.updated APPROVED` firmado con el events secret real, confirmando que la
+  suscripcion pasa a `ACTIVE` con el vencimiento correcto, el pago queda `CONFIRMED`, y un
+  reintento del mismo evento (Wompi puede reenviar webhooks) no lo vuelve a aplicar. **Lo unico
+  que NO se pudo verificar en este entorno**: que el algoritmo de `verifyWebhookSignature`
+  coincida exactamente con un webhook 100% real enviado por Wompi (para eso hace falta completar
+  un pago de verdad con una tarjeta de prueba a traves del navegador y tener una URL publica
+  registrada en el dashboard de Wompi como destino del webhook) — el algoritmo implementado sigue
+  la documentacion oficial al pie de la letra, pero esa pieza especifica quedo verificada solo por
+  autoconsistencia (mismo codigo genera y verifica), no contra el servicio real.
 
 ## Envio real de recordatorios (iteracion 17)
 
@@ -97,3 +148,14 @@ El panel es transversal a todas las empresas: no usa `tenantContextMiddleware` (
    negocio en Meta, no es un problema de codigo).
 2. Actualizaciones automaticas de `apps/web`/`apps/mobile` ("Nueva version disponible") — fuera
    del alcance de este backend, responsabilidad de Service Worker / Expo OTA updates.
+3. Wompi: confirmar `verifyWebhookSignature` contra un webhook 100% real (ver limitacion en la
+   seccion dedicada arriba) — falta completar un pago de prueba end-to-end por navegador con una
+   URL publica registrada en el dashboard de Wompi.
+4. Wompi: sin UI web todavia para generar el link de cobro desde el panel
+   (`apps/web/src/features/platform-admin`) — hoy solo existe el endpoint
+   (`POST /admin/subscriptions/:id/checkout`), un admin de plataforma lo llamaria a mano o via un
+   script para mandarle el link al cliente.
+5. Wompi: no hay reconciliacion automatica para pagos cuyo webhook se pierda (Wompi reintenta
+   webhooks fallidos por su cuenta, pero no hay un job propio que consulte
+   `GET /v1/transactions/:id` con `WOMPI_PRIVATE_KEY` para pagos que quedaron `PENDING` demasiado
+   tiempo) — la llave privada esta preparada en `config/env.ts` para esto, pero no se uso todavia.

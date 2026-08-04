@@ -46,6 +46,17 @@ const envSchema = z.object({
   // que las variables DIAN_* de arriba.
   RESEND_API_KEY: z.string().default(""),
   RESEND_FROM_EMAIL: z.string().default("no-reply@erp-saas.demo"),
+
+  // ---- Cobro de suscripciones via Wompi/Bancolombia (ver modules/saas-admin/README.md) ----
+  // Vacios por defecto = generar un link de cobro falla con mensaje claro (mismo criterio que
+  // las variables DIAN_*/RESEND_* de arriba, no un crash silencioso). WOMPI_PRIVATE_KEY no lo usa
+  // el flujo actual (Web Checkout + webhook no requieren llamar la API de Wompi desde el
+  // backend), se deja preparado para una futura reconciliacion manual (GET /v1/transactions/:id).
+  WOMPI_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
+  WOMPI_PUBLIC_KEY: z.string().default(""),
+  WOMPI_PRIVATE_KEY: z.string().default(""),
+  WOMPI_INTEGRITY_SECRET: z.string().default(""),
+  WOMPI_EVENTS_SECRET: z.string().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);

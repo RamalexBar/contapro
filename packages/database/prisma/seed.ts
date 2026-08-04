@@ -41,6 +41,14 @@ async function main() {
     }
 
     // ---- Planes (panel administrador SaaS) ----
+    // Precios reales de mercado investigados en 2026-08 contra Siigo/Alegra/World Office/Loggro
+    // (ver docs/PRECIOS.md): todo incluido, sin modulos separados -- ese es el diferencial contra
+    // la competencia, que factura POS/nomina/contabilidad como productos aparte. Por eso todos
+    // los planes pagos habilitan el mismo set de "features" (pos/inventory/cash/payroll/
+    // accounting = true); lo que diferencia un plan de otro es maxBranches/maxUsers, no
+    // funcionalidad bloqueada.
+    const FULL_FEATURES = { pos: true, inventory: true, cash: true, payroll: true, accounting: true };
+
     await tx.plan.upsert({
       where: { code: "TRIAL" },
       create: {
@@ -50,35 +58,79 @@ async function main() {
         priceYearly: 0,
         maxBranches: 1,
         maxUsers: 3,
-        features: { pos: true, inventory: true, cash: true, payroll: false, accounting: false },
+        features: FULL_FEATURES,
       },
-      update: {},
+      // update completo (no {}): un re-seed debe poder corregir datos de planes ya creados, no
+      // solo poblarlos la primera vez -- distinto del resto del seed (usuarios/productos demo)
+      // porque estos valores SI cambian con el tiempo (ajustes de precio de mercado).
+      update: {
+        name: "Prueba gratuita",
+        priceMonthly: 0,
+        priceYearly: 0,
+        maxBranches: 1,
+        maxUsers: 3,
+        features: FULL_FEATURES,
+      },
     });
     const plan = await tx.plan.upsert({
       where: { code: "BASICO" },
       create: {
         code: "BASICO",
-        name: "Plan Basico",
-        priceMonthly: 49900,
-        priceYearly: 499000,
+        name: "Plan Emprendedor",
+        priceMonthly: 39900,
+        priceYearly: 430900,
+        maxBranches: 1,
+        maxUsers: 3,
+        features: FULL_FEATURES,
+      },
+      update: {
+        name: "Plan Emprendedor",
+        priceMonthly: 39900,
+        priceYearly: 430900,
+        maxBranches: 1,
+        maxUsers: 3,
+        features: FULL_FEATURES,
+      },
+    });
+    await tx.plan.upsert({
+      where: { code: "PYME" },
+      create: {
+        code: "PYME",
+        name: "Plan Pyme",
+        priceMonthly: 79900,
+        priceYearly: 862900,
         maxBranches: 3,
         maxUsers: 10,
-        features: { pos: true, inventory: true, cash: true, payroll: false, accounting: false },
+        features: FULL_FEATURES,
       },
-      update: {},
+      update: {
+        name: "Plan Pyme",
+        priceMonthly: 79900,
+        priceYearly: 862900,
+        maxBranches: 3,
+        maxUsers: 10,
+        features: FULL_FEATURES,
+      },
     });
     await tx.plan.upsert({
       where: { code: "PRO" },
       create: {
         code: "PRO",
-        name: "Plan Pro",
-        priceMonthly: 99900,
-        priceYearly: 999000,
+        name: "Plan Plus",
+        priceMonthly: 149900,
+        priceYearly: 1618900,
         maxBranches: 10,
         maxUsers: 50,
-        features: { pos: true, inventory: true, cash: true, payroll: true, accounting: true },
+        features: FULL_FEATURES,
       },
-      update: {},
+      update: {
+        name: "Plan Plus",
+        priceMonthly: 149900,
+        priceYearly: 1618900,
+        maxBranches: 10,
+        maxUsers: 50,
+        features: FULL_FEATURES,
+      },
     });
 
     // ---- Empresa + Sucursal ----

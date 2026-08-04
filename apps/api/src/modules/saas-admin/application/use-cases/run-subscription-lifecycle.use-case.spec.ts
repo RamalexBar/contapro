@@ -8,6 +8,7 @@ import type {
   ISubscriptionRepository,
   SaasDashboardStats,
   SubscriptionForLifecycleCheck,
+  SubscriptionPaymentRecord,
   SubscriptionRecord,
   SubscriptionStatus,
   SubscriptionWithDetails,
@@ -60,6 +61,18 @@ class FakeSubscriptionRepository implements ISubscriptionRepository {
     return sub as SubscriptionRecord;
   }
   async applyPayment(): Promise<ApplyPaymentResult> {
+    throw new Error("not implemented");
+  }
+  async createPendingPayment(): Promise<SubscriptionPaymentRecord> {
+    throw new Error("not implemented");
+  }
+  async findPaymentByReference(): Promise<SubscriptionPaymentRecord | null> {
+    throw new Error("not implemented");
+  }
+  async confirmPayment(): Promise<ApplyPaymentResult> {
+    throw new Error("not implemented");
+  }
+  async failPayment(): Promise<SubscriptionPaymentRecord> {
     throw new Error("not implemented");
   }
   async listForLifecycleCheck(): Promise<SubscriptionForLifecycleCheck[]> {

@@ -59,6 +59,16 @@ export interface ApplyPaymentResult {
   payment: SubscriptionPaymentRecord;
 }
 
+export interface CreatePendingPaymentData {
+  subscriptionId: string;
+  amount: number;
+  method: string;
+  /** Unico por INTENTO de cobro (no por suscripcion) -- permite reintentar si un intento anterior
+   * quedo DECLINED/expirado sin chocar con ningun constraint. Es el valor que se manda a Wompi
+   * como `reference` y que el webhook devuelve identico, sirve para correlacionar la respuesta. */
+  reference: string;
+}
+
 export interface CompanyWithSubscriptionRecord {
   companyId: string;
   companyName: string;
@@ -85,8 +95,21 @@ export interface ISubscriptionRepository {
   list(filter?: { status?: SubscriptionStatus }): Promise<SubscriptionWithDetails[]>;
   updateStatus(id: string, status: SubscriptionStatus, graceEndsAt?: Date | null): Promise<SubscriptionRecord>;
   /** Crea el SubscriptionPayment (status CONFIRMED), actualiza currentPeriodEnd, limpia
-   * graceEndsAt, vuelve el status a ACTIVE -- todo en una transaccion. */
+   * graceEndsAt, vuelve el status a ACTIVE -- todo en una transaccion. Usado por el registro
+   * MANUAL de un pago (RegisterSubscriptionPaymentUseCase, plataforma confirma "esto ya se
+   * pago"). El flujo Wompi usa createPendingPayment + confirmPayment/failPayment en cambio,
+   * porque ahi el pago no esta confirmado hasta que el webhook lo dice. */
   applyPayment(id: string, data: ApplyPaymentData): Promise<ApplyPaymentResult>;
+  /** Crea un SubscriptionPayment en PENDING -- usado al generar un link de cobro Wompi, antes de
+   * saber si el cliente efectivamente paga. */
+  createPendingPayment(data: CreatePendingPaymentData): Promise<SubscriptionPaymentRecord>;
+  findPaymentByReference(reference: string): Promise<SubscriptionPaymentRecord | null>;
+  /** Confirma un pago PENDING ya existente (por id, no crea uno nuevo): CONFIRMED + paidAt, y
+   * aplica el mismo efecto que applyPayment sobre la suscripcion (currentPeriodEnd, graceEndsAt,
+   * status ACTIVE) en una sola transaccion. */
+  confirmPayment(paymentId: string, newPeriodEnd: Date): Promise<ApplyPaymentResult>;
+  /** Marca un pago PENDING como FAILED -- no toca la suscripcion (queda como estaba). */
+  failPayment(paymentId: string): Promise<SubscriptionPaymentRecord>;
   /** Usado por RunSubscriptionLifecycleUseCase -- suscripciones en estados que necesitan
    * revision diaria (TRIALING/ACTIVE/GRACE_PERIOD; SUSPENDED/CANCELLED ya no cambian solas).
    * Incluye datos de empresa/plan (companyName/companyEmail/planName) porque el recordatorio

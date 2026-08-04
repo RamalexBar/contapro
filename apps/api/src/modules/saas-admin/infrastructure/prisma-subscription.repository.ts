@@ -4,6 +4,7 @@ import type {
   ApplyPaymentData,
   ApplyPaymentResult,
   CompanyWithSubscriptionRecord,
+  CreatePendingPaymentData,
   CreateSubscriptionData,
   ISubscriptionRepository,
   SaasDashboardStats,
@@ -142,6 +143,48 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
     });
 
     return { subscription: toRecord(result.subscription), payment: toPaymentRecord(result.payment) };
+  }
+
+  async createPendingPayment(data: CreatePendingPaymentData): Promise<SubscriptionPaymentRecord> {
+    const row = await basePrisma.subscriptionPayment.create({
+      data: {
+        subscriptionId: data.subscriptionId,
+        amount: data.amount,
+        method: data.method,
+        reference: data.reference,
+        status: "PENDING",
+      },
+    });
+    return toPaymentRecord(row);
+  }
+
+  async findPaymentByReference(reference: string): Promise<SubscriptionPaymentRecord | null> {
+    const row = await basePrisma.subscriptionPayment.findFirst({ where: { reference } });
+    return row ? toPaymentRecord(row) : null;
+  }
+
+  async confirmPayment(paymentId: string, newPeriodEnd: Date): Promise<ApplyPaymentResult> {
+    const existing = await basePrisma.subscriptionPayment.findUnique({ where: { id: paymentId } });
+    if (!existing) throw new NotFoundError("SubscriptionPayment", paymentId);
+
+    const result = await basePrisma.$transaction(async (tx) => {
+      const payment = await tx.subscriptionPayment.update({
+        where: { id: paymentId },
+        data: { status: "CONFIRMED", paidAt: new Date() },
+      });
+      const subscription = await tx.subscription.update({
+        where: { id: existing.subscriptionId },
+        data: { status: "ACTIVE", currentPeriodEnd: newPeriodEnd, graceEndsAt: null },
+      });
+      return { subscription, payment };
+    });
+
+    return { subscription: toRecord(result.subscription), payment: toPaymentRecord(result.payment) };
+  }
+
+  async failPayment(paymentId: string): Promise<SubscriptionPaymentRecord> {
+    const row = await basePrisma.subscriptionPayment.update({ where: { id: paymentId }, data: { status: "FAILED" } });
+    return toPaymentRecord(row);
   }
 
   async listForLifecycleCheck(): Promise<SubscriptionForLifecycleCheck[]> {
