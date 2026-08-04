@@ -18,7 +18,9 @@ services:
     plan: starter
     region: oregon
     rootDir: .
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @erp/database run db:generate && pnpm --filter @erp/api run build
+    # --prod=false: NODE_ENV=production (declarado abajo) hace que pnpm omita devDependencies por
+    # default -- ahi vive "prisma" (el CLI de "db:generate") y "typescript" (el build de tsc).
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @erp/database run db:generate && pnpm --filter @erp/api run build
     # Corre DESPUES del build pero ANTES de que la instancia nueva reciba trafico -- el lugar
     # correcto para migraciones (prisma migrate deploy, no interactivo, seguro para producir).
     preDeployCommand: pnpm --filter @erp/database exec prisma migrate deploy
@@ -97,7 +99,9 @@ services:
     name: contapro-web
     runtime: static
     rootDir: .
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @erp/web run build
+    # Mismo motivo que en contapro-api: Render pone NODE_ENV=production por defecto en el build de
+    # sitios estaticos, y sin --prod=false pnpm omite "vite"/"typescript" (devDependencies).
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @erp/web run build
     staticPublishPath: apps/web/dist
     envVars:
       # Ajustar tras el primer deploy si Render le asigna otra URL a "contapro-api".
