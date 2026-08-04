@@ -24,6 +24,10 @@ services:
     # Corre DESPUES del build pero ANTES de que la instancia nueva reciba trafico -- el lugar
     # correcto para migraciones (prisma migrate deploy, no interactivo, seguro para producir).
     preDeployCommand: pnpm --filter @erp/database exec prisma migrate deploy
+    # "start" corre con tsx (ver apps/api/package.json), no "node dist/server.js": @erp/database,
+    # @erp/shared-types y @erp/shared-utils exponen su "main" como .ts crudo (funciona con tsx/vite/
+    # metro, que interpretan TS al vuelo) y nunca se compilan a JS -- node plano no puede
+    # requerirlos. Mismo motor que ya usa "dev" (tsx watch), sin watch.
     startCommand: pnpm --filter @erp/api run start
     healthCheckPath: /health
     envVars:
