@@ -33,8 +33,17 @@ export interface UserSummary {
   roles: string[];
 }
 
+export interface CreateUserInput {
+  email: string;
+  fullName: string;
+  passwordHash: string;
+  roleId?: string;
+}
+
 export interface IUserDirectoryRepository {
   list(): Promise<UserSummary[]>;
+  create(input: CreateUserInput): Promise<UserSummary>;
+  emailExists(email: string): Promise<boolean>;
   assignRole(companyId: string, userId: string, roleId: string): Promise<void>;
   removeRole(userId: string, roleId: string): Promise<void>;
 }

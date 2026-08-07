@@ -48,6 +48,10 @@ export function listUsers(): Promise<{ data: UserSummary[] }> {
   return apiFetch("/users");
 }
 
+export function createUser(input: { email: string; fullName: string; password: string; roleId?: string }): Promise<UserSummary> {
+  return apiFetch("/users", { method: "POST", body: input });
+}
+
 export function assignRole(userId: string, roleId: string): Promise<void> {
   return apiFetch(`/users/${userId}/roles`, { method: "POST", body: { roleId } });
 }

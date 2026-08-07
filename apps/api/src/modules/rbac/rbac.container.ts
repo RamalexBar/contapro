@@ -5,6 +5,7 @@ import { PrismaRoleRepository } from "./infrastructure/prisma-role.repository";
 import { PrismaPermissionRepository } from "./infrastructure/prisma-permission.repository";
 import { PrismaUserDirectoryRepository } from "./infrastructure/prisma-user-directory.repository";
 import { CreateRoleUseCase } from "./application/use-cases/create-role.use-case";
+import { CreateUserUseCase } from "./application/use-cases/create-user.use-case";
 import { AssignPermissionUseCase } from "./application/use-cases/assign-permission.use-case";
 import { GrantUserPermissionUseCase } from "./application/use-cases/grant-user-permission.use-case";
 import { ListEffectivePermissionsUseCase } from "./application/use-cases/list-effective-permissions.use-case";
@@ -23,6 +24,7 @@ export const rbacController = new RbacController(
   permissionRepo,
   userDirectoryRepo,
   new CreateRoleUseCase(roleRepo),
+  new CreateUserUseCase(userDirectoryRepo, auditService),
   new AssignPermissionUseCase(roleRepo, permissionRepo, auditService),
   new GrantUserPermissionUseCase(permissionRepo, auditService),
   new ListEffectivePermissionsUseCase(userRepo),

@@ -7,9 +7,11 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
 import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
 import {
   assignRole,
   createRole,
+  createUser,
   getEffectivePermissions,
   grantUserPermission,
   listPermissions,
@@ -108,6 +110,21 @@ export function RbacPage() {
     });
   }
 
+  const [newUser, setNewUser] = useState({ fullName: "", email: "", password: "", roleId: "" });
+  const createUserMutation = useMutation({
+    mutationFn: () =>
+      createUser({
+        fullName: newUser.fullName,
+        email: newUser.email,
+        password: newUser.password,
+        roleId: newUser.roleId || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setNewUser({ fullName: "", email: "", password: "", roleId: "" });
+    },
+  });
+
   const [selectedRoleByUser, setSelectedRoleByUser] = useState<Record<string, string>>({});
   const assignRoleMutation = useMutation({
     mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) => assignRole(userId, roleId),
@@ -187,6 +204,54 @@ export function RbacPage() {
             </div>
           ))}
         </div>
+      </Card>
+
+      <Card title="Nuevo usuario" className="mb-6">
+        <form
+          className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createUserMutation.mutate();
+          }}
+        >
+          <Input
+            placeholder="Nombre completo"
+            value={newUser.fullName}
+            onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+            required
+          />
+          <Input
+            type="email"
+            placeholder="Correo"
+            value={newUser.email}
+            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+            required
+          />
+          <Input
+            type="password"
+            placeholder="Contraseña (min. 8 caracteres)"
+            value={newUser.password}
+            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+            minLength={8}
+            required
+          />
+          <Select value={newUser.roleId} onChange={(e) => setNewUser({ ...newUser, roleId: e.target.value })}>
+            <option value="">Sin rol (asignar despues)</option>
+            {roles?.data.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </Select>
+          <Button type="submit" loading={createUserMutation.isPending}>
+            Crear usuario
+          </Button>
+        </form>
+        {createUserMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(createUserMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
       <Card title="Usuarios y roles" noPadding className="mb-6">

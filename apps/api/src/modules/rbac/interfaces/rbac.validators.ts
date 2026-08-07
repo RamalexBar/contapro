@@ -16,3 +16,10 @@ export const grantUserPermissionSchema = z.object({
 export const assignRoleSchema = z.object({
   roleId: z.string().uuid(),
 });
+
+export const createUserSchema = z.object({
+  email: z.string().email(),
+  fullName: z.string().min(2),
+  password: z.string().min(8),
+  roleId: z.string().uuid().optional(),
+});

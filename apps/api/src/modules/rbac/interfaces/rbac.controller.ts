@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { getTenantContext } from "../../../shared/context/request-context";
 import type { CreateRoleUseCase } from "../application/use-cases/create-role.use-case";
+import type { CreateUserUseCase } from "../application/use-cases/create-user.use-case";
 import type { AssignPermissionUseCase } from "../application/use-cases/assign-permission.use-case";
 import type { GrantUserPermissionUseCase } from "../application/use-cases/grant-user-permission.use-case";
 import type { ListEffectivePermissionsUseCase } from "../application/use-cases/list-effective-permissions.use-case";
@@ -11,6 +12,7 @@ import {
   assignPermissionsSchema,
   assignRoleSchema,
   createRoleSchema,
+  createUserSchema,
   grantUserPermissionSchema,
 } from "./rbac.validators";
 
@@ -20,6 +22,7 @@ export class RbacController {
     private readonly permissionRepo: IPermissionRepository,
     private readonly userDirectoryRepo: IUserDirectoryRepository,
     private readonly createRoleUseCase: CreateRoleUseCase,
+    private readonly createUserUseCase: CreateUserUseCase,
     private readonly assignPermissionUseCase: AssignPermissionUseCase,
     private readonly grantUserPermissionUseCase: GrantUserPermissionUseCase,
     private readonly listEffectivePermissionsUseCase: ListEffectivePermissionsUseCase,
@@ -30,6 +33,15 @@ export class RbacController {
   listUsers = async (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ data: await this.userDirectoryRepo.list() });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createUser = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = createUserSchema.parse(req.body);
+      res.status(201).json(await this.createUserUseCase.execute(body));
     } catch (err) {
       next(err);
     }
