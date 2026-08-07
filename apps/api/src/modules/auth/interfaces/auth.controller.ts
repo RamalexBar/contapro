@@ -3,14 +3,18 @@ import type { LoginUseCase } from "../application/use-cases/login.use-case";
 import type { RegisterCompanyUseCase } from "../application/use-cases/register-company.use-case";
 import type { RefreshTokenUseCase } from "../application/use-cases/refresh-token.use-case";
 import type { LogoutUseCase } from "../application/use-cases/logout.use-case";
-import { loginSchema, refreshTokenSchema, registerCompanySchema } from "./auth.validators";
+import type { RequestPasswordResetUseCase } from "../application/use-cases/request-password-reset.use-case";
+import type { ResetPasswordUseCase } from "../application/use-cases/reset-password.use-case";
+import { forgotPasswordSchema, loginSchema, refreshTokenSchema, registerCompanySchema, resetPasswordSchema } from "./auth.validators";
 
 export class AuthController {
   constructor(
     private readonly loginUseCase: LoginUseCase,
     private readonly registerCompanyUseCase: RegisterCompanyUseCase,
     private readonly refreshTokenUseCase: RefreshTokenUseCase,
-    private readonly logoutUseCase: LogoutUseCase
+    private readonly logoutUseCase: LogoutUseCase,
+    private readonly requestPasswordResetUseCase: RequestPasswordResetUseCase,
+    private readonly resetPasswordUseCase: ResetPasswordUseCase
   ) {}
 
   login = async (req: Request, res: Response, next: NextFunction) => {
@@ -52,6 +56,27 @@ export class AuthController {
     try {
       const body = refreshTokenSchema.parse(req.body);
       await this.logoutUseCase.execute(body.refreshToken);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = forgotPasswordSchema.parse(req.body);
+      await this.requestPasswordResetUseCase.execute(body.email);
+      // Mismo mensaje exista o no el correo -- evita revelar que correos estan registrados.
+      res.json({ message: "Si el correo existe, te enviamos un enlace para restablecer tu contraseña." });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = resetPasswordSchema.parse(req.body);
+      await this.resetPasswordUseCase.execute(body.token, body.newPassword);
       res.status(204).send();
     } catch (err) {
       next(err);

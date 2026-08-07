@@ -1,1 +1,1 @@
-export { loginSchema, registerCompanySchema, refreshTokenSchema } from "@erp/shared-types";
+export { loginSchema, registerCompanySchema, refreshTokenSchema, forgotPasswordSchema, resetPasswordSchema } from "@erp/shared-types";

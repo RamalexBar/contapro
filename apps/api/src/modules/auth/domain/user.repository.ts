@@ -40,4 +40,9 @@ export interface IUserRepository {
   saveRefreshToken(userId: string, tokenId: string, tokenHash: string, expiresAt: Date, ip?: string): Promise<void>;
   findRefreshToken(tokenHash: string): Promise<{ id: string; userId: string; expiresAt: Date; revokedAt: Date | null } | null>;
   revokeRefreshToken(tokenId: string): Promise<void>;
+  /** Usado por ResetPasswordUseCase -- revoca todas las sesiones activas del usuario despues de
+   * un reseteo de contrasena, buena practica de seguridad (si alguien mas tenia sesion abierta
+   * con la contrasena vieja, queda deslogueado). */
+  revokeAllRefreshTokensForUser(userId: string): Promise<void>;
+  updatePassword(userId: string, passwordHash: string): Promise<void>;
 }

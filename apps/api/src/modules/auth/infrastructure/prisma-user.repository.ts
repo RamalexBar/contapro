@@ -155,4 +155,12 @@ export class PrismaUserRepository implements IUserRepository {
   async revokeRefreshToken(tokenId: string): Promise<void> {
     await basePrisma.refreshToken.update({ where: { id: tokenId }, data: { revokedAt: new Date() } });
   }
+
+  async revokeAllRefreshTokensForUser(userId: string): Promise<void> {
+    await basePrisma.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  }
+
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    await basePrisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  }
 }

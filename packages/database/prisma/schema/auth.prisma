@@ -17,12 +17,13 @@ model User {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  branches      UserBranch[]
-  roles         UserRole[]
-  permissions   UserPermission[]
-  refreshTokens RefreshToken[]
-  discountLimit CashierDiscountLimit?
-  employee      Employee?
+  branches            UserBranch[]
+  roles               UserRole[]
+  permissions         UserPermission[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  discountLimit       CashierDiscountLimit?
+  employee            Employee?
 
   @@unique([companyId, email])
   @@index([companyId])
@@ -111,6 +112,22 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+/// Token de un solo uso para el flujo "olvide mi contrasena" -- solo se guarda el hash (igual que
+/// RefreshToken.tokenHash), el token crudo va en el link del correo y nunca se persiste.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
 }
 
 /// Registro de auditoria INMUTABLE: el repositorio solo expone create()/lecturas.

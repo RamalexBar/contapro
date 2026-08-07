@@ -46,7 +46,12 @@ export function LoginPage() {
           <p className="mb-6 text-sm text-slate-500">Contabilidad, facturación y punto de venta en un solo lugar.</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <Input label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <div>
+              <Input label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Link to="/forgot-password" className="mt-1 block text-right text-xs font-medium text-brand-700 hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             {error && <Alert tone="danger">{error}</Alert>}
             <Button type="submit" className="w-full" loading={loading}>
               {loading ? "Ingresando..." : "Ingresar"}
