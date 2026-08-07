@@ -20,6 +20,13 @@ export interface GenerateElectronicInvoiceItemInput {
   total: number;
 }
 
+export interface GenerateElectronicInvoiceWithholdingInput {
+  type: "RETEFUENTE" | "RETEICA" | "RETEIVA";
+  base: number;
+  ratePercent: number;
+  amount: number;
+}
+
 export interface GenerateElectronicInvoiceInput {
   saleId: string;
   branchId: string;
@@ -29,6 +36,9 @@ export interface GenerateElectronicInvoiceInput {
   taxTotal: number;
   total: number;
   items: GenerateElectronicInvoiceItemInput[];
+  withholdingTaxes: GenerateElectronicInvoiceWithholdingInput[];
+  // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- ver ubl-invoice-xml-builder.ts.
+  currency?: string;
 }
 
 export class GenerateElectronicInvoiceUseCase {
@@ -66,13 +76,20 @@ export class GenerateElectronicInvoiceUseCase {
         environment: env.DIAN_ENVIRONMENT,
       },
       (fullNumber) => {
+        // Solo ICA participa en la formula del CUFE (ValImp3, codigo "03") segun el Anexo
+        // Tecnico -- ReteFuente/ReteIVA no tienen slot ahi, se quedan fuera a proposito. Este
+        // valor viene de la venta real desde la iteracion de retenciones (antes iba fijo en 0);
+        // sigue sin verificarse contra el servicio real de la DIAN, mismo aviso que el resto de
+        // este calculo (ver README del modulo).
+        const icaAmount = input.withholdingTaxes.find((w) => w.type === "RETEICA")?.amount ?? 0;
+
         const cufe = generateCufe({
           fullNumber,
           issueDate: input.issueDate,
           subtotal: input.subtotal,
           ivaAmount: input.taxTotal,
           consumptionTaxAmount: 0,
-          icaAmount: 0,
+          icaAmount,
           total: input.total,
           issuerNit: company.nit.replace(/\D/g, ""),
           buyerDocumentNumber: buyer.documentNumber,
@@ -90,7 +107,14 @@ export class GenerateElectronicInvoiceUseCase {
           subtotal: input.subtotal,
           taxTotal: input.taxTotal,
           total: input.total,
+          currency: input.currency,
           items: input.items,
+          withholdingTaxes: input.withholdingTaxes.map((w) => ({
+            type: w.type,
+            base: w.base,
+            percent: w.ratePercent,
+            amount: w.amount,
+          })),
         });
 
         generatedXmlContent = xmlContent;

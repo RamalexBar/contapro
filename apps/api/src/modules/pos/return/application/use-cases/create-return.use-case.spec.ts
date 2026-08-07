@@ -23,10 +23,17 @@ const SALE: SaleRecord = {
   discountTotal: 0,
   taxTotal: 38_000,
   total: 238_000,
+  retentionTotal: 0,
   cufe: null,
   cude: null,
   invoiceXmlUrl: null,
+  accountReceivableId: null,
+  currency: "COP",
+  exchangeRate: 1,
+  foreignTotal: null,
+  priceListId: null,
   createdAt: new Date("2026-08-01T00:00:00.000Z"),
+  withholdings: [],
   items: [
     {
       id: "sale-item-1",
@@ -60,6 +67,12 @@ class FakeSaleRepository implements ISaleRepository {
     throw new Error("not used in this spec");
   }
   list(): Promise<SaleRecord[]> {
+    throw new Error("not used in this spec");
+  }
+  listForYear(): Promise<SaleRecord[]> {
+    throw new Error("not used in this spec");
+  }
+  listForPeriod(): Promise<SaleRecord[]> {
     throw new Error("not used in this spec");
   }
 }

@@ -12,6 +12,14 @@ model Customer {
   creditLimit    Decimal  @db.Decimal(14, 2) @default(0)
   currentBalance Decimal  @db.Decimal(14, 2) @default(0)
   isActive       Boolean  @default(true)
+  // Lista de precios asignada (item 35 de docs/ALCANCE.md) -- si es null, las ventas/cotizaciones
+  // a este cliente usan el precio base del producto (Product.currentPrice), salvo que se fuerce
+  // otra lista explicitamente en el request. Sin relacion de Prisma declarada, mismo criterio que
+  // el resto de referencias cruzadas de este modulo (ej. Sale.customerId).
+  priceListId    String?
+  // Item 37 de docs/ALCANCE.md (informacion exogena DIAN): codigo DANE de municipio del tercero,
+  // mismo campo/criterio que Company.municipalityCode y Supplier.municipalityCode. Nullable.
+  municipalityCode String?
   createdAt      DateTime @default(now())
 
   creditMovements CustomerCreditMovement[]

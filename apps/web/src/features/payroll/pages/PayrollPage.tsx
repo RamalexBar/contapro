@@ -16,7 +16,9 @@ import {
   getPayroll,
   listPayrollParameters,
   listPayrolls,
+  listPayslipWhatsAppDeliveries,
   payPayroll,
+  resendPayslipWhatsApp,
 } from "../api/payroll.api";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -556,6 +558,7 @@ export function PayrollPage() {
                                     Desprendible PDF
                                   </Button>
                                 )}
+                                {detail.payslip && <PayslipWhatsAppStatus payslipId={detail.payslip.id} />}
                               </td>
                             </tr>
                           ))}
@@ -576,5 +579,44 @@ export function PayrollPage() {
         {payrolls?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay periodos de nomina.</p>}
       </Card>
     </AppLayout>
+  );
+}
+
+/** Item 41 de docs/ALCANCE.md: estado de envio del desprendible por WhatsApp + reenvio manual. */
+function PayslipWhatsAppStatus({ payslipId }: { payslipId: string }) {
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["payslip-whatsapp-deliveries", payslipId],
+    queryFn: () => listPayslipWhatsAppDeliveries(payslipId),
+  });
+  const resendMutation = useMutation({
+    mutationFn: () => resendPayslipWhatsApp(payslipId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payslip-whatsapp-deliveries", payslipId] }),
+  });
+
+  const latest = data?.data[0];
+  if (!latest) return null;
+
+  return (
+    <div className="mt-1 text-xs text-gray-500">
+      {latest.success ? (
+        "Enviado por WhatsApp"
+      ) : (
+        <>
+          <span>Fallo el envio por WhatsApp</span>
+          {hasPermission("payroll.approve") && (
+            <Button
+              variant="secondary"
+              disabled={resendMutation.isPending}
+              onClick={() => resendMutation.mutate()}
+              className="ml-2"
+            >
+              Reenviar
+            </Button>
+          )}
+        </>
+      )}
+    </div>
   );
 }

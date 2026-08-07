@@ -8,6 +8,7 @@ import type {
   IChartOfAccountsRepository,
 } from "../../domain/chart-of-accounts.repository";
 import type { FinancialPeriodRecord, IFinancialPeriodRepository } from "../../domain/financial-period.repository";
+import type { CostCenterRecord, ICostCenterRepository } from "../../domain/cost-center.repository";
 import type {
   CreateJournalEntryData,
   IJournalEntryRepository,
@@ -40,6 +41,24 @@ class FakeFinancialPeriodRepository implements IFinancialPeriodRepository {
   }
 }
 
+class FakeCostCenterRepository implements ICostCenterRepository {
+  create(): Promise<CostCenterRecord> {
+    throw new Error("not used in this spec");
+  }
+  list(): Promise<CostCenterRecord[]> {
+    throw new Error("not used in this spec");
+  }
+  findByIdOrThrow(): Promise<CostCenterRecord> {
+    throw new Error("not used in this spec");
+  }
+  update(): Promise<CostCenterRecord> {
+    throw new Error("not used in this spec");
+  }
+  deactivate(): Promise<CostCenterRecord> {
+    throw new Error("not used in this spec");
+  }
+}
+
 class FakeJournalEntryRepository implements IJournalEntryRepository {
   entries: JournalEntryRecord[] = [];
   draftMonthsWithEntries = new Set<string>();
@@ -56,6 +75,7 @@ class FakeJournalEntryRepository implements IJournalEntryRepository {
       status: "DRAFT",
       createdByUserId: data.createdByUserId,
       postedAt: null,
+      costCenterId: data.costCenterId ?? null,
       lines: data.lines.map((l, i) => ({ id: `line-${i}`, accountId: l.accountId, debit: l.debit, credit: l.credit, description: l.description ?? null })),
     };
     this.entries.push(entry);
@@ -163,7 +183,13 @@ describe("CreateJournalEntryUseCase + closed period", () => {
     await periodRepo.close(2026, 7);
     const journalRepo = new FakeJournalEntryRepository();
     const accountRepo = new FakeChartOfAccountsRepository();
-    const useCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, periodRepo, new AuditService(new FakeAuditLogRepository()));
+    const useCase = new CreateJournalEntryUseCase(
+      journalRepo,
+      accountRepo,
+      periodRepo,
+      new FakeCostCenterRepository(),
+      new AuditService(new FakeAuditLogRepository())
+    );
 
     const input = {
       date: new Date("2026-07-15T00:00:00.000Z"),
@@ -183,7 +209,13 @@ describe("CreateJournalEntryUseCase + closed period", () => {
     await periodRepo.close(2026, 7);
     const journalRepo = new FakeJournalEntryRepository();
     const accountRepo = new FakeChartOfAccountsRepository();
-    const useCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, periodRepo, new AuditService(new FakeAuditLogRepository()));
+    const useCase = new CreateJournalEntryUseCase(
+      journalRepo,
+      accountRepo,
+      periodRepo,
+      new FakeCostCenterRepository(),
+      new AuditService(new FakeAuditLogRepository())
+    );
 
     const input = {
       date: new Date("2026-08-01T00:00:00.000Z"),

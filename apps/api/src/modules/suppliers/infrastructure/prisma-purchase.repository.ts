@@ -1,3 +1,4 @@
+import { round2 } from "@erp/shared-utils";
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { NotFoundError } from "../../../shared/errors/app-error";
@@ -11,10 +12,15 @@ type PurchaseRow = {
   subtotal: unknown;
   taxTotal: unknown;
   total: unknown;
+  retentionTotal: unknown;
+  currency: string;
+  exchangeRate: unknown;
   status: string;
   createdAt: Date;
   journalEntryId: string | null;
   accountsPayable: { id: string; dueDate: Date }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withholdings: any[];
 };
 
 function toRecord(row: PurchaseRow): PurchaseRecord {
@@ -27,6 +33,17 @@ function toRecord(row: PurchaseRow): PurchaseRecord {
     subtotal: Number(row.subtotal),
     taxTotal: Number(row.taxTotal),
     total: Number(row.total),
+    retentionTotal: Number(row.retentionTotal),
+    currency: row.currency,
+    exchangeRate: Number(row.exchangeRate),
+    foreignTotal: row.currency === "COP" ? null : round2(Number(row.total) / Number(row.exchangeRate)),
+    withholdings: row.withholdings.map((w) => ({
+      withholdingConceptId: w.withholdingConceptId,
+      type: w.withholdingConcept.type,
+      base: Number(w.base),
+      ratePercent: Number(w.ratePercent),
+      amount: Number(w.amount),
+    })),
     status: row.status,
     createdAt: row.createdAt,
     accountPayableId: accountPayable.id,
@@ -35,11 +52,20 @@ function toRecord(row: PurchaseRow): PurchaseRecord {
   };
 }
 
-const PURCHASE_INCLUDE = { accountsPayable: true } as const;
+const PURCHASE_INCLUDE = {
+  accountsPayable: true,
+  withholdings: { include: { withholdingConcept: { select: { type: true } } } },
+} as const;
 
 export class PrismaPurchaseRepository implements IPurchaseRepository {
   async create(data: CreatePurchaseData): Promise<PurchaseRecord> {
     const companyId = getTenantContext().companyId;
+    // AccountPayable queda NETO de retencion desde su creacion (lo que realmente hay que pagarle
+    // al proveedor) -- esto es lo unico que hace falta para que RegisterSupplierPaymentUseCase,
+    // PostSupplierPaymentJournalEntryUseCase y CancelPurchaseUseCase sigan funcionando sin
+    // ningun cambio: los tres operan solo sobre AccountPayable.balance/.amount, nunca sobre
+    // Purchase.total. `Purchase.total` sigue siendo el bruto legal de la factura del proveedor.
+    const netTotal = round2(data.total - data.retentionTotal);
 
     const row = await prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.create({
@@ -51,7 +77,18 @@ export class PrismaPurchaseRepository implements IPurchaseRepository {
           subtotal: data.subtotal,
           taxTotal: data.taxTotal,
           total: data.total,
+          retentionTotal: data.retentionTotal,
+          currency: data.currency,
+          exchangeRate: data.exchangeRate,
           status: "REGISTERED",
+          withholdings: {
+            create: data.withholdings.map((w) => ({
+              withholdingConceptId: w.withholdingConceptId,
+              base: w.base,
+              ratePercent: w.ratePercent,
+              amount: w.amount,
+            })),
+          },
         },
       });
 
@@ -60,8 +97,8 @@ export class PrismaPurchaseRepository implements IPurchaseRepository {
           companyId,
           supplierId: data.supplierId,
           purchaseId: purchase.id,
-          amount: data.total,
-          balance: data.total,
+          amount: netTotal,
+          balance: netTotal,
           dueDate: data.dueDate,
           status: "PENDING",
         },
@@ -85,6 +122,17 @@ export class PrismaPurchaseRepository implements IPurchaseRepository {
       orderBy: { createdAt: "desc" },
       take: filters.take ?? 50,
       skip: filters.skip ?? 0,
+    });
+    return rows.map(toRecord);
+  }
+
+  async listForYear(year: number): Promise<PurchaseRecord[]> {
+    const from = new Date(year, 0, 1);
+    const to = new Date(year + 1, 0, 1);
+    const rows = await prisma.purchase.findMany({
+      where: { status: "REGISTERED", createdAt: { gte: from, lt: to } },
+      include: PURCHASE_INCLUDE,
+      orderBy: { createdAt: "asc" },
     });
     return rows.map(toRecord);
   }

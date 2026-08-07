@@ -4,6 +4,7 @@ import type { PostPayrollJournalEntryUseCase } from "../../../accounting/applica
 import type { GenerateElectronicPayrollUseCase } from "../../../electronic-invoicing/application/use-cases/generate-electronic-payroll.use-case";
 import type { IPayrollDeductionRepository } from "../../domain/payroll-deduction.repository";
 import type { IPayrollRepository, PayrollRecord } from "../../domain/payroll.repository";
+import type { SendPayslipWhatsAppUseCase } from "./send-payslip-whatsapp.use-case";
 
 const DEDUCTION_CONCEPT_CODES = new Set(["LOAN_DEDUCTION", "GARNISHMENT"]);
 
@@ -13,6 +14,7 @@ export class ApprovePayrollUseCase {
     private readonly deductionRepo: IPayrollDeductionRepository,
     private readonly postPayrollJournalEntry: PostPayrollJournalEntryUseCase,
     private readonly generateElectronicPayroll: GenerateElectronicPayrollUseCase,
+    private readonly sendPayslipWhatsApp: SendPayslipWhatsAppUseCase,
     private readonly audit: AuditService
   ) {}
 
@@ -81,6 +83,23 @@ export class ApprovePayrollUseCase {
           description: `No se pudo generar la nomina electronica del empleado ${detail.employeeId}: ${(err as Error).message}`,
           metadata: {},
         });
+      }
+
+      // sendPayslipWhatsApp ya audita/registra exito y fallo internamente (nunca lanza por un
+      // fallo de envio real) -- este try/catch es solo una red de seguridad, mismo criterio que
+      // arriba. detail.payslip siempre existe en este punto (se genera en el paso "calcular").
+      if (detail.payslip) {
+        try {
+          await this.sendPayslipWhatsApp.execute({ payslipId: detail.payslip.id, employeeId: detail.employeeId });
+        } catch (err) {
+          await this.audit.record({
+            action: "WHATSAPP_PAYSLIP_SEND_FAILED",
+            entityType: "PayslipDocument",
+            entityId: detail.payslip.id,
+            description: `No se pudo enviar el desprendible por WhatsApp del empleado ${detail.employeeId}: ${(err as Error).message}`,
+            metadata: {},
+          });
+        }
       }
     }
 

@@ -121,3 +121,15 @@ electronicInvoicingRouter.post(
   requirePermission("electronic-invoicing.manage"),
   electronicInvoicingController.resubmitPayrollDetail
 );
+
+// ---- Envio del RIDE por WhatsApp (item 41 de docs/ALCANCE.md) ----
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/sales/:saleId/whatsapp-deliveries",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.listSaleWhatsAppDeliveries
+);
+electronicInvoicingRouter.post(
+  "/electronic-invoicing/sales/:saleId/whatsapp/resend",
+  requirePermission("electronic-invoicing.manage"),
+  electronicInvoicingController.resendSaleWhatsApp
+);

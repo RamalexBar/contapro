@@ -3,6 +3,7 @@ import { getTenantContext } from "../../../../shared/context/request-context";
 import { ConflictError, ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IChartOfAccountsRepository } from "../../domain/chart-of-accounts.repository";
+import type { ICostCenterRepository } from "../../domain/cost-center.repository";
 import type { IFinancialPeriodRepository } from "../../domain/financial-period.repository";
 import type { CreateJournalEntryData, IJournalEntryRepository, JournalEntryRecord } from "../../domain/journal-entry.repository";
 
@@ -19,6 +20,7 @@ export class CreateJournalEntryUseCase {
     private readonly journalRepo: IJournalEntryRepository,
     private readonly accountRepo: IChartOfAccountsRepository,
     private readonly periodRepo: IFinancialPeriodRepository,
+    private readonly costCenterRepo: ICostCenterRepository,
     private readonly audit: AuditService
   ) {}
 
@@ -50,6 +52,13 @@ export class CreateJournalEntryUseCase {
       }
       if (line.debit > 0 && line.credit > 0) {
         throw new ValidationError("Cada movimiento debe ser debito O credito, no ambos");
+      }
+    }
+
+    if (input.costCenterId) {
+      const costCenter = await this.costCenterRepo.findByIdOrThrow(input.costCenterId);
+      if (!costCenter.isActive) {
+        throw new ValidationError(`El centro de costo ${costCenter.code} ${costCenter.name} esta inactivo`);
       }
     }
 

@@ -11,13 +11,21 @@ import { TimeTrackingPage } from "../features/timetracking/pages/TimeTrackingPag
 import { TimeOffPage } from "../features/time-off/pages/TimeOffPage";
 import { RbacPage } from "../features/rbac/pages/RbacPage";
 import { CustomerListPage } from "../features/customers/pages/CustomerListPage";
+import { OpportunitiesPage } from "../features/crm/pages/OpportunitiesPage";
 import { AuditLogPage } from "../features/audit/pages/AuditLogPage";
 import { QuotesAndNotesPage } from "../features/pos/pages/QuotesAndNotesPage";
 import { AccountingPage } from "../features/accounting/pages/AccountingPage";
 import { BankingPage } from "../features/accounting/pages/BankingPage";
+import { ExogenaPage } from "../features/accounting/pages/ExogenaPage";
 import { SuppliersPage } from "../features/suppliers/pages/SuppliersPage";
 import { PurchaseOrdersPage } from "../features/suppliers/pages/PurchaseOrdersPage";
+import { ExpensesPage } from "../features/expenses/pages/ExpensesPage";
+import { CollectionsPage } from "../features/collections/pages/CollectionsPage";
 import { BillingPage } from "../features/billing/pages/BillingPage";
+import { RecurringInvoicesPage } from "../features/recurring-invoices/pages/RecurringInvoicesPage";
+import { CommissionsPage } from "../features/commissions/pages/CommissionsPage";
+import { FixedAssetsPage } from "../features/fixed-assets/pages/FixedAssetsPage";
+import { IntegrationsPage } from "../features/integrations/pages/IntegrationsPage";
 import { PlatformAdminLoginPage } from "../features/platform-admin/pages/PlatformAdminLoginPage";
 import { PlatformDashboardPage } from "../features/platform-admin/pages/PlatformDashboardPage";
 import { PlansPage } from "../features/platform-admin/pages/PlansPage";
@@ -111,6 +119,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: "/crm",
+    element: (
+      <ProtectedRoute>
+        <OpportunitiesPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: "/audit",
     element: (
       <ProtectedRoute>
@@ -143,6 +159,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: "/accounting/exogena",
+    element: (
+      <ProtectedRoute>
+        <ExogenaPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: "/suppliers",
     element: (
       <ProtectedRoute>
@@ -159,10 +183,58 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: "/expenses",
+    element: (
+      <ProtectedRoute>
+        <ExpensesPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/collections",
+    element: (
+      <ProtectedRoute>
+        <CollectionsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: "/billing",
     element: (
       <ProtectedRoute>
         <BillingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recurring-invoices",
+    element: (
+      <ProtectedRoute>
+        <RecurringInvoicesPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/commissions",
+    element: (
+      <ProtectedRoute>
+        <CommissionsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/fixed-assets",
+    element: (
+      <ProtectedRoute>
+        <FixedAssetsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/integrations",
+    element: (
+      <ProtectedRoute>
+        <IntegrationsPage />
       </ProtectedRoute>
     ),
   },

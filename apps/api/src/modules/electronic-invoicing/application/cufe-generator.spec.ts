@@ -40,4 +40,10 @@ describe("generateCufe", () => {
   it("still generates a value when technicalKey is empty (pre-habilitacion default)", () => {
     expect(() => generateCufe(baseInput)).not.toThrow();
   });
+
+  it("changes when icaAmount changes (ReteICA is wired into ValImp3, unlike RteFuente/ReteIVA which are not part of the formula)", () => {
+    const cufe = generateCufe(baseInput);
+    const withIca = generateCufe({ ...baseInput, icaAmount: 5000 });
+    expect(cufe).not.toBe(withIca);
+  });
 });

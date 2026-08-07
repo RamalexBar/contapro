@@ -8,6 +8,8 @@ export interface CustomerRecord {
   creditLimit: number;
   currentBalance: number;
   isActive: boolean;
+  priceListId: string | null;
+  municipalityCode: string | null;
 }
 
 export interface CreateCustomerInput {
@@ -18,6 +20,8 @@ export interface CreateCustomerInput {
   phone?: string;
   address?: string;
   creditLimit?: number;
+  priceListId?: string;
+  municipalityCode?: string;
 }
 
 export function listCustomers(search?: string): Promise<{ data: CustomerRecord[] }> {
@@ -26,4 +30,8 @@ export function listCustomers(search?: string): Promise<{ data: CustomerRecord[]
 
 export function createCustomer(input: CreateCustomerInput): Promise<CustomerRecord> {
   return apiFetch("/customers", { method: "POST", body: input });
+}
+
+export function updateCustomerPriceList(id: string, priceListId: string | null): Promise<CustomerRecord> {
+  return apiFetch(`/customers/${id}/price-list`, { method: "PATCH", body: { priceListId } });
 }

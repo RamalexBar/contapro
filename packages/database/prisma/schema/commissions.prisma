@@ -1,0 +1,35 @@
+// Item 38 de docs/ALCANCE.md: comisiones de vendedores. Calcula sobre Sale.sellerUserId
+// directamente (cualquier User, sin depender de Employee/payroll -- no todo vendedor tiene un
+// Employee formal, ver README del modulo).
+model SalesCommissionScheme {
+  id           String   @id @default(uuid())
+  companyId    String
+  sellerUserId String
+  ratePercent  Decimal  @db.Decimal(5, 2)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@unique([companyId, sellerUserId])
+  @@index([companyId])
+  @@map("sales_commission_schemes")
+}
+
+model CommissionSettlement {
+  id               String    @id @default(uuid())
+  companyId        String
+  sellerUserId     String
+  year             Int
+  month            Int
+  salesBase        Decimal   @db.Decimal(14, 2)
+  ratePercent      Decimal   @db.Decimal(5, 2)
+  commissionAmount Decimal   @db.Decimal(14, 2)
+  // "CALCULATED" | "PAID"
+  status           String    @default("CALCULATED")
+  calculatedAt     DateTime  @default(now())
+  paidAt           DateTime?
+  journalEntryId   String?
+
+  @@unique([companyId, sellerUserId, year, month])
+  @@index([companyId])
+  @@map("commission_settlements")
+}

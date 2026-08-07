@@ -1,5 +1,6 @@
 import type { AuditService } from "../../../../audit/application/audit.service";
 import type { ISaleRepository, SaleRecord } from "../../domain/sale.repository";
+import type { IAccountReceivableRepository } from "../../../../collections/domain/account-receivable.repository";
 
 /**
  * Requiere permiso `sale.cancel`. NOTA (limitacion conocida): no restaura automaticamente el
@@ -11,9 +12,21 @@ import type { ISaleRepository, SaleRecord } from "../../domain/sale.repository";
  * de restaurar su inventario en este codebase.
  */
 export class CancelSaleUseCase {
-  constructor(private readonly saleRepo: ISaleRepository, private readonly audit: AuditService) {}
+  constructor(
+    private readonly saleRepo: ISaleRepository,
+    private readonly accountReceivableRepo: IAccountReceivableRepository,
+    private readonly audit: AuditService
+  ) {}
 
   async execute(saleId: string, reason: string): Promise<SaleRecord> {
+    const existing = await this.saleRepo.findByIdOrThrow(saleId);
+    if (existing.accountReceivableId) {
+      // Lanza ValidationError si la cuenta por cobrar ya tiene pagos registrados (item 31) -- en
+      // ese caso la venta NO se cancela, mismo criterio de guarda que CancelPurchaseUseCase con
+      // AccountPayable, sin reversar automaticamente.
+      await this.accountReceivableRepo.cancel(existing.accountReceivableId);
+    }
+
     const sale = await this.saleRepo.cancel(saleId, reason);
     await this.audit.record({
       action: "SALE_CANCELLED",

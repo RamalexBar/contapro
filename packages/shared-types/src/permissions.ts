@@ -20,6 +20,8 @@ export const PERMISSIONS = [
   { code: "stock.entry.create", module: "inventory", description: "Registrar entradas de inventario" },
   { code: "stock.adjust", module: "inventory", description: "Ajustar inventario" },
   { code: "stock.transfer", module: "inventory", description: "Transferir inventario entre sucursales" },
+  { code: "price-list.manage", module: "inventory", description: "Crear listas de precios y fijar precios por producto" },
+  { code: "price-list.read", module: "inventory", description: "Ver listas de precios y sus precios por producto" },
 
   { code: "sale.create", module: "pos", description: "Registrar ventas" },
   { code: "sale.read", module: "pos", description: "Ver ventas" },
@@ -68,10 +70,36 @@ export const PERMISSIONS = [
   { code: "suppliers.manage", module: "suppliers", description: "Crear proveedores y registrar compras" },
   { code: "suppliers.read", module: "suppliers", description: "Consultar proveedores y compras registradas" },
 
+  { code: "expense.manage", module: "expenses", description: "Administrar categorias de gasto y registrar/cancelar gastos operativos" },
+  { code: "expense.read", module: "expenses", description: "Consultar categorias y gastos operativos" },
+
+  { code: "collection.manage", module: "collections", description: "Registrar abonos y generar links de pago sobre cuentas por cobrar" },
+  { code: "collection.read", module: "collections", description: "Consultar cuentas por cobrar" },
+
+  { code: "opportunity.manage", module: "crm", description: "Crear oportunidades, cambiar de etapa y cerrarlas" },
+  { code: "opportunity.read", module: "crm", description: "Ver el pipeline de oportunidades" },
+
   { code: "electronic-invoicing.manage", module: "electronic-invoicing", description: "Administrar resoluciones de numeracion DIAN" },
   { code: "electronic-invoicing.read", module: "electronic-invoicing", description: "Consultar facturas electronicas generadas" },
 
   { code: "billing.manage", module: "billing", description: "Ver y pagar la suscripcion de la propia empresa" },
+
+  { code: "recurring-invoice.manage", module: "recurring-invoicing", description: "Crear y editar plantillas de facturacion recurrente a clientes" },
+  { code: "recurring-invoice.read", module: "recurring-invoicing", description: "Consultar plantillas de facturacion recurrente y su historial de ejecuciones" },
+
+  { code: "commission.manage", module: "commissions", description: "Crear esquemas de comision, calcular y pagar liquidaciones a vendedores" },
+  { code: "commission.read", module: "commissions", description: "Consultar esquemas de comision y liquidaciones" },
+
+  { code: "fixed-asset.manage", module: "fixed-assets", description: "Registrar activos fijos, calcular y contabilizar su depreciacion" },
+  { code: "fixed-asset.read", module: "fixed-assets", description: "Consultar activos fijos y su depreciacion" },
+
+  // Sensibles a proposito (acceso programatico a los datos de la empresa): solo ADMINISTRADOR/
+  // PROPIETARIO los reciben, mismo criterio restrictivo que rbac.manage -- no se agregan a
+  // SUPERVISOR/CONTADOR/CAJERO.
+  { code: "api-key.manage", module: "integrations", description: "Crear y revocar API keys para integraciones de terceros" },
+  { code: "api-key.read", module: "integrations", description: "Consultar API keys existentes" },
+  { code: "webhook.manage", module: "integrations", description: "Crear webhooks salientes y reenviar entregas fallidas" },
+  { code: "webhook.read", module: "integrations", description: "Consultar webhooks salientes y su historial de entregas" },
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];
@@ -99,9 +127,19 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "accounting.read",
     "suppliers.manage",
     "suppliers.read",
+    "expense.manage",
+    "expense.read",
+    "collection.manage",
+    "collection.read",
     "electronic-invoicing.manage",
     "electronic-invoicing.read",
     "billing.manage",
+    "recurring-invoice.manage",
+    "recurring-invoice.read",
+    "commission.manage",
+    "commission.read",
+    "fixed-asset.manage",
+    "fixed-asset.read",
   ],
   SUPERVISOR: [
     "product.create",
@@ -115,6 +153,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "stock.entry.create",
     "stock.adjust",
     "stock.transfer",
+    "price-list.manage",
+    "price-list.read",
     "sale.create",
     "sale.read",
     "sale.cancel",
@@ -125,6 +165,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "return.create",
     "customer.read",
     "customer.manage",
+    "opportunity.manage",
+    "opportunity.read",
     "cash.session.open",
     "cash.session.close",
     "cash.movement.create",
@@ -142,17 +184,32 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "timeoff.read",
     "suppliers.manage",
     "suppliers.read",
+    "expense.manage",
+    "expense.read",
+    "collection.manage",
+    "collection.read",
     "electronic-invoicing.manage",
     "electronic-invoicing.read",
+    "recurring-invoice.manage",
+    "recurring-invoice.read",
+    "commission.manage",
+    "commission.read",
+    "fixed-asset.manage",
+    "fixed-asset.read",
   ],
   CAJERO: [
     // Explicitamente SIN product.price.update / product.cost.update / product.barcode.update / product.delete
     "product.read",
+    // Solo lectura de listas de precios (puede elegir/ver una al vender, no crearlas ni fijar
+    // precios) -- mismo criterio que product.read vs product.price.update en este mismo rol.
+    "price-list.read",
     "sale.create",
     "sale.read",
     "quote.create",
     "customer.read",
     "customer.manage",
+    "opportunity.manage",
+    "opportunity.read",
     "cash.session.open",
     "cash.session.close",
     "cash.movement.create",

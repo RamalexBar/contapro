@@ -23,6 +23,7 @@ describe("mapInvoiceToRideData", () => {
     taxTotal: 19000,
     total: 119000,
     items: [{ description: "Arroz 500g", quantity: 2, unitPrice: 5000, taxPercent: 19, taxAmount: 1900, total: 10000 }],
+    withholdingTaxes: [],
   });
   const doc: ElectronicInvoiceWithXml = {
     id: "inv-1",

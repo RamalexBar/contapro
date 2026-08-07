@@ -136,16 +136,21 @@ datos de tarjeta, evitando alcance PCI-DSS.
 - `ISubscriptionRepository.listForLifecycleCheck` ahora incluye `companyName`/`companyEmail`/
   `planName` (antes solo devolvia el `Subscription` sin datos de empresa) — el notifier los
   necesita para armar el asunto/cuerpo del correo.
-- **WhatsApp no se implemento** (`SubscriptionReminderLog.channel` sigue soportando el valor
-  `"WHATSAPP"` en el schema, pero nada lo genera): la API de WhatsApp Business requiere
-  verificacion de negocio en Meta y plantillas de mensaje pre-aprobadas, un proceso externo que no
-  se puede completar dentro de este trabajo. `IReminderNotifier` esta diseñado para que agregar
-  un segundo canal sea una implementacion nueva del mismo puerto, no un rediseño.
+- **WhatsApp implementado en la iteracion 41** (`docs/ALCANCE.md` item 41): `RunSubscriptionLifecycleUseCase`
+  intenta WhatsApp primero (`IWhatsAppSender`, `modules/whatsapp`) cuando `Company.phone` esta
+  registrado, y cae automaticamente a email si falla o no esta configurado (mismo criterio de
+  cascada que `RunCollectionsRemindersUseCase` en `collections`). `SubscriptionReminderLog.channel`
+  ahora si guarda `"WHATSAPP"` cuando ese fue el canal que funciono. Sigue bloqueado por la misma
+  limitacion de siempre: la API de WhatsApp Business requiere verificacion de negocio en Meta y
+  plantillas de mensaje pre-aprobadas, un proceso externo no completable en este entorno — ver
+  `modules/whatsapp/README.md` para el detalle completo (incluye el envio de documentos por
+  WhatsApp: RIDE de factura y desprendible de nomina, tambien parte del item 41).
 
 ## Que falta implementar
 
-1. Envio real de recordatorios por WhatsApp — ver aviso arriba (bloqueado por verificacion de
-   negocio en Meta, no es un problema de codigo).
+1. Verificacion end-to-end de WhatsApp contra la API real de Meta — ver
+   `modules/whatsapp/README.md` (bloqueado por verificacion de negocio, no es un problema de
+   codigo).
 2. Actualizaciones automaticas de `apps/web`/`apps/mobile` ("Nueva version disponible") — fuera
    del alcance de este backend, responsabilidad de Service Worker / Expo OTA updates.
 3. Wompi: confirmar `verifyWebhookSignature` contra un webhook 100% real (ver limitacion en la

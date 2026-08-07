@@ -2,7 +2,7 @@ import type { RegisterCompanyInput } from "@erp/shared-types";
 import type { IUserRepository } from "../../domain/user.repository";
 import { hashSecret } from "../../infrastructure/password-hasher.service";
 import { ConflictError } from "../../../../shared/errors/app-error";
-import { basePrisma } from "@erp/database";
+import { basePrisma, seedDefaultExpenseCategories, seedDefaultWithholdingConcepts } from "@erp/database";
 import type { IPlanRepository } from "../../../saas-admin/domain/plan.repository";
 import type { ISubscriptionRepository } from "../../../saas-admin/domain/subscription.repository";
 
@@ -39,6 +39,13 @@ export class RegisterCompanyUseCase {
       adminEmail: input.adminEmail,
       adminPasswordHash,
     });
+
+    // A diferencia de la suscripcion de prueba (mas abajo, tolerante a que el plan no exista
+    // todavia), esto es un simple upsert sin dependencias externas -- si falla, algo mas grave
+    // esta roto (DB caida) y el registro deberia fallar tambien. Si una empresa queda sin estos
+    // conceptos por alguna otra razon, el backfill de seedBase() los completa despues.
+    await seedDefaultWithholdingConcepts(basePrisma, result.companyId);
+    await seedDefaultExpenseCategories(basePrisma, result.companyId);
 
     const trialPlan = await this.planRepo.findByCode(TRIAL_PLAN_CODE);
     if (trialPlan) {

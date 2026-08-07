@@ -10,6 +10,8 @@ export interface SupplierRecord {
   address: string | null;
   isActive: boolean;
   isObligatedToInvoice: boolean;
+  documentType: string;
+  municipalityCode: string | null;
 }
 
 export interface CreateSupplierInput {
@@ -20,6 +22,8 @@ export interface CreateSupplierInput {
   email?: string;
   address?: string;
   isObligatedToInvoice?: boolean;
+  documentType?: string;
+  municipalityCode?: string;
 }
 
 export interface PurchaseRecord {
@@ -30,11 +34,20 @@ export interface PurchaseRecord {
   subtotal: number;
   taxTotal: number;
   total: number;
+  retentionTotal: number;
   status: string;
   createdAt: string;
   accountPayableId: string;
   dueDate: string;
   journalEntryId: string | null;
+  currency: string;
+  exchangeRate: number;
+  foreignTotal: number | null;
+}
+
+export interface PurchaseWithholdingInput {
+  withholdingConceptId: string;
+  base: number;
 }
 
 export interface CreatePurchaseInput {
@@ -45,6 +58,9 @@ export interface CreatePurchaseInput {
   taxTotal: number;
   total: number;
   dueDate: string;
+  withholdings: PurchaseWithholdingInput[];
+  currency?: string;
+  exchangeRate?: number;
 }
 
 export interface AccountPayableRecord {

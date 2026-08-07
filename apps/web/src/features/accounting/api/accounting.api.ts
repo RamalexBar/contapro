@@ -40,6 +40,7 @@ export interface JournalEntryRecord {
   status: string;
   createdByUserId: string;
   postedAt: string | null;
+  costCenterId: string | null;
   lines: JournalEntryLine[];
 }
 
@@ -54,6 +55,7 @@ export interface CreateJournalEntryInput {
   date: string;
   description: string;
   lines: CreateJournalEntryLineInput[];
+  costCenterId?: string;
 }
 
 export interface AccountBalance {
@@ -141,18 +143,21 @@ export function getBalanceSheet(asOf?: string): Promise<BalanceSheet> {
   return apiFetch(`/reports/balance-sheet${asOf ? `?asOf=${asOf}` : ""}`);
 }
 
-export function getIncomeStatement(from: string, to: string): Promise<IncomeStatement> {
-  return apiFetch(`/reports/income-statement?from=${from}&to=${to}`);
+export function getIncomeStatement(from: string, to: string, costCenterId?: string): Promise<IncomeStatement> {
+  const params = new URLSearchParams({ from, to });
+  if (costCenterId) params.set("costCenterId", costCenterId);
+  return apiFetch(`/reports/income-statement?${params.toString()}`);
 }
 
 export function getCashFlow(from: string, to: string): Promise<CashFlowReport> {
   return apiFetch(`/reports/cash-flow?from=${from}&to=${to}`);
 }
 
-export function getLedger(accountId: string, from?: string, to?: string): Promise<{ data: LedgerEntry[] }> {
+export function getLedger(accountId: string, from?: string, to?: string, costCenterId?: string): Promise<{ data: LedgerEntry[] }> {
   const params = new URLSearchParams();
   if (from) params.set("from", from);
   if (to) params.set("to", to);
+  if (costCenterId) params.set("costCenterId", costCenterId);
   const query = params.toString();
   return apiFetch(`/reports/ledger/${accountId}${query ? `?${query}` : ""}`);
 }
@@ -175,4 +180,78 @@ export function closeFinancialPeriod(year: number, month: number): Promise<Finan
 
 export function reopenFinancialPeriod(year: number, month: number): Promise<FinancialPeriodRecord> {
   return apiFetch(`/financial-periods/${year}/${month}/reopen`, { method: "POST" });
+}
+
+export type WithholdingType = "RETEFUENTE" | "RETEICA" | "RETEIVA";
+
+export interface WithholdingConceptRecord {
+  id: string;
+  code: string;
+  name: string;
+  type: WithholdingType;
+  ratePercent: number;
+  isActive: boolean;
+  dianConceptCode: string | null;
+}
+
+export interface CreateWithholdingConceptInput {
+  code: string;
+  name: string;
+  type: WithholdingType;
+  ratePercent: number;
+  dianConceptCode?: string;
+}
+
+export interface UpdateWithholdingConceptInput {
+  name?: string;
+  ratePercent?: number;
+  dianConceptCode?: string;
+}
+
+export function listWithholdingConcepts(): Promise<{ data: WithholdingConceptRecord[] }> {
+  return apiFetch("/withholding-concepts");
+}
+
+export function createWithholdingConcept(input: CreateWithholdingConceptInput): Promise<WithholdingConceptRecord> {
+  return apiFetch("/withholding-concepts", { method: "POST", body: input });
+}
+
+export function updateWithholdingConcept(id: string, input: UpdateWithholdingConceptInput): Promise<WithholdingConceptRecord> {
+  return apiFetch(`/withholding-concepts/${id}`, { method: "PATCH", body: input });
+}
+
+export function deactivateWithholdingConcept(id: string): Promise<WithholdingConceptRecord> {
+  return apiFetch(`/withholding-concepts/${id}/deactivate`, { method: "POST" });
+}
+
+export interface CostCenterRecord {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface CreateCostCenterInput {
+  code: string;
+  name: string;
+}
+
+export interface UpdateCostCenterInput {
+  name?: string;
+}
+
+export function listCostCenters(): Promise<{ data: CostCenterRecord[] }> {
+  return apiFetch("/cost-centers");
+}
+
+export function createCostCenter(input: CreateCostCenterInput): Promise<CostCenterRecord> {
+  return apiFetch("/cost-centers", { method: "POST", body: input });
+}
+
+export function updateCostCenter(id: string, input: UpdateCostCenterInput): Promise<CostCenterRecord> {
+  return apiFetch(`/cost-centers/${id}`, { method: "PATCH", body: input });
+}
+
+export function deactivateCostCenter(id: string): Promise<CostCenterRecord> {
+  return apiFetch(`/cost-centers/${id}/deactivate`, { method: "POST" });
 }

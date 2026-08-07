@@ -116,3 +116,20 @@ export async function downloadPayslipPdf(payslipId: string, fileName: string): P
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+export interface WhatsAppDeliveryRecord {
+  id: string;
+  messageType: string;
+  recipientPhone: string;
+  success: boolean;
+  errorMessage: string | null;
+  sentAt: string;
+}
+
+export function listPayslipWhatsAppDeliveries(payslipId: string): Promise<{ data: WhatsAppDeliveryRecord[] }> {
+  return apiFetch(`/payslips/${payslipId}/whatsapp-deliveries`);
+}
+
+export function resendPayslipWhatsApp(payslipId: string): Promise<void> {
+  return apiFetch(`/payslips/${payslipId}/whatsapp/resend`, { method: "POST" });
+}

@@ -1,0 +1,39 @@
+// Item 39 de docs/ALCANCE.md: activos fijos / depreciacion. No contabiliza la adquisicion del
+// activo (eso ya pasa por Compra a proveedor o Gasto operativo) -- solo registra el activo como
+// un hecho ya conocido y lleva la depreciacion hacia adelante desde ahi.
+model FixedAsset {
+  id                      String    @id @default(uuid())
+  companyId               String
+  branchId                String
+  name                    String
+  description             String?
+  purchaseDate            DateTime
+  cost                    Decimal   @db.Decimal(14, 2)
+  salvageValue            Decimal   @db.Decimal(14, 2) @default(0)
+  usefulLifeMonths        Int
+  accumulatedDepreciation Decimal   @db.Decimal(14, 2) @default(0)
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+
+  depreciationEntries DepreciationEntry[]
+
+  @@index([companyId])
+  @@map("fixed_assets")
+}
+
+model DepreciationEntry {
+  id             String     @id @default(uuid())
+  fixedAssetId   String
+  fixedAsset     FixedAsset @relation(fields: [fixedAssetId], references: [id])
+  year           Int
+  month          Int
+  amount         Decimal    @db.Decimal(14, 2)
+  // "CALCULATED" | "POSTED"
+  status         String     @default("CALCULATED")
+  calculatedAt   DateTime   @default(now())
+  postedAt       DateTime?
+  journalEntryId String?
+
+  @@unique([fixedAssetId, year, month])
+  @@map("depreciation_entries")
+}

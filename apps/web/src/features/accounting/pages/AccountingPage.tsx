@@ -7,18 +7,27 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import {
   type AccountType,
+  type WithholdingType,
   closeFinancialPeriod,
   createAccount,
+  createCostCenter,
   createEntry,
+  createWithholdingConcept,
+  deactivateCostCenter,
+  deactivateWithholdingConcept,
   getBalanceSheet,
   getCashFlow,
   getIncomeStatement,
   getLedger,
   listAccounts,
+  listCostCenters,
   listEntries,
   listFinancialPeriods,
+  listWithholdingConcepts,
   postEntry,
   reopenFinancialPeriod,
+  updateCostCenter,
+  updateWithholdingConcept,
   voidEntry,
 } from "../api/accounting.api";
 
@@ -30,7 +39,13 @@ const ACCOUNT_TYPES: { value: AccountType; label: string }[] = [
   { value: "EXPENSE", label: "Gasto" },
 ];
 
-type Section = "accounts" | "entries" | "reports" | "periods";
+const WITHHOLDING_TYPES: { value: WithholdingType; label: string }[] = [
+  { value: "RETEFUENTE", label: "Retencion en la fuente" },
+  { value: "RETEICA", label: "ReteICA" },
+  { value: "RETEIVA", label: "ReteIVA" },
+];
+
+type Section = "accounts" | "entries" | "reports" | "periods" | "withholding" | "cost-centers";
 type ReportTab = "balance" | "income" | "cashflow" | "ledger";
 
 function formatLocalDate(d: Date): string {
@@ -139,13 +154,315 @@ function AccountsSection() {
   );
 }
 
+function WithholdingSection() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["withholding-concepts"], queryFn: listWithholdingConcepts });
+  const [form, setForm] = useState({ code: "", name: "", type: "RETEFUENTE" as WithholdingType, ratePercent: "", dianConceptCode: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", ratePercent: "", dianConceptCode: "" });
+
+  function invalidate() {
+    return queryClient.invalidateQueries({ queryKey: ["withholding-concepts"] });
+  }
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      createWithholdingConcept({
+        code: form.code,
+        name: form.name,
+        type: form.type,
+        ratePercent: Number(form.ratePercent),
+        dianConceptCode: form.dianConceptCode || undefined,
+      }),
+    onSuccess: () => {
+      invalidate();
+      setForm({ code: "", name: "", type: "RETEFUENTE", ratePercent: "", dianConceptCode: "" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (id: string) =>
+      updateWithholdingConcept(id, {
+        name: editForm.name,
+        ratePercent: Number(editForm.ratePercent),
+        dianConceptCode: editForm.dianConceptCode || undefined,
+      }),
+    onSuccess: () => {
+      invalidate();
+      setEditingId(null);
+    },
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: deactivateWithholdingConcept,
+    onSuccess: () => invalidate(),
+  });
+
+  return (
+    <>
+      <Card className="mb-6">
+        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo concepto de retencion</h2>
+        <p className="mb-3 text-sm text-gray-500">
+          Cada venta o compra puede aplicar uno o mas de estos conceptos. Las tarifas de ReteFuente/ReteIVA de
+          fabrica son valores comunes de mercado; ajusta la de ICA a la tarifa real de tu municipio/actividad.
+        </p>
+        <form
+          className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createMutation.mutate();
+          }}
+        >
+          <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+          <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <select
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.type}
+            onChange={(e) => setForm({ ...form, type: e.target.value as WithholdingType })}
+          >
+            {WITHHOLDING_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <Input
+            type="number"
+            step="0.01"
+            placeholder="Tarifa %"
+            value={form.ratePercent}
+            onChange={(e) => setForm({ ...form, ratePercent: e.target.value })}
+            required
+          />
+          <Input
+            placeholder="Codigo DIAN retencion (opcional, ej. 1301)"
+            value={form.dianConceptCode}
+            onChange={(e) => setForm({ ...form, dianConceptCode: e.target.value })}
+          />
+          <Button type="submit" disabled={createMutation.isPending}>
+            Crear
+          </Button>
+        </form>
+        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+      </Card>
+
+      <Card>
+        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="py-2">Codigo</th>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Tarifa</th>
+              <th>Codigo DIAN</th>
+              <th>Activo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data?.data.map((c) =>
+              editingId === c.id ? (
+                <tr key={c.id} className="border-b border-gray-100">
+                  <td className="py-2">{c.code}</td>
+                  <td>
+                    <input
+                      className="w-full rounded border border-gray-200 px-2 py-1"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    />
+                  </td>
+                  <td>{WITHHOLDING_TYPES.find((t) => t.value === c.type)?.label ?? c.type}</td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="w-20 rounded border border-gray-200 px-2 py-1"
+                      value={editForm.ratePercent}
+                      onChange={(e) => setEditForm({ ...editForm, ratePercent: e.target.value })}
+                    />
+                    %
+                  </td>
+                  <td>
+                    <input
+                      className="w-20 rounded border border-gray-200 px-2 py-1"
+                      value={editForm.dianConceptCode}
+                      onChange={(e) => setEditForm({ ...editForm, dianConceptCode: e.target.value })}
+                    />
+                  </td>
+                  <td>{c.isActive ? "Si" : "No"}</td>
+                  <td className="space-x-2 py-2 text-right">
+                    <Button disabled={updateMutation.isPending} onClick={() => updateMutation.mutate(c.id)}>
+                      Guardar
+                    </Button>
+                    <Button variant="secondary" onClick={() => setEditingId(null)}>
+                      Cancelar
+                    </Button>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={c.id} className="border-b border-gray-100">
+                  <td className="py-2">{c.code}</td>
+                  <td>{c.name}</td>
+                  <td>{WITHHOLDING_TYPES.find((t) => t.value === c.type)?.label ?? c.type}</td>
+                  <td>{c.ratePercent}%</td>
+                  <td className={c.dianConceptCode ? "" : "text-yellow-600"}>{c.dianConceptCode ?? "Sin asignar"}</td>
+                  <td>{c.isActive ? "Si" : "No"}</td>
+                  <td className="space-x-2 py-2 text-right">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setEditingId(c.id);
+                        setEditForm({ name: c.name, ratePercent: String(c.ratePercent), dianConceptCode: c.dianConceptCode ?? "" });
+                      }}
+                    >
+                      Editar
+                    </Button>
+                    {c.isActive && (
+                      <Button variant="danger" disabled={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(c.id)}>
+                        Desactivar
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+      </Card>
+    </>
+  );
+}
+
+function CostCentersSection() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["cost-centers"], queryFn: listCostCenters });
+  const [form, setForm] = useState({ code: "", name: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  function invalidate() {
+    return queryClient.invalidateQueries({ queryKey: ["cost-centers"] });
+  }
+
+  const createMutation = useMutation({
+    mutationFn: () => createCostCenter(form),
+    onSuccess: () => {
+      invalidate();
+      setForm({ code: "", name: "" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (id: string) => updateCostCenter(id, { name: editName }),
+    onSuccess: () => {
+      invalidate();
+      setEditingId(null);
+    },
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: deactivateCostCenter,
+    onSuccess: () => invalidate(),
+  });
+
+  return (
+    <>
+      <Card className="mb-6">
+        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo centro de costo</h2>
+        <p className="mb-3 text-sm text-gray-500">
+          Etiqueta comprobantes manuales y gastos operativos por area/proyecto (ej. sucursal, departamento) para
+          poder filtrar el Estado de Resultados y el Libro Mayor por ese mismo centro.
+        </p>
+        <form
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createMutation.mutate();
+          }}
+        >
+          <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+          <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <Button type="submit" disabled={createMutation.isPending}>
+            Crear
+          </Button>
+        </form>
+        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+      </Card>
+
+      <Card>
+        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="py-2">Codigo</th>
+              <th>Nombre</th>
+              <th>Activo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data?.data.map((c) =>
+              editingId === c.id ? (
+                <tr key={c.id} className="border-b border-gray-100">
+                  <td className="py-2">{c.code}</td>
+                  <td>
+                    <input
+                      className="w-full rounded border border-gray-200 px-2 py-1"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                    />
+                  </td>
+                  <td>{c.isActive ? "Si" : "No"}</td>
+                  <td className="space-x-2 py-2 text-right">
+                    <Button disabled={updateMutation.isPending} onClick={() => updateMutation.mutate(c.id)}>
+                      Guardar
+                    </Button>
+                    <Button variant="secondary" onClick={() => setEditingId(null)}>
+                      Cancelar
+                    </Button>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={c.id} className="border-b border-gray-100">
+                  <td className="py-2">{c.code}</td>
+                  <td>{c.name}</td>
+                  <td>{c.isActive ? "Si" : "No"}</td>
+                  <td className="space-x-2 py-2 text-right">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setEditingId(c.id);
+                        setEditName(c.name);
+                      }}
+                    >
+                      Editar
+                    </Button>
+                    {c.isActive && (
+                      <Button variant="danger" disabled={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(c.id)}>
+                        Desactivar
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+      </Card>
+    </>
+  );
+}
+
 function EntriesSection() {
   const queryClient = useQueryClient();
   const { data: entries, isLoading } = useQuery({ queryKey: ["accounting", "entries"], queryFn: () => listEntries() });
   const { data: accounts } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
+  const { data: costCenters } = useQuery({ queryKey: ["cost-centers"], queryFn: listCostCenters });
 
   const [date, setDate] = useState(todayStr());
   const [description, setDescription] = useState("");
+  const [costCenterId, setCostCenterId] = useState("");
   const [lines, setLines] = useState([
     { accountId: "", debit: "", credit: "", description: "" },
     { accountId: "", debit: "", credit: "", description: "" },
@@ -156,6 +473,7 @@ function EntriesSection() {
       createEntry({
         date,
         description,
+        costCenterId: costCenterId || undefined,
         lines: lines
           .filter((l) => l.accountId)
           .map((l) => ({
@@ -168,6 +486,7 @@ function EntriesSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounting", "entries"] });
       setDescription("");
+      setCostCenterId("");
       setLines([
         { accountId: "", debit: "", credit: "", description: "" },
         { accountId: "", debit: "", credit: "", description: "" },
@@ -198,9 +517,21 @@ function EntriesSection() {
             createMutation.mutate();
           }}
         >
-          <div className="mb-3 grid grid-cols-2 gap-3">
+          <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             <Input placeholder="Descripcion" value={description} onChange={(e) => setDescription(e.target.value)} required />
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={costCenterId}
+              onChange={(e) => setCostCenterId(e.target.value)}
+            >
+              <option value="">Sin centro de costo</option>
+              {costCenters?.data.filter((c) => c.isActive).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} {c.name}
+                </option>
+              ))}
+            </select>
           </div>
           <table className="mb-3 w-full text-left text-sm">
             <thead>
@@ -321,16 +652,19 @@ function ReportsSection() {
   const [from, setFrom] = useState(monthAgoStr());
   const [to, setTo] = useState(todayStr());
   const [ledgerAccountId, setLedgerAccountId] = useState("");
+  const [incomeCostCenterId, setIncomeCostCenterId] = useState("");
+  const [ledgerCostCenterId, setLedgerCostCenterId] = useState("");
 
   const { data: accounts } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
+  const { data: costCenters } = useQuery({ queryKey: ["cost-centers"], queryFn: listCostCenters });
   const balanceQuery = useQuery({
     queryKey: ["accounting", "balance-sheet", asOf],
     queryFn: () => getBalanceSheet(asOf),
     enabled: reportTab === "balance",
   });
   const incomeQuery = useQuery({
-    queryKey: ["accounting", "income-statement", from, to],
-    queryFn: () => getIncomeStatement(from, to),
+    queryKey: ["accounting", "income-statement", from, to, incomeCostCenterId],
+    queryFn: () => getIncomeStatement(from, to, incomeCostCenterId || undefined),
     enabled: reportTab === "income",
   });
   const cashFlowQuery = useQuery({
@@ -339,8 +673,8 @@ function ReportsSection() {
     enabled: reportTab === "cashflow",
   });
   const ledgerQuery = useQuery({
-    queryKey: ["accounting", "ledger", ledgerAccountId, from, to],
-    queryFn: () => getLedger(ledgerAccountId, from, to),
+    queryKey: ["accounting", "ledger", ledgerAccountId, from, to, ledgerCostCenterId],
+    queryFn: () => getLedger(ledgerAccountId, from, to, ledgerCostCenterId || undefined),
     enabled: reportTab === "ledger" && !!ledgerAccountId,
   });
 
@@ -397,6 +731,21 @@ function ReportsSection() {
           <div className="mb-4 flex gap-3">
             <Input type="date" label="Desde" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input type="date" label="Hasta" value={to} onChange={(e) => setTo(e.target.value)} />
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Centro de costo</span>
+              <select
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={incomeCostCenterId}
+                onChange={(e) => setIncomeCostCenterId(e.target.value)}
+              >
+                <option value="">Todos</option>
+                {costCenters?.data.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           {incomeQuery.data && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -475,6 +824,18 @@ function ReportsSection() {
             </select>
             <Input type="date" label="Desde" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input type="date" label="Hasta" value={to} onChange={(e) => setTo(e.target.value)} />
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={ledgerCostCenterId}
+              onChange={(e) => setLedgerCostCenterId(e.target.value)}
+            >
+              <option value="">Todos los centros de costo</option>
+              {costCenters?.data.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} {c.name}
+                </option>
+              ))}
+            </select>
           </div>
           {ledgerQuery.data && (
             <table className="w-full text-left text-sm">
@@ -627,12 +988,20 @@ export function AccountingPage() {
         <Button variant={section === "periods" ? "primary" : "secondary"} onClick={() => setSection("periods")}>
           Cierre de periodo
         </Button>
+        <Button variant={section === "withholding" ? "primary" : "secondary"} onClick={() => setSection("withholding")}>
+          Retenciones
+        </Button>
+        <Button variant={section === "cost-centers" ? "primary" : "secondary"} onClick={() => setSection("cost-centers")}>
+          Centros de costo
+        </Button>
       </div>
 
       {section === "accounts" && <AccountsSection />}
       {section === "entries" && <EntriesSection />}
       {section === "reports" && <ReportsSection />}
       {section === "periods" && <PeriodsSection />}
+      {section === "withholding" && <WithholdingSection />}
+      {section === "cost-centers" && <CostCentersSection />}
     </AppLayout>
   );
 }

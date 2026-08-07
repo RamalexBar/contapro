@@ -7,6 +7,10 @@ export interface CreateSupplierData {
   address?: string;
   /** false = requiere documento soporte electronico en cada compra (ver electronic-invoicing). */
   isObligatedToInvoice?: boolean;
+  // Item 37 de docs/ALCANCE.md (informacion exogena DIAN). documentType default "NIT" a nivel de
+  // schema si se omite.
+  documentType?: string;
+  municipalityCode?: string;
 }
 
 export interface SupplierRecord {
@@ -19,6 +23,8 @@ export interface SupplierRecord {
   address: string | null;
   isActive: boolean;
   isObligatedToInvoice: boolean;
+  documentType: string;
+  municipalityCode: string | null;
 }
 
 export interface ISupplierRepository {

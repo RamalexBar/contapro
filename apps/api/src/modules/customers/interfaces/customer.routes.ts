@@ -8,3 +8,8 @@ customerRouter.use(tenantContextMiddleware);
 
 customerRouter.get("/customers", requirePermission("customer.read"), customerController.list);
 customerRouter.post("/customers", requirePermission("customer.manage"), customerController.create);
+customerRouter.patch(
+  "/customers/:id/price-list",
+  requirePermission("customer.manage"),
+  customerController.updatePriceList
+);

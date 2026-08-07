@@ -33,6 +33,10 @@ export interface ReversePaymentsResult {
 export interface IAccountPayableRepository {
   list(filter?: { status?: string }): Promise<AccountPayableRecord[]>;
   findByIdOrThrow(id: string): Promise<AccountPayableRecord>;
+  /** PENDING/PARTIAL/OVERDUE -- usado por el reporte de informacion exogena DIAN (item 37,
+   * formato 1009: saldos de cuentas por pagar) para sumar el saldo actual por proveedor, mismo
+   * criterio que IAccountReceivableRepository.listActive(). */
+  listActive(): Promise<AccountPayableRecord[]>;
   /** Valida amount <= balance DENTRO de la transaccion (mismo criterio que
    * PrismaStockMovementRepository.adjust() usa para no dejar el inventario en negativo), para
    * que dos abonos concurrentes no puedan sobregirar el saldo. */

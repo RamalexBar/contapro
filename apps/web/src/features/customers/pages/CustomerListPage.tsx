@@ -6,7 +6,8 @@ import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
-import { createCustomer, listCustomers } from "../api/customer.api";
+import { createCustomer, listCustomers, updateCustomerPriceList } from "../api/customer.api";
+import { listPriceLists } from "../../inventory/api/price-list.api";
 
 const EMPTY_FORM = {
   documentType: "CC",
@@ -16,6 +17,8 @@ const EMPTY_FORM = {
   phone: "",
   address: "",
   creditLimit: "",
+  priceListId: "",
+  municipalityCode: "",
 };
 
 export function CustomerListPage() {
@@ -24,6 +27,9 @@ export function CustomerListPage() {
 
   const [search, setSearch] = useState("");
   const { data, isLoading } = useQuery({ queryKey: ["customers", search], queryFn: () => listCustomers(search) });
+
+  const { data: priceLists } = useQuery({ queryKey: ["price-lists"], queryFn: listPriceLists });
+  const activePriceLists = priceLists?.data.filter((pl) => pl.isActive) ?? [];
 
   const [form, setForm] = useState(EMPTY_FORM);
   const createMutation = useMutation({
@@ -36,11 +42,19 @@ export function CustomerListPage() {
         phone: form.phone || undefined,
         address: form.address || undefined,
         creditLimit: form.creditLimit ? Number(form.creditLimit) : undefined,
+        priceListId: form.priceListId || undefined,
+        municipalityCode: form.municipalityCode || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       setForm(EMPTY_FORM);
     },
+  });
+
+  const priceListMutation = useMutation({
+    mutationFn: ({ id, priceListId }: { id: string; priceListId: string | null }) =>
+      updateCustomerPriceList(id, priceListId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] }),
   });
 
   return (
@@ -88,6 +102,23 @@ export function CustomerListPage() {
               value={form.creditLimit}
               onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
             />
+            <Input
+              placeholder="Codigo DANE municipio (opcional)"
+              value={form.municipalityCode}
+              onChange={(e) => setForm({ ...form, municipalityCode: e.target.value })}
+            />
+            <select
+              className="rounded-md border border-gray-200 px-3 py-2 text-sm"
+              value={form.priceListId}
+              onChange={(e) => setForm({ ...form, priceListId: e.target.value })}
+            >
+              <option value="">Sin lista de precios (precio base)</option>
+              {activePriceLists.map((pl) => (
+                <option key={pl.id} value={pl.id}>
+                  {pl.name}
+                </option>
+              ))}
+            </select>
             <Button type="submit" disabled={createMutation.isPending}>
               Crear
             </Button>
@@ -113,6 +144,7 @@ export function CustomerListPage() {
               <th>Nombre</th>
               <th>Cupo de credito</th>
               <th>Saldo actual</th>
+              <th>Lista de precios</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -125,6 +157,27 @@ export function CustomerListPage() {
                 <td>{c.name}</td>
                 <td>{formatCOP(c.creditLimit)}</td>
                 <td>{formatCOP(c.currentBalance)}</td>
+                <td>
+                  {canManage ? (
+                    <select
+                      className="rounded border border-gray-200 px-2 py-1 text-xs"
+                      value={c.priceListId ?? ""}
+                      disabled={priceListMutation.isPending}
+                      onChange={(e) =>
+                        priceListMutation.mutate({ id: c.id, priceListId: e.target.value || null })
+                      }
+                    >
+                      <option value="">Precio base</option>
+                      {activePriceLists.map((pl) => (
+                        <option key={pl.id} value={pl.id}>
+                          {pl.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    activePriceLists.find((pl) => pl.id === c.priceListId)?.name ?? "Precio base"
+                  )}
+                </td>
                 <td className={c.isActive ? "text-green-600" : "text-gray-400"}>
                   {c.isActive ? "Activo" : "Inactivo"}
                 </td>

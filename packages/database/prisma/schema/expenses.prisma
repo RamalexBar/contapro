@@ -1,0 +1,51 @@
+// Gastos operativos (item 30 de docs/ALCANCE.md): arriendo, servicios publicos, honorarios,
+// reembolsos -- distinto de Purchase (suppliers.prisma), que siempre es mercancia/inventario.
+// Ver apps/api/src/modules/expenses/README.md
+
+model ExpenseCategory {
+  id          String   @id @default(uuid())
+  companyId   String
+  code        String
+  name        String
+  // Codigo PUC de la cuenta de gasto asociada (ej. "5120" Arrendamientos). La cuenta se
+  // autocrea con upsertByCode la primera vez que se usa, mismo criterio que el resto de cuentas
+  // estandar del sistema -- ver post-expense-journal-entry.use-case.ts.
+  accountCode String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  expenses Expense[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id                String          @id @default(uuid())
+  companyId         String
+  branchId          String
+  expenseCategoryId String
+  expenseCategory   ExpenseCategory @relation(fields: [expenseCategoryId], references: [id])
+  // Texto libre (arrendador, empresa de servicios) -- a proposito NO un Supplier (Supplier es
+  // para proveedores de mercancia, ver suppliers/README.md).
+  payeeName         String
+  description       String?
+  date              DateTime
+  subtotal          Decimal         @db.Decimal(14, 2)
+  taxTotal          Decimal         @db.Decimal(14, 2) @default(0)
+  total             Decimal         @db.Decimal(14, 2)
+  paymentMethod     String          // CASH, CARD, TRANSFER -- pagado completo de una vez, sin cuentas por pagar de gastos
+  // Centro de costo opcional (item 34 de docs/ALCANCE.md) -- se copia tal cual al JournalEntry
+  // que este gasto genera, ver post-expense-journal-entry.use-case.ts.
+  costCenterId      String?
+  status            String          @default("REGISTERED") // REGISTERED, CANCELLED
+  // Id del JournalEntry que lo contabilizo -- se guarda para poder anularlo si el gasto se
+  // cancela (CancelExpenseUseCase), mismo criterio que Purchase.journalEntryId.
+  journalEntryId    String?
+  createdByUserId   String
+  createdAt         DateTime        @default(now())
+
+  @@index([companyId, branchId])
+  @@map("expenses")
+}

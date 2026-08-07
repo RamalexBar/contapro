@@ -14,6 +14,8 @@ function toRecord(row: {
   address: string | null;
   isActive: boolean;
   isObligatedToInvoice: boolean;
+  documentType: string;
+  municipalityCode: string | null;
 }): SupplierRecord {
   return {
     id: row.id,
@@ -25,6 +27,8 @@ function toRecord(row: {
     address: row.address,
     isActive: row.isActive,
     isObligatedToInvoice: row.isObligatedToInvoice,
+    documentType: row.documentType,
+    municipalityCode: row.municipalityCode,
   };
 }
 
@@ -41,6 +45,8 @@ export class PrismaSupplierRepository implements ISupplierRepository {
           email: data.email,
           address: data.address,
           isObligatedToInvoice: data.isObligatedToInvoice ?? true,
+          documentType: data.documentType,
+          municipalityCode: data.municipalityCode,
         },
       });
       return toRecord(row);

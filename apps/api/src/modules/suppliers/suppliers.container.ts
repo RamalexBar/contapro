@@ -1,6 +1,11 @@
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
-import { postPurchaseJournalEntryUseCase, postSupplierPaymentJournalEntryUseCase, voidJournalEntryUseCase } from "../accounting/accounting.container";
+import {
+  postPurchaseJournalEntryUseCase,
+  postSupplierPaymentJournalEntryUseCase,
+  voidJournalEntryUseCase,
+  withholdingConceptRepository,
+} from "../accounting/accounting.container";
 // Instancia propia, no importada de accounting.container.ts (que no la exporta): mismo criterio
 // ya usado con PrismaCashSessionRepository en accounting.container.ts / PrismaSupplierRepository
 // en electronic-invoicing.container.ts -- el repositorio no tiene estado propio, instanciarlo dos
@@ -43,6 +48,7 @@ export const suppliersController = new SuppliersController(
   new CreatePurchaseUseCase(
     purchaseRepo,
     supplierRepo,
+    withholdingConceptRepository,
     postPurchaseJournalEntryUseCase,
     generateElectronicSupportDocumentUseCase,
     auditService

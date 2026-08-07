@@ -9,6 +9,9 @@ import { verifySecret } from "../../../../auth/infrastructure/password-hasher.se
 import { prisma } from "../../../../../shared/prisma/prisma-client";
 import type { IProductRepository } from "../../../../inventory/product/domain/product.repository";
 import type { ISaleRepository, SaleRecord } from "../../domain/sale.repository";
+import { sumWithholdingsByType } from "../../../../accounting/application/sum-withholdings-by-type";
+import { resolveReceivableInput } from "../resolve-receivable-input";
+import type { IAccountReceivableRepository } from "../../../../collections/domain/account-receivable.repository";
 
 /**
  * Autorizacion de descuento (spec): registra QUIEN autorizo, QUIEN vendio, el PRODUCTO, el
@@ -22,6 +25,7 @@ export class AuthorizeDiscountUseCase {
     private readonly postSaleJournalEntry: PostSaleJournalEntryUseCase,
     private readonly generateElectronicInvoice: GenerateElectronicInvoiceUseCase,
     private readonly productRepo: IProductRepository,
+    private readonly accountReceivableRepo: IAccountReceivableRepository,
     private readonly audit: AuditService
   ) {}
 
@@ -80,8 +84,22 @@ export class AuthorizeDiscountUseCase {
         discountTotal: updatedSale.discountTotal,
         taxTotal: updatedSale.taxTotal,
         total: updatedSale.total,
+        retentionTotal: updatedSale.retentionTotal,
+        withholdingsByType: sumWithholdingsByType(updatedSale.withholdings),
         payments: updatedSale.payments,
+        currency: updatedSale.currency,
+        exchangeRate: updatedSale.exchangeRate,
       });
+
+      // AccountReceivable (item 31): esta venta no la creo al momento de CreateSaleUseCase
+      // porque necesitaba autorizacion de descuento -- se crea recien ahora que se completa.
+      // Vencimiento por defecto (30 dias desde AHORA, no desde la venta original -- ver
+      // resolve-receivable-input.ts), el request original de creacion no se persiste mientras
+      // la venta espera autorizacion.
+      const receivable = resolveReceivableInput(updatedSale.payments, updatedSale.customerId ?? undefined, undefined);
+      if (receivable) {
+        await this.accountReceivableRepo.create({ customerId: receivable.customerId, saleId: updatedSale.id, amount: receivable.amount, dueDate: receivable.dueDate });
+      }
 
       try {
         const items = await Promise.all(
@@ -106,7 +124,14 @@ export class AuthorizeDiscountUseCase {
           subtotal: updatedSale.subtotal,
           taxTotal: updatedSale.taxTotal,
           total: updatedSale.total,
+          currency: updatedSale.currency,
           items,
+          withholdingTaxes: updatedSale.withholdings.map((w) => ({
+            type: w.type,
+            base: w.base,
+            ratePercent: w.ratePercent,
+            amount: w.amount,
+          })),
         });
       } catch (err) {
         // Mismo criterio que create-sale.use-case.ts: no bloquear la venta si falla la

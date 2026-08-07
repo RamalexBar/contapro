@@ -18,6 +18,8 @@ import { PayPayrollUseCase } from "./application/use-cases/pay-payroll.use-case"
 import { CreatePayrollDeductionUseCase } from "./application/use-cases/create-payroll-deduction.use-case";
 import { ListPayrollDeductionsUseCase } from "./application/use-cases/list-payroll-deductions.use-case";
 import { CancelPayrollDeductionUseCase } from "./application/use-cases/cancel-payroll-deduction.use-case";
+import { SendPayslipWhatsAppUseCase } from "./application/use-cases/send-payslip-whatsapp.use-case";
+import { whatsAppSender, whatsAppDeliveryLogRepo } from "../whatsapp/whatsapp.container";
 import { PayrollController } from "./interfaces/payroll.controller";
 
 const payrollParameterRepo = new PrismaPayrollParameterRepository();
@@ -25,6 +27,17 @@ const payrollRepo = new PrismaPayrollRepository();
 const payrollDeductionRepo = new PrismaPayrollDeductionRepository();
 const companyReader = new PrismaCompanyReaderRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
+
+/** Usado por ApprovePayrollUseCase (al aprobar el periodo) y por el endpoint de reenvio manual
+ * de este mismo modulo. */
+export const sendPayslipWhatsAppUseCase = new SendPayslipWhatsAppUseCase(
+  employeeRepo,
+  payrollRepo,
+  companyReader,
+  whatsAppSender,
+  whatsAppDeliveryLogRepo,
+  auditService
+);
 
 export const payrollController = new PayrollController(
   payrollRepo,
@@ -40,10 +53,13 @@ export const payrollController = new PayrollController(
     payrollDeductionRepo,
     postPayrollJournalEntryUseCase,
     generateElectronicPayrollUseCase,
+    sendPayslipWhatsAppUseCase,
     auditService
   ),
   new PayPayrollUseCase(payrollRepo, auditService),
   new CreatePayrollDeductionUseCase(payrollDeductionRepo, employeeRepo, auditService),
   new ListPayrollDeductionsUseCase(payrollDeductionRepo),
-  new CancelPayrollDeductionUseCase(payrollDeductionRepo, auditService)
+  new CancelPayrollDeductionUseCase(payrollDeductionRepo, auditService),
+  whatsAppDeliveryLogRepo,
+  sendPayslipWhatsAppUseCase
 );

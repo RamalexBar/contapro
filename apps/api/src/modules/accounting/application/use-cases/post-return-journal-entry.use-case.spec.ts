@@ -4,6 +4,7 @@ import { AuditService } from "../../../audit/application/audit.service";
 import type { AuditLogEntry, CreateAuditLogInput, IAuditLogRepository } from "../../../audit/domain/audit-log.repository";
 import type { AccountRecord, CreateAccountData, IChartOfAccountsRepository } from "../../domain/chart-of-accounts.repository";
 import type { FinancialPeriodRecord, IFinancialPeriodRepository } from "../../domain/financial-period.repository";
+import type { CostCenterRecord, ICostCenterRepository } from "../../domain/cost-center.repository";
 import type { CreateJournalEntryData, IJournalEntryRepository, JournalEntryRecord } from "../../domain/journal-entry.repository";
 import { CreateJournalEntryUseCase } from "./create-journal-entry.use-case";
 import { PostJournalEntryUseCase } from "./post-journal-entry.use-case";
@@ -24,6 +25,24 @@ class FakeFinancialPeriodRepository implements IFinancialPeriodRepository {
   }
 }
 
+class FakeCostCenterRepository implements ICostCenterRepository {
+  create(): Promise<CostCenterRecord> {
+    throw new Error("not used in this spec");
+  }
+  list(): Promise<CostCenterRecord[]> {
+    throw new Error("not used in this spec");
+  }
+  findByIdOrThrow(): Promise<CostCenterRecord> {
+    throw new Error("not used in this spec");
+  }
+  update(): Promise<CostCenterRecord> {
+    throw new Error("not used in this spec");
+  }
+  deactivate(): Promise<CostCenterRecord> {
+    throw new Error("not used in this spec");
+  }
+}
+
 class FakeJournalEntryRepository implements IJournalEntryRepository {
   entries: JournalEntryRecord[] = [];
 
@@ -39,6 +58,7 @@ class FakeJournalEntryRepository implements IJournalEntryRepository {
       status: "DRAFT",
       createdByUserId: data.createdByUserId,
       postedAt: null,
+      costCenterId: data.costCenterId ?? null,
       lines: data.lines.map((l, i) => ({ id: `line-${i}`, accountId: l.accountId, debit: l.debit, credit: l.credit, description: l.description ?? null })),
     };
     this.entries.push(entry);
@@ -113,7 +133,13 @@ function makeUseCase() {
   const accountRepo = new FakeChartOfAccountsRepository();
   const journalRepo = new FakeJournalEntryRepository();
   const auditService = new AuditService(new FakeAuditLogRepository());
-  const createEntry = new CreateJournalEntryUseCase(journalRepo, accountRepo, new FakeFinancialPeriodRepository(), auditService);
+  const createEntry = new CreateJournalEntryUseCase(
+    journalRepo,
+    accountRepo,
+    new FakeFinancialPeriodRepository(),
+    new FakeCostCenterRepository(),
+    auditService
+  );
   const postEntry = new PostJournalEntryUseCase(journalRepo, auditService);
   return { useCase: new PostReturnJournalEntryUseCase(accountRepo, createEntry, postEntry), journalRepo, accountRepo };
 }

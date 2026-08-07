@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AuditService } from "../../../audit/application/audit.service";
 import type { AuditLogEntry, CreateAuditLogInput, IAuditLogRepository } from "../../../audit/domain/audit-log.repository";
 import type { IReminderNotifier, SubscriptionReminderNotification } from "../../domain/reminder-notifier";
+import type { IWhatsAppSender } from "../../../whatsapp/domain/whatsapp-sender.port";
 import type {
   ApplyPaymentResult,
   CompanyWithSubscriptionRecord,
@@ -21,6 +22,7 @@ function makeSubscription(overrides: Partial<SubscriptionForLifecycleCheck> = {}
     companyId: "company-1",
     companyName: "Minimarket Demo",
     companyEmail: "demo@example.com",
+    companyPhone: null,
     planId: "plan-1",
     planName: "Plan Basico",
     status: "ACTIVE",
@@ -37,6 +39,7 @@ function makeSubscription(overrides: Partial<SubscriptionForLifecycleCheck> = {}
 class FakeSubscriptionRepository implements ISubscriptionRepository {
   subscriptions: SubscriptionForLifecycleCheck[] = [];
   reminderLogs = new Set<string>();
+  channelsUsed: string[] = [];
   statusUpdates: Array<{ id: string; status: SubscriptionStatus; graceEndsAt?: Date | null }> = [];
 
   async create(): Promise<SubscriptionRecord> {
@@ -87,8 +90,9 @@ class FakeSubscriptionRepository implements ISubscriptionRepository {
   async hasReminderLog(subscriptionId: string, daysBeforeDue: number): Promise<boolean> {
     return this.reminderLogs.has(`${subscriptionId}:${daysBeforeDue}`);
   }
-  async createReminderLog(subscriptionId: string, daysBeforeDue: number): Promise<void> {
+  async createReminderLog(subscriptionId: string, daysBeforeDue: number, channel: string): Promise<void> {
     this.reminderLogs.add(`${subscriptionId}:${daysBeforeDue}`);
+    this.channelsUsed.push(channel);
   }
   async listCompaniesWithSubscription(): Promise<CompanyWithSubscriptionRecord[]> {
     return [];
@@ -105,6 +109,19 @@ class FakeReminderNotifier implements IReminderNotifier {
   async send(notification: SubscriptionReminderNotification): Promise<void> {
     if (this.shouldFail) throw new Error("proveedor caido");
     this.sent.push(notification);
+  }
+}
+
+class FakeWhatsAppSender implements IWhatsAppSender {
+  sent: Array<{ to: string; message: string }> = [];
+  shouldFail = true;
+
+  async sendText(to: string, message: string): Promise<void> {
+    if (this.shouldFail) throw new Error("WHATSAPP_ACCESS_TOKEN no esta configurado");
+    this.sent.push({ to, message });
+  }
+  async sendDocument(): Promise<void> {
+    throw new Error("not implemented");
   }
 }
 
@@ -125,13 +142,45 @@ describe("RunSubscriptionLifecycleUseCase", () => {
     repo.subscriptions.push(makeSubscription({ currentPeriodEnd: new Date() }));
     const notifier = new FakeReminderNotifier();
     const auditRepo = new FakeAuditLogRepository();
-    const useCase = new RunSubscriptionLifecycleUseCase(repo, notifier, new AuditService(auditRepo));
+    const useCase = new RunSubscriptionLifecycleUseCase(repo, notifier, new FakeWhatsAppSender(), new AuditService(auditRepo));
 
     await useCase.execute();
 
     expect(notifier.sent).toHaveLength(1);
     expect(repo.reminderLogs.has("sub-1:0")).toBe(true);
+    expect(repo.channelsUsed).toEqual(["EMAIL"]);
     expect(auditRepo.entries.some((e) => e.action === "SUBSCRIPTION_REMINDER_SENT")).toBe(true);
+  });
+
+  it("prefers WhatsApp over email when the company has a phone and WhatsApp succeeds", async () => {
+    const repo = new FakeSubscriptionRepository();
+    repo.subscriptions.push(makeSubscription({ currentPeriodEnd: new Date(), companyPhone: "3001234567" }));
+    const notifier = new FakeReminderNotifier();
+    const whatsApp = new FakeWhatsAppSender();
+    whatsApp.shouldFail = false;
+    const useCase = new RunSubscriptionLifecycleUseCase(repo, notifier, whatsApp, new AuditService(new FakeAuditLogRepository()));
+
+    await useCase.execute();
+
+    expect(whatsApp.sent).toHaveLength(1);
+    expect(whatsApp.sent[0].to).toBe("573001234567");
+    expect(notifier.sent).toHaveLength(0);
+    expect(repo.channelsUsed).toEqual(["WHATSAPP"]);
+  });
+
+  it("falls back to email when WhatsApp fails (e.g. not configured)", async () => {
+    const repo = new FakeSubscriptionRepository();
+    repo.subscriptions.push(makeSubscription({ currentPeriodEnd: new Date(), companyPhone: "3001234567" }));
+    const notifier = new FakeReminderNotifier();
+    const whatsApp = new FakeWhatsAppSender();
+    whatsApp.shouldFail = true;
+    const useCase = new RunSubscriptionLifecycleUseCase(repo, notifier, whatsApp, new AuditService(new FakeAuditLogRepository()));
+
+    await useCase.execute();
+
+    expect(whatsApp.sent).toHaveLength(0);
+    expect(notifier.sent).toHaveLength(1);
+    expect(repo.channelsUsed).toEqual(["EMAIL"]);
   });
 
   it("does not log the reminder when the notifier fails, so it retries next cycle", async () => {
@@ -140,7 +189,7 @@ describe("RunSubscriptionLifecycleUseCase", () => {
     const notifier = new FakeReminderNotifier();
     notifier.shouldFail = true;
     const auditRepo = new FakeAuditLogRepository();
-    const useCase = new RunSubscriptionLifecycleUseCase(repo, notifier, new AuditService(auditRepo));
+    const useCase = new RunSubscriptionLifecycleUseCase(repo, notifier, new FakeWhatsAppSender(), new AuditService(auditRepo));
 
     await useCase.execute();
 
@@ -154,7 +203,12 @@ describe("RunSubscriptionLifecycleUseCase", () => {
     repo.subscriptions.push(makeSubscription({ currentPeriodEnd: new Date() }));
     repo.reminderLogs.add("sub-1:0");
     const notifier = new FakeReminderNotifier();
-    const useCase = new RunSubscriptionLifecycleUseCase(repo, notifier, new AuditService(new FakeAuditLogRepository()));
+    const useCase = new RunSubscriptionLifecycleUseCase(
+      repo,
+      notifier,
+      new FakeWhatsAppSender(),
+      new AuditService(new FakeAuditLogRepository())
+    );
 
     await useCase.execute();
 
@@ -169,6 +223,7 @@ describe("RunSubscriptionLifecycleUseCase", () => {
     const useCase = new RunSubscriptionLifecycleUseCase(
       repo,
       new FakeReminderNotifier(),
+      new FakeWhatsAppSender(),
       new AuditService(new FakeAuditLogRepository())
     );
 
@@ -189,6 +244,7 @@ describe("RunSubscriptionLifecycleUseCase", () => {
     const useCase = new RunSubscriptionLifecycleUseCase(
       repo,
       new FakeReminderNotifier(),
+      new FakeWhatsAppSender(),
       new AuditService(new FakeAuditLogRepository())
     );
 

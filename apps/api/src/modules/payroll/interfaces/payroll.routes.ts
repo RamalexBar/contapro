@@ -18,6 +18,16 @@ payrollRouter.post("/payrolls/:id/pay", requirePermission("payroll.pay"), payrol
 
 payrollRouter.get("/payslips/:id", requirePermission("payroll.read"), payrollController.getPayslip);
 payrollRouter.get("/payslips/:id/pdf", requirePermission("payroll.read"), payrollController.getPayslipPdf);
+payrollRouter.get(
+  "/payslips/:id/whatsapp-deliveries",
+  requirePermission("payroll.read"),
+  payrollController.listPayslipWhatsAppDeliveries
+);
+payrollRouter.post(
+  "/payslips/:id/whatsapp/resend",
+  requirePermission("payroll.approve"),
+  payrollController.resendPayslipWhatsApp
+);
 
 payrollRouter.post("/payroll-deductions", requirePermission("payroll.deduction.manage"), payrollController.createDeduction);
 payrollRouter.get("/payroll-deductions", requirePermission("payroll.read"), payrollController.listDeductions);

@@ -32,6 +32,9 @@ import { ResubmitElectronicDebitNoteUseCase } from "./application/use-cases/resu
 import { ResubmitElectronicSupportDocumentUseCase } from "./application/use-cases/resubmit-electronic-support-document.use-case";
 import { ResubmitElectronicPayrollUseCase } from "./application/use-cases/resubmit-electronic-payroll.use-case";
 import { PollDianSubmissionsUseCase } from "./application/use-cases/poll-dian-submissions.use-case";
+import { SendInvoiceWhatsAppUseCase } from "./application/use-cases/send-invoice-whatsapp.use-case";
+import { PrismaSaleRepository } from "../pos/sale/infrastructure/prisma-sale.repository";
+import { whatsAppSender, whatsAppDeliveryLogRepo } from "../whatsapp/whatsapp.container";
 import { ElectronicInvoicingController } from "./interfaces/electronic-invoicing.controller";
 
 const electronicInvoiceRepo = new PrismaElectronicInvoiceRepository();
@@ -81,6 +84,20 @@ const resubmitSupportDocumentUseCase = new ResubmitElectronicSupportDocumentUseC
   auditService
 );
 const getPayrollUseCase = new GetElectronicPayrollUseCase(electronicPayrollRepo);
+// Instancia propia, no importada de sale.container.ts: ese container importa
+// sendInvoiceWhatsAppUseCase de aqui, importar en la otra direccion crearia un ciclo de modulos.
+// PrismaSaleRepository no tiene estado propio, instanciarla dos veces es segura (mismo criterio
+// que supplierRepo mas arriba).
+const saleRepoForWhatsApp = new PrismaSaleRepository();
+/** Usado por sale.container.ts (al completar una venta) y por el endpoint de reenvio manual de
+ * este mismo modulo. */
+export const sendInvoiceWhatsAppUseCase = new SendInvoiceWhatsAppUseCase(
+  customerRepo,
+  getInvoiceUseCase,
+  whatsAppSender,
+  whatsAppDeliveryLogRepo,
+  auditService
+);
 const resubmitPayrollUseCase = new ResubmitElectronicPayrollUseCase(
   electronicPayrollRepo,
   certificateLoader,
@@ -100,7 +117,10 @@ export const electronicInvoicingController = new ElectronicInvoicingController(
   getSupportDocumentUseCase,
   resubmitSupportDocumentUseCase,
   getPayrollUseCase,
-  resubmitPayrollUseCase
+  resubmitPayrollUseCase,
+  sendInvoiceWhatsAppUseCase,
+  saleRepoForWhatsApp,
+  whatsAppDeliveryLogRepo
 );
 
 /** Usado por sale.container.ts para generar el CUFE/XML local (y firmar si hay certificado

@@ -56,6 +56,16 @@ es la segunda parte menos verificada, ver mas abajo.
      (`application/numbering-claim.ts`) con pruebas unitarias.
    - Genera el CUFE (`application/cufe-generator.ts`, SHA-384) y el XML
      (`application/ubl-invoice-xml-builder.ts`).
+   - **Retenciones (RteFuente/ReteICA/ReteIVA, item 29 de `docs/ALCANCE.md`, ver
+     `modules/accounting/README.md` para el detalle completo)**: si la venta tiene
+     `SaleWithholding` aplicadas, el XML gana un bloque `<cac:WithholdingTaxTotal>` por tipo con
+     monto > 0 (`buildWithholdingTaxTotal` en `ubl-invoice-xml-builder.ts`), usando los codigos
+     de esquema DIAN 06 (ReteRenta) / 07 (ReteIVA) / 08 (ReteICA) — **sin verificar contra el
+     Anexo Tecnico real**, mismo aviso que el resto de este README. El monto de ReteICA (si hay)
+     se pasa al generador de CUFE en el slot `icaAmount` que ya existia (antes siempre 0) —
+     RteFuente/ReteIVA quedan confirmados **fuera** de la formula del CUFE (solo IVA/INC/ICA
+     segun el Anexo Tecnico). El documento soporte de compras (punto 8 mas abajo) **no** lleva
+     retenciones todavia.
    - Actualiza `Sale.cufe` e `Sale.invoiceXmlUrl` (con la ruta de este modulo,
      `/api/electronic-invoicing/sales/{saleId}/xml`).
    - **Si `DIAN_CERTIFICATE_PATH` esta configurado**, ademas firma el XML (ver punto 4) y lo
@@ -201,9 +211,12 @@ credenciales de habilitacion reales.
 5. **Verificar contra el Anexo Tecnico DIAN vigente**:
    - El orden exacto de concatenacion del CUFE y el formato de decimales
      (`application/cufe-generator.ts`).
-   - La lista completa de codigos de impuesto (hoy solo IVA/INC/ICA con montos de INC e ICA
-     fijos en 0 desde `CreateSaleUseCase`, que no discrimina impuestos por tipo).
+   - La lista completa de codigos de impuesto (IVA/ICA ya llegan del calculo real de la venta;
+     INC sigue fijo en 0, no hay ningun flujo que lo calcule).
    - El tipo de documento/numero correcto para "consumidor final" (`DIAN_GENERIC_FINAL_CONSUMER`).
+   - Los codigos de esquema 06/07/08 usados en `<cac:WithholdingTaxTotal>` para
+     RteFuente/ReteIVA/ReteICA (`ubl-invoice-xml-builder.ts`) — misma clase de estimacion sin
+     confirmar que el resto de este punto.
 6. **CUDE de notas**: el orden de concatenacion (`application/cude-generator.ts`) y los
    codigos de tipo de nota (`DIAN_NOTE_TYPE_CODE` en `application/constants.ts`, "91"/"92") son
    la misma clase de estimacion sin verificar que el CUFE — confirmar contra el Anexo Tecnico

@@ -31,6 +31,20 @@ model Sale {
   discountTotal Decimal       @db.Decimal(14, 2) @default(0)
   taxTotal      Decimal       @db.Decimal(14, 2) @default(0)
   total         Decimal       @db.Decimal(14, 2)
+  // Multi-moneda informativa (item 33 de docs/ALCANCE.md): el comprobante contable
+  // (post-sale-journal-entry.use-case.ts) y el XML DIAN (ubl-invoice-xml-builder.ts) siempre
+  // quedan en COP sin importar estos dos campos -- son solo para mostrar un total de referencia
+  // en otra moneda. `exchangeRate` es la TRM capturada manualmente al momento de la venta (COP
+  // por 1 unidad de `currency`), sin fetch automatico en esta primera version.
+  currency      String        @default("COP") // ISO 4217, 3 letras
+  exchangeRate  Decimal       @db.Decimal(14, 4) @default(1)
+  // Lista de precios efectiva usada al vender (item 35 de docs/ALCANCE.md) -- informativa, para
+  // trazabilidad; el precio real ya quedo fijado en SaleItem.unitPrice. Null = precio base.
+  priceListId   String?
+  // Suma de retenciones practicadas por el cliente (RteFuente/ReteICA/ReteIVA, ver
+  // SaleWithholding) -- informativa, no reduce `total` (el bruto legal de la factura), solo el
+  // efectivo realmente cobrado (netTotal = total - retentionTotal en create-sale.use-case.ts).
+  retentionTotal Decimal      @db.Decimal(14, 2) @default(0)
   // Preparado para facturacion electronica futura (DIAN):
   cufe          String?
   cude          String?
@@ -41,7 +55,14 @@ model Sale {
 
   items             SaleItem[]
   payments          SalePayment[]
+  withholdings       SaleWithholding[]
   electronicInvoice ElectronicInvoice?
+  // Presente solo si la venta incluyo un pago method="CREDIT" -- ver
+  // apps/api/src/modules/collections/README.md (item 31 de docs/ALCANCE.md).
+  accountReceivable AccountReceivable?
+  // Presente solo si esta venta se origino al cerrar una Opportunity como ganada -- ver
+  // apps/api/src/modules/crm/opportunity/README.md (item 32 de docs/ALCANCE.md).
+  opportunity       Opportunity?
 
   @@unique([branchId, number])
   @@index([companyId, branchId, createdAt])
@@ -68,6 +89,19 @@ model SaleItem {
   @@map("sale_items")
 }
 
+model SaleWithholding {
+  id                   String             @id @default(uuid())
+  saleId               String
+  sale                 Sale               @relation(fields: [saleId], references: [id])
+  withholdingConceptId String
+  withholdingConcept   WithholdingConcept @relation(fields: [withholdingConceptId], references: [id])
+  base                 Decimal            @db.Decimal(14, 2)
+  ratePercent          Decimal            @db.Decimal(5, 2) // snapshot del concepto al aplicarse
+  amount               Decimal            @db.Decimal(14, 2)
+
+  @@map("sale_withholdings")
+}
+
 model SalePayment {
   id        String  @id @default(uuid())
   saleId    String
@@ -89,6 +123,9 @@ model Quote {
   validUntil   DateTime
   subtotal     Decimal  @db.Decimal(14, 2)
   total        Decimal  @db.Decimal(14, 2)
+  // Lista de precios efectiva usada al cotizar (item 35 de docs/ALCANCE.md) -- informativa, mismo
+  // criterio que Sale.priceListId. Null = precio base.
+  priceListId  String?
   createdAt    DateTime @default(now())
 
   items QuoteItem[]

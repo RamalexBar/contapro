@@ -44,6 +44,22 @@ const TENANT_MODELS = new Set([
   "ChartOfAccounts",
   "JournalEntry",
   "FinancialPeriod",
+  "WithholdingConcept",
+  "CostCenter",
+  // "ProductPriceListEntry" NO va aqui: fila hija sin companyId propia, protegida via su
+  // PriceList padre (mismo criterio que OpportunityItem/QuoteItem/SaleItem).
+  "PriceList",
+  "ExpenseCategory",
+  "Expense",
+  // "AccountReceivablePayment" NO va aqui a proposito: no tiene columna companyId propia
+  // (se protege via su AccountReceivable padre, mismo criterio que SupplierPayment/SaleItem/
+  // PurchaseWithholding) -- agregarla causaba que esta extension intentara inyectar companyId
+  // en su create() y Prisma lo rechazara (columna inexistente), encontrado en verificacion en
+  // vivo al registrar el primer abono.
+  "AccountReceivable",
+  // "OpportunityItem" NO va aqui: fila hija sin companyId propia, protegida via su Opportunity
+  // padre (mismo criterio que QuoteItem/SaleItem/AccountReceivablePayment).
+  "Opportunity",
   "BankAccount",
   "Employee",
   "Payroll",
@@ -56,6 +72,24 @@ const TENANT_MODELS = new Set([
   "ElectronicDebitNote",
   "ElectronicSupportDocument",
   "ElectronicPayroll",
+  // "RecurringInvoiceItem"/"RecurringInvoiceRun" NO van aqui: filas hijas sin companyId propia,
+  // protegidas via su RecurringInvoice padre (mismo criterio que SaleItem/ProductPriceListEntry).
+  "RecurringInvoice",
+  "SalesCommissionScheme",
+  "CommissionSettlement",
+  // "DepreciationEntry" NO va aqui: fila hija sin companyId propia, protegida via su FixedAsset
+  // padre (mismo criterio que CommissionSettlement/SaleItem).
+  "FixedAsset",
+  "ApiKey",
+  // "WebhookDelivery" NO va aqui: fila hija sin companyId propia, protegida via su
+  // WebhookSubscription padre (mismo criterio que DepreciationEntry -- el repo filtra con un
+  // join a companyId desde el principio, ver PrismaWebhookDeliveryRepository).
+  "WebhookSubscription",
+  // "WhatsAppDeliveryLog" NO va aqui a proposito, aunque SI tiene companyId propia: se escribe
+  // tanto desde casos de uso tenant-scoped (factura, nomina, recordatorio de cobranza) como
+  // desde el poller de recordatorios de suscripcion (platform-level, sin AsyncLocalStorage de
+  // tenant) -- la inyeccion/filtro automatico de esta extension rompiera ese segundo caso.
+  // PrismaWhatsAppDeliveryLogRepository recibe companyId explicito en cada metodo en su lugar.
 ]);
 
 const MULTI_ROW_READ_OPS = new Set(["findMany", "findFirst", "findFirstOrThrow", "count", "aggregate", "groupBy"]);

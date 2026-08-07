@@ -17,6 +17,9 @@ export interface JournalEntryRecord {
   status: string; // DRAFT, POSTED, VOID
   createdByUserId: string;
   postedAt: Date | null;
+  // Item 34 de docs/ALCANCE.md: etiquetado opcional para segmentar reportes (ver
+  // AccountingReportsService.getIncomeStatement/getLedger).
+  costCenterId: string | null;
   lines: JournalEntryLineRecord[];
 }
 
@@ -36,6 +39,7 @@ export interface CreateJournalEntryData {
   sourceId?: string;
   createdByUserId: string;
   lines: CreateJournalEntryLineData[];
+  costCenterId?: string;
 }
 
 export interface PostedLineAggregate {
@@ -54,8 +58,10 @@ export interface IJournalEntryRepository {
   list(filter?: { status?: string }): Promise<JournalEntryRecord[]>;
   findByIdOrThrow(id: string): Promise<JournalEntryRecord>;
   updateStatus(id: string, status: string, postedAt?: Date): Promise<JournalEntryRecord>;
-  /** Lineas de comprobantes POSTED, para libro mayor y reportes financieros. */
-  listPostedLines(filter: { from?: Date; to?: Date; accountId?: string }): Promise<PostedLineAggregate[]>;
+  /** Lineas de comprobantes POSTED, para libro mayor y reportes financieros. `costCenterId`
+   * filtra por el campo del mismo nombre en JournalEntry (item 34 de docs/ALCANCE.md) -- se
+   * omite del where cuando no se pasa, sin cambiar el comportamiento existente. */
+  listPostedLines(filter: { from?: Date; to?: Date; accountId?: string; costCenterId?: string }): Promise<PostedLineAggregate[]>;
   /** Para bloquear el cierre de un periodo con comprobantes sin publicar/anular pendientes. */
   hasDraftEntriesInPeriod(year: number, month: number): Promise<boolean>;
   /** Encuentra el comprobante generado automaticamente para un hecho economico dado (ej. un

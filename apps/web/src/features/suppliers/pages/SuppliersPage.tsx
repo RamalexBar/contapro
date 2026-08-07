@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatCOP } from "@erp/shared-utils";
+import { calculateTax, formatCOP, formatCurrency, round2 } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
+import { listWithholdingConcepts } from "../../accounting/api/accounting.api";
 import {
   cancelPurchase,
   createPurchase,
@@ -14,6 +15,7 @@ import {
   listPurchases,
   listSuppliers,
   registerSupplierPayment,
+  type PurchaseWithholdingInput,
   type SupplierRecord,
 } from "../api/supplier.api";
 
@@ -25,13 +27,22 @@ function todayStr(): string {
 function SuppliersSection() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["suppliers"], queryFn: () => listSuppliers() });
-  const [form, setForm] = useState({ name: "", nit: "", contactName: "", phone: "", isObligatedToInvoice: true });
+  const [form, setForm] = useState({
+    name: "",
+    nit: "",
+    contactName: "",
+    phone: "",
+    isObligatedToInvoice: true,
+    documentType: "NIT",
+    municipalityCode: "",
+  });
 
   const createMutation = useMutation({
-    mutationFn: () => createSupplier(form),
+    mutationFn: () =>
+      createSupplier({ ...form, municipalityCode: form.municipalityCode || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      setForm({ name: "", nit: "", contactName: "", phone: "", isObligatedToInvoice: true });
+      setForm({ name: "", nit: "", contactName: "", phone: "", isObligatedToInvoice: true, documentType: "NIT", municipalityCode: "" });
     },
   });
 
@@ -47,9 +58,23 @@ function SuppliersSection() {
           }}
         >
           <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Input placeholder="NIT" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} required />
+          <select
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.documentType}
+            onChange={(e) => setForm({ ...form, documentType: e.target.value })}
+          >
+            <option value="NIT">NIT</option>
+            <option value="CC">CC</option>
+            <option value="CE">CE</option>
+          </select>
+          <Input placeholder="NIT / documento" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} required />
           <Input placeholder="Contacto" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
           <Input placeholder="Telefono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input
+            placeholder="Codigo DANE municipio (opcional)"
+            value={form.municipalityCode}
+            onChange={(e) => setForm({ ...form, municipalityCode: e.target.value })}
+          />
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
@@ -74,6 +99,7 @@ function SuppliersSection() {
               <th>NIT</th>
               <th>Contacto</th>
               <th>Obligado a facturar</th>
+              <th>Municipio (DANE)</th>
             </tr>
           </thead>
           <tbody>
@@ -83,6 +109,7 @@ function SuppliersSection() {
                 <td>{s.nit}</td>
                 <td>{s.contactName ?? "-"}</td>
                 <td>{s.isObligatedToInvoice ? "Si" : "No"}</td>
+                <td className={s.municipalityCode ? "" : "text-yellow-600"}>{s.municipalityCode ?? "Sin asignar"}</td>
               </tr>
             ))}
           </tbody>
@@ -95,10 +122,38 @@ function SuppliersSection() {
 function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
   const { data, isLoading } = useQuery({ queryKey: ["purchases"], queryFn: listPurchases });
+  // Quien registra compras normalmente ya tiene accounting.read (CONTADOR/ADMINISTRADOR) -- a
+  // diferencia del POS, no hay un caso de uso tipo CAJERO sin acceso aqui, pero se gatea igual
+  // por consistencia con el resto de la app.
+  const canApplyWithholdings = hasPermission("accounting.read");
+  const { data: withholdingConcepts } = useQuery({
+    queryKey: ["withholding-concepts"],
+    queryFn: listWithholdingConcepts,
+    enabled: canApplyWithholdings,
+  });
+  const activeConcepts = withholdingConcepts?.data.filter((c) => c.isActive) ?? [];
 
-  const [form, setForm] = useState({ supplierId: "", invoiceNumber: "", subtotal: "", taxTotal: "", dueDate: todayStr() });
+  const [form, setForm] = useState({
+    supplierId: "",
+    invoiceNumber: "",
+    subtotal: "",
+    taxTotal: "",
+    dueDate: todayStr(),
+    // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- ver POSPage.tsx, mismo criterio.
+    currency: "COP",
+    exchangeRate: "",
+  });
+  const [withholdings, setWithholdings] = useState<PurchaseWithholdingInput[]>([]);
   const total = (Number(form.subtotal) || 0) + (Number(form.taxTotal) || 0);
+  const retentionTotal = round2(
+    withholdings.reduce((sum, w) => {
+      const concept = activeConcepts.find((c) => c.id === w.withholdingConceptId);
+      return sum + (concept ? calculateTax(w.base, concept.ratePercent) : 0);
+    }, 0)
+  );
+  const netTotal = round2(total - retentionTotal);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -110,11 +165,14 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
         taxTotal: Number(form.taxTotal) || 0,
         total,
         dueDate: form.dueDate,
+        withholdings,
+        ...(form.currency !== "COP" ? { currency: form.currency, exchangeRate: Number(form.exchangeRate) } : {}),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
       queryClient.invalidateQueries({ queryKey: ["accounts-payable"] });
-      setForm({ supplierId: "", invoiceNumber: "", subtotal: "", taxTotal: "", dueDate: todayStr() });
+      setForm({ supplierId: "", invoiceNumber: "", subtotal: "", taxTotal: "", dueDate: todayStr(), currency: "COP", exchangeRate: "" });
+      setWithholdings([]);
     },
   });
 
@@ -166,10 +224,102 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
           />
           <Input type="number" placeholder="IVA" value={form.taxTotal} onChange={(e) => setForm({ ...form, taxTotal: e.target.value })} />
           <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} required />
-          <Button type="submit" disabled={createMutation.isPending}>
-            Total: {formatCOP(total)}
+          <select
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.currency}
+            onChange={(e) => setForm({ ...form, currency: e.target.value })}
+          >
+            <option value="COP">COP</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+          {form.currency !== "COP" && (
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="TRM (COP por 1 unidad)"
+              value={form.exchangeRate}
+              onChange={(e) => setForm({ ...form, exchangeRate: e.target.value })}
+              required
+            />
+          )}
+          <Button
+            type="submit"
+            disabled={createMutation.isPending || (form.currency !== "COP" && !(Number(form.exchangeRate) > 0))}
+          >
+            {retentionTotal > 0 ? `Neto a pagar: ${formatCOP(netTotal)}` : `Total: ${formatCOP(total)}`}
           </Button>
         </form>
+        {form.currency !== "COP" && Number(form.exchangeRate) > 0 && (
+          <p className="mt-2 text-sm text-gray-500">
+            Referencia en {form.currency}: {formatCurrency(round2(total / Number(form.exchangeRate)), form.currency)}
+          </p>
+        )}
+
+        {canApplyWithholdings && Number(form.subtotal) > 0 && (
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-700">Retenciones al proveedor</h3>
+              {activeConcepts.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-blue-600 hover:underline"
+                  onClick={() => {
+                    const first = activeConcepts[0];
+                    if (!first) return;
+                    setWithholdings((prev) => [...prev, { withholdingConceptId: first.id, base: Number(form.subtotal) }]);
+                  }}
+                >
+                  + agregar retencion
+                </button>
+              )}
+            </div>
+            {withholdings.map((w, i) => (
+              <div key={i} className="mb-2 flex items-center gap-2 text-sm">
+                <select
+                  className="flex-1 rounded border border-gray-200 px-2 py-1"
+                  value={w.withholdingConceptId}
+                  onChange={(e) =>
+                    setWithholdings((prev) =>
+                      prev.map((row, idx) => (idx === i ? { ...row, withholdingConceptId: e.target.value } : row))
+                    )
+                  }
+                >
+                  {activeConcepts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.ratePercent}%)
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  max={Number(form.subtotal)}
+                  value={w.base}
+                  title="Base de retencion"
+                  className="w-28 rounded border border-gray-200 px-2 py-1"
+                  onChange={(e) =>
+                    setWithholdings((prev) => prev.map((row, idx) => (idx === i ? { ...row, base: Number(e.target.value) } : row)))
+                  }
+                />
+                <button
+                  type="button"
+                  className="text-xs text-red-500 hover:underline"
+                  onClick={() => setWithholdings((prev) => prev.filter((_, idx) => idx !== i))}
+                >
+                  Quitar
+                </button>
+              </div>
+            ))}
+            {retentionTotal > 0 && (
+              <p className="text-sm text-gray-600">
+                Retencion total: <span className="text-red-600">-{formatCOP(retentionTotal)}</span> · Neto a pagar al proveedor:{" "}
+                <span className="font-semibold">{formatCOP(netTotal)}</span>
+              </p>
+            )}
+          </div>
+        )}
         {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
       </Card>
 
@@ -181,6 +331,7 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
               <th className="py-2">Factura</th>
               <th>Proveedor</th>
               <th>Total</th>
+              <th>Neto (retencion)</th>
               <th>Estado</th>
               <th></th>
             </tr>
@@ -190,7 +341,13 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
               <tr key={p.id} className="border-b border-gray-100">
                 <td className="py-2">{p.invoiceNumber}</td>
                 <td>{supplierName(p.supplierId)}</td>
-                <td>{formatCOP(p.total)}</td>
+                <td>
+                  {formatCOP(p.total)}
+                  {p.currency !== "COP" && p.foreignTotal !== null && (
+                    <span className="block text-xs text-gray-400">{formatCurrency(p.foreignTotal, p.currency)}</span>
+                  )}
+                </td>
+                <td>{p.retentionTotal > 0 ? formatCOP(p.total - p.retentionTotal) : "-"}</td>
                 <td>{p.status}</td>
                 <td className="text-right">
                   {p.status === "REGISTERED" && (

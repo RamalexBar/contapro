@@ -62,6 +62,14 @@ export class PrismaAccountPayableRepository implements IAccountPayableRepository
     return rows.map(toRecord);
   }
 
+  async listActive(): Promise<AccountPayableRecord[]> {
+    const rows = await prisma.accountPayable.findMany({
+      where: { status: { in: ["PENDING", "PARTIAL", "OVERDUE"] } },
+      include: INCLUDE,
+    });
+    return rows.map(toRecord);
+  }
+
   async findByIdOrThrow(id: string): Promise<AccountPayableRecord> {
     const row = await prisma.accountPayable.findFirst({ where: { id }, include: INCLUDE });
     if (!row) throw new NotFoundError("AccountPayable", id);

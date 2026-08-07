@@ -2,9 +2,16 @@ import { calculateGraceEndsAt } from "@erp/shared-utils";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IReminderNotifier } from "../../domain/reminder-notifier";
 import type { ISubscriptionRepository } from "../../domain/subscription.repository";
+import type { IWhatsAppSender } from "../../../whatsapp/domain/whatsapp-sender.port";
+import { normalizeToE164 } from "../../../whatsapp/application/normalize-phone";
 
 const REMINDER_DAYS = [8, 5, 3, 1, 0];
-const REMINDER_CHANNEL = "EMAIL";
+
+function buildWhatsAppMessage(companyName: string, planName: string, daysBeforeDue: number, currentPeriodEnd: Date): string {
+  const dueDate = currentPeriodEnd.toISOString().slice(0, 10);
+  if (daysBeforeDue === 0) return `Hola ${companyName}, tu plan ${planName} en Contapro vence hoy. Ingresa a tu panel para renovar.`;
+  return `Hola ${companyName}, tu plan ${planName} en Contapro vence el ${dueDate} (en ${daysBeforeDue} dias). Ingresa a tu panel para renovar.`;
+}
 
 function daysBetween(from: Date, to: Date): number {
   const a = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
@@ -28,6 +35,7 @@ export class RunSubscriptionLifecycleUseCase {
   constructor(
     private readonly repo: ISubscriptionRepository,
     private readonly notifier: IReminderNotifier,
+    private readonly whatsAppSender: IWhatsAppSender,
     private readonly audit: AuditService
   ) {}
 
@@ -42,19 +50,42 @@ export class RunSubscriptionLifecycleUseCase {
         const alreadySent = await this.repo.hasReminderLog(subscription.id, daysUntilDue);
         if (!alreadySent) {
           try {
-            await this.notifier.send({
-              companyName: subscription.companyName,
-              companyEmail: subscription.companyEmail,
-              planName: subscription.planName,
-              daysBeforeDue: daysUntilDue,
-              currentPeriodEnd: subscription.currentPeriodEnd,
-            });
-            await this.repo.createReminderLog(subscription.id, daysUntilDue, REMINDER_CHANNEL);
+            // Cascada: WhatsApp primero si hay telefono, cae a email si falla o no esta
+            // configurado (ver modules/whatsapp/README.md) -- mismo criterio que
+            // RunCollectionsRemindersUseCase.
+            let channelUsed: "WHATSAPP" | "EMAIL" | null = null;
+            let recipient = "";
+            if (subscription.companyPhone) {
+              try {
+                recipient = normalizeToE164(subscription.companyPhone);
+                await this.whatsAppSender.sendText(
+                  recipient,
+                  buildWhatsAppMessage(subscription.companyName, subscription.planName, daysUntilDue, subscription.currentPeriodEnd)
+                );
+                channelUsed = "WHATSAPP";
+              } catch {
+                channelUsed = null;
+              }
+            }
+
+            if (!channelUsed) {
+              await this.notifier.send({
+                companyName: subscription.companyName,
+                companyEmail: subscription.companyEmail,
+                planName: subscription.planName,
+                daysBeforeDue: daysUntilDue,
+                currentPeriodEnd: subscription.currentPeriodEnd,
+              });
+              channelUsed = "EMAIL";
+              recipient = subscription.companyEmail;
+            }
+
+            await this.repo.createReminderLog(subscription.id, daysUntilDue, channelUsed);
             await this.audit.recordWithoutContext(subscription.companyId, null, {
               action: "SUBSCRIPTION_REMINDER_SENT",
               entityType: "Subscription",
               entityId: subscription.id,
-              description: `Recordatorio de vencimiento enviado (${daysUntilDue} dias antes) a ${subscription.companyEmail}`,
+              description: `Recordatorio de vencimiento enviado por ${channelUsed} (${daysUntilDue} dias antes) a ${recipient}`,
             });
           } catch (err) {
             await this.audit.recordWithoutContext(subscription.companyId, null, {

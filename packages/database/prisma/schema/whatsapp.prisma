@@ -1,0 +1,22 @@
+// Item 41 de docs/ALCANCE.md: envio de documentos y recordatorios por WhatsApp -- ver
+// apps/api/src/modules/whatsapp/README.md.
+model WhatsAppDeliveryLog {
+  id             String   @id @default(uuid())
+  // companyId explicito y SIN filtro automatico de tenant (ver tenant.extension.ts): este
+  // modelo se escribe tanto desde casos de uso tenant-scoped (factura, nomina, recordatorio de
+  // cobranza) como desde el poller de recordatorios de suscripcion, que es platform-level y
+  // nunca corre dentro de un AsyncLocalStorage de tenant.
+  companyId      String
+  // SALE_INVOICE_RIDE | PAYSLIP | SUBSCRIPTION_REMINDER | COLLECTION_REMINDER
+  messageType    String
+  // Sale.id | PayslipDocument.id | Subscription.id | AccountReceivable.id segun messageType.
+  referenceId    String
+  recipientPhone String
+  success        Boolean
+  errorMessage   String?
+  sentAt         DateTime @default(now())
+
+  @@index([companyId])
+  @@index([referenceId])
+  @@map("whatsapp_delivery_logs")
+}

@@ -93,6 +93,16 @@ implementado. Consumo FIFO real (modulo POS) documentado abajo.
    crearlo) y se anula con `VoidJournalEntryUseCase`. No reversa dinero real de caja/banco, solo
    anula los comprobantes -- igual alcance que ya tenia la cancelacion del comprobante de la
    compra misma.
+10. **Retenciones al proveedor (RteFuente/ReteICA/ReteIVA)** (item 29 de `docs/ALCANCE.md`,
+    conceptos definidos en `modules/accounting`, ver su README para el detalle completo):
+    `POST /purchases` acepta `withholdings: [{withholdingConceptId, base}]`; `Purchase` gana
+    `retentionTotal` + la relacion `PurchaseWithholding` (tarifa snapshoteada al aplicarse). El
+    cambio real está en `PrismaPurchaseRepository.create()`: el `AccountPayable` que se crea
+    queda **neto de retencion** desde el inicio (`amount`/`balance` = `total - retentionTotal`)
+    -- por eso `RegisterSupplierPaymentUseCase` y la reversa de abonos del punto 9 de arriba no
+    necesitaron ningun cambio, ya operaban solo sobre `AccountPayable.balance`. Verificado en
+    vivo: compra con ReteICA, `AccountPayable` neto correcto, abono contra ese saldo neto, y
+    cancelacion con reverso completo del abono y del comprobante -- los tres sin tocar código.
 
 ## Consumo FIFO real (iteracion 16, `modules/pos/sale`)
 

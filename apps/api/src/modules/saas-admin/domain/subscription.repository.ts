@@ -31,6 +31,9 @@ export interface SubscriptionWithDetails extends SubscriptionRecord {
 export interface SubscriptionForLifecycleCheck extends SubscriptionRecord {
   companyName: string;
   companyEmail: string;
+  // Item 41 de docs/ALCANCE.md (recordatorio por WhatsApp con fallback a email): null si la
+  // empresa no registro telefono.
+  companyPhone: string | null;
   planName: string;
 }
 

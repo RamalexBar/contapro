@@ -13,6 +13,10 @@ import type { GetElectronicPayrollUseCase } from "../application/use-cases/get-e
 import type { ResubmitElectronicPayrollUseCase } from "../application/use-cases/resubmit-electronic-payroll.use-case";
 import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSupportDocumentToRideData } from "../application/ride-data-mapper";
 import { renderRidePdf } from "../infrastructure/pdfkit-ride-renderer";
+import type { SendInvoiceWhatsAppUseCase } from "../application/use-cases/send-invoice-whatsapp.use-case";
+import type { ISaleRepository } from "../../pos/sale/domain/sale.repository";
+import type { IWhatsAppDeliveryLogRepository } from "../../whatsapp/domain/whatsapp-delivery-log.repository";
+import { getTenantContext } from "../../../shared/context/request-context";
 import { createNumberingResolutionSchema } from "./electronic-invoicing.validators";
 
 export class ElectronicInvoicingController {
@@ -28,7 +32,10 @@ export class ElectronicInvoicingController {
     private readonly getSupportDocumentUseCase: GetElectronicSupportDocumentUseCase,
     private readonly resubmitSupportDocumentUseCase: ResubmitElectronicSupportDocumentUseCase,
     private readonly getPayrollUseCase: GetElectronicPayrollUseCase,
-    private readonly resubmitPayrollUseCase: ResubmitElectronicPayrollUseCase
+    private readonly resubmitPayrollUseCase: ResubmitElectronicPayrollUseCase,
+    private readonly sendInvoiceWhatsAppUseCase: SendInvoiceWhatsAppUseCase,
+    private readonly saleRepo: ISaleRepository,
+    private readonly whatsAppDeliveryLogRepo: IWhatsAppDeliveryLogRepository
   ) {}
 
   createResolution = async (req: Request, res: Response, next: NextFunction) => {
@@ -236,6 +243,32 @@ export class ElectronicInvoicingController {
       const doc = await this.getPayrollUseCase.execute(req.params.payrollDetailId);
       const pdf = await renderRidePdf(mapPayrollToRideData(doc));
       res.type("application/pdf").send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ---- Envio del RIDE por WhatsApp (item 41 de docs/ALCANCE.md), ver
+  // application/use-cases/send-invoice-whatsapp.use-case.ts. ----
+
+  listSaleWhatsAppDeliveries = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const deliveries = await this.whatsAppDeliveryLogRepo.list({
+        companyId: getTenantContext().companyId,
+        messageType: "SALE_INVOICE_RIDE",
+        referenceId: req.params.saleId,
+      });
+      res.json({ data: deliveries });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resendSaleWhatsApp = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sale = await this.saleRepo.findByIdOrThrow(req.params.saleId);
+      await this.sendInvoiceWhatsAppUseCase.execute({ saleId: sale.id, customerId: sale.customerId });
+      res.status(204).send();
     } catch (err) {
       next(err);
     }

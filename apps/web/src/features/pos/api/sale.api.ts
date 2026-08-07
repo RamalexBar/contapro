@@ -5,7 +5,11 @@ export interface SaleResponse {
   id: string;
   number: number;
   status: string;
+  customerId: string | null;
   total: number;
+  currency: string;
+  exchangeRate: number;
+  foreignTotal: number | null;
   items: Array<{
     id: string;
     productId: string;
@@ -32,4 +36,21 @@ export function getSale(saleId: string): Promise<SaleResponse> {
 
 export function listSales(): Promise<{ data: SaleResponse[] }> {
   return apiFetch("/sales");
+}
+
+export interface WhatsAppDeliveryRecord {
+  id: string;
+  messageType: string;
+  recipientPhone: string;
+  success: boolean;
+  errorMessage: string | null;
+  sentAt: string;
+}
+
+export function listSaleWhatsAppDeliveries(saleId: string): Promise<{ data: WhatsAppDeliveryRecord[] }> {
+  return apiFetch(`/electronic-invoicing/sales/${saleId}/whatsapp-deliveries`);
+}
+
+export function resendSaleWhatsApp(saleId: string): Promise<void> {
+  return apiFetch(`/electronic-invoicing/sales/${saleId}/whatsapp/resend`, { method: "POST" });
 }

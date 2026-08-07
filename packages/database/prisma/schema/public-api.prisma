@@ -1,0 +1,54 @@
+// Item 40 de docs/ALCANCE.md: API publica + webhooks salientes para integraciones de terceros
+// (Zapier/Make/scripts propios de sync con e-commerce). Sin conectores nativos a Shopify/
+// WooCommerce/Mercado Libre (requieren credenciales de desarrollador de cada plataforma) -- ver
+// apps/api/src/modules/public-api/README.md.
+model ApiKey {
+  id              String    @id @default(uuid())
+  companyId       String
+  name            String
+  // Hash SHA-256 de la key -- la key en texto plano solo se devuelve una vez, al crearla.
+  keyHash         String    @unique
+  // Primeros caracteres de la key, visibles en la UI para identificarla sin poder reconstruirla.
+  keyPrefix       String
+  // Codigos de permiso (PermissionCode) -- subconjunto de los permisos de quien la crea.
+  scopes          String[]
+  isActive        Boolean   @default(true)
+  lastUsedAt      DateTime?
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+
+  @@index([companyId])
+  @@map("api_keys")
+}
+
+model WebhookSubscription {
+  id         String   @id @default(uuid())
+  companyId  String
+  url        String
+  // Tipos de evento suscritos (ej. "sale.created") -- solo ese evento existe en v1.
+  eventTypes String[]
+  // Secreto usado para firmar HMAC-SHA256 el payload saliente (header X-Webhook-Signature).
+  secret     String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  deliveries WebhookDelivery[]
+
+  @@index([companyId])
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  id                    String              @id @default(uuid())
+  webhookSubscriptionId String
+  webhookSubscription   WebhookSubscription @relation(fields: [webhookSubscriptionId], references: [id])
+  eventType             String
+  payload               Json
+  responseStatus        Int?
+  success               Boolean
+  errorMessage          String?
+  attemptedAt           DateTime            @default(now())
+
+  @@index([webhookSubscriptionId])
+  @@map("webhook_deliveries")
+}

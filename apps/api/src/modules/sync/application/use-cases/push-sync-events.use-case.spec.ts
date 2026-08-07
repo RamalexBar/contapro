@@ -16,6 +16,9 @@ function makeSalePayload(overrides: Partial<CreateSaleInput> = {}): CreateSaleIn
     branchId: "11111111-1111-1111-1111-111111111111",
     items: [{ productId: "22222222-2222-2222-2222-222222222222", quantity: 2, discountPercent: 0 }],
     payments: [{ method: "CASH", amount: 10000 }],
+    withholdings: [],
+    currency: "COP",
+    exchangeRate: 1,
     ...overrides,
   };
 }
@@ -34,10 +37,17 @@ function makeSaleRecord(id: string): SaleRecord {
     discountTotal: 0,
     taxTotal: 1900,
     total: 11900,
+    retentionTotal: 0,
     cufe: null,
     cude: null,
     invoiceXmlUrl: null,
+    accountReceivableId: null,
+    currency: "COP",
+    exchangeRate: 1,
+    foreignTotal: null,
+    priceListId: null,
     createdAt: new Date(),
+    withholdings: [],
     items: [],
     payments: [],
   };
@@ -159,6 +169,9 @@ describe("PushSyncEventsUseCase", () => {
       payments: original.payments,
       items: original.items.map((item) => ({ discountPercent: item.discountPercent, quantity: item.quantity, productId: item.productId })),
       branchId: original.branchId,
+      withholdings: original.withholdings,
+      currency: original.currency,
+      exchangeRate: original.exchangeRate,
     };
 
     await useCase.execute({

@@ -119,9 +119,9 @@ export class AccountingReportsService {
     };
   }
 
-  async getIncomeStatement(from: Date, to: Date): Promise<IncomeStatement> {
+  async getIncomeStatement(from: Date, to: Date, costCenterId?: string): Promise<IncomeStatement> {
     const accounts = await this.accountRepo.list();
-    const lines = await this.journalRepo.listPostedLines({ from, to });
+    const lines = await this.journalRepo.listPostedLines({ from, to, costCenterId });
     const byAccount = this.aggregateByAccount(lines);
 
     const income: AccountBalance[] = [];
@@ -151,9 +151,9 @@ export class AccountingReportsService {
     };
   }
 
-  async getLedger(accountId: string, from?: Date, to?: Date): Promise<LedgerEntry[]> {
+  async getLedger(accountId: string, from?: Date, to?: Date, costCenterId?: string): Promise<LedgerEntry[]> {
     const account = await this.accountRepo.findByIdOrThrow(accountId);
-    const lines = await this.journalRepo.listPostedLines({ accountId, from, to });
+    const lines = await this.journalRepo.listPostedLines({ accountId, from, to, costCenterId });
     const normalDebit = account.type === "ASSET" || account.type === "EXPENSE";
 
     let running = 0;

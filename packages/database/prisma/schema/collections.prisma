@@ -1,0 +1,53 @@
+// Cobranza de ventas a credito (item 31 de docs/ALCANCE.md): estructura sobre el mecanismo de
+// pago method="CREDIT" que ya existe en Sale/SalePayment (ya satisface la validacion de pago y ya
+// se contabiliza como debito a "1305 Clientes" -- ver post-sale-journal-entry.use-case.ts). Lo
+// que agrega este modelo es el registro de QUIEN debe, CUANTO y PARA CUANDO, y la forma de
+// cobrarlo despues (en persona o en linea via Wompi). Analogo a AccountPayable/SupplierPayment
+// (suppliers.prisma) pero del lado de las ventas. Ver apps/api/src/modules/collections/README.md
+
+model AccountReceivable {
+  id         String   @id @default(uuid())
+  companyId  String
+  customerId String
+  saleId     String   @unique
+  sale       Sale     @relation(fields: [saleId], references: [id])
+  amount     Decimal  @db.Decimal(14, 2)
+  balance    Decimal  @db.Decimal(14, 2)
+  dueDate    DateTime
+  status     String   @default("PENDING") // PENDING, PARTIAL, PAID, CANCELLED
+
+  payments AccountReceivablePayment[]
+
+  @@index([companyId])
+  @@map("accounts_receivable")
+}
+
+model AccountReceivablePayment {
+  id                  String            @id @default(uuid())
+  accountReceivableId String
+  accountReceivable   AccountReceivable @relation(fields: [accountReceivableId], references: [id])
+  amount              Decimal           @db.Decimal(14, 2)
+  method              String            // CASH, CARD, TRANSFER, WOMPI
+  // PENDING: pago en linea creado, esperando confirmacion del webhook de Wompi. REGISTERED:
+  // confirmado (abono manual siempre nace aqui directo). FAILED: Wompi lo rechazo/reverso.
+  status              String            @default("REGISTERED")
+  reference           String?           @unique // solo pagos en linea (Wompi)
+  paidAt              DateTime          @default(now())
+  createdByUserId     String? // null en pagos en linea confirmados por webhook (sin usuario)
+
+  @@map("account_receivable_payments")
+}
+
+// Deduplicacion de recordatorios de cobro (run-collections-reminders.use-case.ts), mismo patron
+// que SubscriptionReminderLog (tenant.prisma) -- unique en (accountReceivableId, daysBeforeDue)
+// es el respaldo a nivel de DB, el caso de uso ademas hace un pre-check antes de enviar.
+model AccountReceivableReminderLog {
+  id                  String   @id @default(uuid())
+  accountReceivableId String
+  daysBeforeDue       Int // positivo = antes de vencer, 0 = el dia, negativo = dias de mora
+  channel             String // EMAIL
+  sentAt              DateTime @default(now())
+
+  @@unique([accountReceivableId, daysBeforeDue])
+  @@map("account_receivable_reminder_logs")
+}

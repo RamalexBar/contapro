@@ -7,6 +7,13 @@ export interface UblInvoiceLine {
   total: number;
 }
 
+export interface UblWithholdingTax {
+  type: "RETEFUENTE" | "RETEICA" | "RETEIVA";
+  base: number;
+  percent: number;
+  amount: number;
+}
+
 export interface UblInvoiceInput {
   fullNumber: string;
   cufe: string;
@@ -18,6 +25,48 @@ export interface UblInvoiceInput {
   taxTotal: number;
   total: number;
   items: UblInvoiceLine[];
+  withholdingTaxes: UblWithholdingTax[];
+  // Multi-moneda informativa (item 33 de docs/ALCANCE.md): solo afecta este encabezado -- todos
+  // los montos (`currencyID="COP"` en LineExtensionAmount/TaxAmount/PayableAmount/etc.) siguen en
+  // COP sin importar este campo, la DIAN exige el valor legal de la factura en COP.
+  currency?: string;
+}
+
+/**
+ * Codigos de esquema DIAN para el bloque WithholdingTaxTotal (distinto de TaxTotal, que es
+ * IVA/INC/ICA generado). NO verificados contra el Anexo Tecnico real -- mismo aviso que el resto
+ * de este modulo (CUFE, XAdES, RIDE): son la convencion mas citada para estos 3 conceptos, pero
+ * sin credenciales de habilitacion no hay forma de confirmarlos contra el servicio real de la
+ * DIAN. Ver README del modulo.
+ */
+const WITHHOLDING_TAX_SCHEME_ID: Record<UblWithholdingTax["type"], string> = {
+  RETEFUENTE: "06",
+  RETEIVA: "07",
+  RETEICA: "08",
+};
+
+const WITHHOLDING_TAX_SCHEME_NAME: Record<UblWithholdingTax["type"], string> = {
+  RETEFUENTE: "ReteRenta",
+  RETEIVA: "ReteIVA",
+  RETEICA: "ReteICA",
+};
+
+function buildWithholdingTaxTotal(w: UblWithholdingTax): string {
+  return `
+  <cac:WithholdingTaxTotal>
+    <cbc:TaxAmount currencyID="COP">${w.amount.toFixed(2)}</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="COP">${w.base.toFixed(2)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="COP">${w.amount.toFixed(2)}</cbc:TaxAmount>
+      <cbc:Percent>${w.percent}</cbc:Percent>
+      <cac:TaxCategory>
+        <cac:TaxScheme>
+          <cbc:ID>${WITHHOLDING_TAX_SCHEME_ID[w.type]}</cbc:ID>
+          <cbc:Name>${WITHHOLDING_TAX_SCHEME_NAME[w.type]}</cbc:Name>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:WithholdingTaxTotal>`;
 }
 
 function escapeXml(value: string): string {
@@ -61,6 +110,7 @@ export function buildUblInvoiceXml(input: UblInvoiceInput): string {
       ? "DIAN 2.1: Factura Electronica de Venta"
       : "DIAN 2.1: Factura Electronica de Venta (habilitacion)";
   const lines = input.items.map(buildLine).join("");
+  const currency = input.currency ?? "COP";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
@@ -71,6 +121,7 @@ export function buildUblInvoiceXml(input: UblInvoiceInput): string {
   <cbc:UUID schemeName="CUFE-SHA384">${input.cufe}</cbc:UUID>
   <cbc:IssueDate>${issueDateStr}</cbc:IssueDate>
   <cbc:InvoiceTypeCode>01</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>${escapeXml(currency)}</cbc:DocumentCurrencyCode>
   <cbc:ProfileID>${escapeXml(profileLabel)}</cbc:ProfileID>
   <cac:AccountingSupplierParty>
     <cac:Party>
@@ -90,7 +141,7 @@ export function buildUblInvoiceXml(input: UblInvoiceInput): string {
   </cac:AccountingCustomerParty>
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="COP">${input.taxTotal.toFixed(2)}</cbc:TaxAmount>
-  </cac:TaxTotal>
+  </cac:TaxTotal>${input.withholdingTaxes.map(buildWithholdingTaxTotal).join("")}
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="COP">${input.subtotal.toFixed(2)}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="COP">${input.subtotal.toFixed(2)}</cbc:TaxExclusiveAmount>

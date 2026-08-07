@@ -17,6 +17,14 @@ model Supplier {
   // (ver electronic-invoicing.prisma). Default true = proveedor formal/registrado, el caso
   // comun, para que proveedores existentes no generen documentos soporte sin marcarlo.
   isObligatedToInvoice Boolean @default(true)
+  // Item 37 de docs/ALCANCE.md (informacion exogena DIAN): tipo de documento del tercero
+  // (NIT/CC/CE). Default "NIT" -- la mayoria de proveedores son personas juridicas, y hasta
+  // ahora se asumia NIT implicitamente en todo el modulo (ver electronic-invoicing/README.md).
+  documentType String @default("NIT")
+  // Codigo DANE de municipio del tercero (5 digitos, los primeros 2 codifican el departamento),
+  // mismo campo/criterio que Company.municipalityCode (nomina electronica). Nullable: opcional,
+  // terceros existentes no lo tienen.
+  municipalityCode String?
 
   @@unique([companyId, nit])
   @@index([companyId])
@@ -89,6 +97,17 @@ model Purchase {
   subtotal      Decimal  @db.Decimal(14, 2)
   taxTotal      Decimal  @db.Decimal(14, 2) @default(0)
   total         Decimal  @db.Decimal(14, 2)
+  // Multi-moneda informativa (item 33 de docs/ALCANCE.md): el comprobante contable y el
+  // documento soporte electronico siempre quedan en COP sin importar estos dos campos -- son
+  // solo para mostrar un total de referencia en otra moneda. `exchangeRate` es la TRM capturada
+  // manualmente al momento de la compra (COP por 1 unidad de `currency`), sin fetch automatico.
+  currency      String   @default("COP") // ISO 4217, 3 letras
+  exchangeRate  Decimal  @db.Decimal(14, 4) @default(1)
+  // Suma de retenciones practicadas a este proveedor (RteFuente/ReteICA/ReteIVA, ver
+  // PurchaseWithholding). No reduce `total` (el bruto legal de la factura del proveedor) -- se
+  // descuenta del AccountPayable generado (ver prisma-purchase.repository.ts), que queda neto de
+  // retencion desde su creacion.
+  retentionTotal Decimal @db.Decimal(14, 2) @default(0)
   status        String   @default("REGISTERED") // REGISTERED, CANCELLED
   createdAt     DateTime @default(now())
   // Preparado para documento soporte electronico (DIAN, ver electronic-invoicing.prisma):
@@ -101,10 +120,24 @@ model Purchase {
   journalEntryId String?
 
   accountsPayable AccountPayable[]
+  withholdings    PurchaseWithholding[]
   electronicSupportDocument ElectronicSupportDocument?
 
   @@index([companyId, branchId])
   @@map("purchases")
+}
+
+model PurchaseWithholding {
+  id                   String             @id @default(uuid())
+  purchaseId           String
+  purchase             Purchase           @relation(fields: [purchaseId], references: [id])
+  withholdingConceptId String
+  withholdingConcept   WithholdingConcept @relation(fields: [withholdingConceptId], references: [id])
+  base                 Decimal            @db.Decimal(14, 2)
+  ratePercent          Decimal            @db.Decimal(5, 2) // snapshot del concepto al aplicarse
+  amount               Decimal            @db.Decimal(14, 2)
+
+  @@map("purchase_withholdings")
 }
 
 model AccountPayable {

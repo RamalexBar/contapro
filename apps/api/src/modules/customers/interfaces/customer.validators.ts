@@ -8,4 +8,12 @@ export const createCustomerSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   creditLimit: z.number().nonnegative().optional(),
+  // Item 35 de docs/ALCANCE.md (listas de precios).
+  priceListId: z.string().uuid().optional(),
+  // Item 37 de docs/ALCANCE.md (informacion exogena DIAN): codigo DANE de municipio.
+  municipalityCode: z.string().optional(),
+});
+
+export const updateCustomerPriceListSchema = z.object({
+  priceListId: z.string().uuid().nullable(),
 });

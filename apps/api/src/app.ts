@@ -11,6 +11,7 @@ import { rbacRouter } from "./modules/rbac/interfaces/rbac.routes";
 import { categoryRouter } from "./modules/inventory/category/interfaces/category.routes";
 import { brandRouter } from "./modules/inventory/brand/interfaces/brand.routes";
 import { productRouter } from "./modules/inventory/product/interfaces/product.routes";
+import { priceListRouter } from "./modules/inventory/price-list/interfaces/price-list.routes";
 import { stockRouter } from "./modules/inventory/stock/interfaces/stock.routes";
 import { saleRouter } from "./modules/pos/sale/interfaces/sale.routes";
 import { quoteRouter } from "./modules/pos/quote/interfaces/quote.routes";
@@ -27,9 +28,20 @@ import { timetrackingRouter } from "./modules/timetracking/interfaces/timetracki
 import { payrollRouter } from "./modules/payroll/interfaces/payroll.routes";
 import { accountingRouter } from "./modules/accounting/interfaces/accounting.routes";
 import { suppliersRouter } from "./modules/suppliers/interfaces/suppliers.routes";
+import { expensesRouter } from "./modules/expenses/interfaces/expenses.routes";
 import { electronicInvoicingRouter } from "./modules/electronic-invoicing/interfaces/electronic-invoicing.routes";
 import { syncRouter } from "./modules/sync/interfaces/sync.routes";
 import { billingRouter } from "./modules/billing/interfaces/billing.routes";
+import { collectionsRouter } from "./modules/collections/interfaces/collections.routes";
+import { collectionsWebhookRouter } from "./modules/collections/interfaces/collections-webhook.routes";
+import { opportunityRouter } from "./modules/crm/opportunity/interfaces/opportunity.routes";
+import { recurringInvoiceRouter } from "./modules/recurring-invoices/interfaces/recurring-invoice.routes";
+import { exogenaRouter } from "./modules/exogena/interfaces/exogena.routes";
+import { commissionsRouter } from "./modules/commissions/interfaces/commissions.routes";
+import { fixedAssetsRouter } from "./modules/fixed-assets/interfaces/fixed-assets.routes";
+import { apiKeyRouter } from "./modules/public-api/interfaces/api-key.routes";
+import { publicApiRouter } from "./modules/public-api/interfaces/public-api.routes";
+import { webhooksRouter } from "./modules/webhooks/interfaces/webhooks.routes";
 
 import { saasAdminRouter } from "./modules/saas-admin/interfaces/saas-admin.routes";
 
@@ -52,10 +64,18 @@ app.use("/api", authRouter);
 // shared/middlewares/require-platform-admin.middleware.ts), tiene que montarse antes de que un
 // router tenant-scoped tenga la oportunidad de interceptarlo.
 app.use("/api", saasAdminRouter);
+// Mismo motivo que saasAdminRouter arriba: el webhook de Wompi para cobranza (item 31) no lleva
+// JWT/tenant context, tiene que montarse antes de que un router tenant-scoped lo intercepte.
+app.use("/api", collectionsWebhookRouter);
+// Mismo motivo: la API publica (item 40) se autentica por API key (apiKeyAuthMiddleware), no por
+// JWT (tenantContextMiddleware) -- tiene que montarse antes de que un router tenant-scoped la
+// intercepte.
+app.use("/api", publicApiRouter);
 app.use("/api", rbacRouter);
 app.use("/api", categoryRouter);
 app.use("/api", brandRouter);
 app.use("/api", productRouter);
+app.use("/api", priceListRouter);
 app.use("/api", stockRouter);
 app.use("/api", saleRouter);
 app.use("/api", quoteRouter);
@@ -71,9 +91,18 @@ app.use("/api", timetrackingRouter);
 app.use("/api", payrollRouter);
 app.use("/api", accountingRouter);
 app.use("/api", suppliersRouter);
+app.use("/api", expensesRouter);
 app.use("/api", electronicInvoicingRouter);
 app.use("/api", syncRouter);
 app.use("/api", billingRouter);
+app.use("/api", collectionsRouter);
+app.use("/api", opportunityRouter);
+app.use("/api", recurringInvoiceRouter);
+app.use("/api", exogenaRouter);
+app.use("/api", commissionsRouter);
+app.use("/api", fixedAssetsRouter);
+app.use("/api", apiKeyRouter);
+app.use("/api", webhooksRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: "NOT_FOUND", message: `Ruta no encontrada: ${req.method} ${req.path}` });

@@ -1,3 +1,4 @@
+import { round2 } from "@erp/shared-utils";
 import { prisma } from "../../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { NotFoundError } from "../../../../shared/errors/app-error";
@@ -18,10 +19,23 @@ function toRecord(row: any): SaleRecord {
     discountTotal: Number(row.discountTotal),
     taxTotal: Number(row.taxTotal),
     total: Number(row.total),
+    retentionTotal: Number(row.retentionTotal),
     cufe: row.cufe,
     cude: row.cude,
     invoiceXmlUrl: row.invoiceXmlUrl,
     createdAt: row.createdAt,
+    accountReceivableId: row.accountReceivable?.id ?? null,
+    currency: row.currency,
+    exchangeRate: Number(row.exchangeRate),
+    foreignTotal: row.currency === "COP" ? null : round2(Number(row.total) / Number(row.exchangeRate)),
+    priceListId: row.priceListId,
+    withholdings: row.withholdings.map((w: any) => ({
+      withholdingConceptId: w.withholdingConceptId,
+      type: w.withholdingConcept.type,
+      base: Number(w.base),
+      ratePercent: Number(w.ratePercent),
+      amount: Number(w.amount),
+    })),
     items: row.items.map((item: any) => ({
       id: item.id,
       productId: item.productId,
@@ -38,7 +52,12 @@ function toRecord(row: any): SaleRecord {
   };
 }
 
-const SALE_INCLUDE = { items: true, payments: true } as const;
+const SALE_INCLUDE = {
+  items: true,
+  payments: true,
+  withholdings: { include: { withholdingConcept: { select: { type: true } } } },
+  accountReceivable: { select: { id: true } },
+} as const;
 
 export class PrismaSaleRepository implements ISaleRepository {
   async create(data: CreateSaleData): Promise<SaleRecord> {
@@ -63,6 +82,10 @@ export class PrismaSaleRepository implements ISaleRepository {
           discountTotal: data.discountTotal,
           taxTotal: data.taxTotal,
           total: data.total,
+          retentionTotal: data.retentionTotal,
+          currency: data.currency,
+          exchangeRate: data.exchangeRate,
+          priceListId: data.priceListId,
           items: {
             create: data.items.map((item) => ({
               productId: item.productId,
@@ -79,12 +102,38 @@ export class PrismaSaleRepository implements ISaleRepository {
           payments: {
             create: data.payments.map((p) => ({ method: p.method, amount: p.amount, reference: p.reference })),
           },
+          withholdings: {
+            create: data.withholdings.map((w) => ({
+              withholdingConceptId: w.withholdingConceptId,
+              base: w.base,
+              ratePercent: w.ratePercent,
+              amount: w.amount,
+            })),
+          },
         },
         include: SALE_INCLUDE,
       });
 
       if (data.status === "COMPLETED") {
         await this.applyCompletionSideEffects(tx, sale.id, data.branchId, data.cashSessionId, sale.items, sale.total, sale.sellerUserId);
+      }
+
+      // AccountReceivable (item 31, modulo `collections`) dentro de la MISMA transaccion que la
+      // venta -- no dispara su propia contabilizacion, la venta ya contabilizo el monto CREDIT
+      // como debito a "Clientes" en PostSaleJournalEntryUseCase; esto solo deja el registro
+      // estructurado de quien debe, cuanto y para cuando.
+      if (data.receivable) {
+        await tx.accountReceivable.create({
+          data: {
+            companyId,
+            customerId: data.receivable.customerId,
+            saleId: sale.id,
+            amount: data.receivable.amount,
+            balance: data.receivable.amount,
+            dueDate: data.receivable.dueDate,
+          },
+        });
+        return tx.sale.findFirstOrThrow({ where: { id: sale.id }, include: SALE_INCLUDE });
       }
 
       return sale;
@@ -155,6 +204,28 @@ export class PrismaSaleRepository implements ISaleRepository {
       orderBy: { createdAt: "desc" },
       take: filters.take ?? 50,
       skip: filters.skip ?? 0,
+    });
+    return rows.map(toRecord);
+  }
+
+  async listForYear(year: number): Promise<SaleRecord[]> {
+    const from = new Date(year, 0, 1);
+    const to = new Date(year + 1, 0, 1);
+    const rows = await prisma.sale.findMany({
+      where: { status: { in: ["COMPLETED", "RETURNED_PARTIAL"] }, createdAt: { gte: from, lt: to } },
+      include: SALE_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(toRecord);
+  }
+
+  async listForPeriod(year: number, month: number): Promise<SaleRecord[]> {
+    const from = new Date(year, month - 1, 1);
+    const to = new Date(year, month, 1);
+    const rows = await prisma.sale.findMany({
+      where: { status: { in: ["COMPLETED", "RETURNED_PARTIAL"] }, createdAt: { gte: from, lt: to } },
+      include: SALE_INCLUDE,
+      orderBy: { createdAt: "asc" },
     });
     return rows.map(toRecord);
   }

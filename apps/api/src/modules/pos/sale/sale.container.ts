@@ -1,9 +1,13 @@
 import { PrismaAuditLogRepository } from "../../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../../audit/application/audit.service";
 import { PrismaUserRepository } from "../../auth/infrastructure/prisma-user.repository";
-import { postSaleJournalEntryUseCase } from "../../accounting/accounting.container";
-import { generateElectronicInvoiceUseCase } from "../../electronic-invoicing/electronic-invoicing.container";
+import { postSaleJournalEntryUseCase, withholdingConceptRepository } from "../../accounting/accounting.container";
+import { generateElectronicInvoiceUseCase, sendInvoiceWhatsAppUseCase } from "../../electronic-invoicing/electronic-invoicing.container";
+import { accountReceivableRepo } from "../../collections/collections.container";
 import { productRepo } from "../../inventory/product/product.container";
+import { priceListRepository } from "../../inventory/price-list/price-list.container";
+import { customerRepo } from "../../customers/customer.container";
+import { webhookDispatcherService } from "../../webhooks/webhooks.container";
 import { PrismaSaleRepository } from "./infrastructure/prisma-sale.repository";
 import { PrismaDiscountLimitRepository } from "./infrastructure/prisma-discount-limit.repository";
 import { CreateSaleUseCase } from "./application/use-cases/create-sale.use-case";
@@ -24,8 +28,13 @@ export const createSaleUseCase = new CreateSaleUseCase(
   saleRepo,
   productRepo,
   discountLimitRepo,
+  withholdingConceptRepository,
+  customerRepo,
+  priceListRepository,
   postSaleJournalEntryUseCase,
   generateElectronicInvoiceUseCase,
+  webhookDispatcherService,
+  sendInvoiceWhatsAppUseCase,
   auditService
 );
 
@@ -37,9 +46,10 @@ export const saleController = new SaleController(
     postSaleJournalEntryUseCase,
     generateElectronicInvoiceUseCase,
     productRepo,
+    accountReceivableRepo,
     auditService
   ),
-  new CancelSaleUseCase(saleRepo, auditService),
+  new CancelSaleUseCase(saleRepo, accountReceivableRepo, auditService),
   new GetSaleUseCase(saleRepo),
   new ListSalesUseCase(saleRepo)
 );

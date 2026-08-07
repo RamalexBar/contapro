@@ -11,6 +11,8 @@ import { PrismaFinancialPeriodRepository } from "./infrastructure/prisma-financi
 import { PrismaBankAccountRepository } from "./infrastructure/prisma-bank-account.repository";
 import { PrismaBankTransactionRepository } from "./infrastructure/prisma-bank-transaction.repository";
 import { PrismaBankReconciliationRepository } from "./infrastructure/prisma-bank-reconciliation.repository";
+import { PrismaWithholdingConceptRepository } from "./infrastructure/prisma-withholding-concept.repository";
+import { PrismaCostCenterRepository } from "./infrastructure/prisma-cost-center.repository";
 import { AccountingReportsService } from "./application/accounting-reports.service";
 import { CreateAccountUseCase } from "./application/use-cases/create-account.use-case";
 import { CreateJournalEntryUseCase } from "./application/use-cases/create-journal-entry.use-case";
@@ -22,6 +24,10 @@ import { PostReturnJournalEntryUseCase } from "./application/use-cases/post-retu
 import { PostPurchaseJournalEntryUseCase } from "./application/use-cases/post-purchase-journal-entry.use-case";
 import { PostSupplierPaymentJournalEntryUseCase } from "./application/use-cases/post-supplier-payment-journal-entry.use-case";
 import { PostCashSessionAdjustmentJournalEntryUseCase } from "./application/use-cases/post-cash-session-adjustment-journal-entry.use-case";
+import { PostExpenseJournalEntryUseCase } from "./application/use-cases/post-expense-journal-entry.use-case";
+import { PostCommissionJournalEntryUseCase } from "./application/use-cases/post-commission-journal-entry.use-case";
+import { PostDepreciationJournalEntryUseCase } from "./application/use-cases/post-depreciation-journal-entry.use-case";
+import { PostReceivableCollectionJournalEntryUseCase } from "./application/use-cases/post-receivable-collection-journal-entry.use-case";
 import { CreateBankAccountUseCase } from "./application/use-cases/create-bank-account.use-case";
 import { ListBankAccountsUseCase } from "./application/use-cases/list-bank-accounts.use-case";
 import { RegisterBankTransactionUseCase } from "./application/use-cases/register-bank-transaction.use-case";
@@ -34,6 +40,14 @@ import { ListBankReconciliationsUseCase } from "./application/use-cases/list-ban
 import { SuggestBankReconciliationMatchesUseCase } from "./application/use-cases/suggest-bank-reconciliation-matches.use-case";
 import { CloseFinancialPeriodUseCase } from "./application/use-cases/close-financial-period.use-case";
 import { ReopenFinancialPeriodUseCase } from "./application/use-cases/reopen-financial-period.use-case";
+import { CreateWithholdingConceptUseCase } from "./application/use-cases/create-withholding-concept.use-case";
+import { UpdateWithholdingConceptUseCase } from "./application/use-cases/update-withholding-concept.use-case";
+import { DeactivateWithholdingConceptUseCase } from "./application/use-cases/deactivate-withholding-concept.use-case";
+import { ListWithholdingConceptsUseCase } from "./application/use-cases/list-withholding-concepts.use-case";
+import { CreateCostCenterUseCase } from "./application/use-cases/create-cost-center.use-case";
+import { UpdateCostCenterUseCase } from "./application/use-cases/update-cost-center.use-case";
+import { DeactivateCostCenterUseCase } from "./application/use-cases/deactivate-cost-center.use-case";
+import { ListCostCentersUseCase } from "./application/use-cases/list-cost-centers.use-case";
 import { AccountingController } from "./interfaces/accounting.controller";
 
 const accountRepo = new PrismaChartOfAccountsRepository();
@@ -43,11 +57,13 @@ const bankAccountRepo = new PrismaBankAccountRepository();
 const bankTransactionRepo = new PrismaBankTransactionRepository();
 const bankReconciliationRepo = new PrismaBankReconciliationRepository();
 const financialPeriodRepo = new PrismaFinancialPeriodRepository();
+const withholdingConceptRepo = new PrismaWithholdingConceptRepository();
+const costCenterRepo = new PrismaCostCenterRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessionRepo, bankTransactionRepo);
 
 const createAccountUseCase = new CreateAccountUseCase(accountRepo, auditService);
-const createEntryUseCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, financialPeriodRepo, auditService);
+const createEntryUseCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, financialPeriodRepo, costCenterRepo, auditService);
 const postEntryUseCase = new PostJournalEntryUseCase(journalRepo, auditService);
 
 /** Usado tambien por suppliers.container.ts (CancelPurchaseUseCase) para anular el comprobante de
@@ -74,8 +90,24 @@ export const accountingController = new AccountingController(
   new ListBankReconciliationsUseCase(bankReconciliationRepo),
   new SuggestBankReconciliationMatchesUseCase(bankReconciliationRepo, bankTransactionRepo, journalRepo),
   new CloseFinancialPeriodUseCase(financialPeriodRepo, journalRepo, auditService),
-  new ReopenFinancialPeriodUseCase(financialPeriodRepo, auditService)
+  new ReopenFinancialPeriodUseCase(financialPeriodRepo, auditService),
+  new CreateWithholdingConceptUseCase(withholdingConceptRepo, auditService),
+  new UpdateWithholdingConceptUseCase(withholdingConceptRepo, auditService),
+  new DeactivateWithholdingConceptUseCase(withholdingConceptRepo, auditService),
+  new ListWithholdingConceptsUseCase(withholdingConceptRepo),
+  new CreateCostCenterUseCase(costCenterRepo, auditService),
+  new UpdateCostCenterUseCase(costCenterRepo, auditService),
+  new DeactivateCostCenterUseCase(costCenterRepo, auditService),
+  new ListCostCentersUseCase(costCenterRepo)
 );
+
+/** Usado por sale.container.ts y suppliers.container.ts para resolver los conceptos de retencion
+ * aplicados a una venta/compra (validar que existan, esten activos y tomar su tarifa vigente). */
+export const withholdingConceptRepository = withholdingConceptRepo;
+
+/** Usado por expenses.container.ts para validar el centro de costo opcional de un gasto (item 34
+ * de docs/ALCANCE.md). */
+export const costCenterRepository = costCenterRepo;
 
 /** Usado por payroll.container.ts para generar el comprobante de nomina al aprobar un periodo. */
 export const postPayrollJournalEntryUseCase = new PostPayrollJournalEntryUseCase(
@@ -110,3 +142,19 @@ export const postCashSessionAdjustmentJournalEntryUseCase = new PostCashSessionA
   createEntryUseCase,
   postEntryUseCase
 );
+
+/** Usado por expenses.container.ts para contabilizar un gasto operativo al registrarse. */
+export const postExpenseJournalEntryUseCase = new PostExpenseJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
+
+/** Usado por collections.container.ts para contabilizar un cobro sobre una cuenta por cobrar. */
+export const postReceivableCollectionJournalEntryUseCase = new PostReceivableCollectionJournalEntryUseCase(
+  accountRepo,
+  createEntryUseCase,
+  postEntryUseCase
+);
+
+/** Usado por commissions.container.ts para contabilizar el pago de una liquidacion de comisiones. */
+export const postCommissionJournalEntryUseCase = new PostCommissionJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
+
+/** Usado por fixed-assets.container.ts para contabilizar una entrada de depreciacion. */
+export const postDepreciationJournalEntryUseCase = new PostDepreciationJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);

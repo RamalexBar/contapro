@@ -204,12 +204,13 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
   async listForLifecycleCheck(): Promise<SubscriptionForLifecycleCheck[]> {
     const rows = await basePrisma.subscription.findMany({
       where: { status: { in: LIFECYCLE_STATUSES } },
-      include: { company: { select: { name: true, email: true } }, plan: { select: { name: true } } },
+      include: { company: { select: { name: true, email: true, phone: true } }, plan: { select: { name: true } } },
     });
     return rows.map((row) => ({
       ...toRecord(row),
       companyName: row.company.name,
       companyEmail: row.company.email,
+      companyPhone: row.company.phone,
       planName: row.plan.name,
     }));
   }

@@ -9,6 +9,8 @@ import type { PayPayrollUseCase } from "../application/use-cases/pay-payroll.use
 import type { CreatePayrollDeductionUseCase } from "../application/use-cases/create-payroll-deduction.use-case";
 import type { ListPayrollDeductionsUseCase } from "../application/use-cases/list-payroll-deductions.use-case";
 import type { CancelPayrollDeductionUseCase } from "../application/use-cases/cancel-payroll-deduction.use-case";
+import type { SendPayslipWhatsAppUseCase } from "../application/use-cases/send-payslip-whatsapp.use-case";
+import type { IWhatsAppDeliveryLogRepository } from "../../whatsapp/domain/whatsapp-delivery-log.repository";
 import type { IPayrollRepository } from "../domain/payroll.repository";
 import type { PayrollDeductionStatus } from "../domain/payroll-deduction.repository";
 import type { IEmployeeRepository } from "../../employees/domain/employee.repository";
@@ -32,7 +34,9 @@ export class PayrollController {
     private readonly payPayrollUseCase: PayPayrollUseCase,
     private readonly createDeductionUseCase: CreatePayrollDeductionUseCase,
     private readonly listDeductionsUseCase: ListPayrollDeductionsUseCase,
-    private readonly cancelDeductionUseCase: CancelPayrollDeductionUseCase
+    private readonly cancelDeductionUseCase: CancelPayrollDeductionUseCase,
+    private readonly whatsAppDeliveryLogRepo: IWhatsAppDeliveryLogRepository,
+    private readonly sendPayslipWhatsAppUseCase: SendPayslipWhatsAppUseCase
   ) {}
 
   createParameter = async (req: Request, res: Response, next: NextFunction) => {
@@ -148,6 +152,33 @@ export class PayrollController {
   cancelDeduction = async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(await this.cancelDeductionUseCase.execute(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ---- Envio del desprendible por WhatsApp (item 41 de docs/ALCANCE.md), ver
+  // application/use-cases/send-payslip-whatsapp.use-case.ts. ----
+
+  listPayslipWhatsAppDeliveries = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const deliveries = await this.whatsAppDeliveryLogRepo.list({
+        companyId: getTenantContext().companyId,
+        messageType: "PAYSLIP",
+        referenceId: req.params.id,
+      });
+      res.json({ data: deliveries });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resendPayslipWhatsApp = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const payslip = await this.payrollRepo.findPayslipByIdOrThrow(req.params.id);
+      const employeeId = (payslip.summaryJson as { employeeId: string }).employeeId;
+      await this.sendPayslipWhatsAppUseCase.execute({ payslipId: payslip.id, employeeId });
+      res.status(204).send();
     } catch (err) {
       next(err);
     }

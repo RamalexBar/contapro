@@ -9,6 +9,59 @@ enum AccountType {
   EXPENSE
 }
 
+enum WithholdingType {
+  RETEFUENTE
+  RETEICA
+  RETEIVA
+}
+
+// Conceptos de retencion configurables por empresa (ver post-sale-journal-entry.use-case.ts y
+// post-purchase-journal-entry.use-case.ts): cada uno agrega en una de 6 cuentas fijas por tipo
+// (una por tipo x direccion venta/compra), nunca una cuenta por concepto -- mismo criterio que ya
+// usa 2408 para IVA sin importar la tarifa del producto. Tarifa (ratePercent) se snapshotea en
+// SaleWithholding/PurchaseWithholding al aplicarse, para que editar el concepto despues no altere
+// ventas/compras ya registradas.
+model WithholdingConcept {
+  id          String          @id @default(uuid())
+  companyId   String
+  code        String
+  name        String
+  type        WithholdingType
+  ratePercent Decimal         @db.Decimal(5, 2)
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  // Item 37 de docs/ALCANCE.md (informacion exogena DIAN, formato 1003): codigo numerico DIAN de
+  // concepto de retencion (ej. 1301 compras, 1302 servicios) -- distinto de `code`, que es libre
+  // por empresa. Nullable: sin asignar, el reporte marca las filas de este concepto como
+  // "conceptoIncompleto" en vez de fallar.
+  dianConceptCode String?
+
+  saleWithholdings     SaleWithholding[]
+  purchaseWithholdings PurchaseWithholding[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("withholding_concepts")
+}
+
+// Centros de costo (item 34 de docs/ALCANCE.md): catalogo simple para segmentar comprobantes por
+// area/proyecto -- mismo criterio que WithholdingConcept arriba. A diferencia de `branchId` en
+// JournalEntry (presente en el schema desde la iteracion 1 pero nunca leido por ningun reporte,
+// mismo patron de columna muerta que Company.currency en el item 33), este campo SI se filtra en
+// AccountingReportsService.getIncomeStatement/getLedger -- ver ese archivo.
+model CostCenter {
+  id        String   @id @default(uuid())
+  companyId String
+  code      String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("cost_centers")
+}
+
 model ChartOfAccounts {
   id             String            @id @default(uuid())
   companyId      String
@@ -31,6 +84,10 @@ model JournalEntry {
   id              String    @id @default(uuid())
   companyId       String
   branchId        String?
+  // Item 34: etiquetado opcional, hoy solo via comprobante manual o gasto operativo (ver
+  // create-journal-entry.use-case.ts / post-expense-journal-entry.use-case.ts). Sin relacion de
+  // Prisma declarada ni FK -- mismo criterio que accountId/branchId en este mismo modelo.
+  costCenterId    String?
   number          Int
   date            DateTime
   description     String

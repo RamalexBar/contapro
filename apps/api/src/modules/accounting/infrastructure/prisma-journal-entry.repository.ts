@@ -19,6 +19,7 @@ type EntryRow = {
   status: string;
   createdByUserId: string;
   postedAt: Date | null;
+  costCenterId: string | null;
   lines: { id: string; accountId: string; debit: unknown; credit: unknown; description: string | null }[];
 };
 
@@ -34,6 +35,7 @@ function toRecord(row: EntryRow): JournalEntryRecord {
     status: row.status,
     createdByUserId: row.createdByUserId,
     postedAt: row.postedAt,
+    costCenterId: row.costCenterId,
     lines: row.lines.map((l) => ({
       id: l.id,
       accountId: l.accountId,
@@ -64,6 +66,7 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
           sourceType: data.sourceType,
           sourceId: data.sourceId,
           createdByUserId: data.createdByUserId,
+          costCenterId: data.costCenterId,
           lines: {
             create: data.lines.map((l) => ({
               accountId: l.accountId,
@@ -104,7 +107,7 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
     return toRecord(row);
   }
 
-  async listPostedLines(filter: { from?: Date; to?: Date; accountId?: string }): Promise<PostedLineAggregate[]> {
+  async listPostedLines(filter: { from?: Date; to?: Date; accountId?: string; costCenterId?: string }): Promise<PostedLineAggregate[]> {
     const companyId = getTenantContext().companyId;
     const rows = await prisma.journalEntryLine.findMany({
       where: {
@@ -113,6 +116,7 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
           companyId,
           status: "POSTED",
           date: { gte: filter.from, lte: filter.to },
+          costCenterId: filter.costCenterId,
         },
       },
       include: { journalEntry: true },

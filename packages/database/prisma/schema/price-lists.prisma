@@ -1,0 +1,31 @@
+// Listas de precios (item 35 de docs/ALCANCE.md): un producto tiene un precio base
+// (Product.currentPrice) mas, opcionalmente, un precio distinto por lista
+// (ProductPriceListEntry). Si un producto no tiene fila en la lista efectiva de una venta o
+// cotizacion, se usa el precio base -- ver apps/api/src/modules/inventory/price-list/
+// application/resolve-effective-price.ts.
+
+model PriceList {
+  id        String   @id @default(uuid())
+  companyId String
+  code      String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  productPrices ProductPriceListEntry[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("price_lists")
+}
+
+model ProductPriceListEntry {
+  id          String    @id @default(uuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  productId   String
+  price       Decimal   @db.Decimal(14, 4)
+
+  @@unique([priceListId, productId])
+  @@map("product_price_list_entries")
+}

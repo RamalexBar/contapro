@@ -1,6 +1,7 @@
 import { round2 } from "@erp/shared-utils";
 import type { IChartOfAccountsRepository } from "../../domain/chart-of-accounts.repository";
 import type { JournalEntryRecord } from "../../domain/journal-entry.repository";
+import type { WithholdingType } from "../../domain/withholding-concept.repository";
 import { CreateJournalEntryUseCase } from "./create-journal-entry.use-case";
 import { PostJournalEntryUseCase } from "./post-journal-entry.use-case";
 
@@ -14,6 +15,20 @@ const STANDARD_ACCOUNTS = {
   // Misma cuenta que usa PostPurchaseJournalEntryUseCase para el IVA descontable: el PUC
   // colombiano netea IVA generado (credito) e IVA descontable (debito) en la cuenta 2408.
   ivaPorPagar: { code: "2408", name: "Impuesto sobre las ventas por pagar", type: "LIABILITY" as const },
+  // Retenciones que el CLIENTE practica sobre esta venta: para Contapro (el vendedor) son plata
+  // ya "pagada" al fisco por adelantado a su nombre, no un pasivo -- de ahi que sean cuentas de
+  // ACTIVO (anticipo de impuestos), no de pasivo como en post-purchase-journal-entry.use-case.ts
+  // (donde Contapro es quien retiene). Una cuenta fija por tipo, nunca por concepto -- mismo
+  // criterio que 2408 para IVA sin importar la tarifa.
+  anticipoRetefuente: { code: "135515", name: "Anticipo de impuestos - Retencion en la fuente", type: "ASSET" as const },
+  anticipoReteica: { code: "135517", name: "Anticipo de impuestos - Retencion de ICA", type: "ASSET" as const },
+  anticipoReteiva: { code: "135518", name: "Anticipo de impuestos - Retencion de IVA", type: "ASSET" as const },
+};
+
+const WITHHOLDING_ACCOUNT_KEY: Record<WithholdingType, "anticipoRetefuente" | "anticipoReteica" | "anticipoReteiva"> = {
+  RETEFUENTE: "anticipoRetefuente",
+  RETEICA: "anticipoReteica",
+  RETEIVA: "anticipoReteiva",
 };
 
 export interface SaleJournalEntryInput {
@@ -25,14 +40,24 @@ export interface SaleJournalEntryInput {
   discountTotal: number;
   taxTotal: number;
   total: number;
+  retentionTotal: number;
+  withholdingsByType: Record<WithholdingType, number>;
   payments: { method: string; amount: number }[];
+  // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- opcional para no romper callers/
+  // fixtures existentes; default "COP"/1 no cambia la descripcion del comprobante. Los montos
+  // debito/credito de este comprobante SIEMPRE son en COP, sin importar estos dos campos.
+  currency?: string;
+  exchangeRate?: number;
 }
 
 /**
- * Contabiliza una venta COMPLETED: debito Caja (efectivo), Bancos (tarjeta/transferencia) y/o
- * Clientes (saldo no cubierto por los pagos registrados, ej. ventas a credito), credito
- * Ingresos por ventas (base gravable) + IVA generado. Las cuentas estandar se crean solas la
- * primera vez que se usan (upsertByCode), igual que en PostPayrollJournalEntryUseCase.
+ * Contabiliza una venta COMPLETED: debito Caja (efectivo), Bancos (tarjeta/transferencia),
+ * Clientes (saldo no cubierto por los pagos registrados, ej. ventas a credito) y/o Anticipo de
+ * impuestos (retenciones practicadas por el cliente, ver STANDARD_ACCOUNTS arriba); credito
+ * Ingresos por ventas (base gravable) + IVA generado. `total` sigue siendo el bruto legal de la
+ * factura -- lo que cambia con retencion es como se reparte ese debito entre caja/bancos/clientes
+ * (neto de lo retenido, `netTotal`) y las 3 cuentas de anticipo. Las cuentas estandar se crean
+ * solas la primera vez que se usan (upsertByCode), igual que en PostPayrollJournalEntryUseCase.
  */
 export class PostSaleJournalEntryUseCase {
   constructor(
@@ -46,6 +71,7 @@ export class PostSaleJournalEntryUseCase {
 
     const accounts = await this.ensureAccounts();
     const taxableBase = round2(input.subtotal - input.discountTotal);
+    const netTotal = round2(input.total - input.retentionTotal);
 
     let cash = 0;
     let bank = 0;
@@ -56,12 +82,28 @@ export class PostSaleJournalEntryUseCase {
       else otherPayments += payment.amount;
     }
     const paymentsTotal = round2(cash + bank + otherPayments);
-    const receivable = round2(otherPayments + (input.total - paymentsTotal));
+    const receivable = round2(otherPayments + (netTotal - paymentsTotal));
+
+    const withholdingLines = (Object.entries(input.withholdingsByType) as [WithholdingType, number][]).map(
+      ([type, amount]) => ({
+        accountId: accounts[WITHHOLDING_ACCOUNT_KEY[type]].id,
+        debit: round2(amount),
+        credit: 0,
+        description: `Retencion practicada por el cliente (${type})`,
+      })
+    );
+
+    const currency = input.currency ?? "COP";
+    const exchangeRate = input.exchangeRate ?? 1;
+    const description =
+      currency === "COP"
+        ? `Venta #${input.number}`
+        : `Venta #${input.number} (${currency} ${round2(input.total / exchangeRate)} @ TRM ${exchangeRate})`;
 
     const entry = await this.createEntry.execute({
       branchId: input.branchId,
       date: input.date,
-      description: `Venta #${input.number}`,
+      description,
       type: "SALE",
       sourceType: "Sale",
       sourceId: input.saleId,
@@ -69,6 +111,7 @@ export class PostSaleJournalEntryUseCase {
         { accountId: accounts.caja.id, debit: round2(cash), credit: 0, description: "Efectivo" },
         { accountId: accounts.bancos.id, debit: round2(bank), credit: 0, description: "Tarjeta/transferencia" },
         { accountId: accounts.clientes.id, debit: receivable, credit: 0, description: "Ventas a credito" },
+        ...withholdingLines,
         { accountId: accounts.ingresosPorVentas.id, debit: 0, credit: taxableBase, description: "Ingreso por ventas" },
         { accountId: accounts.ivaPorPagar.id, debit: 0, credit: input.taxTotal, description: "IVA generado" },
       ].filter((line) => line.debit > 0 || line.credit > 0),

@@ -57,6 +57,15 @@ const envSchema = z.object({
   WOMPI_PRIVATE_KEY: z.string().default(""),
   WOMPI_INTEGRITY_SECRET: z.string().default(""),
   WOMPI_EVENTS_SECRET: z.string().default(""),
+
+  // ---- WhatsApp Business Cloud API, Meta (ver modules/whatsapp/README.md) ----
+  // Vacios por defecto = envio real deshabilitado (mismo criterio que DIAN_*/RESEND_*/WOMPI_*
+  // de arriba): el envio de documentos/recordatorios por WhatsApp falla con mensaje claro y,
+  // segun el flujo, o queda auditado como fallo (documentos) o cae automaticamente a email
+  // (recordatorios) -- nunca un crash silencioso.
+  WHATSAPP_ACCESS_TOKEN: z.string().default(""),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().default(""),
+  WHATSAPP_API_VERSION: z.string().default("v21.0"),
 });
 
 const parsed = envSchema.safeParse(process.env);

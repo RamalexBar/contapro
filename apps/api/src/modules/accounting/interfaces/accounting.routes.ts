@@ -115,3 +115,37 @@ accountingRouter.post(
   requirePermission("accounting.manage"),
   accountingController.reopenFinancialPeriod
 );
+
+accountingRouter.get(
+  "/withholding-concepts",
+  requirePermission("accounting.read"),
+  accountingController.listWithholdingConcepts
+);
+accountingRouter.post(
+  "/withholding-concepts",
+  requirePermission("accounting.manage"),
+  accountingController.createWithholdingConcept
+);
+accountingRouter.patch(
+  "/withholding-concepts/:id",
+  requirePermission("accounting.manage"),
+  accountingController.updateWithholdingConcept
+);
+accountingRouter.post(
+  "/withholding-concepts/:id/deactivate",
+  requirePermission("accounting.manage"),
+  accountingController.deactivateWithholdingConcept
+);
+
+accountingRouter.get("/cost-centers", requirePermission("accounting.read"), accountingController.listCostCenters);
+accountingRouter.post("/cost-centers", requirePermission("accounting.manage"), accountingController.createCostCenter);
+accountingRouter.patch(
+  "/cost-centers/:id",
+  requirePermission("accounting.manage"),
+  accountingController.updateCostCenter
+);
+accountingRouter.post(
+  "/cost-centers/:id/deactivate",
+  requirePermission("accounting.manage"),
+  accountingController.deactivateCostCenter
+);

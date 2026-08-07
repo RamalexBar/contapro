@@ -1,0 +1,50 @@
+// Item 36 de docs/ALCANCE.md: facturacion recurrente a clientes propios del tenant (distinto del
+// motor de recurrencia de saas-admin/billing, que cobra la suscripcion de la EMPRESA misma).
+model RecurringInvoice {
+  id          String    @id @default(uuid())
+  companyId   String
+  customerId  String
+  branchId    String
+  name        String
+  // Reservado para el futuro -- hoy solo se soporta "MONTHLY" (dia fijo del mes, 1-28).
+  frequency   String    @default("MONTHLY")
+  dayOfMonth  Int
+  priceListId String?
+  dueDays     Int       @default(30)
+  isActive    Boolean   @default(true)
+  nextRunDate DateTime
+  lastRunDate DateTime?
+  createdAt   DateTime  @default(now())
+
+  items RecurringInvoiceItem[]
+  runs  RecurringInvoiceRun[]
+
+  @@index([companyId])
+  @@index([nextRunDate, isActive])
+  @@map("recurring_invoices")
+}
+
+model RecurringInvoiceItem {
+  id                 String           @id @default(uuid())
+  recurringInvoiceId String
+  recurringInvoice   RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id])
+  productId          String
+  quantity           Decimal          @db.Decimal(14, 4)
+
+  @@map("recurring_invoice_items")
+}
+
+model RecurringInvoiceRun {
+  id                 String           @id @default(uuid())
+  recurringInvoiceId String
+  recurringInvoice   RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id])
+  runDate            DateTime
+  // "SUCCESS" | "FAILED"
+  status             String
+  saleId             String?
+  errorMessage       String?
+  createdAt          DateTime         @default(now())
+
+  @@index([recurringInvoiceId])
+  @@map("recurring_invoice_runs")
+}

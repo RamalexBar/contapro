@@ -10,6 +10,9 @@ export interface CreateQuoteData {
   sellerUserId: string;
   validUntil: Date;
   items: QuoteItemInput[];
+  // Lista de precios efectiva ya resuelta por CreateQuoteUseCase (item 35 de docs/ALCANCE.md) --
+  // mismo criterio que Sale.priceListId.
+  priceListId: string | null;
 }
 
 export interface QuoteRecord {
@@ -19,6 +22,7 @@ export interface QuoteRecord {
   total: number;
   validUntil: Date;
   createdAt: Date;
+  priceListId: string | null;
 }
 
 export interface IQuoteRepository {

@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: "/time-off", label: "Vacaciones", permissions: ["timeoff.request", "timeoff.manage", "timeoff.read"] },
   { to: "/rbac", label: "Roles y permisos", permissions: ["rbac.manage"] },
   { to: "/customers", label: "Clientes", permissions: ["customer.read"] },
+  { to: "/crm", label: "Oportunidades", permissions: ["opportunity.read"] },
   { to: "/audit", label: "Auditoria", permissions: ["audit.read"] },
   {
     to: "/quotes-notes",
@@ -22,8 +23,15 @@ const NAV_ITEMS = [
   },
   { to: "/accounting", label: "Contabilidad", permissions: ["accounting.read"] },
   { to: "/accounting/banks", label: "Bancos", permissions: ["accounting.read"] },
+  { to: "/accounting/exogena", label: "Exógena DIAN", permissions: ["accounting.read"] },
   { to: "/suppliers", label: "Proveedores", permissions: ["suppliers.read"] },
   { to: "/purchase-orders", label: "Ordenes de compra", permissions: ["suppliers.read"] },
+  { to: "/expenses", label: "Gastos", permissions: ["expense.read"] },
+  { to: "/collections", label: "Cuentas por cobrar", permissions: ["collection.read"] },
+  { to: "/recurring-invoices", label: "Facturacion recurrente", permissions: ["recurring-invoice.read"] },
+  { to: "/commissions", label: "Comisiones", permissions: ["commission.read"] },
+  { to: "/fixed-assets", label: "Activos fijos", permissions: ["fixed-asset.read"] },
+  { to: "/integrations", label: "Integraciones", permissions: ["api-key.read", "webhook.read"] },
   { to: "/billing", label: "Mi suscripcion", permissions: ["billing.manage"] },
 ];
 

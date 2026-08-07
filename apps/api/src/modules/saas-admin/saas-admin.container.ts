@@ -18,6 +18,7 @@ import { GetSaasDashboardUseCase } from "./application/use-cases/get-saas-dashbo
 import { RunSubscriptionLifecycleUseCase } from "./application/use-cases/run-subscription-lifecycle.use-case";
 import { CreateSubscriptionCheckoutUseCase } from "./application/use-cases/create-subscription-checkout.use-case";
 import { ConfirmWompiPaymentUseCase } from "./application/use-cases/confirm-wompi-payment.use-case";
+import { whatsAppSender } from "../whatsapp/whatsapp.container";
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
 
 const platformAdminRepo = new PrismaPlatformAdminRepository();
@@ -51,5 +52,6 @@ export const saasAdminController = new SaasAdminController(
 export const runSubscriptionLifecycleUseCase = new RunSubscriptionLifecycleUseCase(
   subscriptionRepo,
   new ResendEmailNotifier(),
+  whatsAppSender,
   auditService
 );

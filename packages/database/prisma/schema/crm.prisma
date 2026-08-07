@@ -1,0 +1,58 @@
+// CRM basico: pipeline de negociacion (item 32 de docs/ALCANCE.md). Quote.status ya tenia un
+// comentario sugiriendo un valor CONVERTED, pero esta muerto (ningun caso de uso lo escribe,
+// Sale no tiene ninguna relacion con Quote) -- por eso este modelo es nuevo en vez de
+// resucitarlo. Al cerrarse como ganada, una Opportunity se convierte en una Sale real via
+// CreateSaleUseCase (reuso cross-modulo, ver opportunity.container.ts), que a su vez ya crea
+// automaticamente una AccountReceivable si el pago es CREDIT (item 31). Ver
+// apps/api/src/modules/crm/opportunity/README.md
+
+model Opportunity {
+  id                String    @id @default(uuid())
+  companyId         String
+  branchId          String
+  customerId        String
+  ownerUserId       String
+  title             String
+  description       String?
+  // PROSPECTO, CONTACTO, PROPUESTA, NEGOCIACION (abiertas, se puede mover libremente entre
+  // ellas) y GANADA, PERDIDA (terminales). String plano, no enum de Prisma -- mismo criterio que
+  // Quote.status/Order.status. Validado en opportunity.validators.ts. GANADA solo se alcanza via
+  // CloseOpportunityAsWonUseCase (crea la Sale); UpdateStageUseCase rechaza ese valor.
+  stage             String    @default("PROSPECTO")
+  expectedValue     Decimal   @db.Decimal(14, 2)
+  expectedCloseDate DateTime?
+  lostReason        String?
+  wonAt             DateTime?
+  lostAt            DateTime?
+  // Seteado unicamente por CloseOpportunityAsWonUseCase.
+  saleId            String?   @unique
+  sale              Sale?     @relation(fields: [saleId], references: [id])
+  createdAt         DateTime  @default(now())
+
+  items OpportunityItem[]
+
+  @@index([companyId, branchId])
+  @@index([companyId, stage])
+  @@index([customerId])
+  @@map("opportunities")
+}
+
+model OpportunityItem {
+  id              String      @id @default(uuid())
+  opportunityId   String
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+  productId       String
+  quantity        Decimal     @db.Decimal(14, 4)
+  // Precio negociado, informativo (calcula expectedValue). CloseOpportunityAsWonUseCase NO lo
+  // envia a CreateSaleUseCase -- este siempre re-cotiza al precio vigente del producto (ver
+  // create-sale.use-case.ts), asi que el valor final facturado puede diferir del negociado si el
+  // precio del producto cambio entre tanto. Limitacion documentada, ver README del modulo.
+  unitPrice       Decimal     @db.Decimal(14, 4)
+  discountPercent Decimal     @db.Decimal(5, 2) @default(0)
+  // Incluye IVA (calculado con el taxRate vigente del producto al crear la oportunidad) --
+  // necesario porque CloseOpportunityAsWonUseCase usa expectedValue (suma de estos totales) como
+  // monto del pago que le pasa a CreateSaleUseCase, y ese exige cubrir el neto CON impuesto.
+  total           Decimal     @db.Decimal(14, 2)
+
+  @@map("opportunity_items")
+}
