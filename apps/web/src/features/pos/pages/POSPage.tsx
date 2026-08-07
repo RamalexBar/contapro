@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyDiscount, calculateTax, formatCOP, formatCurrency, round2 } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
@@ -172,6 +172,31 @@ export function POSPage() {
     });
   }
 
+  // Un lector de codigo de barras USB/Bluetooth funciona como un teclado: "escribe" el codigo
+  // en el campo enfocado y termina con Enter. Filtramos en el cliente (el catalogo completo ya
+  // se carga de una vez, tope de 100 productos igual que el resto de la app) para que ese Enter
+  // agregue el producto sin round-trip adicional al backend.
+  const [productSearch, setProductSearch] = useState("");
+  const normalizedSearch = productSearch.trim().toLowerCase();
+  const visibleProducts = (products?.data ?? []).filter((p) => {
+    if (!normalizedSearch) return true;
+    return p.name.toLowerCase().includes(normalizedSearch) || p.barcodes.some((b) => b.toLowerCase().includes(normalizedSearch));
+  });
+
+  function handleProductSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const term = productSearch.trim();
+    if (!term) return;
+    const exactBarcodeMatch = products?.data.find((p) => p.barcodes.includes(term));
+    const singleVisibleMatch = visibleProducts.length === 1 ? visibleProducts[0] : undefined;
+    const match = exactBarcodeMatch ?? singleVisibleMatch;
+    if (match) {
+      addToCart(match);
+      setProductSearch("");
+    }
+  }
+
   return (
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Punto de venta</h1>
@@ -184,6 +209,14 @@ export function POSPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="mb-3 text-sm font-semibold text-slate-900">Productos</h2>
+          <Input
+            className="mb-3"
+            placeholder="Buscar por nombre o escanear codigo de barras"
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            onKeyDown={handleProductSearchKeyDown}
+            autoFocus
+          />
           <div className="mb-3 flex items-center gap-2 text-sm">
             <label className="text-slate-600">Lista de precios:</label>
             <Select className="flex-1" value={selectedPriceListId} onChange={(e) => setSelectedPriceListId(e.target.value)}>
@@ -196,7 +229,7 @@ export function POSPage() {
             </Select>
           </div>
           <div className="max-h-96 space-y-1.5 overflow-y-auto">
-            {products?.data.map((p) => (
+            {visibleProducts.map((p) => (
               <button
                 key={p.id}
                 onClick={() => addToCart(p)}
@@ -206,6 +239,9 @@ export function POSPage() {
                 <span className="font-medium text-slate-500">{formatCOP(resolvePrice(p.id, p.currentPrice))}</span>
               </button>
             ))}
+            {normalizedSearch && visibleProducts.length === 0 && (
+              <p className="px-1 py-2 text-sm text-slate-500">Ningun producto coincide con "{productSearch.trim()}".</p>
+            )}
           </div>
         </Card>
 

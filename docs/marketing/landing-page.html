@@ -1,0 +1,541 @@
+<title>Contapro — el ERP para tiendas y negocios colombianos</title>
+<style>
+  :root {
+    --page-bg: #E4DECE;
+    --page-bg-2: #D8D0BC;
+    --paper: #FCFAF2;
+    --paper-2: #F4EFE1;
+    --ink: #241F19;
+    --muted: #746A5C;
+    --rule: #D8CFB9;
+    --accent: #B93E24;
+    --accent-ink: #FCFAF2;
+    --gold: #A8791E;
+    --green: #3C6B48;
+    --shadow: 30 20% 10%;
+    --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    --font-sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page-bg: #100D0A;
+      --page-bg-2: #171310;
+      --paper: #1E1913;
+      --paper-2: #262019;
+      --ink: #EDE6D8;
+      --muted: #A99C89;
+      --rule: #3B3226;
+      --accent: #E2704E;
+      --accent-ink: #1A1410;
+      --gold: #E3B657;
+      --green: #7BAE87;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-bg: #100D0A;
+    --page-bg-2: #171310;
+    --paper: #1E1913;
+    --paper-2: #262019;
+    --ink: #EDE6D8;
+    --muted: #A99C89;
+    --rule: #3B3226;
+    --accent: #E2704E;
+    --accent-ink: #1A1410;
+    --gold: #E3B657;
+    --green: #7BAE87;
+  }
+  :root[data-theme="light"] {
+    --page-bg: #E4DECE;
+    --page-bg-2: #D8D0BC;
+    --paper: #FCFAF2;
+    --paper-2: #F4EFE1;
+    --ink: #241F19;
+    --muted: #746A5C;
+    --rule: #D8CFB9;
+    --accent: #B93E24;
+    --accent-ink: #FCFAF2;
+    --gold: #A8791E;
+    --green: #3C6B48;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, var(--page-bg-2), transparent),
+      var(--page-bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+
+  a { color: inherit; }
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  .wrap {
+    max-width: 660px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 5rem;
+  }
+
+  /* ---- the receipt ---- */
+  .receipt {
+    position: relative;
+    background: var(--paper);
+    box-shadow: 0 2px 4px hsl(var(--shadow) / 0.15), 0 24px 48px -20px hsl(var(--shadow) / 0.45);
+    padding: 2.6rem clamp(1.25rem, 5vw, 3.2rem) 0;
+  }
+  .receipt::before,
+  .receipt::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 15px;
+    background-image:
+      linear-gradient(135deg, var(--page-bg) 50%, transparent 50%),
+      linear-gradient(45deg, var(--page-bg) 50%, transparent 50%);
+    background-size: 15px 15px;
+    background-position: 0 0, 7.5px 0;
+    background-repeat: repeat-x;
+  }
+  .receipt::before { top: -1px; }
+  .receipt::after { bottom: -1px; transform: scaleY(-1); }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    padding-top: 0.5rem;
+  }
+
+  .wordmark {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    text-align: center;
+    font-size: clamp(1.9rem, 6vw, 2.6rem);
+    letter-spacing: 0.06em;
+    margin: 0.6rem 0 0.15rem;
+  }
+  .wordmark span { color: var(--accent); }
+
+  .tagline {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+    margin-bottom: 1.4rem;
+  }
+
+  .meta-row {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    padding: 0.7rem 0;
+    border-top: 1px dashed var(--rule);
+    border-bottom: 1px dashed var(--rule);
+    margin-bottom: 2.2rem;
+  }
+
+  .hero-line {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.16;
+    font-size: clamp(2rem, 7.2vw, 3.1rem);
+    letter-spacing: -0.01em;
+    margin-bottom: 1.1rem;
+  }
+  .hero-line .strike { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: var(--accent); }
+  .hero-line .zero { color: var(--green); }
+
+  .hero-sub {
+    text-align: center;
+    max-width: 46ch;
+    margin: 0 auto 2rem;
+    color: var(--ink);
+    font-size: 1.02rem;
+  }
+
+  .cta-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.6rem;
+  }
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    padding: 0.85rem 1.4rem;
+    border-radius: 3px;
+    display: inline-block;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .btn-primary:hover { box-shadow: 0 8px 20px -8px hsl(var(--shadow) / 0.5); }
+  .btn-ghost { border-color: var(--rule); color: var(--ink); }
+
+  .section-title {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 1.1rem;
+  }
+  .section-title::after {
+    content: "";
+    flex: 1;
+    border-top: 1px dashed var(--rule);
+  }
+
+  section { margin-bottom: 2.6rem; }
+
+  .line-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.15rem 0.75rem;
+    align-items: baseline;
+    padding: 0.85rem 0;
+    border-bottom: 1px dotted var(--rule);
+  }
+  .line-item:last-child { border-bottom: none; }
+  .line-item .name {
+    font-weight: 700;
+    font-size: 0.98rem;
+  }
+  .line-item .name::before {
+    content: "✓";
+    color: var(--green);
+    font-weight: 700;
+    margin-right: 0.5rem;
+  }
+  .line-item .status {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--green);
+    white-space: nowrap;
+  }
+  .line-item .desc {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: 0.88rem;
+    margin-top: 0.1rem;
+    padding-left: 1.55rem;
+  }
+
+  .callout {
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.1rem 1.25rem;
+    font-size: 0.92rem;
+    color: var(--ink);
+  }
+  .callout strong { color: var(--accent); }
+
+  .plans {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .plan {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1rem 1.1rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.3rem 1rem;
+    align-items: baseline;
+  }
+  .plan.free { border-style: dashed; }
+  .plan .plan-name {
+    font-weight: 700;
+    grid-column: 1;
+  }
+  .plan .plan-price {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 1.05rem;
+    grid-column: 2;
+    text-align: right;
+  }
+  .plan .plan-price small { font-family: var(--font-sans); font-weight: 400; color: var(--muted); font-size: 0.75rem; }
+  .plan .plan-meta {
+    grid-column: 1 / -1;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+  }
+
+  .totals {
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 2px solid var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+  .totals .row { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+  .totals .row.grand { font-weight: 700; font-size: 1rem; border-top: 1px dashed var(--rule); margin-top: 0.4rem; padding-top: 0.6rem; }
+  .totals .grand .val { color: var(--green); }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+  }
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.35rem 0.85rem;
+    color: var(--muted);
+  }
+
+  .stamp {
+    display: inline-block;
+    border: 2.5px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 4px;
+    transform: rotate(-3deg);
+    opacity: 0.9;
+  }
+
+  .barcode {
+    height: 44px;
+    margin: 1.6rem 0 0.9rem;
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--ink) 0px, var(--ink) 2px,
+      transparent 2px, transparent 5px,
+      var(--ink) 5px, var(--ink) 6px,
+      transparent 6px, transparent 9px,
+      var(--ink) 9px, var(--ink) 12px,
+      transparent 12px, transparent 15px,
+      var(--ink) 15px, var(--ink) 16px,
+      transparent 16px, transparent 20px
+    );
+    opacity: 0.85;
+  }
+
+  .thanks {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    font-size: 0.95rem;
+    margin-bottom: 0.4rem;
+  }
+  .fineprint {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding-bottom: 2.4rem;
+  }
+  .fineprint p { margin: 0.3rem 0; }
+
+  footer.below {
+    max-width: 660px;
+    margin: 0 auto;
+    padding: 0 1.25rem 3rem;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  footer.below a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+  footer.below a:hover { color: var(--accent); }
+
+  .biz-note {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 0.9rem;
+  }
+
+  @media (max-width: 420px) {
+    .receipt { padding-left: 1rem; padding-right: 1rem; }
+    .plan { grid-template-columns: 1fr; }
+    .plan .plan-price { text-align: left; grid-column: 1; }
+  }
+</style>
+
+<div class="wrap">
+  <main class="receipt">
+    <p class="eyebrow">Factura de venta · No. 0001</p>
+    <h1 class="wordmark">CONTA<span>PRO</span></h1>
+    <p class="tagline">ERP para tiendas, minimercados, ferreterías, droguerías y boutiques en Colombia</p>
+
+    <div class="meta-row">
+      <span>ATIENDE: tu negocio</span>
+      <span>MÓDULOS: todos</span>
+      <span>COSTOS OCULTOS: $0</span>
+    </div>
+
+    <p class="hero-line">
+      TOTAL A PAGAR<br>
+      <span class="strike">por módulos separados</span><br>
+      <span class="zero">$0 sorpresas</span>
+    </p>
+    <p class="hero-sub">
+      Ventas, inventario, contabilidad, nómina y facturación electrónica DIAN en un solo sistema —
+      sin que cada función venga con su propio cobro aparte.
+    </p>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#planes">Empezar prueba gratis · 30 días</a>
+      <a class="btn btn-ghost" href="#incluye">Ver qué incluye</a>
+    </div>
+
+    <section id="incluye">
+      <p class="section-title">Qué incluye</p>
+      <div class="line-item">
+        <span class="name">Punto de venta (POS)</span>
+        <span class="status">incluido</span>
+        <span class="desc">Carrito con código de barras, cotizaciones, descuentos con autorización, devoluciones y ventas a crédito.</span>
+      </div>
+      <div class="line-item">
+        <span class="name">Inventario</span>
+        <span class="status">incluido</span>
+        <span class="desc">Lotes, costeo FIFO, kardex por producto, listas de precios por cliente, control por sucursal.</span>
+      </div>
+      <div class="line-item">
+        <span class="name">Contabilidad</span>
+        <span class="status">incluido</span>
+        <span class="desc">Comprobantes automáticos, balance general, estado de resultados, conciliación bancaria, cierre de período.</span>
+      </div>
+      <div class="line-item">
+        <span class="name">Nómina colombiana</span>
+        <span class="status">incluido</span>
+        <span class="desc">Liquidación con horas extra y festivos, vacaciones e incapacidades, desprendible en PDF.</span>
+      </div>
+      <div class="line-item">
+        <span class="name">Facturación electrónica DIAN</span>
+        <span class="status">incluido</span>
+        <span class="desc">Factura, notas crédito/débito, documento soporte y nómina electrónica, con RIDE en PDF.</span>
+      </div>
+      <div class="line-item">
+        <span class="name">Proveedores y compras</span>
+        <span class="status">incluido</span>
+        <span class="desc">Órdenes de compra, recepción de mercancía, cuentas por pagar y abonos.</span>
+      </div>
+      <div class="line-item">
+        <span class="name">Cobranza y CRM</span>
+        <span class="status">incluido</span>
+        <span class="desc">Cuentas por cobrar, cobro en línea, recordatorios automáticos, tablero de negociaciones.</span>
+      </div>
+      <div class="line-item">
+        <span class="name">Multisucursal y app móvil</span>
+        <span class="status">incluido</span>
+        <span class="desc">Varias sucursales por empresa; app móvil que vende sin conexión y sincroniza sola.</span>
+      </div>
+    </section>
+
+    <section id="por-que">
+      <p class="section-title">Por qué no como la competencia</p>
+      <div class="callout">
+        La mayoría de sistemas contables en Colombia venden <strong>facturación, contabilidad, POS
+        y nómina como productos separados</strong> — el costo real de montar todo termina 30–80%
+        por encima del precio de entrada anunciado. En Contapro los cuatro planes activan
+        exactamente el mismo conjunto de módulos: lo único que cambia con el precio es cuántas
+        sucursales y usuarios necesita tu negocio.
+      </div>
+    </section>
+
+    <section id="planes">
+      <p class="section-title">Planes</p>
+      <div class="plans">
+        <div class="plan free">
+          <span class="plan-name">Prueba gratuita</span>
+          <span class="plan-price">$0</span>
+          <span class="plan-meta">30 días · 1 sucursal · 3 usuarios · todos los módulos activos</span>
+        </div>
+        <div class="plan">
+          <span class="plan-name">Plan Emprendedor</span>
+          <span class="plan-price">$39.900 <small>/mes</small></span>
+          <span class="plan-meta">1 sucursal · 3 usuarios · $430.900/año con 10% de descuento</span>
+        </div>
+        <div class="plan">
+          <span class="plan-name">Plan Pyme</span>
+          <span class="plan-price">$79.900 <small>/mes</small></span>
+          <span class="plan-meta">3 sucursales · 10 usuarios · $862.900/año con 10% de descuento</span>
+        </div>
+        <div class="plan">
+          <span class="plan-name">Plan Plus</span>
+          <span class="plan-price">$149.900 <small>/mes</small></span>
+          <span class="plan-meta">10 sucursales · 50 usuarios · $1.618.900/año con 10% de descuento</span>
+        </div>
+      </div>
+
+      <div class="totals">
+        <div class="row"><span>Módulos por separado, como en otros sistemas</span><span>varios cobros</span></div>
+        <div class="row"><span>Descuento Contapro</span><span>100%</span></div>
+        <div class="row grand"><span>Total módulos incluidos por plan</span><span class="val">todos</span></div>
+      </div>
+
+      <div class="cta-row" style="margin-top:1.6rem;">
+        <a class="btn btn-primary" href="#incluye">Empezar prueba gratuita</a>
+        <span class="stamp">Sin tarjeta</span>
+      </div>
+    </section>
+
+    <section id="negocios">
+      <p class="section-title">Para qué tipo de negocio</p>
+      <div class="chips">
+        <span class="chip">Tienda de barrio</span>
+        <span class="chip">Minimercado</span>
+        <span class="chip">Ferretería</span>
+        <span class="chip">Droguería</span>
+        <span class="chip">Papelería</span>
+        <span class="chip">Boutique</span>
+        <span class="chip">Supermercado</span>
+      </div>
+      <p class="biz-note">
+        Contapro se adapta al catálogo y las reglas de cada uno: código de barras y presentaciones,
+        lotes con fecha de entrada, listas de precios por cliente, y facturación electrónica lista
+        para la DIAN desde el primer día.
+      </p>
+    </section>
+
+    <div class="barcode" role="presentation"></div>
+    <p class="thanks">Gracias por su visita</p>
+    <div class="fineprint">
+      <p>* Precios de referencia vigentes a la fecha de esta página, sujetos a actualización.</p>
+      <p>Contapro es un ERP en desarrollo activo — esta página es una vista previa del producto.</p>
+    </div>
+  </main>
+</div>
+
+<footer class="below">
+  <a href="#incluye">Qué incluye</a> · <a href="#planes">Planes</a> · <a href="#negocios">Para tu negocio</a>
+</footer>
