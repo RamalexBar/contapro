@@ -5,6 +5,12 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import {
   createEmployee,
@@ -103,11 +109,10 @@ export function EmployeeListPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Empleados</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Empleados</h1>
 
       {canCreate && (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo empleado</h2>
+        <Card title="Nuevo empleado" className="mb-6">
           <form
             className="grid grid-cols-2 gap-3 sm:grid-cols-4"
             onSubmit={(e) => {
@@ -139,17 +144,13 @@ export function EmployeeListPage() {
               onChange={(e) => setForm({ ...form, position: e.target.value })}
               required
             />
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={form.contractType}
-              onChange={(e) => setForm({ ...form, contractType: e.target.value })}
-            >
+            <Select value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })}>
               {CONTRACT_TYPES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input
               placeholder="Salario base"
               type="number"
@@ -164,17 +165,13 @@ export function EmployeeListPage() {
               onChange={(e) => setForm({ ...form, hireDate: e.target.value })}
               required
             />
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={form.arlRiskLevel}
-              onChange={(e) => setForm({ ...form, arlRiskLevel: e.target.value })}
-            >
+            <Select value={form.arlRiskLevel} onChange={(e) => setForm({ ...form, arlRiskLevel: e.target.value })}>
               {ARL_LEVELS.map((l) => (
                 <option key={l} value={l}>
                   ARL nivel {l}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input placeholder="EPS" value={form.eps} onChange={(e) => setForm({ ...form, eps: e.target.value })} />
             <Input
               placeholder="Fondo de pension"
@@ -186,119 +183,123 @@ export function EmployeeListPage() {
               value={form.compensationFund}
               onChange={(e) => setForm({ ...form, compensationFund: e.target.value })}
             />
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" loading={createMutation.isPending}>
               Crear
             </Button>
           </form>
           {createMutation.isError && (
-            <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>
+            <Alert tone="danger" className="mt-2">
+              {(createMutation.error as Error).message}
+            </Alert>
           )}
         </Card>
       )}
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Documento</th>
-              <th>Nombre</th>
-              <th>Cargo</th>
-              <th>Contrato</th>
-              <th>Salario</th>
-              <th>Ingreso</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((employee) => (
-              <tr key={employee.id} className="border-b border-gray-100">
-                <td className="py-2">{employee.documentNumber}</td>
-                <td>
-                  {employee.firstName} {employee.lastName}
-                </td>
-                <td>
-                  {editingId === employee.id ? (
-                    <input
-                      className="w-32 rounded border border-gray-200 px-2 py-1"
-                      value={editValues.position}
-                      onChange={(e) => setEditValues({ ...editValues, position: e.target.value })}
-                    />
-                  ) : (
-                    employee.position
-                  )}
-                </td>
-                <td>{CONTRACT_TYPES.find((c) => c.value === employee.contractType)?.label ?? employee.contractType}</td>
-                <td>
-                  {editingId === employee.id ? (
-                    <input
-                      type="number"
-                      className="w-28 rounded border border-gray-200 px-2 py-1"
-                      value={editValues.baseSalary}
-                      onChange={(e) => setEditValues({ ...editValues, baseSalary: e.target.value })}
-                    />
-                  ) : (
-                    formatCOP(employee.baseSalary)
-                  )}
-                </td>
-                <td>{formatDate(employee.hireDate)}</td>
-                <td>
-                  <span
-                    className={
-                      employee.status === "ACTIVE" ? "text-green-600" : "text-gray-400"
-                    }
-                  >
-                    {employee.status === "ACTIVE" ? "Activo" : "Inactivo"}
-                  </span>
-                </td>
-                <td className="space-x-2 py-2 text-right">
-                  {canUpdate && editingId === employee.id && (
-                    <>
-                      <Button onClick={() => updateMutation.mutate(employee.id)} disabled={updateMutation.isPending}>
-                        Guardar
-                      </Button>
-                      <Button variant="secondary" onClick={() => setEditingId(null)}>
-                        Cancelar
-                      </Button>
-                    </>
-                  )}
-                  {canUpdate && editingId !== employee.id && employee.status === "ACTIVE" && (
-                    <Button variant="secondary" onClick={() => startEdit(employee)}>
-                      Editar
-                    </Button>
-                  )}
-                  {canDeactivate && employee.status === "ACTIVE" && deactivatingId !== employee.id && (
-                    <Button variant="danger" onClick={() => setDeactivatingId(employee.id)}>
-                      Dar de baja
-                    </Button>
-                  )}
-                  {canDeactivate && deactivatingId === employee.id && (
-                    <span className="inline-flex items-center gap-2">
-                      <input
-                        type="date"
-                        className="rounded border border-gray-200 px-2 py-1"
-                        value={terminationDate}
-                        onChange={(e) => setTerminationDate(e.target.value)}
-                      />
-                      <Button
-                        variant="danger"
-                        disabled={!terminationDate || deactivateMutation.isPending}
-                        onClick={() => deactivateMutation.mutate(employee.id)}
-                      >
-                        Confirmar
-                      </Button>
-                      <Button variant="secondary" onClick={() => setDeactivatingId(null)}>
-                        Cancelar
-                      </Button>
-                    </span>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="No hay empleados registrados." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Documento</Th>
+                <Th>Nombre</Th>
+                <Th>Cargo</Th>
+                <Th>Contrato</Th>
+                <Th>Salario</Th>
+                <Th>Ingreso</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay empleados registrados.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((employee) => (
+                <TableRow key={employee.id}>
+                  <Td>{employee.documentNumber}</Td>
+                  <Td>
+                    {employee.firstName} {employee.lastName}
+                  </Td>
+                  <Td>
+                    {editingId === employee.id ? (
+                      <Input
+                        className="w-32"
+                        value={editValues.position}
+                        onChange={(e) => setEditValues({ ...editValues, position: e.target.value })}
+                      />
+                    ) : (
+                      employee.position
+                    )}
+                  </Td>
+                  <Td>{CONTRACT_TYPES.find((c) => c.value === employee.contractType)?.label ?? employee.contractType}</Td>
+                  <Td>
+                    {editingId === employee.id ? (
+                      <Input
+                        type="number"
+                        className="w-28"
+                        value={editValues.baseSalary}
+                        onChange={(e) => setEditValues({ ...editValues, baseSalary: e.target.value })}
+                      />
+                    ) : (
+                      formatCOP(employee.baseSalary)
+                    )}
+                  </Td>
+                  <Td>{formatDate(employee.hireDate)}</Td>
+                  <Td>
+                    <Badge tone={employee.status === "ACTIVE" ? "success" : "neutral"}>
+                      {employee.status === "ACTIVE" ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </Td>
+                  <Td className="space-x-2 text-right">
+                    {canUpdate && editingId === employee.id && (
+                      <>
+                        <Button size="sm" loading={updateMutation.isPending} onClick={() => updateMutation.mutate(employee.id)}>
+                          Guardar
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
+                          Cancelar
+                        </Button>
+                      </>
+                    )}
+                    {canUpdate && editingId !== employee.id && employee.status === "ACTIVE" && (
+                      <Button size="sm" variant="secondary" onClick={() => startEdit(employee)}>
+                        Editar
+                      </Button>
+                    )}
+                    {canDeactivate && employee.status === "ACTIVE" && deactivatingId !== employee.id && (
+                      <Button size="sm" variant="danger" onClick={() => setDeactivatingId(employee.id)}>
+                        Dar de baja
+                      </Button>
+                    )}
+                    {canDeactivate && deactivatingId === employee.id && (
+                      <span className="inline-flex items-center gap-2">
+                        <Input
+                          type="date"
+                          className="w-auto"
+                          value={terminationDate}
+                          onChange={(e) => setTerminationDate(e.target.value)}
+                        />
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={!terminationDate}
+                          loading={deactivateMutation.isPending}
+                          onClick={() => deactivateMutation.mutate(employee.id)}
+                        >
+                          Confirmar
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setDeactivatingId(null)}>
+                          Cancelar
+                        </Button>
+                      </span>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </AppLayout>
   );

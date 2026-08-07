@@ -4,6 +4,11 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listEmployees } from "../../employees/api/employee.api";
 import { getMyEmployee } from "../../timetracking/api/timetracking.api";
@@ -42,12 +47,8 @@ function formatDate(value: string): string {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "APPROVED" || status === "TAKEN"
-      ? "text-green-600"
-      : status === "REJECTED"
-        ? "text-red-600"
-        : "text-amber-600";
+  const tone =
+    status === "APPROVED" || status === "TAKEN" ? "success" : status === "REJECTED" ? "danger" : "warning";
   const label: Record<string, string> = {
     REQUESTED: "Solicitada",
     SUBMITTED: "Radicada",
@@ -55,7 +56,7 @@ function StatusBadge({ status }: { status: string }) {
     REJECTED: "Rechazada",
     TAKEN: "Tomada",
   };
-  return <span className={color}>{label[status] ?? status}</span>;
+  return <Badge tone={tone}>{label[status] ?? status}</Badge>;
 }
 
 export function TimeOffPage() {
@@ -75,7 +76,7 @@ export function TimeOffPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Vacaciones y permisos</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Vacaciones y permisos</h1>
 
       <VacationSection
         canRequest={canRequest}
@@ -137,23 +138,16 @@ function EmployeeSelect({
 }) {
   if (!canManage) return null;
   return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium text-gray-700">Empleado</span>
-      <select
-        className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">Seleccionar...</option>
-        {employees
-          .filter((e) => e.status === "ACTIVE")
-          .map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.firstName} {e.lastName}
-            </option>
-          ))}
-      </select>
-    </label>
+    <Select label="Empleado" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Seleccionar...</option>
+      {employees
+        .filter((e) => e.status === "ACTIVE")
+        .map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.firstName} {e.lastName}
+          </option>
+        ))}
+    </Select>
   );
 }
 
@@ -190,8 +184,7 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
   });
 
   return (
-    <Card className="mb-6">
-      <h2 className="mb-3 text-sm font-semibold text-gray-700">Vacaciones</h2>
+    <Card title="Vacaciones" className="mb-6">
       {canRequest && (
         <form
           className="mb-4 flex flex-wrap items-end gap-3"
@@ -211,58 +204,61 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
             onChange={(e) => setDaysTaken(e.target.value)}
             required
           />
-          <Button type="submit" disabled={requestMutation.isPending}>
+          <Button type="submit" loading={requestMutation.isPending}>
             Solicitar
           </Button>
           {requestMutation.isError && (
-            <p className="w-full text-sm text-red-600">{(requestMutation.error as Error).message}</p>
+            <Alert tone="danger" className="w-full">
+              {(requestMutation.error as Error).message}
+            </Alert>
           )}
         </form>
       )}
-      {canRead && (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Empleado</th>
-              <th>Periodo</th>
-              <th>Dias</th>
-              <th>Estado</th>
-              <th></th>
+      {canRead && data?.data.length === 0 && <EmptyState title="Sin solicitudes." />}
+      {canRead && data && data.data.length > 0 && (
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Empleado</Th>
+              <Th>Periodo</Th>
+              <Th>Dias</Th>
+              <Th>Estado</Th>
+              <Th></Th>
             </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((v) => (
-              <tr key={v.id} className="border-b border-gray-100">
-                <td className="py-2">{employeeNames.get(v.employeeId) ?? v.employeeId}</td>
-                <td>
+          </TableHead>
+          <TableBody>
+            {data.data.map((v) => (
+              <TableRow key={v.id}>
+                <Td>{employeeNames.get(v.employeeId) ?? v.employeeId}</Td>
+                <Td>
                   {formatDate(v.startDate)} a {formatDate(v.endDate)}
-                </td>
-                <td>{v.daysTaken}</td>
-                <td>
+                </Td>
+                <Td>{v.daysTaken}</Td>
+                <Td>
                   <StatusBadge status={v.status} />
-                </td>
-                <td className="space-x-2 text-right">
+                </Td>
+                <Td className="space-x-2 text-right">
                   {canManage && v.status === "REQUESTED" && (
                     <>
-                      <Button onClick={() => approveMutation.mutate(v.id)} disabled={approveMutation.isPending}>
+                      <Button size="sm" onClick={() => approveMutation.mutate(v.id)} loading={approveMutation.isPending}>
                         Aprobar
                       </Button>
                       <Button
+                        size="sm"
                         variant="danger"
                         onClick={() => rejectMutation.mutate(v.id)}
-                        disabled={rejectMutation.isPending}
+                        loading={rejectMutation.isPending}
                       >
                         Rechazar
                       </Button>
                     </>
                   )}
-                </td>
-              </tr>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
-      {canRead && data?.data.length === 0 && <p className="py-2 text-sm text-gray-400">Sin solicitudes.</p>}
     </Card>
   );
 }
@@ -301,8 +297,7 @@ function LeavePermissionSection({ canRequest, canManage, canRead, employees, emp
   });
 
   return (
-    <Card className="mb-6">
-      <h2 className="mb-3 text-sm font-semibold text-gray-700">Permisos</h2>
+    <Card title="Permisos" className="mb-6">
       {canRequest && (
         <form
           className="mb-4 flex flex-wrap items-end gap-3"
@@ -312,80 +307,76 @@ function LeavePermissionSection({ canRequest, canManage, canRead, employees, emp
           }}
         >
           <EmployeeSelect canManage={canManage} employees={employees} value={employeeId} onChange={setEmployeeId} />
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">Tipo</span>
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            >
-              {LEAVE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select label="Tipo" value={type} onChange={(e) => setType(e.target.value)}>
+            {LEAVE_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </Select>
           <Input label="Inicio" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
           <Input label="Fin" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-          <label className="flex items-center gap-2 pb-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
             <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
             Remunerado
           </label>
-          <Button type="submit" disabled={requestMutation.isPending}>
+          <Button type="submit" loading={requestMutation.isPending}>
             Solicitar
           </Button>
           {requestMutation.isError && (
-            <p className="w-full text-sm text-red-600">{(requestMutation.error as Error).message}</p>
+            <Alert tone="danger" className="w-full">
+              {(requestMutation.error as Error).message}
+            </Alert>
           )}
         </form>
       )}
-      {canRead && (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Empleado</th>
-              <th>Tipo</th>
-              <th>Periodo</th>
-              <th>Remunerado</th>
-              <th>Estado</th>
-              <th></th>
+      {canRead && data?.data.length === 0 && <EmptyState title="Sin solicitudes." />}
+      {canRead && data && data.data.length > 0 && (
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Empleado</Th>
+              <Th>Tipo</Th>
+              <Th>Periodo</Th>
+              <Th>Remunerado</Th>
+              <Th>Estado</Th>
+              <Th></Th>
             </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((p) => (
-              <tr key={p.id} className="border-b border-gray-100">
-                <td className="py-2">{employeeNames.get(p.employeeId) ?? p.employeeId}</td>
-                <td>{LEAVE_TYPES.find((t) => t.value === p.type)?.label ?? p.type}</td>
-                <td>
+          </TableHead>
+          <TableBody>
+            {data.data.map((p) => (
+              <TableRow key={p.id}>
+                <Td>{employeeNames.get(p.employeeId) ?? p.employeeId}</Td>
+                <Td>{LEAVE_TYPES.find((t) => t.value === p.type)?.label ?? p.type}</Td>
+                <Td>
                   {formatDate(p.startDate)} a {formatDate(p.endDate)}
-                </td>
-                <td>{p.paid ? "Si" : "No"}</td>
-                <td>
+                </Td>
+                <Td>{p.paid ? "Si" : "No"}</Td>
+                <Td>
                   <StatusBadge status={p.status} />
-                </td>
-                <td className="space-x-2 text-right">
+                </Td>
+                <Td className="space-x-2 text-right">
                   {canManage && p.status === "REQUESTED" && (
                     <>
-                      <Button onClick={() => approveMutation.mutate(p.id)} disabled={approveMutation.isPending}>
+                      <Button size="sm" onClick={() => approveMutation.mutate(p.id)} loading={approveMutation.isPending}>
                         Aprobar
                       </Button>
                       <Button
+                        size="sm"
                         variant="danger"
                         onClick={() => rejectMutation.mutate(p.id)}
-                        disabled={rejectMutation.isPending}
+                        loading={rejectMutation.isPending}
                       >
                         Rechazar
                       </Button>
                     </>
                   )}
-                </td>
-              </tr>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
-      {canRead && data?.data.length === 0 && <p className="py-2 text-sm text-gray-400">Sin solicitudes.</p>}
     </Card>
   );
 }
@@ -422,8 +413,7 @@ function SickLeaveSection({ canRequest, canManage, canRead, employees, employeeN
   });
 
   return (
-    <Card className="mb-6">
-      <h2 className="mb-3 text-sm font-semibold text-gray-700">Incapacidades</h2>
+    <Card title="Incapacidades" className="mb-6">
       {canRequest && (
         <form
           className="mb-4 flex flex-wrap items-end gap-3"
@@ -433,74 +423,70 @@ function SickLeaveSection({ canRequest, canManage, canRead, employees, employeeN
           }}
         >
           <EmployeeSelect canManage={canManage} employees={employees} value={employeeId} onChange={setEmployeeId} />
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">Tipo</span>
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            >
-              {SICK_LEAVE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select label="Tipo" value={type} onChange={(e) => setType(e.target.value)}>
+            {SICK_LEAVE_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </Select>
           <Input label="Inicio" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
           <Input label="Fin" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-          <Button type="submit" disabled={requestMutation.isPending}>
+          <Button type="submit" loading={requestMutation.isPending}>
             Radicar
           </Button>
           {requestMutation.isError && (
-            <p className="w-full text-sm text-red-600">{(requestMutation.error as Error).message}</p>
+            <Alert tone="danger" className="w-full">
+              {(requestMutation.error as Error).message}
+            </Alert>
           )}
         </form>
       )}
-      {canRead && (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Empleado</th>
-              <th>Tipo</th>
-              <th>Periodo</th>
-              <th>Estado</th>
-              <th></th>
+      {canRead && data?.data.length === 0 && <EmptyState title="Sin incapacidades." />}
+      {canRead && data && data.data.length > 0 && (
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Empleado</Th>
+              <Th>Tipo</Th>
+              <Th>Periodo</Th>
+              <Th>Estado</Th>
+              <Th></Th>
             </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((s) => (
-              <tr key={s.id} className="border-b border-gray-100">
-                <td className="py-2">{employeeNames.get(s.employeeId) ?? s.employeeId}</td>
-                <td>{SICK_LEAVE_TYPES.find((t) => t.value === s.type)?.label ?? s.type}</td>
-                <td>
+          </TableHead>
+          <TableBody>
+            {data.data.map((s) => (
+              <TableRow key={s.id}>
+                <Td>{employeeNames.get(s.employeeId) ?? s.employeeId}</Td>
+                <Td>{SICK_LEAVE_TYPES.find((t) => t.value === s.type)?.label ?? s.type}</Td>
+                <Td>
                   {formatDate(s.startDate)} a {formatDate(s.endDate)}
-                </td>
-                <td>
+                </Td>
+                <Td>
                   <StatusBadge status={s.status} />
-                </td>
-                <td className="space-x-2 text-right">
+                </Td>
+                <Td className="space-x-2 text-right">
                   {canManage && s.status === "SUBMITTED" && (
                     <>
-                      <Button onClick={() => approveMutation.mutate(s.id)} disabled={approveMutation.isPending}>
+                      <Button size="sm" onClick={() => approveMutation.mutate(s.id)} loading={approveMutation.isPending}>
                         Aprobar
                       </Button>
                       <Button
+                        size="sm"
                         variant="danger"
                         onClick={() => rejectMutation.mutate(s.id)}
-                        disabled={rejectMutation.isPending}
+                        loading={rejectMutation.isPending}
                       >
                         Rechazar
                       </Button>
                     </>
                   )}
-                </td>
-              </tr>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
-      {canRead && data?.data.length === 0 && <p className="py-2 text-sm text-gray-400">Sin incapacidades.</p>}
     </Card>
   );
 }
@@ -539,8 +525,7 @@ function AbsenceSection({
   });
 
   return (
-    <Card>
-      <h2 className="mb-3 text-sm font-semibold text-gray-700">Ausencias</h2>
+    <Card title="Ausencias">
       {canManage && (
         <form
           className="mb-4 flex flex-wrap items-end gap-3"
@@ -549,68 +534,55 @@ function AbsenceSection({
             registerMutation.mutate();
           }}
         >
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">Empleado</span>
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              required
-            >
-              <option value="">Seleccionar...</option>
-              {employees
-                .filter((e) => e.status === "ACTIVE")
-                .map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.firstName} {e.lastName}
-                  </option>
-                ))}
-            </select>
-          </label>
+          <Select label="Empleado" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required>
+            <option value="">Seleccionar...</option>
+            {employees
+              .filter((e) => e.status === "ACTIVE")
+              .map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.firstName} {e.lastName}
+                </option>
+              ))}
+          </Select>
           <Input label="Fecha" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">Tipo</span>
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            >
-              <option value="UNJUSTIFIED">Injustificada</option>
-              <option value="JUSTIFIED">Justificada</option>
-            </select>
-          </label>
+          <Select label="Tipo" value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="UNJUSTIFIED">Injustificada</option>
+            <option value="JUSTIFIED">Justificada</option>
+          </Select>
           <Input label="Motivo" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <Button type="submit" disabled={registerMutation.isPending}>
+          <Button type="submit" loading={registerMutation.isPending}>
             Registrar
           </Button>
           {registerMutation.isError && (
-            <p className="w-full text-sm text-red-600">{(registerMutation.error as Error).message}</p>
+            <Alert tone="danger" className="w-full">
+              {(registerMutation.error as Error).message}
+            </Alert>
           )}
         </form>
       )}
-      {canRead && (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Empleado</th>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Motivo</th>
+      {canRead && data?.data.length === 0 && <EmptyState title="Sin ausencias registradas." />}
+      {canRead && data && data.data.length > 0 && (
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Empleado</Th>
+              <Th>Fecha</Th>
+              <Th>Tipo</Th>
+              <Th>Motivo</Th>
             </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((a) => (
-              <tr key={a.id} className="border-b border-gray-100">
-                <td className="py-2">{employeeNames.get(a.employeeId) ?? a.employeeId}</td>
-                <td>{formatDate(a.date)}</td>
-                <td>{a.type === "JUSTIFIED" ? "Justificada" : "Injustificada"}</td>
-                <td>{a.reason ?? "-"}</td>
-              </tr>
+          </TableHead>
+          <TableBody>
+            {data.data.map((a) => (
+              <TableRow key={a.id}>
+                <Td>{employeeNames.get(a.employeeId) ?? a.employeeId}</Td>
+                <Td>{formatDate(a.date)}</Td>
+                <Td>{a.type === "JUSTIFIED" ? "Justificada" : "Injustificada"}</Td>
+                <Td>{a.reason ?? "-"}</Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
-      {canRead && data?.data.length === 0 && <p className="py-2 text-sm text-gray-400">Sin ausencias registradas.</p>}
     </Card>
   );
 }

@@ -5,6 +5,7 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Spinner } from "../../../components/ui/Spinner";
 import { closeSession, getActiveSession, listCashRegisters, openSession } from "../api/cash.api";
 
 export function CashSessionPage() {
@@ -33,20 +34,15 @@ export function CashSessionPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Caja</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Caja</h1>
       <Card className="max-w-md">
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
+        {isLoading && <Spinner />}
 
         {!isLoading && !activeSession && (
           <div className="space-y-3">
-            <p className="text-sm text-gray-600">No hay una sesion de caja abierta.</p>
-            <Input
-              label="Dinero inicial"
-              type="number"
-              value={openingAmount}
-              onChange={(e) => setOpeningAmount(e.target.value)}
-            />
-            <Button onClick={() => openMutation.mutate()} disabled={!registerId || openMutation.isPending}>
+            <p className="text-sm text-slate-600">No hay una sesion de caja abierta.</p>
+            <Input label="Dinero inicial" type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} />
+            <Button onClick={() => openMutation.mutate()} disabled={!registerId} loading={openMutation.isPending}>
               Abrir caja
             </Button>
           </div>
@@ -54,20 +50,15 @@ export function CashSessionPage() {
 
         {activeSession && (
           <div className="space-y-3">
-            <p className="text-sm text-gray-600">
-              Caja abierta con <strong>{formatCOP(activeSession.openingAmount)}</strong>
+            <p className="text-sm text-slate-600">
+              Caja abierta con <strong className="text-slate-900">{formatCOP(activeSession.openingAmount)}</strong>
             </p>
-            <Input
-              label="Dinero contado al cierre"
-              type="number"
-              value={closingAmount}
-              onChange={(e) => setClosingAmount(e.target.value)}
-            />
-            <Button variant="danger" onClick={() => closeMutation.mutate()} disabled={closeMutation.isPending}>
+            <Input label="Dinero contado al cierre" type="number" value={closingAmount} onChange={(e) => setClosingAmount(e.target.value)} />
+            <Button variant="danger" onClick={() => closeMutation.mutate()} loading={closeMutation.isPending}>
               Cerrar caja (arqueo)
             </Button>
             {closeMutation.data && (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-600">
                 Esperado: {formatCOP(closeMutation.data.closingAmountExpected ?? 0)} — Diferencia:{" "}
                 {formatCOP(closeMutation.data.difference ?? 0)}
               </p>

@@ -4,6 +4,11 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listEmployees } from "../../employees/api/employee.api";
 import { clockIn, clockOut, getMyEmployee, getMyOpenEntry, listTimeEntries } from "../api/timetracking.api";
@@ -84,41 +89,34 @@ export function TimeTrackingPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Control de horarios</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Control de horarios</h1>
 
       {canClock && (
-        <Card className="mb-6 max-w-md">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Mi marcacion</h2>
+        <Card title="Mi marcacion" className="mb-6 max-w-md">
           {!myEmployee && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-slate-500">
               Tu usuario no esta vinculado a un empleado, no puedes marcar entrada/salida.
             </p>
           )}
-          {myEmployee && loadingMyStatus && <p className="text-sm text-gray-500">Cargando...</p>}
+          {myEmployee && loadingMyStatus && <Spinner />}
           {myEmployee && !loadingMyStatus && (
             <div className="space-y-2">
               {myOpenEntry ? (
                 <>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-slate-600">
                     Entrada marcada: <strong>{formatDateTime(myOpenEntry.clockIn)}</strong>
                   </p>
-                  <Button
-                    variant="danger"
-                    onClick={() => myClockOutMutation.mutate()}
-                    disabled={myClockOutMutation.isPending}
-                  >
+                  <Button variant="danger" onClick={() => myClockOutMutation.mutate()} loading={myClockOutMutation.isPending}>
                     Marcar salida
                   </Button>
                 </>
               ) : (
-                <Button onClick={() => myClockInMutation.mutate()} disabled={myClockInMutation.isPending}>
+                <Button onClick={() => myClockInMutation.mutate()} loading={myClockInMutation.isPending}>
                   Marcar entrada
                 </Button>
               )}
               {(myClockInMutation.isError || myClockOutMutation.isError) && (
-                <p className="text-sm text-red-600">
-                  {((myClockInMutation.error ?? myClockOutMutation.error) as Error).message}
-                </p>
+                <Alert tone="danger">{((myClockInMutation.error ?? myClockOutMutation.error) as Error).message}</Alert>
               )}
             </div>
           )}
@@ -126,98 +124,90 @@ export function TimeTrackingPage() {
       )}
 
       {canManage && (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Marcar por otro empleado</h2>
+        <Card title="Marcar por otro empleado" className="mb-6">
           <div className="flex flex-wrap items-end gap-3">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">Empleado</span>
-              <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                value={manualEmployeeId}
-                onChange={(e) => setManualEmployeeId(e.target.value)}
-              >
-                <option value="">Seleccionar...</option>
-                {employees?.data
-                  .filter((e) => e.status === "ACTIVE")
-                  .map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.firstName} {e.lastName}
-                    </option>
-                  ))}
-              </select>
-            </label>
+            <Select label="Empleado" value={manualEmployeeId} onChange={(e) => setManualEmployeeId(e.target.value)}>
+              <option value="">Seleccionar...</option>
+              {employees?.data
+                .filter((e) => e.status === "ACTIVE")
+                .map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.firstName} {e.lastName}
+                  </option>
+                ))}
+            </Select>
             <Button
-              disabled={!manualEmployeeId || manualClockInMutation.isPending}
+              disabled={!manualEmployeeId}
+              loading={manualClockInMutation.isPending}
               onClick={() => manualClockInMutation.mutate()}
             >
               Marcar entrada
             </Button>
           </div>
           {manualClockInMutation.isError && (
-            <p className="mt-2 text-sm text-red-600">{(manualClockInMutation.error as Error).message}</p>
+            <Alert tone="danger" className="mt-2">
+              {(manualClockInMutation.error as Error).message}
+            </Alert>
           )}
         </Card>
       )}
 
       {canRead && (
-        <Card>
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Registros</h2>
-          <div className="mb-3 flex flex-wrap items-end gap-3">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">Empleado</span>
-              <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                value={filterEmployeeId}
-                onChange={(e) => setFilterEmployeeId(e.target.value)}
-              >
-                <option value="">Todos</option>
-                {employees?.data.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.firstName} {e.lastName}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <Card title="Registros" noPadding>
+          <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 p-4">
+            <Select label="Empleado" value={filterEmployeeId} onChange={(e) => setFilterEmployeeId(e.target.value)}>
+              <option value="">Todos</option>
+              {employees?.data.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.firstName} {e.lastName}
+                </option>
+              ))}
+            </Select>
             <Input label="Desde" type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
             <Input label="Hasta" type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
           </div>
 
-          {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-gray-500">
-                <th className="py-2">Empleado</th>
-                <th>Entrada</th>
-                <th>Salida</th>
-                <th>Duracion</th>
-                <th>Origen</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries?.data.map((entry) => (
-                <tr key={entry.id} className="border-b border-gray-100">
-                  <td className="py-2">{employeeNames.get(entry.employeeId) ?? entry.employeeId}</td>
-                  <td>{formatDateTime(entry.clockIn)}</td>
-                  <td>{formatDateTime(entry.clockOut)}</td>
-                  <td>{durationLabel(entry.clockIn, entry.clockOut)}</td>
-                  <td>{entry.source}</td>
-                  <td className="text-right">
-                    {canManage && !entry.clockOut && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => manualClockOutMutation.mutate(entry.id)}
-                        disabled={manualClockOutMutation.isPending}
-                      >
-                        Marcar salida
-                      </Button>
-                    )}
-                  </td>
+          {isLoading ? (
+            <Spinner />
+          ) : entries?.data.length === 0 ? (
+            <EmptyState title="No hay registros." />
+          ) : (
+            <Table>
+              <TableHead>
+                <tr>
+                  <Th>Empleado</Th>
+                  <Th>Entrada</Th>
+                  <Th>Salida</Th>
+                  <Th>Duracion</Th>
+                  <Th>Origen</Th>
+                  <Th></Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {entries?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay registros.</p>}
+              </TableHead>
+              <TableBody>
+                {entries?.data.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <Td>{employeeNames.get(entry.employeeId) ?? entry.employeeId}</Td>
+                    <Td>{formatDateTime(entry.clockIn)}</Td>
+                    <Td>{formatDateTime(entry.clockOut)}</Td>
+                    <Td>{durationLabel(entry.clockIn, entry.clockOut)}</Td>
+                    <Td>{entry.source}</Td>
+                    <Td className="text-right">
+                      {canManage && !entry.clockOut && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => manualClockOutMutation.mutate(entry.id)}
+                          loading={manualClockOutMutation.isPending}
+                        >
+                          Marcar salida
+                        </Button>
+                      )}
+                    </Td>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </Card>
       )}
     </AppLayout>

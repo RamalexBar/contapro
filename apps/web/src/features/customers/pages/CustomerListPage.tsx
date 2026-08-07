@@ -5,6 +5,12 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { createCustomer, listCustomers, updateCustomerPriceList } from "../api/customer.api";
 import { listPriceLists } from "../../inventory/api/price-list.api";
@@ -59,11 +65,10 @@ export function CustomerListPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Clientes</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Clientes</h1>
 
       {canManage && (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo cliente</h2>
+        <Card title="Nuevo cliente" className="mb-6">
           <form
             className="grid grid-cols-2 gap-3 sm:grid-cols-4"
             onSubmit={(e) => {
@@ -107,85 +112,82 @@ export function CustomerListPage() {
               value={form.municipalityCode}
               onChange={(e) => setForm({ ...form, municipalityCode: e.target.value })}
             />
-            <select
-              className="rounded-md border border-gray-200 px-3 py-2 text-sm"
-              value={form.priceListId}
-              onChange={(e) => setForm({ ...form, priceListId: e.target.value })}
-            >
+            <Select value={form.priceListId} onChange={(e) => setForm({ ...form, priceListId: e.target.value })}>
               <option value="">Sin lista de precios (precio base)</option>
               {activePriceLists.map((pl) => (
                 <option key={pl.id} value={pl.id}>
                   {pl.name}
                 </option>
               ))}
-            </select>
-            <Button type="submit" disabled={createMutation.isPending}>
+            </Select>
+            <Button type="submit" loading={createMutation.isPending}>
               Crear
             </Button>
           </form>
           {createMutation.isError && (
-            <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>
+            <Alert tone="danger" className="mt-2">
+              {(createMutation.error as Error).message}
+            </Alert>
           )}
         </Card>
       )}
 
-      <Card>
-        <Input
-          placeholder="Buscar por nombre o documento..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mb-3"
-        />
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Documento</th>
-              <th>Nombre</th>
-              <th>Cupo de credito</th>
-              <th>Saldo actual</th>
-              <th>Lista de precios</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((c) => (
-              <tr key={c.id} className="border-b border-gray-100">
-                <td className="py-2">
-                  {c.documentType} {c.documentNumber}
-                </td>
-                <td>{c.name}</td>
-                <td>{formatCOP(c.creditLimit)}</td>
-                <td>{formatCOP(c.currentBalance)}</td>
-                <td>
-                  {canManage ? (
-                    <select
-                      className="rounded border border-gray-200 px-2 py-1 text-xs"
-                      value={c.priceListId ?? ""}
-                      disabled={priceListMutation.isPending}
-                      onChange={(e) =>
-                        priceListMutation.mutate({ id: c.id, priceListId: e.target.value || null })
-                      }
-                    >
-                      <option value="">Precio base</option>
-                      {activePriceLists.map((pl) => (
-                        <option key={pl.id} value={pl.id}>
-                          {pl.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    activePriceLists.find((pl) => pl.id === c.priceListId)?.name ?? "Precio base"
-                  )}
-                </td>
-                <td className={c.isActive ? "text-green-600" : "text-gray-400"}>
-                  {c.isActive ? "Activo" : "Inactivo"}
-                </td>
+      <Card noPadding>
+        <div className="border-b border-slate-200 p-4">
+          <Input placeholder="Buscar por nombre o documento..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="No hay clientes." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Documento</Th>
+                <Th>Nombre</Th>
+                <Th>Cupo de credito</Th>
+                <Th>Saldo actual</Th>
+                <Th>Lista de precios</Th>
+                <Th>Estado</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay clientes.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((c) => (
+                <TableRow key={c.id}>
+                  <Td>
+                    {c.documentType} {c.documentNumber}
+                  </Td>
+                  <Td>{c.name}</Td>
+                  <Td>{formatCOP(c.creditLimit)}</Td>
+                  <Td>{formatCOP(c.currentBalance)}</Td>
+                  <Td>
+                    {canManage ? (
+                      <Select
+                        className="text-xs"
+                        value={c.priceListId ?? ""}
+                        disabled={priceListMutation.isPending}
+                        onChange={(e) => priceListMutation.mutate({ id: c.id, priceListId: e.target.value || null })}
+                      >
+                        <option value="">Precio base</option>
+                        {activePriceLists.map((pl) => (
+                          <option key={pl.id} value={pl.id}>
+                            {pl.name}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      activePriceLists.find((pl) => pl.id === c.priceListId)?.name ?? "Precio base"
+                    )}
+                  </Td>
+                  <Td>
+                    <Badge tone={c.isActive ? "success" : "neutral"}>{c.isActive ? "Activo" : "Inactivo"}</Badge>
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </AppLayout>
   );

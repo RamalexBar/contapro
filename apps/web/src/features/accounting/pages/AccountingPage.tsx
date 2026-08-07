@@ -5,6 +5,11 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
 import {
   type AccountType,
   type WithholdingType,
@@ -62,6 +67,10 @@ function monthAgoStr(): string {
   return formatLocalDate(d);
 }
 
+function ActiveBadge({ active }: { active: boolean }) {
+  return <Badge tone={active ? "success" : "neutral"}>{active ? "Activo" : "Inactivo"}</Badge>;
+}
+
 function AccountsSection() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
@@ -83,9 +92,8 @@ function AccountsSection() {
   });
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nueva cuenta</h2>
+    <div className="space-y-6">
+      <Card title="Nueva cuenta">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-5"
           onSubmit={(e) => {
@@ -95,62 +103,61 @@ function AccountsSection() {
         >
           <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
           <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value as AccountType })}
-          >
+          <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AccountType })}>
             {ACCOUNT_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
               </option>
             ))}
-          </select>
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.parentId}
-            onChange={(e) => setForm({ ...form, parentId: e.target.value })}
-          >
+          </Select>
+          <Select value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })}>
             <option value="">(sin cuenta padre)</option>
             {data?.data.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.code} {a.name}
               </option>
             ))}
-          </select>
-          <Button type="submit" disabled={createMutation.isPending}>
+          </Select>
+          <Button type="submit" loading={createMutation.isPending}>
             Crear
           </Button>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-3">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Codigo</th>
-              <th>Nombre</th>
-              <th>Tipo</th>
-              <th>Nivel</th>
-              <th>Admite movimientos</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((a) => (
-              <tr key={a.id} className="border-b border-gray-100">
-                <td className="py-2">{a.code}</td>
-                <td>{a.name}</td>
-                <td>{ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type}</td>
-                <td>{a.level}</td>
-                <td>{a.acceptsEntries ? "Si" : "No"}</td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Codigo</Th>
+                <Th>Nombre</Th>
+                <Th>Tipo</Th>
+                <Th>Nivel</Th>
+                <Th>Admite movimientos</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((a) => (
+                <TableRow key={a.id}>
+                  <Td className="font-medium text-slate-900">{a.code}</Td>
+                  <Td>{a.name}</Td>
+                  <Td>{ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type}</Td>
+                  <Td>{a.level}</Td>
+                  <Td>{a.acceptsEntries ? "Si" : "No"}</Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -199,10 +206,9 @@ function WithholdingSection() {
   });
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo concepto de retencion</h2>
-        <p className="mb-3 text-sm text-gray-500">
+    <div className="space-y-6">
+      <Card title="Nuevo concepto de retencion">
+        <p className="mb-3 text-sm text-slate-500">
           Cada venta o compra puede aplicar uno o mas de estos conceptos. Las tarifas de ReteFuente/ReteIVA de
           fabrica son valores comunes de mercado; ajusta la de ICA a la tarifa real de tu municipio/actividad.
         </p>
@@ -215,17 +221,13 @@ function WithholdingSection() {
         >
           <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
           <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value as WithholdingType })}
-          >
+          <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as WithholdingType })}>
             {WITHHOLDING_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
               </option>
             ))}
-          </select>
+          </Select>
           <Input
             type="number"
             step="0.01"
@@ -239,98 +241,108 @@ function WithholdingSection() {
             value={form.dianConceptCode}
             onChange={(e) => setForm({ ...form, dianConceptCode: e.target.value })}
           />
-          <Button type="submit" disabled={createMutation.isPending}>
+          <Button type="submit" loading={createMutation.isPending}>
             Crear
           </Button>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-3">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Codigo</th>
-              <th>Nombre</th>
-              <th>Tipo</th>
-              <th>Tarifa</th>
-              <th>Codigo DIAN</th>
-              <th>Activo</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((c) =>
-              editingId === c.id ? (
-                <tr key={c.id} className="border-b border-gray-100">
-                  <td className="py-2">{c.code}</td>
-                  <td>
-                    <input
-                      className="w-full rounded border border-gray-200 px-2 py-1"
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    />
-                  </td>
-                  <td>{WITHHOLDING_TYPES.find((t) => t.value === c.type)?.label ?? c.type}</td>
-                  <td>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-20 rounded border border-gray-200 px-2 py-1"
-                      value={editForm.ratePercent}
-                      onChange={(e) => setEditForm({ ...editForm, ratePercent: e.target.value })}
-                    />
-                    %
-                  </td>
-                  <td>
-                    <input
-                      className="w-20 rounded border border-gray-200 px-2 py-1"
-                      value={editForm.dianConceptCode}
-                      onChange={(e) => setEditForm({ ...editForm, dianConceptCode: e.target.value })}
-                    />
-                  </td>
-                  <td>{c.isActive ? "Si" : "No"}</td>
-                  <td className="space-x-2 py-2 text-right">
-                    <Button disabled={updateMutation.isPending} onClick={() => updateMutation.mutate(c.id)}>
-                      Guardar
-                    </Button>
-                    <Button variant="secondary" onClick={() => setEditingId(null)}>
-                      Cancelar
-                    </Button>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={c.id} className="border-b border-gray-100">
-                  <td className="py-2">{c.code}</td>
-                  <td>{c.name}</td>
-                  <td>{WITHHOLDING_TYPES.find((t) => t.value === c.type)?.label ?? c.type}</td>
-                  <td>{c.ratePercent}%</td>
-                  <td className={c.dianConceptCode ? "" : "text-yellow-600"}>{c.dianConceptCode ?? "Sin asignar"}</td>
-                  <td>{c.isActive ? "Si" : "No"}</td>
-                  <td className="space-x-2 py-2 text-right">
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        setEditingId(c.id);
-                        setEditForm({ name: c.name, ratePercent: String(c.ratePercent), dianConceptCode: c.dianConceptCode ?? "" });
-                      }}
-                    >
-                      Editar
-                    </Button>
-                    {c.isActive && (
-                      <Button variant="danger" disabled={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(c.id)}>
-                        Desactivar
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Codigo</Th>
+                <Th>Nombre</Th>
+                <Th>Tipo</Th>
+                <Th>Tarifa</Th>
+                <Th>Codigo DIAN</Th>
+                <Th>Estado</Th>
+                <Th></Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((c) =>
+                editingId === c.id ? (
+                  <TableRow key={c.id}>
+                    <Td className="font-medium text-slate-900">{c.code}</Td>
+                    <Td>
+                      <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                    </Td>
+                    <Td>{WITHHOLDING_TYPES.find((t) => t.value === c.type)?.label ?? c.type}</Td>
+                    <Td>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="w-20"
+                          value={editForm.ratePercent}
+                          onChange={(e) => setEditForm({ ...editForm, ratePercent: e.target.value })}
+                        />
+                        %
+                      </div>
+                    </Td>
+                    <Td>
+                      <Input
+                        className="w-24"
+                        value={editForm.dianConceptCode}
+                        onChange={(e) => setEditForm({ ...editForm, dianConceptCode: e.target.value })}
+                      />
+                    </Td>
+                    <Td>
+                      <ActiveBadge active={c.isActive} />
+                    </Td>
+                    <Td className="space-x-2 text-right">
+                      <Button size="sm" loading={updateMutation.isPending} onClick={() => updateMutation.mutate(c.id)}>
+                        Guardar
                       </Button>
-                    )}
-                  </td>
-                </tr>
-              )
-            )}
-          </tbody>
-        </table>
+                      <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
+                        Cancelar
+                      </Button>
+                    </Td>
+                  </TableRow>
+                ) : (
+                  <TableRow key={c.id}>
+                    <Td className="font-medium text-slate-900">{c.code}</Td>
+                    <Td>{c.name}</Td>
+                    <Td>{WITHHOLDING_TYPES.find((t) => t.value === c.type)?.label ?? c.type}</Td>
+                    <Td>{c.ratePercent}%</Td>
+                    <Td className={c.dianConceptCode ? "" : "text-warning-600"}>{c.dianConceptCode ?? "Sin asignar"}</Td>
+                    <Td>
+                      <ActiveBadge active={c.isActive} />
+                    </Td>
+                    <Td className="space-x-2 text-right">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setEditingId(c.id);
+                          setEditForm({ name: c.name, ratePercent: String(c.ratePercent), dianConceptCode: c.dianConceptCode ?? "" });
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      {c.isActive && (
+                        <Button size="sm" variant="danger" loading={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(c.id)}>
+                          Desactivar
+                        </Button>
+                      )}
+                    </Td>
+                  </TableRow>
+                )
+              )}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -367,10 +379,9 @@ function CostCentersSection() {
   });
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo centro de costo</h2>
-        <p className="mb-3 text-sm text-gray-500">
+    <div className="space-y-6">
+      <Card title="Nuevo centro de costo">
+        <p className="mb-3 text-sm text-slate-500">
           Etiqueta comprobantes manuales y gastos operativos por area/proyecto (ej. sucursal, departamento) para
           poder filtrar el Estado de Resultados y el Libro Mayor por ese mismo centro.
         </p>
@@ -383,74 +394,82 @@ function CostCentersSection() {
         >
           <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
           <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Button type="submit" disabled={createMutation.isPending}>
+          <Button type="submit" loading={createMutation.isPending}>
             Crear
           </Button>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-3">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Codigo</th>
-              <th>Nombre</th>
-              <th>Activo</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((c) =>
-              editingId === c.id ? (
-                <tr key={c.id} className="border-b border-gray-100">
-                  <td className="py-2">{c.code}</td>
-                  <td>
-                    <input
-                      className="w-full rounded border border-gray-200 px-2 py-1"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                    />
-                  </td>
-                  <td>{c.isActive ? "Si" : "No"}</td>
-                  <td className="space-x-2 py-2 text-right">
-                    <Button disabled={updateMutation.isPending} onClick={() => updateMutation.mutate(c.id)}>
-                      Guardar
-                    </Button>
-                    <Button variant="secondary" onClick={() => setEditingId(null)}>
-                      Cancelar
-                    </Button>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={c.id} className="border-b border-gray-100">
-                  <td className="py-2">{c.code}</td>
-                  <td>{c.name}</td>
-                  <td>{c.isActive ? "Si" : "No"}</td>
-                  <td className="space-x-2 py-2 text-right">
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        setEditingId(c.id);
-                        setEditName(c.name);
-                      }}
-                    >
-                      Editar
-                    </Button>
-                    {c.isActive && (
-                      <Button variant="danger" disabled={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(c.id)}>
-                        Desactivar
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Codigo</Th>
+                <Th>Nombre</Th>
+                <Th>Estado</Th>
+                <Th></Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((c) =>
+                editingId === c.id ? (
+                  <TableRow key={c.id}>
+                    <Td className="font-medium text-slate-900">{c.code}</Td>
+                    <Td>
+                      <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                    </Td>
+                    <Td>
+                      <ActiveBadge active={c.isActive} />
+                    </Td>
+                    <Td className="space-x-2 text-right">
+                      <Button size="sm" loading={updateMutation.isPending} onClick={() => updateMutation.mutate(c.id)}>
+                        Guardar
                       </Button>
-                    )}
-                  </td>
-                </tr>
-              )
-            )}
-          </tbody>
-        </table>
+                      <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
+                        Cancelar
+                      </Button>
+                    </Td>
+                  </TableRow>
+                ) : (
+                  <TableRow key={c.id}>
+                    <Td className="font-medium text-slate-900">{c.code}</Td>
+                    <Td>{c.name}</Td>
+                    <Td>
+                      <ActiveBadge active={c.isActive} />
+                    </Td>
+                    <Td className="space-x-2 text-right">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setEditingId(c.id);
+                          setEditName(c.name);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      {c.isActive && (
+                        <Button size="sm" variant="danger" loading={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(c.id)}>
+                          Desactivar
+                        </Button>
+                      )}
+                    </Td>
+                  </TableRow>
+                )
+              )}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -507,10 +526,15 @@ function EntriesSection() {
     setLines(lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)));
   }
 
+  function entryStatusTone(status: string): "neutral" | "success" | "danger" {
+    if (status === "POSTED") return "success";
+    if (status === "VOID") return "danger";
+    return "neutral";
+  }
+
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo comprobante manual</h2>
+    <div className="space-y-6">
+      <Card title="Nuevo comprobante manual">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -520,37 +544,31 @@ function EntriesSection() {
           <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             <Input placeholder="Descripcion" value={description} onChange={(e) => setDescription(e.target.value)} required />
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={costCenterId}
-              onChange={(e) => setCostCenterId(e.target.value)}
-            >
+            <Select value={costCenterId} onChange={(e) => setCostCenterId(e.target.value)}>
               <option value="">Sin centro de costo</option>
-              {costCenters?.data.filter((c) => c.isActive).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} {c.name}
-                </option>
-              ))}
-            </select>
+              {costCenters?.data
+                .filter((c) => c.isActive)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} {c.name}
+                  </option>
+                ))}
+            </Select>
           </div>
-          <table className="mb-3 w-full text-left text-sm">
-            <thead>
-              <tr className="text-gray-500">
-                <th className="py-1">Cuenta</th>
-                <th>Debito</th>
-                <th>Credito</th>
-                <th>Descripcion</th>
+          <Table className="mb-3">
+            <TableHead>
+              <tr>
+                <Th>Cuenta</Th>
+                <Th>Debito</Th>
+                <Th>Credito</Th>
+                <Th>Descripcion</Th>
               </tr>
-            </thead>
-            <tbody>
+            </TableHead>
+            <TableBody>
               {lines.map((line, i) => (
-                <tr key={i}>
-                  <td className="py-1 pr-2">
-                    <select
-                      className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
-                      value={line.accountId}
-                      onChange={(e) => updateLine(i, "accountId", e.target.value)}
-                    >
+                <TableRow key={i} className="hover:bg-transparent">
+                  <Td className="pr-2">
+                    <Select value={line.accountId} onChange={(e) => updateLine(i, "accountId", e.target.value)}>
                       <option value="">Seleccionar...</option>
                       {accounts?.data
                         .filter((a) => a.acceptsEntries)
@@ -559,35 +577,21 @@ function EntriesSection() {
                             {a.code} {a.name}
                           </option>
                         ))}
-                    </select>
-                  </td>
-                  <td className="pr-2">
-                    <input
-                      type="number"
-                      className="w-24 rounded border border-gray-200 px-2 py-1"
-                      value={line.debit}
-                      onChange={(e) => updateLine(i, "debit", e.target.value)}
-                    />
-                  </td>
-                  <td className="pr-2">
-                    <input
-                      type="number"
-                      className="w-24 rounded border border-gray-200 px-2 py-1"
-                      value={line.credit}
-                      onChange={(e) => updateLine(i, "credit", e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="w-full rounded border border-gray-200 px-2 py-1"
-                      value={line.description}
-                      onChange={(e) => updateLine(i, "description", e.target.value)}
-                    />
-                  </td>
-                </tr>
+                    </Select>
+                  </Td>
+                  <Td className="pr-2">
+                    <Input type="number" className="w-28" value={line.debit} onChange={(e) => updateLine(i, "debit", e.target.value)} />
+                  </Td>
+                  <Td className="pr-2">
+                    <Input type="number" className="w-28" value={line.credit} onChange={(e) => updateLine(i, "credit", e.target.value)} />
+                  </Td>
+                  <Td>
+                    <Input value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} />
+                  </Td>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -596,53 +600,62 @@ function EntriesSection() {
             >
               + Linea
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" loading={createMutation.isPending}>
               Crear comprobante
             </Button>
           </div>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-3">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">#</th>
-              <th>Fecha</th>
-              <th>Descripcion</th>
-              <th>Tipo</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries?.data.map((entry) => (
-              <tr key={entry.id} className="border-b border-gray-100">
-                <td className="py-2">{entry.number}</td>
-                <td>{entry.date.slice(0, 10)}</td>
-                <td>{entry.description}</td>
-                <td>{entry.type}</td>
-                <td>{entry.status}</td>
-                <td className="space-x-2 py-2 text-right">
-                  {entry.status === "DRAFT" && (
-                    <Button onClick={() => postMutation.mutate(entry.id)} disabled={postMutation.isPending}>
-                      Postear
-                    </Button>
-                  )}
-                  {entry.status === "POSTED" && (
-                    <Button variant="danger" onClick={() => voidMutation.mutate(entry.id)} disabled={voidMutation.isPending}>
-                      Anular
-                    </Button>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>#</Th>
+                <Th>Fecha</Th>
+                <Th>Descripcion</Th>
+                <Th>Tipo</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </TableHead>
+            <TableBody>
+              {entries?.data.map((entry) => (
+                <TableRow key={entry.id}>
+                  <Td className="font-medium text-slate-900">{entry.number}</Td>
+                  <Td>{entry.date.slice(0, 10)}</Td>
+                  <Td>{entry.description}</Td>
+                  <Td>{entry.type}</Td>
+                  <Td>
+                    <Badge tone={entryStatusTone(entry.status)}>{entry.status}</Badge>
+                  </Td>
+                  <Td className="space-x-2 text-right">
+                    {entry.status === "DRAFT" && (
+                      <Button size="sm" onClick={() => postMutation.mutate(entry.id)} loading={postMutation.isPending}>
+                        Postear
+                      </Button>
+                    )}
+                    {entry.status === "POSTED" && (
+                      <Button size="sm" variant="danger" onClick={() => voidMutation.mutate(entry.id)} loading={voidMutation.isPending}>
+                        Anular
+                      </Button>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -679,10 +692,10 @@ function ReportsSection() {
   });
 
   return (
-    <>
-      <div className="mb-4 flex gap-2">
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
         {(["balance", "income", "cashflow", "ledger"] as ReportTab[]).map((tab) => (
-          <Button key={tab} variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
+          <Button key={tab} size="sm" variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
             {tab === "balance" ? "Balance General" : tab === "income" ? "Estado de Resultados" : tab === "cashflow" ? "Flujo de caja" : "Libro mayor"}
           </Button>
         ))}
@@ -696,27 +709,27 @@ function ReportsSection() {
           {balanceQuery.data && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Activos ({formatCOP(balanceQuery.data.totalAssets)})</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Activos ({formatCOP(balanceQuery.data.totalAssets)})</h3>
                 {balanceQuery.data.assets.map((a) => (
-                  <p key={a.accountId} className="text-sm text-gray-600">
+                  <p key={a.accountId} className="text-sm text-slate-600">
                     {a.name}: {formatCOP(a.balance)}
                   </p>
                 ))}
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Pasivos ({formatCOP(balanceQuery.data.totalLiabilities)})</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Pasivos ({formatCOP(balanceQuery.data.totalLiabilities)})</h3>
                 {balanceQuery.data.liabilities.map((a) => (
-                  <p key={a.accountId} className="text-sm text-gray-600">
+                  <p key={a.accountId} className="text-sm text-slate-600">
                     {a.name}: {formatCOP(a.balance)}
                   </p>
                 ))}
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">
                   Patrimonio ({formatCOP(balanceQuery.data.totalEquity)}) — Utilidad: {formatCOP(balanceQuery.data.netIncome)}
                 </h3>
                 {balanceQuery.data.equity.map((a) => (
-                  <p key={a.accountId} className="text-sm text-gray-600">
+                  <p key={a.accountId} className="text-sm text-slate-600">
                     {a.name}: {formatCOP(a.balance)}
                   </p>
                 ))}
@@ -728,44 +741,37 @@ function ReportsSection() {
 
       {reportTab === "income" && (
         <Card>
-          <div className="mb-4 flex gap-3">
+          <div className="mb-4 flex flex-wrap items-end gap-3">
             <Input type="date" label="Desde" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input type="date" label="Hasta" value={to} onChange={(e) => setTo(e.target.value)} />
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">Centro de costo</span>
-              <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                value={incomeCostCenterId}
-                onChange={(e) => setIncomeCostCenterId(e.target.value)}
-              >
-                <option value="">Todos</option>
-                {costCenters?.data.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select label="Centro de costo" value={incomeCostCenterId} onChange={(e) => setIncomeCostCenterId(e.target.value)}>
+              <option value="">Todos</option>
+              {costCenters?.data.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} {c.name}
+                </option>
+              ))}
+            </Select>
           </div>
           {incomeQuery.data && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Ingresos ({formatCOP(incomeQuery.data.totalIncome)})</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Ingresos ({formatCOP(incomeQuery.data.totalIncome)})</h3>
                 {incomeQuery.data.income.map((a) => (
-                  <p key={a.accountId} className="text-sm text-gray-600">
+                  <p key={a.accountId} className="text-sm text-slate-600">
                     {a.name}: {formatCOP(a.balance)}
                   </p>
                 ))}
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Gastos ({formatCOP(incomeQuery.data.totalExpenses)})</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Gastos ({formatCOP(incomeQuery.data.totalExpenses)})</h3>
                 {incomeQuery.data.expenses.map((a) => (
-                  <p key={a.accountId} className="text-sm text-gray-600">
+                  <p key={a.accountId} className="text-sm text-slate-600">
                     {a.name}: {formatCOP(a.balance)}
                   </p>
                 ))}
               </div>
-              <p className="col-span-2 text-sm font-semibold">Utilidad neta: {formatCOP(incomeQuery.data.netIncome)}</p>
+              <p className="col-span-2 text-sm font-semibold text-slate-900">Utilidad neta: {formatCOP(incomeQuery.data.netIncome)}</p>
             </div>
           )}
         </Card>
@@ -773,35 +779,35 @@ function ReportsSection() {
 
       {reportTab === "cashflow" && (
         <Card>
-          <div className="mb-4 flex gap-3">
+          <div className="mb-4 flex flex-wrap items-end gap-3">
             <Input type="date" label="Desde" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input type="date" label="Hasta" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
           {cashFlowQuery.data && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
-                <h3 className="mb-2 text-sm font-semibold">
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">
                   Caja — entradas {formatCOP(cashFlowQuery.data.totalCashIn)}, salidas {formatCOP(cashFlowQuery.data.totalCashOut)}, neto{" "}
                   {formatCOP(cashFlowQuery.data.netCash)}
                 </h3>
                 {cashFlowQuery.data.cash.map((l) => (
-                  <p key={l.type} className="text-sm text-gray-600">
+                  <p key={l.type} className="text-sm text-slate-600">
                     {l.type}: {formatCOP(l.total)}
                   </p>
                 ))}
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">
                   Bancos — entradas {formatCOP(cashFlowQuery.data.totalBankIn)}, salidas {formatCOP(cashFlowQuery.data.totalBankOut)}, neto{" "}
                   {formatCOP(cashFlowQuery.data.netBank)}
                 </h3>
                 {cashFlowQuery.data.bank.map((l) => (
-                  <p key={l.type} className="text-sm text-gray-600">
+                  <p key={l.type} className="text-sm text-slate-600">
                     {l.type}: {formatCOP(l.total)}
                   </p>
                 ))}
               </div>
-              <p className="col-span-2 text-sm font-semibold">Flujo de caja neto: {formatCOP(cashFlowQuery.data.netCashFlow)}</p>
+              <p className="col-span-2 text-sm font-semibold text-slate-900">Flujo de caja neto: {formatCOP(cashFlowQuery.data.netCashFlow)}</p>
             </div>
           )}
         </Card>
@@ -809,63 +815,55 @@ function ReportsSection() {
 
       {reportTab === "ledger" && (
         <Card>
-          <div className="mb-4 flex gap-3">
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={ledgerAccountId}
-              onChange={(e) => setLedgerAccountId(e.target.value)}
-            >
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <Select label="Cuenta" value={ledgerAccountId} onChange={(e) => setLedgerAccountId(e.target.value)}>
               <option value="">Seleccionar cuenta...</option>
               {accounts?.data.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.code} {a.name}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input type="date" label="Desde" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input type="date" label="Hasta" value={to} onChange={(e) => setTo(e.target.value)} />
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={ledgerCostCenterId}
-              onChange={(e) => setLedgerCostCenterId(e.target.value)}
-            >
+            <Select label="Centro de costo" value={ledgerCostCenterId} onChange={(e) => setLedgerCostCenterId(e.target.value)}>
               <option value="">Todos los centros de costo</option>
               {costCenters?.data.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.code} {c.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           {ledgerQuery.data && (
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-gray-500">
-                  <th className="py-2">#</th>
-                  <th>Fecha</th>
-                  <th>Descripcion</th>
-                  <th>Debito</th>
-                  <th>Credito</th>
-                  <th>Saldo</th>
+            <Table>
+              <TableHead>
+                <tr>
+                  <Th>#</Th>
+                  <Th>Fecha</Th>
+                  <Th>Descripcion</Th>
+                  <Th>Debito</Th>
+                  <Th>Credito</Th>
+                  <Th>Saldo</Th>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHead>
+              <TableBody>
                 {ledgerQuery.data.data.map((l, i) => (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-2">{l.entryNumber}</td>
-                    <td>{l.date.slice(0, 10)}</td>
-                    <td>{l.description}</td>
-                    <td>{formatCOP(l.debit)}</td>
-                    <td>{formatCOP(l.credit)}</td>
-                    <td>{formatCOP(l.runningBalance)}</td>
-                  </tr>
+                  <TableRow key={i}>
+                    <Td>{l.entryNumber}</Td>
+                    <Td>{l.date.slice(0, 10)}</Td>
+                    <Td>{l.description}</Td>
+                    <Td>{formatCOP(l.debit)}</Td>
+                    <Td>{formatCOP(l.credit)}</Td>
+                    <Td>{formatCOP(l.runningBalance)}</Td>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
         </Card>
       )}
-    </>
+    </div>
   );
 }
 
@@ -892,108 +890,107 @@ function PeriodsSection() {
   });
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Cerrar periodo contable</h2>
-        <p className="mb-3 text-sm text-gray-500">
+    <div className="space-y-6">
+      <Card title="Cerrar periodo contable">
+        <p className="mb-3 text-sm text-slate-500">
           Al cerrar un periodo no se podran crear ni contabilizar comprobantes (manuales o automaticos) con fecha
           dentro de ese mes. Requiere que todos los comprobantes del mes esten publicados o anulados.
         </p>
         <form
-          className="flex items-end gap-3"
+          className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             closeMutation.mutate();
           }}
         >
           <Input label="Año" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} required />
-          <div>
-            <label className="mb-1 block text-sm text-gray-600">Mes</label>
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
-            >
-              {MONTH_LABELS.map((label, i) => (
-                <option key={label} value={i + 1}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button type="submit" disabled={closeMutation.isPending}>
+          <Select label="Mes" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            {MONTH_LABELS.map((label, i) => (
+              <option key={label} value={i + 1}>
+                {label}
+              </option>
+            ))}
+          </Select>
+          <Button type="submit" loading={closeMutation.isPending}>
             Cerrar periodo
           </Button>
         </form>
-        {closeMutation.isError && <p className="mt-2 text-sm text-red-600">{(closeMutation.error as Error).message}</p>}
+        {closeMutation.isError && (
+          <Alert tone="danger" className="mt-3">
+            {(closeMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Historial de periodos</h2>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Periodo</th>
-              <th>Estado</th>
-              <th>Cerrado el</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((p) => (
-              <tr key={p.id} className="border-b border-gray-100">
-                <td className="py-2">
-                  {MONTH_LABELS[p.month - 1]} {p.year}
-                </td>
-                <td>{p.status === "CLOSED" ? "Cerrado" : "Abierto"}</td>
-                <td>{p.closedAt ? p.closedAt.slice(0, 10) : "-"}</td>
-                <td className="text-right">
-                  {p.status === "CLOSED" && (
-                    <Button
-                      variant="secondary"
-                      disabled={reopenMutation.isPending}
-                      onClick={() => reopenMutation.mutate({ year: p.year, month: p.month })}
-                    >
-                      Reabrir
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay periodos cerrados todavia.</p>}
+      <Card title="Historial de periodos" noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <>
+            <Table>
+              <TableHead>
+                <tr>
+                  <Th>Periodo</Th>
+                  <Th>Estado</Th>
+                  <Th>Cerrado el</Th>
+                  <Th></Th>
+                </tr>
+              </TableHead>
+              <TableBody>
+                {data?.data.map((p) => (
+                  <TableRow key={p.id}>
+                    <Td className="font-medium text-slate-900">
+                      {MONTH_LABELS[p.month - 1]} {p.year}
+                    </Td>
+                    <Td>
+                      <Badge tone={p.status === "CLOSED" ? "neutral" : "success"}>{p.status === "CLOSED" ? "Cerrado" : "Abierto"}</Badge>
+                    </Td>
+                    <Td>{p.closedAt ? p.closedAt.slice(0, 10) : "-"}</Td>
+                    <Td className="text-right">
+                      {p.status === "CLOSED" && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={reopenMutation.isPending}
+                          onClick={() => reopenMutation.mutate({ year: p.year, month: p.month })}
+                        >
+                          Reabrir
+                        </Button>
+                      )}
+                    </Td>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {data?.data.length === 0 && <p className="p-4 text-sm text-slate-400">No hay periodos cerrados todavia.</p>}
+          </>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
+
+const SECTIONS: { value: Section; label: string }[] = [
+  { value: "accounts", label: "Plan de cuentas" },
+  { value: "entries", label: "Comprobantes" },
+  { value: "reports", label: "Reportes" },
+  { value: "periods", label: "Cierre de periodo" },
+  { value: "withholding", label: "Retenciones" },
+  { value: "cost-centers", label: "Centros de costo" },
+];
 
 export function AccountingPage() {
   const [section, setSection] = useState<Section>("accounts");
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Contabilidad</h1>
-      <div className="mb-6 flex gap-2">
-        <Button variant={section === "accounts" ? "primary" : "secondary"} onClick={() => setSection("accounts")}>
-          Plan de cuentas
-        </Button>
-        <Button variant={section === "entries" ? "primary" : "secondary"} onClick={() => setSection("entries")}>
-          Comprobantes
-        </Button>
-        <Button variant={section === "reports" ? "primary" : "secondary"} onClick={() => setSection("reports")}>
-          Reportes
-        </Button>
-        <Button variant={section === "periods" ? "primary" : "secondary"} onClick={() => setSection("periods")}>
-          Cierre de periodo
-        </Button>
-        <Button variant={section === "withholding" ? "primary" : "secondary"} onClick={() => setSection("withholding")}>
-          Retenciones
-        </Button>
-        <Button variant={section === "cost-centers" ? "primary" : "secondary"} onClick={() => setSection("cost-centers")}>
-          Centros de costo
-        </Button>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Contabilidad</h1>
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {SECTIONS.map((s) => (
+          <Button key={s.value} size="sm" variant={section === s.value ? "primary" : "secondary"} onClick={() => setSection(s.value)}>
+            {s.label}
+          </Button>
+        ))}
       </div>
 
       {section === "accounts" && <AccountsSection />}

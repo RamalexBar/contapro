@@ -5,6 +5,11 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import {
   closeBankReconciliation,
   createBankAccount,
@@ -35,9 +40,8 @@ function BankAccountsSection() {
   });
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nueva cuenta bancaria</h2>
+    <div className="space-y-6">
+      <Card title="Nueva cuenta bancaria">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-4"
           onSubmit={(e) => {
@@ -52,45 +56,45 @@ function BankAccountsSection() {
             onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
             required
           />
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.accountType}
-            onChange={(e) => setForm({ ...form, accountType: e.target.value })}
-          >
+          <Select value={form.accountType} onChange={(e) => setForm({ ...form, accountType: e.target.value })}>
             <option value="AHORROS">Ahorros</option>
             <option value="CORRIENTE">Corriente</option>
-          </select>
-          <Button type="submit" disabled={createMutation.isPending}>
+          </Select>
+          <Button type="submit" loading={createMutation.isPending}>
             Crear
           </Button>
         </form>
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Banco</th>
-              <th>Numero</th>
-              <th>Tipo</th>
-              <th>Saldo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((a) => (
-              <tr key={a.id} className="border-b border-gray-100">
-                <td className="py-2">{a.bankName}</td>
-                <td>{a.accountNumber}</td>
-                <td>{a.accountType}</td>
-                <td>{formatCOP(a.currentBalance)}</td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="No hay cuentas bancarias registradas" />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Banco</Th>
+                <Th>Numero</Th>
+                <Th>Tipo</Th>
+                <Th>Saldo</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay cuentas bancarias registradas.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((a) => (
+                <TableRow key={a.id}>
+                  <Td className="font-medium text-slate-900">{a.bankName}</Td>
+                  <Td>{a.accountNumber}</Td>
+                  <Td>{a.accountType}</Td>
+                  <Td>{formatCOP(a.currentBalance)}</Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -114,21 +118,16 @@ function BankTransactionsSection() {
   });
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Movimientos bancarios</h2>
-        <select
-          className="mb-4 rounded-md border border-gray-300 px-3 py-2 text-sm"
-          value={bankAccountId}
-          onChange={(e) => setBankAccountId(e.target.value)}
-        >
+    <div className="space-y-6">
+      <Card title="Movimientos bancarios">
+        <Select className="mb-4" value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)}>
           <option value="">Seleccionar cuenta bancaria...</option>
           {accounts?.data.map((a) => (
             <option key={a.id} value={a.id}>
               {a.bankName} {a.accountNumber}
             </option>
           ))}
-        </select>
+        </Select>
 
         {bankAccountId && (
           <form
@@ -152,15 +151,11 @@ function BankTransactionsSection() {
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
               required
             />
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as "DEBIT" | "CREDIT" })}
-            >
+            <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as "DEBIT" | "CREDIT" })}>
               <option value="CREDIT">Credito (entrada)</option>
               <option value="DEBIT">Debito (salida)</option>
-            </select>
-            <Button type="submit" disabled={createMutation.isPending}>
+            </Select>
+            <Button type="submit" loading={createMutation.isPending}>
               Registrar
             </Button>
           </form>
@@ -168,35 +163,40 @@ function BankTransactionsSection() {
       </Card>
 
       {bankAccountId && (
-        <Card>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-gray-500">
-                <th className="py-2">Fecha</th>
-                <th>Descripcion</th>
-                <th>Tipo</th>
-                <th>Monto</th>
-                <th>Conciliado</th>
-                <th>Id</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions?.data.map((t) => (
-                <tr key={t.id} className="border-b border-gray-100">
-                  <td className="py-2">{t.date.slice(0, 10)}</td>
-                  <td>{t.description}</td>
-                  <td>{t.type}</td>
-                  <td>{formatCOP(t.amount)}</td>
-                  <td>{t.reconciled ? "Si" : "No"}</td>
-                  <td className="font-mono text-xs text-gray-400">{t.id}</td>
+        <Card noPadding>
+          {transactions?.data.length === 0 ? (
+            <EmptyState title="Sin movimientos" />
+          ) : (
+            <Table>
+              <TableHead>
+                <tr>
+                  <Th>Fecha</Th>
+                  <Th>Descripcion</Th>
+                  <Th>Tipo</Th>
+                  <Th>Monto</Th>
+                  <Th>Conciliado</Th>
+                  <Th>Id</Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {transactions?.data.length === 0 && <p className="py-4 text-sm text-gray-400">Sin movimientos.</p>}
+              </TableHead>
+              <TableBody>
+                {transactions?.data.map((t) => (
+                  <TableRow key={t.id}>
+                    <Td>{t.date.slice(0, 10)}</Td>
+                    <Td>{t.description}</Td>
+                    <Td>{t.type}</Td>
+                    <Td>{formatCOP(t.amount)}</Td>
+                    <Td>
+                      <Badge tone={t.reconciled ? "success" : "neutral"}>{t.reconciled ? "Si" : "No"}</Badge>
+                    </Td>
+                    <Td className="font-mono text-xs text-slate-400">{t.id}</Td>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </Card>
       )}
-    </>
+    </div>
   );
 }
 
@@ -244,9 +244,8 @@ function ReconciliationsSection() {
   });
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Iniciar conciliacion</h2>
+    <div className="space-y-6">
+      <Card title="Iniciar conciliacion">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-5"
           onSubmit={(e) => {
@@ -254,19 +253,14 @@ function ReconciliationsSection() {
             startMutation.mutate();
           }}
         >
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.bankAccountId}
-            onChange={(e) => setForm({ ...form, bankAccountId: e.target.value })}
-            required
-          >
+          <Select value={form.bankAccountId} onChange={(e) => setForm({ ...form, bankAccountId: e.target.value })} required>
             <option value="">Cuenta bancaria...</option>
             {accounts?.data.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.bankName} {a.accountNumber}
               </option>
             ))}
-          </select>
+          </Select>
           <Input type="date" label="Inicio periodo" value={form.periodStart} onChange={(e) => setForm({ ...form, periodStart: e.target.value })} />
           <Input type="date" label="Fin periodo" value={form.periodEnd} onChange={(e) => setForm({ ...form, periodEnd: e.target.value })} />
           <Input
@@ -283,82 +277,87 @@ function ReconciliationsSection() {
             onChange={(e) => setForm({ ...form, bookBalance: e.target.value })}
             required
           />
-          <Button type="submit" disabled={startMutation.isPending}>
+          <Button type="submit" loading={startMutation.isPending}>
             Iniciar
           </Button>
         </form>
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Periodo</th>
-              <th>Extracto</th>
-              <th>Libros</th>
-              <th>Diferencia</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {reconciliations?.data.map((r) => (
-              <Fragment key={r.id}>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2">
-                    {r.periodStart.slice(0, 10)} - {r.periodEnd.slice(0, 10)}
-                  </td>
-                  <td>{formatCOP(r.statementBalance)}</td>
-                  <td>{formatCOP(r.bookBalance)}</td>
-                  <td>{formatCOP(r.statementBalance - r.bookBalance)}</td>
-                  <td>{r.status}</td>
-                  <td className="text-right">
-                    <Button variant="secondary" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
-                      {expandedId === r.id ? "Ocultar" : "Ver"}
-                    </Button>
-                  </td>
-                </tr>
-                {expandedId === r.id && (
-                  <tr>
-                    <td colSpan={6} className="bg-gray-50 p-4">
-                      <p className="mb-2 text-xs font-semibold text-gray-500">Items conciliados</p>
-                      {r.items.map((item) => (
-                        <p key={item.id} className="text-xs text-gray-600">
-                          BankTransaction: {item.bankTransactionId ?? "-"} / JournalEntryLine: {item.journalEntryLineId ?? "-"}
-                        </p>
-                      ))}
-                      {r.items.length === 0 && <p className="text-xs text-gray-400">Sin items todavia.</p>}
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Periodo</Th>
+                <Th>Extracto</Th>
+                <Th>Libros</Th>
+                <Th>Diferencia</Th>
+                <Th>Estado</Th>
+                <Th></Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {reconciliations?.data.map((r) => (
+                <Fragment key={r.id}>
+                  <TableRow>
+                    <Td className="font-medium text-slate-900">
+                      {r.periodStart.slice(0, 10)} - {r.periodEnd.slice(0, 10)}
+                    </Td>
+                    <Td>{formatCOP(r.statementBalance)}</Td>
+                    <Td>{formatCOP(r.bookBalance)}</Td>
+                    <Td>{formatCOP(r.statementBalance - r.bookBalance)}</Td>
+                    <Td>
+                      <Badge tone={r.status === "CLOSED" ? "success" : "neutral"}>{r.status}</Badge>
+                    </Td>
+                    <Td className="text-right">
+                      <Button size="sm" variant="secondary" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
+                        {expandedId === r.id ? "Ocultar" : "Ver"}
+                      </Button>
+                    </Td>
+                  </TableRow>
+                  {expandedId === r.id && (
+                    <tr>
+                      <td colSpan={6} className="bg-slate-50 p-4">
+                        <p className="mb-2 text-xs font-semibold text-slate-500">Items conciliados</p>
+                        {r.items.map((item) => (
+                          <p key={item.id} className="text-xs text-slate-600">
+                            BankTransaction: {item.bankTransactionId ?? "-"} / JournalEntryLine: {item.journalEntryLineId ?? "-"}
+                          </p>
+                        ))}
+                        {r.items.length === 0 && <p className="text-xs text-slate-400">Sin items todavia.</p>}
 
-                      {r.status === "IN_PROGRESS" && (
-                        <div className="mt-3 flex flex-wrap items-end gap-2">
-                          <Input
-                            placeholder="bankTransactionId"
-                            value={matchForm.bankTransactionId}
-                            onChange={(e) => setMatchForm({ ...matchForm, bankTransactionId: e.target.value })}
-                          />
-                          <Input
-                            placeholder="journalEntryLineId"
-                            value={matchForm.journalEntryLineId}
-                            onChange={(e) => setMatchForm({ ...matchForm, journalEntryLineId: e.target.value })}
-                          />
-                          <Button onClick={() => matchMutation.mutate(r.id)} disabled={matchMutation.isPending}>
-                            Emparejar
-                          </Button>
-                          <Button variant="danger" onClick={() => closeMutation.mutate(r.id)} disabled={closeMutation.isPending}>
-                            Cerrar conciliacion
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+                        {r.status === "IN_PROGRESS" && (
+                          <div className="mt-3 flex flex-wrap items-end gap-2">
+                            <Input
+                              placeholder="bankTransactionId"
+                              value={matchForm.bankTransactionId}
+                              onChange={(e) => setMatchForm({ ...matchForm, bankTransactionId: e.target.value })}
+                            />
+                            <Input
+                              placeholder="journalEntryLineId"
+                              value={matchForm.journalEntryLineId}
+                              onChange={(e) => setMatchForm({ ...matchForm, journalEntryLineId: e.target.value })}
+                            />
+                            <Button size="sm" onClick={() => matchMutation.mutate(r.id)} loading={matchMutation.isPending}>
+                              Emparejar
+                            </Button>
+                            <Button size="sm" variant="danger" onClick={() => closeMutation.mutate(r.id)} loading={closeMutation.isPending}>
+                              Cerrar conciliacion
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -369,15 +368,15 @@ export function BankingPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Bancos</h1>
-      <div className="mb-6 flex gap-2">
-        <Button variant={section === "accounts" ? "primary" : "secondary"} onClick={() => setSection("accounts")}>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Bancos</h1>
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <Button size="sm" variant={section === "accounts" ? "primary" : "secondary"} onClick={() => setSection("accounts")}>
           Cuentas bancarias
         </Button>
-        <Button variant={section === "transactions" ? "primary" : "secondary"} onClick={() => setSection("transactions")}>
+        <Button size="sm" variant={section === "transactions" ? "primary" : "secondary"} onClick={() => setSection("transactions")}>
           Movimientos
         </Button>
-        <Button variant={section === "reconciliations" ? "primary" : "secondary"} onClick={() => setSection("reconciliations")}>
+        <Button size="sm" variant={section === "reconciliations" ? "primary" : "secondary"} onClick={() => setSection("reconciliations")}>
           Conciliaciones
         </Button>
       </div>

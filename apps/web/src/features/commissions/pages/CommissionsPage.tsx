@@ -5,6 +5,12 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import {
   calculateCommissions,
@@ -47,8 +53,7 @@ function SchemesSection() {
   return (
     <>
       {canManage && (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo esquema de comision</h2>
+        <Card title="Nuevo esquema de comision" className="mb-6">
           <form
             className="grid grid-cols-2 gap-3 sm:grid-cols-4"
             onSubmit={(e) => {
@@ -56,19 +61,14 @@ function SchemesSection() {
               createMutation.mutate();
             }}
           >
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={form.sellerUserId}
-              onChange={(e) => setForm({ ...form, sellerUserId: e.target.value })}
-              required
-            >
+            <Select value={form.sellerUserId} onChange={(e) => setForm({ ...form, sellerUserId: e.target.value })} required>
               <option value="">Vendedor...</option>
               {sellers?.data.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.fullName}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input
               type="number"
               step="0.01"
@@ -77,43 +77,53 @@ function SchemesSection() {
               onChange={(e) => setForm({ ...form, ratePercent: e.target.value })}
               required
             />
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" loading={createMutation.isPending}>
               Crear
             </Button>
           </form>
-          {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
         </Card>
       )}
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Vendedor</th>
-              <th>Tarifa</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((s) => (
-              <tr key={s.id} className="border-b border-gray-100">
-                <td className="py-2">{sellerName(s.sellerUserId)}</td>
-                <td>{s.ratePercent}%</td>
-                <td className={s.isActive ? "text-green-600" : "text-gray-400"}>{s.isActive ? "Activo" : "Inactivo"}</td>
-                <td className="text-right">
-                  {canManage && s.isActive && (
-                    <Button variant="danger" disabled={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(s.id)}>
-                      Desactivar
-                    </Button>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="No hay esquemas todavia." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Vendedor</Th>
+                <Th>Tarifa</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay esquemas todavia.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((s) => (
+                <TableRow key={s.id}>
+                  <Td>{sellerName(s.sellerUserId)}</Td>
+                  <Td>{s.ratePercent}%</Td>
+                  <Td>
+                    <Badge tone={s.isActive ? "success" : "neutral"}>{s.isActive ? "Activo" : "Inactivo"}</Badge>
+                  </Td>
+                  <Td className="text-right">
+                    {canManage && s.isActive && (
+                      <Button size="sm" variant="danger" loading={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(s.id)}>
+                        Desactivar
+                      </Button>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </>
   );
@@ -161,89 +171,75 @@ function SettlementsSection() {
     <>
       <Card className="mb-6">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            Año:
-            <input
-              type="number"
-              className="w-24 rounded border border-gray-300 px-2 py-1"
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            Mes:
-            <input
-              type="number"
-              min={1}
-              max={12}
-              className="w-16 rounded border border-gray-300 px-2 py-1"
-              value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
-            />
-          </label>
+          <Input label="Año" type="number" className="w-24" value={year} onChange={(e) => setYear(Number(e.target.value))} />
+          <Input label="Mes" type="number" min={1} max={12} className="w-16" value={month} onChange={(e) => setMonth(Number(e.target.value))} />
           {canManage && (
-            <Button disabled={calculateMutation.isPending} onClick={() => calculateMutation.mutate()}>
-              {calculateMutation.isPending ? "Calculando..." : "Calcular comisiones del periodo"}
+            <Button loading={calculateMutation.isPending} onClick={() => calculateMutation.mutate()}>
+              Calcular comisiones del periodo
             </Button>
           )}
         </div>
-        {calculateMutation.isError && <p className="mt-2 text-sm text-red-600">{(calculateMutation.error as Error).message}</p>}
+        {calculateMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(calculateMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Vendedor</th>
-              <th>Base (ventas)</th>
-              <th>Tarifa</th>
-              <th>Comision</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((s) => (
-              <tr key={s.id} className="border-b border-gray-100">
-                <td className="py-2">{sellerName(s.sellerUserId)}</td>
-                <td>{formatCOP(s.salesBase)}</td>
-                <td>{s.ratePercent}%</td>
-                <td className="font-medium">{formatCOP(s.commissionAmount)}</td>
-                <td className={s.status === "PAID" ? "text-green-600" : "text-yellow-600"}>
-                  {s.status === "PAID" ? "Pagada" : "Calculada"}
-                </td>
-                <td className="text-right">
-                  {canManage && s.status === "CALCULATED" && payingId !== s.id && (
-                    <Button variant="secondary" onClick={() => setPayingId(s.id)}>
-                      Pagar
-                    </Button>
-                  )}
-                  {payingId === s.id && (
-                    <span className="inline-flex items-center gap-2">
-                      <select
-                        className="rounded border border-gray-200 px-2 py-1"
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                      >
-                        <option value="CASH">Efectivo</option>
-                        <option value="CARD">Tarjeta</option>
-                        <option value="TRANSFER">Transferencia</option>
-                      </select>
-                      <Button disabled={payMutation.isPending} onClick={() => payMutation.mutate(s.id)}>
-                        Confirmar
-                      </Button>
-                      <Button variant="secondary" onClick={() => setPayingId(null)}>
-                        Cancelar
-                      </Button>
-                    </span>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="Sin liquidaciones para este periodo." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Vendedor</Th>
+                <Th>Base (ventas)</Th>
+                <Th>Tarifa</Th>
+                <Th>Comision</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">Sin liquidaciones para este periodo.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((s) => (
+                <TableRow key={s.id}>
+                  <Td>{sellerName(s.sellerUserId)}</Td>
+                  <Td>{formatCOP(s.salesBase)}</Td>
+                  <Td>{s.ratePercent}%</Td>
+                  <Td className="font-medium">{formatCOP(s.commissionAmount)}</Td>
+                  <Td>
+                    <Badge tone={s.status === "PAID" ? "success" : "warning"}>{s.status === "PAID" ? "Pagada" : "Calculada"}</Badge>
+                  </Td>
+                  <Td className="text-right">
+                    {canManage && s.status === "CALCULATED" && payingId !== s.id && (
+                      <Button size="sm" variant="secondary" onClick={() => setPayingId(s.id)}>
+                        Pagar
+                      </Button>
+                    )}
+                    {payingId === s.id && (
+                      <span className="inline-flex items-center gap-2">
+                        <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                          <option value="CASH">Efectivo</option>
+                          <option value="CARD">Tarjeta</option>
+                          <option value="TRANSFER">Transferencia</option>
+                        </Select>
+                        <Button size="sm" loading={payMutation.isPending} onClick={() => payMutation.mutate(s.id)}>
+                          Confirmar
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setPayingId(null)}>
+                          Cancelar
+                        </Button>
+                      </span>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </>
   );
@@ -256,12 +252,12 @@ export function CommissionsPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Comisiones de vendedores</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Comisiones de vendedores</h1>
       <div className="mb-6 flex gap-2">
-        <Button variant={section === "settlements" ? "primary" : "secondary"} onClick={() => setSection("settlements")}>
+        <Button size="sm" variant={section === "settlements" ? "primary" : "secondary"} onClick={() => setSection("settlements")}>
           Liquidaciones
         </Button>
-        <Button variant={section === "schemes" ? "primary" : "secondary"} onClick={() => setSection("schemes")}>
+        <Button size="sm" variant={section === "schemes" ? "primary" : "secondary"} onClick={() => setSection("schemes")}>
           Esquemas
         </Button>
       </div>

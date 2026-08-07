@@ -5,6 +5,11 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import {
   calculateDepreciation,
@@ -58,9 +63,8 @@ function AssetsSection() {
   return (
     <>
       {canManage && (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo activo fijo</h2>
-          <p className="mb-3 text-sm text-gray-500">
+        <Card title="Nuevo activo fijo" className="mb-6">
+          <p className="mb-3 text-sm text-slate-500">
             Este registro no contabiliza la compra (eso ya se hizo por Proveedores o Gastos) -- solo
             lleva la depreciación hacia adelante desde el costo y la fecha indicados.
           </p>
@@ -103,49 +107,59 @@ function AssetsSection() {
               onChange={(e) => setForm({ ...form, usefulLifeMonths: e.target.value })}
               required
             />
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" loading={createMutation.isPending}>
               Crear
             </Button>
           </form>
-          {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
         </Card>
       )}
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Nombre</th>
-              <th>Compra</th>
-              <th>Costo</th>
-              <th>Depreciacion acum.</th>
-              <th>Valor en libros</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((a) => (
-              <tr key={a.id} className="border-b border-gray-100">
-                <td className="py-2">{a.name}</td>
-                <td>{a.purchaseDate.slice(0, 10)}</td>
-                <td>{formatCOP(a.cost)}</td>
-                <td>{formatCOP(a.accumulatedDepreciation)}</td>
-                <td className="font-medium">{formatCOP(a.cost - a.accumulatedDepreciation)}</td>
-                <td className={a.isActive ? "text-green-600" : "text-gray-400"}>{a.isActive ? "Activo" : "Dado de baja"}</td>
-                <td className="text-right">
-                  {canManage && a.isActive && (
-                    <Button variant="danger" disabled={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(a.id)}>
-                      Dar de baja
-                    </Button>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="No hay activos fijos todavia." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Nombre</Th>
+                <Th>Compra</Th>
+                <Th>Costo</Th>
+                <Th>Depreciacion acum.</Th>
+                <Th>Valor en libros</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay activos fijos todavia.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((a) => (
+                <TableRow key={a.id}>
+                  <Td>{a.name}</Td>
+                  <Td>{a.purchaseDate.slice(0, 10)}</Td>
+                  <Td>{formatCOP(a.cost)}</Td>
+                  <Td>{formatCOP(a.accumulatedDepreciation)}</Td>
+                  <Td className="font-medium">{formatCOP(a.cost - a.accumulatedDepreciation)}</Td>
+                  <Td>
+                    <Badge tone={a.isActive ? "success" : "neutral"}>{a.isActive ? "Activo" : "Dado de baja"}</Badge>
+                  </Td>
+                  <Td className="text-right">
+                    {canManage && a.isActive && (
+                      <Button size="sm" variant="danger" loading={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(a.id)}>
+                        Dar de baja
+                      </Button>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </>
   );
@@ -189,66 +203,56 @@ function DepreciationSection() {
     <>
       <Card className="mb-6">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            Año:
-            <input
-              type="number"
-              className="w-24 rounded border border-gray-300 px-2 py-1"
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            Mes:
-            <input
-              type="number"
-              min={1}
-              max={12}
-              className="w-16 rounded border border-gray-300 px-2 py-1"
-              value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
-            />
-          </label>
+          <Input label="Año" type="number" className="w-24" value={year} onChange={(e) => setYear(Number(e.target.value))} />
+          <Input label="Mes" type="number" min={1} max={12} className="w-16" value={month} onChange={(e) => setMonth(Number(e.target.value))} />
           {canManage && (
-            <Button disabled={calculateMutation.isPending} onClick={() => calculateMutation.mutate()}>
-              {calculateMutation.isPending ? "Calculando..." : "Calcular depreciacion del periodo"}
+            <Button loading={calculateMutation.isPending} onClick={() => calculateMutation.mutate()}>
+              Calcular depreciacion del periodo
             </Button>
           )}
         </div>
-        {calculateMutation.isError && <p className="mt-2 text-sm text-red-600">{(calculateMutation.error as Error).message}</p>}
+        {calculateMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(calculateMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Activo</th>
-              <th>Cuota</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((e) => (
-              <tr key={e.id} className="border-b border-gray-100">
-                <td className="py-2">{assetName(e.fixedAssetId)}</td>
-                <td className="font-medium">{formatCOP(e.amount)}</td>
-                <td className={e.status === "POSTED" ? "text-green-600" : "text-yellow-600"}>
-                  {e.status === "POSTED" ? "Contabilizada" : "Calculada"}
-                </td>
-                <td className="text-right">
-                  {canManage && e.status === "CALCULATED" && (
-                    <Button variant="secondary" disabled={postMutation.isPending} onClick={() => postMutation.mutate(e.id)}>
-                      Contabilizar
-                    </Button>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="Sin entradas de depreciacion para este periodo." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Activo</Th>
+                <Th>Cuota</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">Sin entradas de depreciacion para este periodo.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((e) => (
+                <TableRow key={e.id}>
+                  <Td>{assetName(e.fixedAssetId)}</Td>
+                  <Td className="font-medium">{formatCOP(e.amount)}</Td>
+                  <Td>
+                    <Badge tone={e.status === "POSTED" ? "success" : "warning"}>{e.status === "POSTED" ? "Contabilizada" : "Calculada"}</Badge>
+                  </Td>
+                  <Td className="text-right">
+                    {canManage && e.status === "CALCULATED" && (
+                      <Button size="sm" variant="secondary" loading={postMutation.isPending} onClick={() => postMutation.mutate(e.id)}>
+                        Contabilizar
+                      </Button>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </>
   );
@@ -261,12 +265,12 @@ export function FixedAssetsPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Activos fijos</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Activos fijos</h1>
       <div className="mb-6 flex gap-2">
-        <Button variant={section === "assets" ? "primary" : "secondary"} onClick={() => setSection("assets")}>
+        <Button size="sm" variant={section === "assets" ? "primary" : "secondary"} onClick={() => setSection("assets")}>
           Activos
         </Button>
-        <Button variant={section === "depreciation" ? "primary" : "secondary"} onClick={() => setSection("depreciation")}>
+        <Button size="sm" variant={section === "depreciation" ? "primary" : "secondary"} onClick={() => setSection("depreciation")}>
           Depreciacion
         </Button>
       </div>

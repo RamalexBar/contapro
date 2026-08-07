@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { Blocks } from "lucide-react";
 import { usePlatformAuthStore } from "../hooks/usePlatformAuthStore";
 import { Button } from "../../../components/ui/Button";
 
@@ -11,7 +12,10 @@ const NAV_ITEMS = [
 ];
 
 /** Layout separado de AppLayout (modules/auth) -- este panel no comparte autenticacion ni marca
- * visual con el resto de la app (ver README de saas-admin: PlatformAdmin no es un User). */
+ * visual con el resto de la app (ver README de saas-admin: PlatformAdmin no es un User). Se queda
+ * con su propia barra superior oscura (deliberadamente distinta al sidebar del tenant, para que
+ * un operador de plataforma nunca confunda en qué panel está) en vez de forzar un sidebar para
+ * solo 4 links. */
 export function PlatformAdminLayout({ children }: PropsWithChildren) {
   const navigate = useNavigate();
   const platformAdmin = usePlatformAuthStore((s) => s.platformAdmin);
@@ -23,20 +27,34 @@ export function PlatformAdminLayout({ children }: PropsWithChildren) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="border-b border-gray-800 bg-gray-900">
+    <div className="min-h-screen bg-slate-100">
+      <header className="border-b border-slate-800 bg-slate-900">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <nav className="flex items-center gap-4">
-            <span className="font-semibold text-white">ERP · Plataforma</span>
-            {NAV_ITEMS.map((item) => (
-              <Link key={item.to} to={item.to} className="text-sm text-gray-300 hover:text-white">
-                {item.label}
-              </Link>
-            ))}
+          <nav className="flex items-center gap-6">
+            <span className="flex items-center gap-2 font-semibold text-white">
+              <Blocks size={18} className="text-brand-400" />
+              Contapro <span className="font-normal text-slate-400">· Plataforma</span>
+            </span>
+            <div className="flex items-center gap-1">
+              {NAV_ITEMS.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end
+                  className={({ isActive }) =>
+                    `rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                      isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
           </nav>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-400">{platformAdmin?.fullName}</span>
-            <Button variant="secondary" onClick={handleLogout}>
+            <span className="text-sm text-slate-400">{platformAdmin?.fullName}</span>
+            <Button variant="secondary" size="sm" onClick={handleLogout}>
               Salir
             </Button>
           </div>

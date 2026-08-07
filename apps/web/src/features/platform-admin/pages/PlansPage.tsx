@@ -4,6 +4,10 @@ import { formatCOP } from "@erp/shared-utils";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
 import { PlatformAdminLayout } from "../components/PlatformAdminLayout";
 import { createPlan, listPlans } from "../api/saas-admin.api";
 
@@ -30,10 +34,9 @@ export function PlansPage() {
 
   return (
     <PlatformAdminLayout>
-      <h1 className="mb-4 text-lg font-semibold">Planes</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Planes</h1>
 
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo plan</h2>
+      <Card title="Nuevo plan" className="mb-6">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-6"
           onSubmit={(e) => {
@@ -71,41 +74,50 @@ export function PlansPage() {
             onChange={(e) => setForm({ ...form, maxUsers: e.target.value })}
             required
           />
-          <Button type="submit" disabled={createMutation.isPending}>
+          <Button type="submit" loading={createMutation.isPending}>
             Crear
           </Button>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Codigo</th>
-              <th>Nombre</th>
-              <th>Mensual</th>
-              <th>Anual</th>
-              <th>Max. sucursales</th>
-              <th>Max. usuarios</th>
-              <th>Activo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((p) => (
-              <tr key={p.id} className="border-b border-gray-100">
-                <td className="py-2">{p.code}</td>
-                <td>{p.name}</td>
-                <td>{formatCOP(p.priceMonthly)}</td>
-                <td>{formatCOP(p.priceYearly)}</td>
-                <td>{p.maxBranches}</td>
-                <td>{p.maxUsers}</td>
-                <td>{p.isActive ? "Si" : "No"}</td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Codigo</Th>
+                <Th>Nombre</Th>
+                <Th>Mensual</Th>
+                <Th>Anual</Th>
+                <Th>Max. sucursales</Th>
+                <Th>Max. usuarios</Th>
+                <Th>Activo</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((p) => (
+                <TableRow key={p.id}>
+                  <Td>{p.code}</Td>
+                  <Td>{p.name}</Td>
+                  <Td>{formatCOP(p.priceMonthly)}</Td>
+                  <Td>{formatCOP(p.priceYearly)}</Td>
+                  <Td>{p.maxBranches}</Td>
+                  <Td>{p.maxUsers}</Td>
+                  <Td>
+                    <Badge tone={p.isActive ? "success" : "neutral"}>{p.isActive ? "Si" : "No"}</Badge>
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </PlatformAdminLayout>
   );

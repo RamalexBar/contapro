@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Blocks } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Card } from "../../../components/ui/Card";
+import { Alert } from "../../../components/ui/Alert";
 import { login } from "../api/auth.api";
 import { useAuthStore } from "../hooks/useAuthStore";
 import { ApiError } from "../../../lib/api-client";
@@ -31,28 +33,36 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
-      <Card className="w-full max-w-sm">
-        <h1 className="mb-1 text-xl font-semibold text-gray-900">ERP SaaS Colombia</h1>
-        <p className="mb-6 text-sm text-gray-500">Ingresa a tu empresa</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Ingresando..." : "Ingresar"}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-xs text-gray-500">
-          No tenes cuenta?{" "}
-          <Link to="/register" className="text-brand-700 hover:underline">
-            Crea una gratis
-          </Link>
-        </p>
-        <p className="mt-2 text-xs text-gray-400">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
+            <Blocks size={22} />
+          </div>
+          <span className="text-lg font-semibold text-slate-900">Contapro</span>
+        </div>
+        <Card>
+          <h1 className="mb-1 text-lg font-semibold text-slate-900">Ingresa a tu empresa</h1>
+          <p className="mb-6 text-sm text-slate-500">Contabilidad, facturación y punto de venta en un solo lugar.</p>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            {error && <Alert tone="danger">{error}</Alert>}
+            <Button type="submit" className="w-full" loading={loading}>
+              {loading ? "Ingresando..." : "Ingresar"}
+            </Button>
+          </form>
+          <p className="mt-4 text-center text-xs text-slate-500">
+            No tenes cuenta?{" "}
+            <Link to="/register" className="font-medium text-brand-700 hover:underline">
+              Crea una gratis
+            </Link>
+          </p>
+        </Card>
+        <p className="mt-4 text-center text-xs text-slate-400">
           Demo: admin@demo.com / cajero@demo.com — contraseña Demo1234!
         </p>
-      </Card>
+      </div>
     </div>
   );
 }

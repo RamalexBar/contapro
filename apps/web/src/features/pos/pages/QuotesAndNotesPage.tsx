@@ -5,6 +5,10 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Alert } from "../../../components/ui/Alert";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listProducts } from "../../inventory/api/product.api";
 import { listCustomers } from "../../customers/api/customer.api";
@@ -68,26 +72,18 @@ function QuoteSection() {
   });
 
   return (
-    <Card className="mb-6">
-      <h2 className="mb-3 text-sm font-semibold text-gray-700">Cotizaciones</h2>
+    <Card title="Cotizaciones" className="mb-6">
       {canCreate && (
         <div className="mb-4 space-y-3">
           <div className="flex flex-wrap items-end gap-3">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">Cliente (opcional)</span>
-              <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-              >
-                <option value="">Sin cliente</option>
-                {customers?.data.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select label="Cliente (opcional)" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+              <option value="">Sin cliente</option>
+              {customers?.data.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
             <Input label="Valida hasta" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
           </div>
 
@@ -97,7 +93,7 @@ function QuoteSection() {
                 key={p.id}
                 type="button"
                 onClick={() => addLine(p)}
-                className="rounded border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50"
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:border-brand-200 hover:bg-brand-50"
               >
                 + {p.name}
               </button>
@@ -108,23 +104,19 @@ function QuoteSection() {
             <div className="space-y-1">
               {lines.map((line) => (
                 <div key={line.productId} className="flex items-center gap-2 text-sm">
-                  <span className="flex-1">{line.name}</span>
-                  <input
+                  <span className="flex-1 text-slate-800">{line.name}</span>
+                  <Input
                     type="number"
                     min={1}
                     value={line.quantity}
-                    className="w-16 rounded border border-gray-200 px-2 py-1"
+                    className="w-16"
                     onChange={(e) =>
-                      setLines((prev) =>
-                        prev.map((l) =>
-                          l.productId === line.productId ? { ...l, quantity: Number(e.target.value) } : l
-                        )
-                      )
+                      setLines((prev) => prev.map((l) => (l.productId === line.productId ? { ...l, quantity: Number(e.target.value) } : l)))
                     }
                   />
                   <button
                     type="button"
-                    className="text-xs text-red-500"
+                    className="text-xs text-danger-500 hover:underline"
                     onClick={() => setLines((prev) => prev.filter((l) => l.productId !== line.productId))}
                   >
                     Quitar
@@ -134,40 +126,38 @@ function QuoteSection() {
             </div>
           )}
 
-          <Button
-            disabled={lines.length === 0 || !validUntil || createMutation.isPending}
-            onClick={() => createMutation.mutate()}
-          >
+          <Button disabled={lines.length === 0 || !validUntil} loading={createMutation.isPending} onClick={() => createMutation.mutate()}>
             Crear cotizacion
           </Button>
-          {createMutation.isError && (
-            <p className="text-sm text-red-600">{(createMutation.error as Error).message}</p>
-          )}
+          {createMutation.isError && <Alert tone="danger">{(createMutation.error as Error).message}</Alert>}
         </div>
       )}
 
-      {canRead && (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Estado</th>
-              <th>Subtotal</th>
-              <th>Total</th>
-              <th>Valida hasta</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotes?.data.map((q) => (
-              <tr key={q.id} className="border-b border-gray-100">
-                <td className="py-2">{q.status}</td>
-                <td>{formatCOP(q.subtotal)}</td>
-                <td>{formatCOP(q.total)}</td>
-                <td>{q.validUntil.slice(0, 10)}</td>
+      {canRead &&
+        (quotes?.data.length === 0 ? (
+          <EmptyState title="Sin cotizaciones todavia" />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Estado</Th>
+                <Th>Subtotal</Th>
+                <Th>Total</Th>
+                <Th>Valida hasta</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </TableHead>
+            <TableBody>
+              {quotes?.data.map((q) => (
+                <TableRow key={q.id}>
+                  <Td>{q.status}</Td>
+                  <Td>{formatCOP(q.subtotal)}</Td>
+                  <Td>{formatCOP(q.total)}</Td>
+                  <Td>{q.validUntil.slice(0, 10)}</Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ))}
     </Card>
   );
 }
@@ -220,8 +210,7 @@ function NoteSection({
   });
 
   return (
-    <Card className="mb-6">
-      <h2 className="mb-3 text-sm font-semibold text-gray-700">{title}</h2>
+    <Card title={title} className="mb-6">
       {canCreate && (
         <form
           className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5"
@@ -230,59 +219,50 @@ function NoteSection({
             createMutation.mutate();
           }}
         >
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">Cliente</span>
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-            >
-              <option value="">Seleccionar...</option>
-              {customers?.data.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select label="Cliente" value={customerId} onChange={(e) => setCustomerId(e.target.value)} required>
+            <option value="">Seleccionar...</option>
+            {customers?.data.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
           <Input placeholder="ID de venta (opcional)" value={saleId} onChange={(e) => setSaleId(e.target.value)} />
           <Input placeholder="Motivo" value={reason} onChange={(e) => setReason(e.target.value)} required />
-          <Input
-            placeholder="Monto"
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-          />
-          <Button type="submit" disabled={createMutation.isPending}>
+          <Input placeholder="Monto" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <Button type="submit" loading={createMutation.isPending}>
             Emitir
           </Button>
           {createMutation.isError && (
-            <p className="col-span-full text-sm text-red-600">{(createMutation.error as Error).message}</p>
+            <Alert tone="danger" className="col-span-full">
+              {(createMutation.error as Error).message}
+            </Alert>
           )}
         </form>
       )}
-      {canRead && (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Motivo</th>
-              <th>Monto</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {notes?.data.map((n) => (
-              <tr key={n.id} className="border-b border-gray-100">
-                <td className="py-2">{n.reason}</td>
-                <td>{formatCOP(n.amount)}</td>
-                <td>{n.status}</td>
+      {canRead &&
+        (notes?.data.length === 0 ? (
+          <EmptyState title="Sin registros todavia" />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Motivo</Th>
+                <Th>Monto</Th>
+                <Th>Estado</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </TableHead>
+            <TableBody>
+              {notes?.data.map((n) => (
+                <TableRow key={n.id}>
+                  <Td>{n.reason}</Td>
+                  <Td>{formatCOP(n.amount)}</Td>
+                  <Td>{n.status}</Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ))}
     </Card>
   );
 }
@@ -353,55 +333,47 @@ function ReturnSection() {
   });
 
   return (
-    <Card className="mb-6">
-      <h2 className="mb-3 text-sm font-semibold text-gray-700">Devoluciones</h2>
+    <Card title="Devoluciones" className="mb-6">
       {canCreate && (
         <div className="mb-4 space-y-3">
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">Venta</span>
-            <select
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm sm:w-auto"
-              value={saleId}
-              onChange={(e) => selectSale(e.target.value)}
-            >
-              <option value="">Seleccionar venta...</option>
-              {returnableSales.map((s) => (
-                <option key={s.id} value={s.id}>
-                  Venta #{s.number} - {formatCOP(s.total)} - {s.status}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select label="Venta" className="sm:w-auto" value={saleId} onChange={(e) => selectSale(e.target.value)}>
+            <option value="">Seleccionar venta...</option>
+            {returnableSales.map((s) => (
+              <option key={s.id} value={s.id}>
+                Venta #{s.number} - {formatCOP(s.total)} - {s.status}
+              </option>
+            ))}
+          </Select>
 
           {sale && (
             <>
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 text-gray-500">
-                    <th className="py-2">Producto</th>
-                    <th>Vendido</th>
-                    <th>Ya devuelto</th>
-                    <th>Cantidad a devolver</th>
-                    <th>Reponer a inventario</th>
+              <Table>
+                <TableHead>
+                  <tr>
+                    <Th>Producto</Th>
+                    <Th>Vendido</Th>
+                    <Th>Ya devuelto</Th>
+                    <Th>Cantidad a devolver</Th>
+                    <Th>Reponer a inventario</Th>
                   </tr>
-                </thead>
-                <tbody>
+                </TableHead>
+                <TableBody>
                   {sale.items.map((item) => {
                     const alreadyReturned = alreadyReturnedByItem.get(item.id) ?? 0;
                     const remaining = item.quantity - alreadyReturned;
                     return (
-                      <tr key={item.id} className="border-b border-gray-100">
-                        <td className="py-2">{productName(item.productId)}</td>
-                        <td>{item.quantity}</td>
-                        <td>{alreadyReturned}</td>
-                        <td>
-                          <input
+                      <TableRow key={item.id}>
+                        <Td>{productName(item.productId)}</Td>
+                        <Td>{item.quantity}</Td>
+                        <Td>{alreadyReturned}</Td>
+                        <Td>
+                          <Input
                             type="number"
                             min={0}
                             max={remaining}
                             disabled={remaining <= 0}
                             value={quantities[item.id] ?? 0}
-                            className="w-20 rounded border border-gray-200 px-2 py-1 disabled:bg-gray-100"
+                            className="w-20"
                             onChange={(e) =>
                               setQuantities((prev) => ({
                                 ...prev,
@@ -409,73 +381,64 @@ function ReturnSection() {
                               }))
                             }
                           />
-                        </td>
-                        <td>
+                        </Td>
+                        <Td>
                           <input
                             type="checkbox"
                             checked={restock[item.id] ?? true}
                             disabled={remaining <= 0}
                             onChange={(e) => setRestock((prev) => ({ ...prev, [item.id]: e.target.checked }))}
                           />
-                        </td>
-                      </tr>
+                        </Td>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
 
               <div className="flex flex-wrap items-end gap-3">
                 <Input placeholder="Motivo" value={reason} onChange={(e) => setReason(e.target.value)} required />
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-gray-700">Medio de reembolso</span>
-                  <select
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    value={refundMethod}
-                    onChange={(e) => setRefundMethod(e.target.value as RefundMethod)}
-                  >
-                    <option value="CASH">Efectivo</option>
-                    <option value="CARD">Tarjeta</option>
-                    <option value="TRANSFER">Transferencia</option>
-                    <option value="CREDIT_TO_ACCOUNT">Abono a cuenta del cliente</option>
-                  </select>
-                </label>
-                <Button
-                  disabled={!hasItemsToReturn || !reason || createMutation.isPending}
-                  onClick={() => createMutation.mutate()}
-                >
+                <Select label="Medio de reembolso" value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as RefundMethod)}>
+                  <option value="CASH">Efectivo</option>
+                  <option value="CARD">Tarjeta</option>
+                  <option value="TRANSFER">Transferencia</option>
+                  <option value="CREDIT_TO_ACCOUNT">Abono a cuenta del cliente</option>
+                </Select>
+                <Button disabled={!hasItemsToReturn || !reason} loading={createMutation.isPending} onClick={() => createMutation.mutate()}>
                   Registrar devolucion
                 </Button>
               </div>
-              {createMutation.isError && (
-                <p className="text-sm text-red-600">{(createMutation.error as Error).message}</p>
-              )}
+              {createMutation.isError && <Alert tone="danger">{(createMutation.error as Error).message}</Alert>}
             </>
           )}
         </div>
       )}
 
-      {canRead && (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Motivo</th>
-              <th>Total</th>
-              <th>Estado</th>
-              <th>Fecha</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allReturns?.data.map((r) => (
-              <tr key={r.id} className="border-b border-gray-100">
-                <td className="py-2">{r.reason}</td>
-                <td>{formatCOP(r.total)}</td>
-                <td>{r.status}</td>
-                <td>{r.createdAt.slice(0, 10)}</td>
+      {canRead &&
+        (allReturns?.data.length === 0 ? (
+          <EmptyState title="Sin devoluciones todavia" />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Motivo</Th>
+                <Th>Total</Th>
+                <Th>Estado</Th>
+                <Th>Fecha</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </TableHead>
+            <TableBody>
+              {allReturns?.data.map((r) => (
+                <TableRow key={r.id}>
+                  <Td>{r.reason}</Td>
+                  <Td>{formatCOP(r.total)}</Td>
+                  <Td>{r.status}</Td>
+                  <Td>{r.createdAt.slice(0, 10)}</Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ))}
     </Card>
   );
 }
@@ -483,7 +446,7 @@ function ReturnSection() {
 export function QuotesAndNotesPage() {
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Cotizaciones, notas y devoluciones</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Cotizaciones, notas y devoluciones</h1>
       <QuoteSection />
       <NoteSection
         title="Notas credito"

@@ -4,6 +4,12 @@ import { formatCOP } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listSuppliers, type SupplierRecord } from "../api/supplier.api";
 import { listProducts, type ProductListItem } from "../../inventory/api/product.api";
@@ -36,82 +42,53 @@ function ItemsEditor({
   withBatch?: boolean;
 }) {
   function update(index: number, field: keyof ItemRow, value: string) {
-    onChange(
-      items.map((item, i) =>
-        i === index
-          ? { ...item, [field]: field === "quantity" || field === "unitCost" ? Number(value) : value }
-          : item
-      )
-    );
+    onChange(items.map((item, i) => (i === index ? { ...item, [field]: field === "quantity" || field === "unitCost" ? Number(value) : value } : item)));
   }
 
   return (
-    <table className="mb-3 w-full text-left text-sm">
-      <thead>
-        <tr className="text-gray-500">
-          <th className="py-1">Producto</th>
-          <th>Cantidad</th>
-          <th>Costo unit.</th>
-          {withBatch && <th>Lote</th>}
-          {withBatch && <th>Vencimiento</th>}
+    <Table className="mb-3">
+      <TableHead>
+        <tr>
+          <Th>Producto</Th>
+          <Th>Cantidad</Th>
+          <Th>Costo unit.</Th>
+          {withBatch && <Th>Lote</Th>}
+          {withBatch && <Th>Vencimiento</Th>}
         </tr>
-      </thead>
-      <tbody>
+      </TableHead>
+      <TableBody>
         {items.map((item, i) => (
-          <tr key={i}>
-            <td className="py-1 pr-2">
-              <select
-                className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
-                value={item.productId}
-                onChange={(e) => update(i, "productId", e.target.value)}
-              >
+          <TableRow key={i} className="hover:bg-transparent">
+            <Td className="pr-2">
+              <Select value={item.productId} onChange={(e) => update(i, "productId", e.target.value)}>
                 <option value="">Seleccionar...</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.sku} {p.name}
                   </option>
                 ))}
-              </select>
-            </td>
-            <td className="pr-2">
-              <input
-                type="number"
-                className="w-20 rounded border border-gray-200 px-2 py-1"
-                value={item.quantity}
-                onChange={(e) => update(i, "quantity", e.target.value)}
-              />
-            </td>
-            <td className="pr-2">
-              <input
-                type="number"
-                className="w-24 rounded border border-gray-200 px-2 py-1"
-                value={item.unitCost}
-                onChange={(e) => update(i, "unitCost", e.target.value)}
-              />
-            </td>
+              </Select>
+            </Td>
+            <Td className="pr-2">
+              <Input type="number" className="w-20" value={item.quantity} onChange={(e) => update(i, "quantity", e.target.value)} />
+            </Td>
+            <Td className="pr-2">
+              <Input type="number" className="w-24" value={item.unitCost} onChange={(e) => update(i, "unitCost", e.target.value)} />
+            </Td>
             {withBatch && (
-              <td className="pr-2">
-                <input
-                  className="w-24 rounded border border-gray-200 px-2 py-1"
-                  value={item.batchNumber ?? ""}
-                  onChange={(e) => update(i, "batchNumber", e.target.value)}
-                />
-              </td>
+              <Td className="pr-2">
+                <Input className="w-24" value={item.batchNumber ?? ""} onChange={(e) => update(i, "batchNumber", e.target.value)} />
+              </Td>
             )}
             {withBatch && (
-              <td>
-                <input
-                  type="date"
-                  className="rounded border border-gray-200 px-2 py-1"
-                  value={item.expirationDate ?? ""}
-                  onChange={(e) => update(i, "expirationDate", e.target.value)}
-                />
-              </td>
+              <Td>
+                <Input type="date" value={item.expirationDate ?? ""} onChange={(e) => update(i, "expirationDate", e.target.value)} />
+              </Td>
             )}
-          </tr>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -155,102 +132,105 @@ function PurchaseOrdersSection({ suppliers, products }: { suppliers: SupplierRec
   }
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nueva orden de compra</h2>
+    <div className="space-y-6">
+      <Card title="Nueva orden de compra">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             createMutation.mutate();
           }}
         >
-          <select
-            className="mb-3 rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
-            required
-          >
+          <Select className="mb-3" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required>
             <option value="">Proveedor...</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
           <ItemsEditor items={items} onChange={setItems} products={products} />
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" onClick={() => setItems([...items, { ...EMPTY_ITEM }])}>
               + Item
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" loading={createMutation.isPending}>
               Crear orden
             </Button>
           </div>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Proveedor</th>
-              <th>Total</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((po) => (
-              <Fragment key={po.id}>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2">{supplierName(po.supplierId)}</td>
-                  <td>{formatCOP(po.total)}</td>
-                  <td>{po.status}</td>
-                  <td className="space-x-2 text-right">
-                    {po.status === "DRAFT" && (
-                      <Button onClick={() => sendMutation.mutate(po.id)} disabled={sendMutation.isPending}>
-                        Enviar
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Proveedor</Th>
+                <Th>Total</Th>
+                <Th>Estado</Th>
+                <Th></Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((po) => (
+                <Fragment key={po.id}>
+                  <TableRow>
+                    <Td className="font-medium text-slate-900">{supplierName(po.supplierId)}</Td>
+                    <Td>{formatCOP(po.total)}</Td>
+                    <Td>
+                      <Badge tone={po.status === "DRAFT" ? "neutral" : "success"}>{po.status}</Badge>
+                    </Td>
+                    <Td className="space-x-2 text-right">
+                      {po.status === "DRAFT" && (
+                        <Button size="sm" onClick={() => sendMutation.mutate(po.id)} loading={sendMutation.isPending}>
+                          Enviar
+                        </Button>
+                      )}
+                      <Button size="sm" variant="secondary" onClick={() => setExpandedId(expandedId === po.id ? null : po.id)}>
+                        {expandedId === po.id ? "Ocultar" : "Ver items"}
                       </Button>
-                    )}
-                    <Button variant="secondary" onClick={() => setExpandedId(expandedId === po.id ? null : po.id)}>
-                      {expandedId === po.id ? "Ocultar" : "Ver items"}
-                    </Button>
-                  </td>
-                </tr>
-                {expandedId === po.id && detail && (
-                  <tr>
-                    <td colSpan={4} className="bg-gray-50 p-4">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="text-gray-500">
-                            <th>Producto</th>
-                            <th>Pedido</th>
-                            <th>Recibido</th>
-                            <th>Costo</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detail.items.map((item) => (
-                            <tr key={item.id}>
-                              <td>{products.find((p) => p.id === item.productId)?.name ?? item.productId}</td>
-                              <td>{item.quantity}</td>
-                              <td>{item.receivedQuantity}</td>
-                              <td>{formatCOP(item.unitCost)}</td>
+                    </Td>
+                  </TableRow>
+                  {expandedId === po.id && detail && (
+                    <tr>
+                      <td colSpan={4} className="bg-slate-50 p-4">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="text-slate-500">
+                              <th>Producto</th>
+                              <th>Pedido</th>
+                              <th>Recibido</th>
+                              <th>Costo</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+                          </thead>
+                          <tbody>
+                            {detail.items.map((item) => (
+                              <tr key={item.id}>
+                                <td>{products.find((p) => p.id === item.productId)?.name ?? item.productId}</td>
+                                <td>{item.quantity}</td>
+                                <td>{item.receivedQuantity}</td>
+                                <td>{formatCOP(item.unitCost)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -294,9 +274,8 @@ function GoodsReceiptsSection({ suppliers, products }: { suppliers: SupplierReco
   }
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Registrar recepcion de mercancia</h2>
+    <div className="space-y-6">
+      <Card title="Registrar recepcion de mercancia">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -304,24 +283,15 @@ function GoodsReceiptsSection({ suppliers, products }: { suppliers: SupplierReco
           }}
         >
           <div className="mb-3 grid grid-cols-2 gap-3">
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              required
-            >
+            <Select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required>
               <option value="">Proveedor...</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
               ))}
-            </select>
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={purchaseOrderId}
-              onChange={(e) => setPurchaseOrderId(e.target.value)}
-            >
+            </Select>
+            <Select value={purchaseOrderId} onChange={(e) => setPurchaseOrderId(e.target.value)}>
               <option value="">(sin orden de compra)</option>
               {orders?.data
                 .filter((o) => o.status === "SENT" || o.status === "PARTIALLY_RECEIVED")
@@ -330,43 +300,50 @@ function GoodsReceiptsSection({ suppliers, products }: { suppliers: SupplierReco
                     {supplierName(o.supplierId)} — {formatCOP(o.total)}
                   </option>
                 ))}
-            </select>
+            </Select>
           </div>
           <ItemsEditor items={items} onChange={setItems} products={products} withBatch />
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" onClick={() => setItems([...items, { ...EMPTY_ITEM }])}>
               + Item
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" loading={createMutation.isPending}>
               Registrar recepcion
             </Button>
           </div>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Proveedor</th>
-              <th>Fecha</th>
-              <th>Items</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((gr) => (
-              <tr key={gr.id} className="border-b border-gray-100">
-                <td className="py-2">{supplierName(gr.supplierId)}</td>
-                <td>{gr.createdAt.slice(0, 10)}</td>
-                <td>{gr.items.length}</td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Proveedor</Th>
+                <Th>Fecha</Th>
+                <Th>Items</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((gr) => (
+                <TableRow key={gr.id}>
+                  <Td className="font-medium text-slate-900">{supplierName(gr.supplierId)}</Td>
+                  <Td>{gr.createdAt.slice(0, 10)}</Td>
+                  <Td>{gr.items.length}</Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -379,12 +356,12 @@ export function PurchaseOrdersPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Ordenes de compra</h1>
-      <div className="mb-6 flex gap-2">
-        <Button variant={section === "orders" ? "primary" : "secondary"} onClick={() => setSection("orders")}>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Ordenes de compra</h1>
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <Button size="sm" variant={section === "orders" ? "primary" : "secondary"} onClick={() => setSection("orders")}>
           Ordenes de compra
         </Button>
-        <Button variant={section === "receipts" ? "primary" : "secondary"} onClick={() => setSection("receipts")}>
+        <Button size="sm" variant={section === "receipts" ? "primary" : "secondary"} onClick={() => setSection("receipts")}>
           Recepciones
         </Button>
       </div>

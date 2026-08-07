@@ -4,6 +4,9 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
 import {
   assignRole,
   createRole,
@@ -42,11 +45,11 @@ function PermissionMatrix({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {groupByModule(permissions).map(([module, perms]) => (
         <div key={module}>
-          <h3 className="mb-1 text-xs font-semibold uppercase text-gray-500">{module}</h3>
+          <h3 className="mb-1 text-xs font-semibold uppercase text-slate-500">{module}</h3>
           <ul className="space-y-1">
             {perms.map((p) => (
               <li key={p.code}>
-                <label className="flex items-start gap-2 text-sm text-gray-700">
+                <label className="flex items-start gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"
                     className="mt-0.5"
@@ -129,10 +132,9 @@ export function RbacPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Roles y permisos</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Roles y permisos</h1>
 
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Roles</h2>
+      <Card title="Roles" className="mb-6">
         <form
           className="mb-4 flex items-end gap-3"
           onSubmit={(e) => {
@@ -147,41 +149,38 @@ export function RbacPage() {
             onChange={(e) => setNewRoleName(e.target.value)}
             required
           />
-          <Button type="submit" disabled={createRoleMutation.isPending}>
+          <Button type="submit" loading={createRoleMutation.isPending}>
             Crear
           </Button>
         </form>
 
         <div className="space-y-3">
           {roles?.data.map((role) => (
-            <div key={role.id} className="rounded-md border border-gray-100 p-3">
+            <div key={role.id} className="rounded-md border border-slate-100 p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-medium">{role.name}</span>{" "}
-                  {role.isSystem && <span className="text-xs text-gray-400">(rol de sistema, no editable)</span>}
-                  <span className="ml-2 text-xs text-gray-500">{role.permissionCodes.length} permisos</span>
+                  {role.isSystem && <span className="text-xs text-slate-400">(rol de sistema, no editable)</span>}
+                  <span className="ml-2 text-xs text-slate-500">{role.permissionCodes.length} permisos</span>
                 </div>
                 {!role.isSystem &&
                   (editingRoleId === role.id ? (
                     <div className="space-x-2">
-                      <Button
-                        onClick={() => setPermissionsMutation.mutate(role.id)}
-                        disabled={setPermissionsMutation.isPending}
-                      >
+                      <Button size="sm" loading={setPermissionsMutation.isPending} onClick={() => setPermissionsMutation.mutate(role.id)}>
                         Guardar
                       </Button>
-                      <Button variant="secondary" onClick={() => setEditingRoleId(null)}>
+                      <Button size="sm" variant="secondary" onClick={() => setEditingRoleId(null)}>
                         Cancelar
                       </Button>
                     </div>
                   ) : (
-                    <Button variant="secondary" onClick={() => startEditRole(role.id, role.permissionCodes)}>
+                    <Button size="sm" variant="secondary" onClick={() => startEditRole(role.id, role.permissionCodes)}>
                       Editar permisos
                     </Button>
                   ))}
               </div>
               {editingRoleId === role.id && permissions && (
-                <div className="mt-3 border-t border-gray-100 pt-3">
+                <div className="mt-3 border-t border-slate-100 pt-3">
                   <PermissionMatrix permissions={permissions.data} checked={editingCodes} onToggle={toggleEditingCode} />
                 </div>
               )}
@@ -190,49 +189,46 @@ export function RbacPage() {
         </div>
       </Card>
 
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Usuarios y roles</h2>
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Nombre</th>
-              <th>Correo</th>
-              <th>Roles</th>
-              <th>Asignar rol</th>
+      <Card title="Usuarios y roles" noPadding className="mb-6">
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Nombre</Th>
+              <Th>Correo</Th>
+              <Th>Roles</Th>
+              <Th>Asignar rol</Th>
             </tr>
-          </thead>
-          <tbody>
+          </TableHead>
+          <TableBody>
             {users?.data.map((user) => (
-              <tr key={user.id} className="border-b border-gray-100">
-                <td className="py-2">{user.fullName}</td>
-                <td>{user.email}</td>
-                <td className="space-x-1">
+              <TableRow key={user.id}>
+                <Td>{user.fullName}</Td>
+                <Td>{user.email}</Td>
+                <Td className="space-x-1">
                   {user.roles.map((roleName) => {
                     const roleId = roleIdByName.get(roleName);
                     return (
-                      <span
-                        key={roleName}
-                        className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-xs"
-                      >
-                        {roleName}
-                        {roleId && (
-                          <button
-                            type="button"
-                            className="text-gray-400 hover:text-red-600"
-                            onClick={() => removeRoleMutation.mutate({ userId: user.id, roleId })}
-                            title="Quitar rol"
-                          >
-                            &times;
-                          </button>
-                        )}
+                      <span key={roleName} className="inline-flex items-center gap-1">
+                        <Badge tone="neutral">
+                          {roleName}
+                          {roleId && (
+                            <button
+                              type="button"
+                              className="ml-1 text-slate-400 hover:text-danger-600"
+                              onClick={() => removeRoleMutation.mutate({ userId: user.id, roleId })}
+                              title="Quitar rol"
+                            >
+                              &times;
+                            </button>
+                          )}
+                        </Badge>
                       </span>
                     );
                   })}
-                </td>
-                <td>
+                </Td>
+                <Td>
                   <span className="inline-flex items-center gap-2">
-                    <select
-                      className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+                    <Select
                       value={selectedRoleByUser[user.id] ?? ""}
                       onChange={(e) => setSelectedRoleByUser((prev) => ({ ...prev, [user.id]: e.target.value }))}
                     >
@@ -242,45 +238,37 @@ export function RbacPage() {
                           {r.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                     <Button
+                      size="sm"
                       variant="secondary"
-                      disabled={!selectedRoleByUser[user.id] || assignRoleMutation.isPending}
-                      onClick={() =>
-                        assignRoleMutation.mutate({ userId: user.id, roleId: selectedRoleByUser[user.id]! })
-                      }
+                      disabled={!selectedRoleByUser[user.id]}
+                      loading={assignRoleMutation.isPending}
+                      onClick={() => assignRoleMutation.mutate({ userId: user.id, roleId: selectedRoleByUser[user.id]! })}
                     >
                       Asignar
                     </Button>
                   </span>
-                </td>
-              </tr>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
 
-      <Card>
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Permisos individuales (override por usuario)</h2>
-        <label className="mb-3 block">
-          <span className="mb-1 block text-sm font-medium text-gray-700">Usuario</span>
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={overrideUserId}
-            onChange={(e) => setOverrideUserId(e.target.value)}
-          >
-            <option value="">Seleccionar...</option>
-            {users?.data.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.fullName} ({u.email})
-              </option>
-            ))}
-          </select>
-        </label>
+      <Card title="Permisos individuales (override por usuario)">
+        <Select label="Usuario" value={overrideUserId} onChange={(e) => setOverrideUserId(e.target.value)} className="mb-3">
+          <option value="">Seleccionar...</option>
+          {users?.data.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.fullName} ({u.email})
+            </option>
+          ))}
+        </Select>
 
         {overrideUserId && permissions && effective && (
           <>
-            <p className="mb-2 text-xs text-gray-500">
+            <p className="mb-2 text-xs text-slate-500">
               Roles: {effective.roles.join(", ") || "ninguno"}. Los permisos marcados abajo reflejan el conjunto
               efectivo (rol + overrides). Desmarcar/marcar crea un override individual para este usuario.
             </p>

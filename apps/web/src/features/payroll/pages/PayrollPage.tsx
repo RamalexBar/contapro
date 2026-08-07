@@ -5,6 +5,10 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listEmployees } from "../../employees/api/employee.api";
 import {
@@ -160,37 +164,37 @@ export function PayrollPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Nomina</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Nomina</h1>
 
       {canManageParameters && (
         <Card className="mb-6">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">Parametros legales por año</h2>
-            <Button variant="secondary" onClick={() => setShowParameterForm((v) => !v)}>
+            <h2 className="text-sm font-semibold text-slate-900">Parametros legales por año</h2>
+            <Button size="sm" variant="secondary" onClick={() => setShowParameterForm((v) => !v)}>
               {showParameterForm ? "Cancelar" : "Nuevo parametro"}
             </Button>
           </div>
 
-          <table className="mb-3 w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-gray-500">
-                <th className="py-2">Año</th>
-                <th>Salario minimo</th>
-                <th>Aux. transporte</th>
-                <th>Divisor horas</th>
+          <Table className="mb-3">
+            <TableHead>
+              <tr>
+                <Th>Año</Th>
+                <Th>Salario minimo</Th>
+                <Th>Aux. transporte</Th>
+                <Th>Divisor horas</Th>
               </tr>
-            </thead>
-            <tbody>
+            </TableHead>
+            <TableBody>
               {parameters?.data.map((p) => (
-                <tr key={p.id} className="border-b border-gray-100">
-                  <td className="py-2">{p.year}</td>
-                  <td>{formatCOP(p.minimumWage)}</td>
-                  <td>{formatCOP(p.transportAllowance)}</td>
-                  <td>{p.monthlyHoursDivisor}</td>
-                </tr>
+                <TableRow key={p.id}>
+                  <Td className="font-medium text-slate-900">{p.year}</Td>
+                  <Td>{formatCOP(p.minimumWage)}</Td>
+                  <Td>{formatCOP(p.transportAllowance)}</Td>
+                  <Td>{p.monthlyHoursDivisor}</Td>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
 
           {showParameterForm && (
             <form
@@ -403,14 +407,14 @@ export function PayrollPage() {
                 required
               />
               <div className="col-span-2 sm:col-span-4">
-                <Button type="submit" disabled={createParameterMutation.isPending}>
+                <Button type="submit" loading={createParameterMutation.isPending}>
                   Guardar parametro
                 </Button>
               </div>
               {createParameterMutation.isError && (
-                <p className="col-span-full text-sm text-red-600">
+                <Alert tone="danger" className="col-span-full">
                   {(createParameterMutation.error as Error).message}
-                </p>
+                </Alert>
               )}
             </form>
           )}
@@ -419,7 +423,7 @@ export function PayrollPage() {
 
       {canCreate && (
         <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo periodo de nomina</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Nuevo periodo de nomina</h2>
           <form
             className="grid grid-cols-2 gap-3 sm:grid-cols-5"
             onSubmit={(e) => {
@@ -458,125 +462,126 @@ export function PayrollPage() {
               required
             />
             <div className="self-end">
-              <Button type="submit" disabled={createPayrollMutation.isPending}>
+              <Button type="submit" loading={createPayrollMutation.isPending}>
                 Crear periodo
               </Button>
             </div>
           </form>
           {createPayrollMutation.isError && (
-            <p className="mt-2 text-sm text-red-600">{(createPayrollMutation.error as Error).message}</p>
+            <Alert tone="danger" className="mt-2">
+              {(createPayrollMutation.error as Error).message}
+            </Alert>
           )}
         </Card>
       )}
 
-      <Card>
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Periodos de nomina</h2>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Periodo</th>
-              <th>Tipo</th>
-              <th>Fechas</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {payrolls?.data.map((payroll) => (
-              <Fragment key={payroll.id}>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2">
-                    {payroll.month}/{payroll.year}
-                  </td>
-                  <td>{payroll.periodType === "MONTHLY" ? "Mensual" : "Quincenal"}</td>
-                  <td>
-                    {payroll.startDate.slice(0, 10)} a {payroll.endDate.slice(0, 10)}
-                  </td>
-                  <td>{STATUS_LABEL[payroll.status] ?? payroll.status}</td>
-                  <td className="space-x-2 py-2 text-right">
-                    <Button
-                      variant="secondary"
-                      onClick={() => setExpandedId(expandedId === payroll.id ? null : payroll.id)}
-                    >
-                      {expandedId === payroll.id ? "Ocultar" : "Ver detalle"}
-                    </Button>
-                    {canCalculate && (payroll.status === "DRAFT" || payroll.status === "CALCULATED") && (
-                      <Button
-                        onClick={() => calculateMutation.mutate(payroll.id)}
-                        disabled={calculateMutation.isPending}
-                      >
-                        Calcular
+      <Card title="Periodos de nomina" noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Periodo</Th>
+                <Th>Tipo</Th>
+                <Th>Fechas</Th>
+                <Th>Estado</Th>
+                <Th></Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {payrolls?.data.map((payroll) => (
+                <Fragment key={payroll.id}>
+                  <TableRow>
+                    <Td className="font-medium text-slate-900">
+                      {payroll.month}/{payroll.year}
+                    </Td>
+                    <Td>{payroll.periodType === "MONTHLY" ? "Mensual" : "Quincenal"}</Td>
+                    <Td>
+                      {payroll.startDate.slice(0, 10)} a {payroll.endDate.slice(0, 10)}
+                    </Td>
+                    <Td>
+                      <Badge tone={payroll.status === "PAID" ? "success" : payroll.status === "DRAFT" ? "neutral" : "info"}>
+                        {STATUS_LABEL[payroll.status] ?? payroll.status}
+                      </Badge>
+                    </Td>
+                    <Td className="space-x-2 text-right">
+                      <Button size="sm" variant="secondary" onClick={() => setExpandedId(expandedId === payroll.id ? null : payroll.id)}>
+                        {expandedId === payroll.id ? "Ocultar" : "Ver detalle"}
                       </Button>
-                    )}
-                    {canApprove && payroll.status === "CALCULATED" && (
-                      <Button onClick={() => approveMutation.mutate(payroll.id)} disabled={approveMutation.isPending}>
-                        Aprobar
-                      </Button>
-                    )}
-                    {canPay && payroll.status === "APPROVED" && (
-                      <Button onClick={() => payMutation.mutate(payroll.id)} disabled={payMutation.isPending}>
-                        Pagar
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-                {expandedId === payroll.id && expandedPayroll && (
-                  <tr>
-                    <td colSpan={5} className="bg-gray-50 px-2 py-3">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="text-gray-500">
-                            <th className="py-1">Empleado</th>
-                            <th>Devengado</th>
-                            <th>Deducciones</th>
-                            <th>Neto a pagar</th>
-                            <th>Costo empleador</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {expandedPayroll.details.map((detail) => (
-                            <tr key={detail.id} className="border-t border-gray-200">
-                              <td className="py-1">{employeeNames.get(detail.employeeId) ?? detail.employeeId}</td>
-                              <td>{formatCOP(detail.grossTotal)}</td>
-                              <td>{formatCOP(detail.totalDeductions)}</td>
-                              <td className="font-semibold">{formatCOP(detail.netPay)}</td>
-                              <td>{formatCOP(detail.employerCostTotal)}</td>
-                              <td className="text-right">
-                                {detail.payslip && (
-                                  <Button
-                                    variant="secondary"
-                                    disabled={downloadPayslipMutation.isPending}
-                                    onClick={() =>
-                                      downloadPayslipMutation.mutate({
-                                        payslipId: detail.payslip!.id,
-                                        fileName: `desprendible-${(employeeNames.get(detail.employeeId) ?? detail.employeeId).replace(/\s+/g, "-")}-${payroll.month}-${payroll.year}.pdf`,
-                                      })
-                                    }
-                                  >
-                                    Desprendible PDF
-                                  </Button>
-                                )}
-                                {detail.payslip && <PayslipWhatsAppStatus payslipId={detail.payslip.id} />}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {expandedPayroll.details.length === 0 && (
-                        <p className="py-2 text-xs text-gray-400">
-                          Este periodo aun no se ha calculado.
-                        </p>
+                      {canCalculate && (payroll.status === "DRAFT" || payroll.status === "CALCULATED") && (
+                        <Button size="sm" onClick={() => calculateMutation.mutate(payroll.id)} loading={calculateMutation.isPending}>
+                          Calcular
+                        </Button>
                       )}
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-        {payrolls?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay periodos de nomina.</p>}
+                      {canApprove && payroll.status === "CALCULATED" && (
+                        <Button size="sm" onClick={() => approveMutation.mutate(payroll.id)} loading={approveMutation.isPending}>
+                          Aprobar
+                        </Button>
+                      )}
+                      {canPay && payroll.status === "APPROVED" && (
+                        <Button size="sm" onClick={() => payMutation.mutate(payroll.id)} loading={payMutation.isPending}>
+                          Pagar
+                        </Button>
+                      )}
+                    </Td>
+                  </TableRow>
+                  {expandedId === payroll.id && expandedPayroll && (
+                    <tr>
+                      <td colSpan={5} className="bg-slate-50 px-2 py-3">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="text-slate-500">
+                              <th className="py-1">Empleado</th>
+                              <th>Devengado</th>
+                              <th>Deducciones</th>
+                              <th>Neto a pagar</th>
+                              <th>Costo empleador</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {expandedPayroll.details.map((detail) => (
+                              <tr key={detail.id} className="border-t border-slate-200">
+                                <td className="py-1">{employeeNames.get(detail.employeeId) ?? detail.employeeId}</td>
+                                <td>{formatCOP(detail.grossTotal)}</td>
+                                <td>{formatCOP(detail.totalDeductions)}</td>
+                                <td className="font-semibold text-slate-900">{formatCOP(detail.netPay)}</td>
+                                <td>{formatCOP(detail.employerCostTotal)}</td>
+                                <td className="text-right">
+                                  {detail.payslip && (
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      loading={downloadPayslipMutation.isPending}
+                                      onClick={() =>
+                                        downloadPayslipMutation.mutate({
+                                          payslipId: detail.payslip!.id,
+                                          fileName: `desprendible-${(employeeNames.get(detail.employeeId) ?? detail.employeeId).replace(/\s+/g, "-")}-${payroll.month}-${payroll.year}.pdf`,
+                                        })
+                                      }
+                                    >
+                                      Desprendible PDF
+                                    </Button>
+                                  )}
+                                  {detail.payslip && <PayslipWhatsAppStatus payslipId={detail.payslip.id} />}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {expandedPayroll.details.length === 0 && (
+                          <p className="py-2 text-xs text-slate-400">Este periodo aun no se ha calculado.</p>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {payrolls?.data.length === 0 && <p className="p-4 text-sm text-slate-400">No hay periodos de nomina.</p>}
       </Card>
     </AppLayout>
   );
@@ -599,19 +604,14 @@ function PayslipWhatsAppStatus({ payslipId }: { payslipId: string }) {
   if (!latest) return null;
 
   return (
-    <div className="mt-1 text-xs text-gray-500">
+    <div className="mt-1 text-xs text-slate-500">
       {latest.success ? (
         "Enviado por WhatsApp"
       ) : (
         <>
           <span>Fallo el envio por WhatsApp</span>
           {hasPermission("payroll.approve") && (
-            <Button
-              variant="secondary"
-              disabled={resendMutation.isPending}
-              onClick={() => resendMutation.mutate()}
-              className="ml-2"
-            >
+            <Button size="sm" variant="secondary" loading={resendMutation.isPending} onClick={() => resendMutation.mutate()} className="ml-2">
               Reenviar
             </Button>
           )}

@@ -18,8 +18,8 @@ export function DiscountAuthorizationModal({ saleItemId, onCancel, onSubmit, isS
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <Card className="w-full max-w-sm">
-        <h2 className="mb-1 text-base font-semibold">Autorizacion de descuento requerida</h2>
-        <p className="mb-4 text-xs text-gray-500">Item {saleItemId} supera el limite de descuento del cajero.</p>
+        <h2 className="mb-1 text-base font-semibold text-slate-900">Autorizacion de descuento requerida</h2>
+        <p className="mb-4 text-xs text-slate-500">Item {saleItemId} supera el limite de descuento del cajero.</p>
         <div className="space-y-3">
           <Input
             label="ID del supervisor/admin autorizador"
@@ -34,6 +34,7 @@ export function DiscountAuthorizationModal({ saleItemId, onCancel, onSubmit, isS
             </Button>
             <Button
               disabled={isSubmitting || !authorizerUserId || !pin}
+              loading={isSubmitting}
               onClick={() => onSubmit({ authorizerUserId, pin, reason })}
             >
               Autorizar

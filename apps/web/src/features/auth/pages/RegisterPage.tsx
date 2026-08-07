@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Blocks } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Card } from "../../../components/ui/Card";
+import { Alert } from "../../../components/ui/Alert";
 import { login, registerCompany } from "../api/auth.api";
 import { useAuthStore } from "../hooks/useAuthStore";
 import { ApiError } from "../../../lib/api-client";
@@ -61,10 +63,17 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-8">
-      <Card className="w-full max-w-md">
-        <h1 className="mb-1 text-xl font-semibold text-gray-900">Crear tu cuenta en Contapro</h1>
-        <p className="mb-6 text-sm text-gray-500">30 dias de prueba gratis, sin tarjeta de credito.</p>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
+            <Blocks size={22} />
+          </div>
+          <span className="text-lg font-semibold text-slate-900">Contapro</span>
+        </div>
+        <Card>
+        <h1 className="mb-1 text-lg font-semibold text-slate-900">Crear tu cuenta</h1>
+        <p className="mb-6 text-sm text-slate-500">30 dias de prueba gratis, sin tarjeta de credito.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Nombre comercial"
@@ -89,7 +98,7 @@ export function RegisterPage() {
             onChange={(e) => update("companyEmail", e.target.value)}
             required
           />
-          <hr className="border-gray-200" />
+          <hr className="border-slate-200" />
           <Input
             label="Tu nombre completo"
             value={form.adminFullName}
@@ -111,18 +120,19 @@ export function RegisterPage() {
             onChange={(e) => update("adminPassword", e.target.value)}
             required
           />
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
+          {error && <Alert tone="danger">{error}</Alert>}
+          <Button type="submit" className="w-full" loading={loading}>
             {loading ? "Creando cuenta..." : "Crear cuenta gratis"}
           </Button>
         </form>
-        <p className="mt-4 text-center text-xs text-gray-500">
+        <p className="mt-4 text-center text-xs text-slate-500">
           Ya tenes cuenta?{" "}
-          <Link to="/login" className="text-brand-700 hover:underline">
+          <Link to="/login" className="font-medium text-brand-700 hover:underline">
             Ingresa aqui
           </Link>
         </p>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,11 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import {
   createApiKey,
@@ -62,24 +67,21 @@ function ApiKeysSection() {
   return (
     <>
       {justCreated && (
-        <Card className="mb-6 border-blue-200 bg-blue-50">
-          <p className="mb-1 text-sm font-semibold text-blue-900">
-            API key creada: {justCreated.name}
-          </p>
-          <p className="mb-2 text-sm text-blue-800">
+        <Alert tone="info" className="mb-6">
+          <p className="mb-1 font-semibold">API key creada: {justCreated.name}</p>
+          <p className="mb-2">
             Guárdala ahora — no se puede volver a mostrar. Úsala en el header{" "}
             <code>Authorization: Bearer &lt;key&gt;</code> contra <code>/api/public/v1/...</code>.
           </p>
           <code className="block break-all rounded bg-white px-3 py-2 text-sm">{justCreated.key}</code>
-          <button className="mt-2 text-xs text-blue-600 hover:underline" onClick={() => setJustCreated(null)}>
+          <button className="mt-2 text-xs underline" onClick={() => setJustCreated(null)}>
             Ya la guardé, cerrar
           </button>
-        </Card>
+        </Alert>
       )}
 
       {canManage && (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Nueva API key</h2>
+        <Card title="Nueva API key" className="mb-6">
           <form
             className="space-y-3"
             onSubmit={(e) => {
@@ -89,59 +91,69 @@ function ApiKeysSection() {
           >
             <Input placeholder="Nombre (ej. Integracion Shopify)" value={name} onChange={(e) => setName(e.target.value)} required />
             <div>
-              <p className="mb-1 text-xs font-medium text-gray-600">Scopes</p>
+              <p className="mb-1 text-xs font-medium text-slate-600">Scopes</p>
               <div className="flex flex-wrap gap-3">
                 {availableScopes.map((s) => (
-                  <label key={s.code} className="flex items-center gap-1 text-sm text-gray-700">
+                  <label key={s.code} className="flex items-center gap-1 text-sm text-slate-700">
                     <input type="checkbox" checked={scopes.includes(s.code)} onChange={() => toggleScope(s.code)} />
                     {s.label}
                   </label>
                 ))}
               </div>
             </div>
-            <Button type="submit" disabled={scopes.length === 0 || createMutation.isPending}>
+            <Button type="submit" disabled={scopes.length === 0} loading={createMutation.isPending}>
               Crear
             </Button>
           </form>
-          {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
         </Card>
       )}
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Nombre</th>
-              <th>Prefijo</th>
-              <th>Scopes</th>
-              <th>Ultimo uso</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((k) => (
-              <tr key={k.id} className="border-b border-gray-100">
-                <td className="py-2">{k.name}</td>
-                <td>
-                  <code>{k.keyPrefix}...</code>
-                </td>
-                <td className="text-xs">{k.scopes.join(", ")}</td>
-                <td>{k.lastUsedAt ? k.lastUsedAt.slice(0, 10) : "Nunca"}</td>
-                <td className={k.isActive ? "text-green-600" : "text-gray-400"}>{k.isActive ? "Activa" : "Revocada"}</td>
-                <td className="text-right">
-                  {canManage && k.isActive && (
-                    <Button variant="danger" disabled={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(k.id)}>
-                      Revocar
-                    </Button>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="No hay API keys todavia." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Nombre</Th>
+                <Th>Prefijo</Th>
+                <Th>Scopes</Th>
+                <Th>Ultimo uso</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay API keys todavia.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((k) => (
+                <TableRow key={k.id}>
+                  <Td>{k.name}</Td>
+                  <Td>
+                    <code>{k.keyPrefix}...</code>
+                  </Td>
+                  <Td className="text-xs">{k.scopes.join(", ")}</Td>
+                  <Td>{k.lastUsedAt ? k.lastUsedAt.slice(0, 10) : "Nunca"}</Td>
+                  <Td>
+                    <Badge tone={k.isActive ? "success" : "neutral"}>{k.isActive ? "Activa" : "Revocada"}</Badge>
+                  </Td>
+                  <Td className="text-right">
+                    {canManage && k.isActive && (
+                      <Button size="sm" variant="danger" loading={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(k.id)}>
+                        Revocar
+                      </Button>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </>
   );
@@ -159,42 +171,40 @@ function DeliveryHistory({ webhookSubscriptionId }: { webhookSubscriptionId: str
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["webhook-deliveries", webhookSubscriptionId] }),
   });
 
-  if (isLoading) return <p className="text-sm text-gray-500">Cargando historial...</p>;
-  if (!data?.data.length) return <p className="text-sm text-gray-400">Todavia no se ha disparado ningun evento.</p>;
+  if (isLoading) return <Spinner label="Cargando historial..." />;
+  if (!data?.data.length) return <p className="text-sm text-slate-400">Todavia no se ha disparado ningun evento.</p>;
 
   return (
-    <table className="w-full text-left text-xs">
-      <thead>
-        <tr className="border-b border-gray-200 text-gray-500">
-          <th className="py-1">Fecha</th>
-          <th>Evento</th>
-          <th>Resultado</th>
-          <th></th>
+    <Table>
+      <TableHead>
+        <tr>
+          <Th>Fecha</Th>
+          <Th>Evento</Th>
+          <Th>Resultado</Th>
+          <Th></Th>
         </tr>
-      </thead>
-      <tbody>
+      </TableHead>
+      <TableBody>
         {data.data.map((d) => (
-          <tr key={d.id} className="border-b border-gray-100">
-            <td className="py-1">{d.attemptedAt.slice(0, 19).replace("T", " ")}</td>
-            <td>{d.eventType}</td>
-            <td className={d.success ? "text-green-600" : "text-red-600"}>
-              {d.success ? `OK (${d.responseStatus})` : d.errorMessage ?? `Fallo (${d.responseStatus ?? "sin respuesta"})`}
-            </td>
-            <td className="text-right">
+          <TableRow key={d.id}>
+            <Td>{d.attemptedAt.slice(0, 19).replace("T", " ")}</Td>
+            <Td>{d.eventType}</Td>
+            <Td>
+              <Badge tone={d.success ? "success" : "danger"}>
+                {d.success ? `OK (${d.responseStatus})` : d.errorMessage ?? `Fallo (${d.responseStatus ?? "sin respuesta"})`}
+              </Badge>
+            </Td>
+            <Td className="text-right">
               {!d.success && (
-                <button
-                  className="text-blue-600 hover:underline"
-                  disabled={resendMutation.isPending}
-                  onClick={() => resendMutation.mutate(d.id)}
-                >
+                <Button size="sm" variant="secondary" loading={resendMutation.isPending} onClick={() => resendMutation.mutate(d.id)}>
                   Reenviar
-                </button>
+                </Button>
               )}
-            </td>
-          </tr>
+            </Td>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -230,22 +240,21 @@ function WebhooksSection() {
   return (
     <>
       {justCreated && (
-        <Card className="mb-6 border-blue-200 bg-blue-50">
-          <p className="mb-1 text-sm font-semibold text-blue-900">Webhook creado apuntando a {justCreated.url}</p>
-          <p className="mb-2 text-sm text-blue-800">
+        <Alert tone="info" className="mb-6">
+          <p className="mb-1 font-semibold">Webhook creado apuntando a {justCreated.url}</p>
+          <p className="mb-2">
             Guarda este secreto ahora — no se puede volver a mostrar. Úsalo para verificar el header{" "}
             <code>X-Webhook-Signature</code> (HMAC-SHA256 del body).
           </p>
           <code className="block break-all rounded bg-white px-3 py-2 text-sm">{justCreated.secret}</code>
-          <button className="mt-2 text-xs text-blue-600 hover:underline" onClick={() => setJustCreated(null)}>
+          <button className="mt-2 text-xs underline" onClick={() => setJustCreated(null)}>
             Ya lo guardé, cerrar
           </button>
-        </Card>
+        </Alert>
       )}
 
       {canManage && (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo webhook</h2>
+        <Card title="Nuevo webhook" className="mb-6">
           <form
             className="space-y-3"
             onSubmit={(e) => {
@@ -261,71 +270,81 @@ function WebhooksSection() {
               required
             />
             <div>
-              <p className="mb-1 text-xs font-medium text-gray-600">Eventos</p>
+              <p className="mb-1 text-xs font-medium text-slate-600">Eventos</p>
               <div className="flex flex-wrap gap-3">
                 {WEBHOOK_EVENT_OPTIONS.map((e) => (
-                  <label key={e.code} className="flex items-center gap-1 text-sm text-gray-700">
+                  <label key={e.code} className="flex items-center gap-1 text-sm text-slate-700">
                     <input type="checkbox" checked={eventTypes.includes(e.code)} onChange={() => toggleEvent(e.code)} />
                     {e.label}
                   </label>
                 ))}
               </div>
             </div>
-            <Button type="submit" disabled={eventTypes.length === 0 || createMutation.isPending}>
+            <Button type="submit" disabled={eventTypes.length === 0} loading={createMutation.isPending}>
               Crear
             </Button>
           </form>
-          {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
         </Card>
       )}
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">URL</th>
-              <th>Eventos</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((w) => (
-              <Fragment key={w.id}>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2">{w.url}</td>
-                  <td className="text-xs">{w.eventTypes.join(", ")}</td>
-                  <td className={w.isActive ? "text-green-600" : "text-gray-400"}>{w.isActive ? "Activo" : "Inactivo"}</td>
-                  <td className="text-right">
-                    <span className="inline-flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="text-xs text-blue-600 hover:underline"
-                        onClick={() => setExpandedId(expandedId === w.id ? null : w.id)}
-                      >
-                        {expandedId === w.id ? "Ocultar entregas" : "Ver entregas"}
-                      </button>
-                      {canManage && w.isActive && (
-                        <Button variant="danger" disabled={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(w.id)}>
-                          Desactivar
-                        </Button>
-                      )}
-                    </span>
-                  </td>
-                </tr>
-                {expandedId === w.id && (
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <td colSpan={4} className="p-3">
-                      <DeliveryHistory webhookSubscriptionId={w.id} />
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay webhooks todavia.</p>}
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="No hay webhooks todavia." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>URL</Th>
+                <Th>Eventos</Th>
+                <Th>Estado</Th>
+                <Th></Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((w) => (
+                <Fragment key={w.id}>
+                  <TableRow>
+                    <Td>{w.url}</Td>
+                    <Td className="text-xs">{w.eventTypes.join(", ")}</Td>
+                    <Td>
+                      <Badge tone={w.isActive ? "success" : "neutral"}>{w.isActive ? "Activo" : "Inactivo"}</Badge>
+                    </Td>
+                    <Td className="text-right">
+                      <span className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="text-xs text-brand-600 hover:underline"
+                          onClick={() => setExpandedId(expandedId === w.id ? null : w.id)}
+                        >
+                          {expandedId === w.id ? "Ocultar entregas" : "Ver entregas"}
+                        </button>
+                        {canManage && w.isActive && (
+                          <Button size="sm" variant="danger" loading={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(w.id)}>
+                            Desactivar
+                          </Button>
+                        )}
+                      </span>
+                    </Td>
+                  </TableRow>
+                  {expandedId === w.id && (
+                    <TableRow>
+                      <Td colSpan={4} className="bg-slate-50 p-3">
+                        <DeliveryHistory webhookSubscriptionId={w.id} />
+                      </Td>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </>
   );
@@ -338,18 +357,18 @@ export function IntegrationsPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Integraciones</h1>
-      <p className="mb-4 text-sm text-gray-500">
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Integraciones</h1>
+      <p className="mb-4 text-sm text-slate-500">
         API pública (<code>/api/public/v1/...</code>) y webhooks salientes para conectar Contapro
         con Zapier, Make o un script propio de sincronización con tu tienda en línea. No incluye
         conectores nativos a Shopify/WooCommerce/Mercado Libre (requieren credenciales de
         desarrollador de cada plataforma).
       </p>
       <div className="mb-6 flex gap-2">
-        <Button variant={section === "api-keys" ? "primary" : "secondary"} onClick={() => setSection("api-keys")}>
+        <Button size="sm" variant={section === "api-keys" ? "primary" : "secondary"} onClick={() => setSection("api-keys")}>
           API Keys
         </Button>
-        <Button variant={section === "webhooks" ? "primary" : "secondary"} onClick={() => setSection("webhooks")}>
+        <Button size="sm" variant={section === "webhooks" ? "primary" : "secondary"} onClick={() => setSection("webhooks")}>
           Webhooks
         </Button>
       </div>

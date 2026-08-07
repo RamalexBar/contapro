@@ -5,6 +5,10 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listProducts } from "../../inventory/api/product.api";
 import { listCustomers } from "../../customers/api/customer.api";
@@ -122,14 +126,14 @@ export function OpportunitiesPage() {
 
   function OpportunityCard({ opp }: { opp: OpportunityRecord }) {
     return (
-      <div className="mb-2 rounded border border-gray-200 bg-white p-2 text-sm shadow-sm">
-        <p className="font-medium text-gray-800">{opp.title}</p>
-        <p className="text-xs text-gray-500">{customerName(opp.customerId)}</p>
-        <p className="mt-1 font-semibold text-gray-700">{formatCOP(opp.expectedValue)}</p>
+      <div className="mb-2 rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm">
+        <p className="font-medium text-slate-800">{opp.title}</p>
+        <p className="text-xs text-slate-500">{customerName(opp.customerId)}</p>
+        <p className="mt-1 font-semibold text-slate-700">{formatCOP(opp.expectedValue)}</p>
         {canManage && (
           <div className="mt-2 space-y-1">
-            <select
-              className="w-full rounded border border-gray-200 px-1 py-1 text-xs"
+            <Select
+              className="text-xs"
               value={opp.stage}
               onChange={(e) => stageMutation.mutate({ id: opp.id, stage: e.target.value })}
             >
@@ -138,27 +142,29 @@ export function OpportunitiesPage() {
                   {STAGE_LABELS[stage]}
                 </option>
               ))}
-            </select>
+            </Select>
             <div className="flex gap-1">
-              <Button variant="secondary" className="flex-1 text-xs" onClick={() => setLosingId(opp.id)}>
+              <Button size="sm" variant="secondary" className="flex-1 text-xs" onClick={() => setLosingId(opp.id)}>
                 Marcar perdida
               </Button>
-              <Button className="flex-1 text-xs" disabled={winMutation.isPending} onClick={() => winMutation.mutate(opp.id)}>
+              <Button size="sm" className="flex-1 text-xs" loading={winMutation.isPending} onClick={() => winMutation.mutate(opp.id)}>
                 Cerrar ganada
               </Button>
             </div>
             {losingId === opp.id && (
               <div className="flex gap-1">
-                <input
-                  className="w-full rounded border border-gray-200 px-1 py-1 text-xs"
+                <Input
+                  className="text-xs"
                   placeholder="Motivo"
                   value={lostReason}
                   onChange={(e) => setLostReason(e.target.value)}
                 />
                 <Button
+                  size="sm"
                   variant="secondary"
                   className="text-xs"
-                  disabled={!lostReason || stageMutation.isPending}
+                  disabled={!lostReason}
+                  loading={stageMutation.isPending}
                   onClick={() => stageMutation.mutate({ id: opp.id, stage: "PERDIDA", reason: lostReason })}
                 >
                   OK
@@ -173,42 +179,38 @@ export function OpportunitiesPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Oportunidades</h1>
-      <p className="mb-4 text-sm text-gray-500">
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Oportunidades</h1>
+      <p className="mb-4 text-sm text-slate-500">
         Pipeline de negociacion: mueva una oportunidad entre etapas y cierrela como ganada para
         convertirla automaticamente en una venta (a credito por defecto).
       </p>
 
       {closeInfo && (
-        <Card className="mb-4 border-green-200 bg-green-50">
-          <p className="text-sm text-green-800">{closeInfo}</p>
-          <button className="mt-1 text-xs text-green-700 hover:underline" onClick={() => setCloseInfo(null)}>
+        <Alert tone="success" className="mb-4">
+          {closeInfo}
+          <button className="ml-2 text-xs underline" onClick={() => setCloseInfo(null)}>
             Cerrar
           </button>
-        </Card>
+        </Alert>
       )}
-      {closeError && <p className="mb-4 text-sm text-red-600">{closeError}</p>}
+      {closeError && (
+        <Alert tone="danger" className="mb-4">
+          {closeError}
+        </Alert>
+      )}
 
       {canManage && (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Nueva oportunidad</h2>
+        <Card title="Nueva oportunidad" className="mb-6">
           <div className="mb-3 flex flex-wrap items-end gap-3">
             <Input label="Titulo" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">Cliente</span>
-              <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-              >
-                <option value="">Seleccionar...</option>
-                {customers?.data.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select label="Cliente" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+              <option value="">Seleccionar...</option>
+              {customers?.data.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
             <Input
               label="Cierre esperado (opcional)"
               type="date"
@@ -223,7 +225,7 @@ export function OpportunitiesPage() {
                 key={p.id}
                 type="button"
                 onClick={() => addLine(p)}
-                className="rounded border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50"
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50"
               >
                 + {p.name}
               </button>
@@ -235,22 +237,22 @@ export function OpportunitiesPage() {
               {lines.map((line) => (
                 <div key={line.productId} className="flex items-center gap-2 text-sm">
                   <span className="flex-1">{line.name}</span>
-                  <input
+                  <Input
                     type="number"
                     min={1}
                     value={line.quantity}
-                    className="w-16 rounded border border-gray-200 px-2 py-1"
+                    className="w-16"
                     onChange={(e) =>
                       setLines((prev) =>
                         prev.map((l) => (l.productId === line.productId ? { ...l, quantity: Number(e.target.value) } : l))
                       )
                     }
                   />
-                  <input
+                  <Input
                     type="number"
                     min={0}
                     value={line.unitPrice}
-                    className="w-24 rounded border border-gray-200 px-2 py-1"
+                    className="w-24"
                     title="Precio negociado"
                     onChange={(e) =>
                       setLines((prev) =>
@@ -260,33 +262,38 @@ export function OpportunitiesPage() {
                   />
                   <button
                     type="button"
-                    className="text-xs text-red-500"
+                    className="text-xs text-danger-600"
                     onClick={() => setLines((prev) => prev.filter((l) => l.productId !== line.productId))}
                   >
                     Quitar
                   </button>
                 </div>
               ))}
-              <p className="text-sm font-semibold text-gray-700">Valor esperado: {formatCOP(expectedValue)}</p>
+              <p className="text-sm font-semibold text-slate-700">Valor esperado: {formatCOP(expectedValue)}</p>
             </div>
           )}
 
           <Button
-            disabled={!title || !customerId || lines.length === 0 || createMutation.isPending}
+            disabled={!title || !customerId || lines.length === 0}
+            loading={createMutation.isPending}
             onClick={() => createMutation.mutate()}
           >
             Crear oportunidad
           </Button>
-          {createMutation.isError && <p className="text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
         </Card>
       )}
 
-      {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
+      {isLoading && <Spinner />}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         {OPEN_STAGES.map((stage) => (
-          <div key={stage} className="rounded bg-gray-100 p-2">
-            <h3 className="mb-2 text-xs font-semibold uppercase text-gray-500">{STAGE_LABELS[stage]}</h3>
+          <div key={stage} className="rounded-lg bg-slate-100 p-2">
+            <h3 className="mb-2 text-xs font-semibold uppercase text-slate-500">{STAGE_LABELS[stage]}</h3>
             {openOpportunities
               .filter((o) => o.stage === stage)
               .map((opp) => (
@@ -297,30 +304,29 @@ export function OpportunitiesPage() {
       </div>
 
       {closedOpportunities.length > 0 && (
-        <Card className="mt-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Ganadas / perdidas</h2>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-gray-500">
-                <th className="py-2">Titulo</th>
-                <th>Cliente</th>
-                <th>Valor</th>
-                <th>Estado</th>
-                <th>Motivo</th>
+        <Card title="Ganadas / perdidas" noPadding className="mt-6">
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Titulo</Th>
+                <Th>Cliente</Th>
+                <Th>Valor</Th>
+                <Th>Estado</Th>
+                <Th>Motivo</Th>
               </tr>
-            </thead>
-            <tbody>
+            </TableHead>
+            <TableBody>
               {closedOpportunities.map((opp) => (
-                <tr key={opp.id} className="border-b border-gray-100">
-                  <td className="py-2">{opp.title}</td>
-                  <td>{customerName(opp.customerId)}</td>
-                  <td>{formatCOP(opp.expectedValue)}</td>
-                  <td>{STAGE_LABELS[opp.stage]}</td>
-                  <td>{opp.lostReason ?? "-"}</td>
-                </tr>
+                <TableRow key={opp.id}>
+                  <Td>{opp.title}</Td>
+                  <Td>{customerName(opp.customerId)}</Td>
+                  <Td>{formatCOP(opp.expectedValue)}</Td>
+                  <Td>{STAGE_LABELS[opp.stage]}</Td>
+                  <Td>{opp.lostReason ?? "-"}</Td>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </Card>
       )}
     </AppLayout>

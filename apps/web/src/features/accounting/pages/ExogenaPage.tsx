@@ -4,6 +4,12 @@ import { formatCOP } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import {
   downloadExogenaFlatFile,
   getExogenaReport,
@@ -25,7 +31,11 @@ const FORMATS: { code: ExogenaFormatCode; label: string }[] = [
 
 function IncompleteBadge({ incompleto }: { incompleto: boolean }) {
   if (!incompleto) return null;
-  return <span className="ml-1 rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">incompleto</span>;
+  return (
+    <Badge tone="warning" >
+      incompleto
+    </Badge>
+  );
 }
 
 export function ExogenaPage() {
@@ -53,148 +63,150 @@ export function ExogenaPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Información exógena DIAN</h1>
-      <p className="mb-4 text-sm text-gray-500">
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Información exógena DIAN</h1>
+      <p className="mb-4 text-sm text-slate-500">
         Formatos 1001/1003/1007/1008/1009 generados a partir de compras, ventas, retenciones y
         saldos ya registrados. Layout de columnas best-effort, no validado contra el prevalidador
         oficial de la DIAN — revisar antes de un envío real (ver <code>modules/exogena/README.md</code>).
-        Los terceros marcados <span className="rounded bg-yellow-100 px-1 text-yellow-700">incompleto</span>{" "}
-        no tienen código DANE de municipio asignado.
+        Los terceros marcados <Badge tone="warning">incompleto</Badge> no tienen código DANE de municipio asignado.
       </p>
 
       <Card className="mb-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {FORMATS.map((f) => (
-              <Button key={f.code} variant={format === f.code ? "primary" : "secondary"} onClick={() => setFormat(f.code)}>
+              <Button key={f.code} size="sm" variant={format === f.code ? "primary" : "secondary"} onClick={() => setFormat(f.code)}>
                 {f.code}
               </Button>
             ))}
           </div>
           {(format === "1001" || format === "1003" || format === "1007") && (
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              Año:
-              <input
-                type="number"
-                className="w-24 rounded border border-gray-300 px-2 py-1"
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-              />
-            </label>
+            <Input
+              type="number"
+              className="w-24"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+            />
           )}
-          <Button variant="secondary" disabled={downloading} onClick={handleDownload}>
+          <Button variant="secondary" loading={downloading} onClick={handleDownload}>
             {downloading ? "Generando..." : "Descargar archivo plano"}
           </Button>
         </div>
-        <p className="text-sm text-gray-600">{FORMATS.find((f) => f.code === format)?.label}</p>
-        {downloadError && <p className="mt-2 text-sm text-red-600">{downloadError}</p>}
+        <p className="text-sm text-slate-600">{FORMATS.find((f) => f.code === format)?.label}</p>
+        {downloadError && (
+          <Alert tone="danger" className="mt-2">
+            {downloadError}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        {isError && <p className="text-sm text-red-600">{(error as Error).message}</p>}
-        {!isLoading && !isError && (
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-gray-500">
-                <th className="py-2">Documento</th>
-                <th>Nombre</th>
+      <Card noPadding>
+        {isLoading && <Spinner />}
+        {isError && (
+          <div className="p-4">
+            <Alert tone="danger">{(error as Error).message}</Alert>
+          </div>
+        )}
+        {!isLoading && !isError && data?.data.length === 0 && <EmptyState title="Sin datos para este formato/año" />}
+        {!isLoading && !isError && data && data.data.length > 0 && (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Documento</Th>
+                <Th>Nombre</Th>
                 {format === "1001" && (
                   <>
-                    <th>Concepto pago</th>
-                    <th>Valor pago</th>
-                    <th>Retención practicada</th>
+                    <Th>Concepto pago</Th>
+                    <Th>Valor pago</Th>
+                    <Th>Retención practicada</Th>
                   </>
                 )}
                 {format === "1003" && (
                   <>
-                    <th>Concepto retención</th>
-                    <th>Base</th>
-                    <th>Retención</th>
+                    <Th>Concepto retención</Th>
+                    <Th>Base</Th>
+                    <Th>Retención</Th>
                   </>
                 )}
-                {format === "1007" && <th>Ingreso</th>}
-                {(format === "1008" || format === "1009") && <th>Saldo</th>}
+                {format === "1007" && <Th>Ingreso</Th>}
+                {(format === "1008" || format === "1009") && <Th>Saldo</Th>}
               </tr>
-            </thead>
-            <tbody>
+            </TableHead>
+            <TableBody>
               {format === "1001" &&
                 (data?.data as Format1001Row[])?.map((r) => (
-                  <tr key={r.supplierId} className="border-b border-gray-100">
-                    <td className="py-2">
+                  <TableRow key={r.supplierId}>
+                    <Td>
                       {r.documentType} {r.documentNumber}
-                    </td>
-                    <td>
-                      {r.name}
+                    </Td>
+                    <Td className="space-x-1">
+                      <span>{r.name}</span>
                       <IncompleteBadge incompleto={r.incompleto} />
-                    </td>
-                    <td>{r.conceptoPago}</td>
-                    <td>{formatCOP(r.valorPago)}</td>
-                    <td>{formatCOP(r.valorRetencionPracticada)}</td>
-                  </tr>
+                    </Td>
+                    <Td>{r.conceptoPago}</Td>
+                    <Td>{formatCOP(r.valorPago)}</Td>
+                    <Td>{formatCOP(r.valorRetencionPracticada)}</Td>
+                  </TableRow>
                 ))}
               {format === "1003" &&
                 (data?.data as Format1003Row[])?.map((r, i) => (
-                  <tr key={`${r.supplierId}-${i}`} className="border-b border-gray-100">
-                    <td className="py-2">
+                  <TableRow key={`${r.supplierId}-${i}`}>
+                    <Td>
                       {r.documentType} {r.documentNumber}
-                    </td>
-                    <td>
-                      {r.name}
+                    </Td>
+                    <Td className="space-x-1">
+                      <span>{r.name}</span>
                       <IncompleteBadge incompleto={r.incompleto} />
-                    </td>
-                    <td>
-                      {r.conceptoRetencion ?? "-"}
+                    </Td>
+                    <Td className="space-x-1">
+                      <span>{r.conceptoRetencion ?? "-"}</span>
                       <IncompleteBadge incompleto={r.conceptoIncompleto} />
-                    </td>
-                    <td>{formatCOP(r.valorBase)}</td>
-                    <td>{formatCOP(r.valorRetencion)}</td>
-                  </tr>
+                    </Td>
+                    <Td>{formatCOP(r.valorBase)}</Td>
+                    <Td>{formatCOP(r.valorRetencion)}</Td>
+                  </TableRow>
                 ))}
               {format === "1007" &&
                 (data?.data as Format1007Row[])?.map((r) => (
-                  <tr key={r.customerId} className="border-b border-gray-100">
-                    <td className="py-2">
+                  <TableRow key={r.customerId}>
+                    <Td>
                       {r.documentType} {r.documentNumber}
-                    </td>
-                    <td>
-                      {r.name}
+                    </Td>
+                    <Td className="space-x-1">
+                      <span>{r.name}</span>
                       <IncompleteBadge incompleto={r.incompleto} />
-                    </td>
-                    <td>{formatCOP(r.valorIngreso)}</td>
-                  </tr>
+                    </Td>
+                    <Td>{formatCOP(r.valorIngreso)}</Td>
+                  </TableRow>
                 ))}
               {format === "1008" &&
                 (data?.data as Format1008Row[])?.map((r) => (
-                  <tr key={r.customerId} className="border-b border-gray-100">
-                    <td className="py-2">
+                  <TableRow key={r.customerId}>
+                    <Td>
                       {r.documentType} {r.documentNumber}
-                    </td>
-                    <td>
-                      {r.name}
+                    </Td>
+                    <Td className="space-x-1">
+                      <span>{r.name}</span>
                       <IncompleteBadge incompleto={r.incompleto} />
-                    </td>
-                    <td>{formatCOP(r.saldo)}</td>
-                  </tr>
+                    </Td>
+                    <Td>{formatCOP(r.saldo)}</Td>
+                  </TableRow>
                 ))}
               {format === "1009" &&
                 (data?.data as Format1009Row[])?.map((r) => (
-                  <tr key={r.supplierId} className="border-b border-gray-100">
-                    <td className="py-2">
+                  <TableRow key={r.supplierId}>
+                    <Td>
                       {r.documentType} {r.documentNumber}
-                    </td>
-                    <td>
-                      {r.name}
+                    </Td>
+                    <Td className="space-x-1">
+                      <span>{r.name}</span>
                       <IncompleteBadge incompleto={r.incompleto} />
-                    </td>
-                    <td>{formatCOP(r.saldo)}</td>
-                  </tr>
+                    </Td>
+                    <Td>{formatCOP(r.saldo)}</Td>
+                  </TableRow>
                 ))}
-            </tbody>
-          </table>
-        )}
-        {!isLoading && !isError && data?.data.length === 0 && (
-          <p className="py-4 text-sm text-gray-400">Sin datos para este formato/año.</p>
+            </TableBody>
+          </Table>
         )}
       </Card>
     </AppLayout>

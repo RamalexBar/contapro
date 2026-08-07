@@ -4,8 +4,22 @@ import { formatCOP } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { listCustomers } from "../../customers/api/customer.api";
 import { createReceivableCheckout, listAccountsReceivable, registerReceivablePayment } from "../api/collections.api";
+
+function statusTone(status: string): "success" | "danger" | "warning" | "neutral" {
+  if (status === "PAID") return "success";
+  if (status === "CANCELLED") return "neutral";
+  if (status === "OVERDUE") return "danger";
+  return "warning";
+}
 
 export function CollectionsPage() {
   const queryClient = useQueryClient();
@@ -44,89 +58,98 @@ export function CollectionsPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Cuentas por cobrar</h1>
-      <p className="mb-4 text-sm text-gray-500">
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Cuentas por cobrar</h1>
+      <p className="mb-4 text-sm text-slate-500">
         Ventas a credito (metodo de pago CREDIT en el punto de venta). Se pueden cobrar en persona
         (abono) o generando un link de pago en linea (Wompi) para que el cliente pague directo.
       </p>
 
       {checkoutResult && (
-        <Card className="mb-4 border-blue-200 bg-blue-50">
-          <p className="text-sm text-blue-800">
-            Link de pago generado:{" "}
-            <a href={checkoutResult.url} target="_blank" rel="noreferrer" className="underline">
-              {checkoutResult.url}
-            </a>
-          </p>
-          <button className="mt-1 text-xs text-blue-600 hover:underline" onClick={() => setCheckoutResult(null)}>
+        <Alert tone="info" className="mb-4">
+          Link de pago generado:{" "}
+          <a href={checkoutResult.url} target="_blank" rel="noreferrer" className="underline">
+            {checkoutResult.url}
+          </a>
+          <button className="ml-2 text-xs underline" onClick={() => setCheckoutResult(null)}>
             Cerrar
           </button>
-        </Card>
+        </Alert>
       )}
-      {checkoutError && <p className="mb-4 text-sm text-red-600">{checkoutError}</p>}
+      {checkoutError && (
+        <Alert tone="danger" className="mb-4">
+          {checkoutError}
+        </Alert>
+      )}
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Cliente</th>
-              <th>Saldo</th>
-              <th>Vencimiento</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((ar) => (
-              <tr key={ar.id} className="border-b border-gray-100">
-                <td className="py-2">{customerName(ar.customerId)}</td>
-                <td>{formatCOP(ar.balance)}</td>
-                <td>{ar.dueDate.slice(0, 10)}</td>
-                <td>{ar.status}</td>
-                <td className="text-right">
-                  {ar.status !== "PAID" && ar.status !== "CANCELLED" && payingId !== ar.id && (
-                    <span className="inline-flex items-center gap-2">
-                      <Button variant="secondary" onClick={() => setPayingId(ar.id)}>
-                        Abonar
-                      </Button>
-                      <Button variant="secondary" disabled={checkoutMutation.isPending} onClick={() => checkoutMutation.mutate(ar.id)}>
-                        Generar link de pago
-                      </Button>
-                    </span>
-                  )}
-                  {payingId === ar.id && (
-                    <span className="inline-flex items-center gap-2">
-                      <input
-                        type="number"
-                        className="w-24 rounded border border-gray-200 px-2 py-1"
-                        placeholder="Monto"
-                        value={payForm.amount}
-                        onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
-                      />
-                      <select
-                        className="rounded border border-gray-200 px-2 py-1"
-                        value={payForm.method}
-                        onChange={(e) => setPayForm({ ...payForm, method: e.target.value })}
-                      >
-                        <option value="CASH">Efectivo</option>
-                        <option value="CARD">Tarjeta</option>
-                        <option value="TRANSFER">Transferencia</option>
-                      </select>
-                      <Button onClick={() => payMutation.mutate(ar.id)} disabled={!payForm.amount || payMutation.isPending}>
-                        Confirmar
-                      </Button>
-                      <Button variant="secondary" onClick={() => setPayingId(null)}>
-                        Cancelar
-                      </Button>
-                    </span>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="No hay cuentas por cobrar todavia." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Cliente</Th>
+                <Th>Saldo</Th>
+                <Th>Vencimiento</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">No hay cuentas por cobrar todavia.</p>}
+            </TableHead>
+            <TableBody>
+              {data?.data.map((ar) => (
+                <TableRow key={ar.id}>
+                  <Td>{customerName(ar.customerId)}</Td>
+                  <Td>{formatCOP(ar.balance)}</Td>
+                  <Td>{ar.dueDate.slice(0, 10)}</Td>
+                  <Td>
+                    <Badge tone={statusTone(ar.status)}>{ar.status}</Badge>
+                  </Td>
+                  <Td className="text-right">
+                    {ar.status !== "PAID" && ar.status !== "CANCELLED" && payingId !== ar.id && (
+                      <span className="inline-flex items-center gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => setPayingId(ar.id)}>
+                          Abonar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={checkoutMutation.isPending}
+                          onClick={() => checkoutMutation.mutate(ar.id)}
+                        >
+                          Generar link de pago
+                        </Button>
+                      </span>
+                    )}
+                    {payingId === ar.id && (
+                      <span className="inline-flex items-center gap-2">
+                        <Input
+                          type="number"
+                          className="w-24"
+                          placeholder="Monto"
+                          value={payForm.amount}
+                          onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
+                        />
+                        <Select value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })}>
+                          <option value="CASH">Efectivo</option>
+                          <option value="CARD">Tarjeta</option>
+                          <option value="TRANSFER">Transferencia</option>
+                        </Select>
+                        <Button size="sm" disabled={!payForm.amount} loading={payMutation.isPending} onClick={() => payMutation.mutate(ar.id)}>
+                          Confirmar
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setPayingId(null)}>
+                          Cancelar
+                        </Button>
+                      </span>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </AppLayout>
   );

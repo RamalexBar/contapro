@@ -4,6 +4,10 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Spinner } from "../../../components/ui/Spinner";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { listAuditLogs } from "../api/audit.api";
 
 const ACTIONS = [
@@ -86,10 +90,10 @@ export function AuditLogPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Auditoria</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Auditoria</h1>
 
-      <Card>
-        <div className="mb-3 flex flex-wrap items-end gap-3">
+      <Card noPadding>
+        <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 p-4">
           <Input
             label="Tipo de entidad"
             placeholder="Sale, Product, Employee..."
@@ -101,76 +105,69 @@ export function AuditLogPage() {
             value={entityId}
             onChange={(e) => resetAndFilter(() => setEntityId(e.target.value))}
           />
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">Accion</span>
-            <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={action}
-              onChange={(e) => resetAndFilter(() => setAction(e.target.value))}
-            >
-              <option value="">Todas</option>
-              {ACTIONS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select label="Accion" value={action} onChange={(e) => resetAndFilter(() => setAction(e.target.value))}>
+            <option value="">Todas</option>
+            {ACTIONS.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </Select>
         </div>
 
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Fecha</th>
-              <th>Accion</th>
-              <th>Entidad</th>
-              <th>Descripcion</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((log) => (
-              <Fragment key={log.id}>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2 whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
-                  <td className="whitespace-nowrap font-mono text-xs">{log.action}</td>
-                  <td className="whitespace-nowrap">
-                    {log.entityType} <span className="text-gray-400">{log.entityId.slice(0, 8)}</span>
-                  </td>
-                  <td>{log.description}</td>
-                  <td className="text-right">
-                    {log.metadata && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
-                      >
-                        {expandedId === log.id ? "Ocultar" : "Detalle"}
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-                {expandedId === log.id && log.metadata && (
-                  <tr>
-                    <td colSpan={5} className="bg-gray-50 px-2 py-2">
-                      <pre className="overflow-x-auto text-xs text-gray-600">
-                        {JSON.stringify(log.metadata, null, 2)}
-                      </pre>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-        {data?.data.length === 0 && <p className="py-4 text-sm text-gray-400">Sin registros.</p>}
+        {isLoading ? (
+          <Spinner />
+        ) : data?.data.length === 0 ? (
+          <EmptyState title="Sin registros." />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Fecha</Th>
+                <Th>Accion</Th>
+                <Th>Entidad</Th>
+                <Th>Descripcion</Th>
+                <Th></Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((log) => (
+                <Fragment key={log.id}>
+                  <TableRow>
+                    <Td className="whitespace-nowrap">{formatDateTime(log.createdAt)}</Td>
+                    <Td className="whitespace-nowrap font-mono text-xs">{log.action}</Td>
+                    <Td className="whitespace-nowrap">
+                      {log.entityType} <span className="text-slate-400">{log.entityId.slice(0, 8)}</span>
+                    </Td>
+                    <Td>{log.description}</Td>
+                    <Td className="text-right">
+                      {log.metadata && (
+                        <Button size="sm" variant="secondary" onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}>
+                          {expandedId === log.id ? "Ocultar" : "Detalle"}
+                        </Button>
+                      )}
+                    </Td>
+                  </TableRow>
+                  {expandedId === log.id && log.metadata && (
+                    <TableRow>
+                      <Td colSpan={5} className="bg-slate-50 px-2 py-2">
+                        <pre className="overflow-x-auto text-xs text-slate-600">{JSON.stringify(log.metadata, null, 2)}</pre>
+                      </Td>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        )}
 
-        <div className="mt-3 flex items-center justify-between">
-          <Button variant="secondary" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+        <div className="flex items-center justify-between border-t border-slate-200 p-4">
+          <Button size="sm" variant="secondary" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
             Anterior
           </Button>
-          <span className="text-xs text-gray-500">Pagina {page + 1}</span>
+          <span className="text-xs text-slate-500">Pagina {page + 1}</span>
           <Button
+            size="sm"
             variant="secondary"
             disabled={(data?.data.length ?? 0) < PAGE_SIZE}
             onClick={() => setPage((p) => p + 1)}

@@ -4,6 +4,9 @@ import { applyDiscount, calculateTax, formatCOP, formatCurrency, round2 } from "
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Alert } from "../../../components/ui/Alert";
 import { listProducts } from "../../inventory/api/product.api";
 import { getActiveSession, listCashRegisters } from "../../cash/api/cash.api";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
@@ -171,95 +174,91 @@ export function POSPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Punto de venta</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Punto de venta</h1>
       {!activeSession && (
-        <p className="mb-4 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-700">
+        <Alert tone="warning" className="mb-4">
           No hay una caja abierta. Abre una sesion de caja para registrar ventas con ingreso automatico de efectivo.
-        </p>
+        </Alert>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Productos</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Productos</h2>
           <div className="mb-3 flex items-center gap-2 text-sm">
-            <label className="text-gray-600">Lista de precios:</label>
-            <select
-              className="flex-1 rounded border border-gray-200 px-2 py-1"
-              value={selectedPriceListId}
-              onChange={(e) => setSelectedPriceListId(e.target.value)}
-            >
-              <option value="">
-                {selectedCustomer?.priceListId ? "Usar la del cliente" : "Precio base"}
-              </option>
+            <label className="text-slate-600">Lista de precios:</label>
+            <Select className="flex-1" value={selectedPriceListId} onChange={(e) => setSelectedPriceListId(e.target.value)}>
+              <option value="">{selectedCustomer?.priceListId ? "Usar la del cliente" : "Precio base"}</option>
               {activePriceLists.map((pl) => (
                 <option key={pl.id} value={pl.id}>
                   {pl.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
-          <div className="max-h-96 space-y-2 overflow-y-auto">
+          <div className="max-h-96 space-y-1.5 overflow-y-auto">
             {products?.data.map((p) => (
               <button
                 key={p.id}
                 onClick={() => addToCart(p)}
-                className="flex w-full items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                className="flex w-full items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-left text-sm transition-colors hover:border-brand-200 hover:bg-brand-50"
               >
-                <span>{p.name}</span>
-                <span className="text-gray-500">{formatCOP(resolvePrice(p.id, p.currentPrice))}</span>
+                <span className="text-slate-800">{p.name}</span>
+                <span className="font-medium text-slate-500">{formatCOP(resolvePrice(p.id, p.currentPrice))}</span>
               </button>
             ))}
           </div>
         </Card>
 
         <Card>
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Carrito</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Carrito</h2>
           <div className="space-y-2">
             {cart.map((line) => {
               const product = products?.data.find((p) => p.id === line.productId);
               const unitPrice = resolvePrice(line.productId, product?.currentPrice ?? 0);
               return (
                 <div key={line.productId} className="flex items-center gap-2 text-sm">
-                  <span className="flex-1">{product?.name ?? line.productId}</span>
-                  <input
+                  <span className="flex-1 text-slate-800">{product?.name ?? line.productId}</span>
+                  <Input
                     type="number"
                     min={1}
                     value={line.quantity}
-                    className="w-16 rounded border border-gray-200 px-2 py-1"
+                    className="w-16"
                     onChange={(e) =>
                       setCart((prev) =>
                         prev.map((l) => (l.productId === line.productId ? { ...l, quantity: Number(e.target.value) } : l))
                       )
                     }
                   />
-                  <input
+                  <Input
                     type="number"
                     min={0}
                     max={100}
                     value={line.discountPercent}
                     title="% descuento"
-                    className="w-16 rounded border border-gray-200 px-2 py-1"
+                    className="w-16"
                     onChange={(e) =>
                       setCart((prev) =>
                         prev.map((l) => (l.productId === line.productId ? { ...l, discountPercent: Number(e.target.value) } : l))
                       )
                     }
                   />
-                  <span className="w-24 text-right">{formatCOP(lineTotal(unitPrice, line.quantity, line.discountPercent, product?.taxRate ?? 0))}</span>
+                  <span className="w-24 text-right font-medium text-slate-700">
+                    {formatCOP(lineTotal(unitPrice, line.quantity, line.discountPercent, product?.taxRate ?? 0))}
+                  </span>
                 </div>
               );
             })}
-            {cart.length === 0 && <p className="text-sm text-gray-400">Agrega productos desde la izquierda</p>}
+            {cart.length === 0 && <p className="text-sm text-slate-400">Agrega productos desde la izquierda</p>}
           </div>
 
           {canApplyWithholdings && cart.length > 0 && (
-            <div className="mt-4 border-t border-gray-100 pt-3">
+            <div className="mt-4 border-t border-slate-100 pt-3">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700">Retenciones</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Retenciones</h3>
                 {activeConcepts.length > 0 && (
                   <button
                     type="button"
-                    className="text-xs font-medium text-blue-600 hover:underline"
+                    className="text-xs font-medium text-brand-600 hover:underline"
                     onClick={() => {
                       const first = activeConcepts[0];
                       if (!first) return;
@@ -272,8 +271,8 @@ export function POSPage() {
               </div>
               {withholdings.map((w, i) => (
                 <div key={i} className="mb-2 flex items-center gap-2 text-sm">
-                  <select
-                    className="flex-1 rounded border border-gray-200 px-2 py-1"
+                  <Select
+                    className="flex-1"
                     value={w.withholdingConceptId}
                     onChange={(e) =>
                       setWithholdings((prev) =>
@@ -286,23 +285,21 @@ export function POSPage() {
                         {c.name} ({c.ratePercent}%)
                       </option>
                     ))}
-                  </select>
-                  <input
+                  </Select>
+                  <Input
                     type="number"
                     min={0}
                     max={subtotal}
                     value={w.base}
                     title="Base de retencion"
-                    className="w-28 rounded border border-gray-200 px-2 py-1"
+                    className="w-28"
                     onChange={(e) =>
-                      setWithholdings((prev) =>
-                        prev.map((row, idx) => (idx === i ? { ...row, base: Number(e.target.value) } : row))
-                      )
+                      setWithholdings((prev) => prev.map((row, idx) => (idx === i ? { ...row, base: Number(e.target.value) } : row)))
                     }
                   />
                   <button
                     type="button"
-                    className="text-xs text-red-500 hover:underline"
+                    className="text-xs text-danger-500 hover:underline"
                     onClick={() => setWithholdings((prev) => prev.filter((_, idx) => idx !== i))}
                   >
                     Quitar
@@ -313,67 +310,48 @@ export function POSPage() {
           )}
 
           {cart.length > 0 && (
-            <div className="mt-4 border-t border-gray-100 pt-3">
-              <div className="mb-2 flex items-center gap-2 text-sm">
-                <label className="text-gray-600">Pago:</label>
-                <select
-                  className="rounded border border-gray-200 px-2 py-1"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as "CASH" | "CREDIT")}
-                >
+            <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+              <div className="flex items-center gap-2 text-sm">
+                <label className="w-20 shrink-0 text-slate-600">Pago:</label>
+                <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as "CASH" | "CREDIT")}>
                   <option value="CASH">Efectivo (de una vez)</option>
                   <option value="CREDIT">A credito</option>
-                </select>
+                </Select>
               </div>
               {/* Cliente: opcional para pago de contado (venta a "consumidor final"), obligatorio
                   a credito -- el backend genera la AccountReceivable (item 31) contra este
                   cliente. */}
-              <div className="mb-2 flex items-center gap-2 text-sm">
-                <label className="text-gray-600">Cliente{paymentMethod === "CREDIT" ? " *" : ""}:</label>
-                <select
-                  className="flex-1 rounded border border-gray-200 px-2 py-1"
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  required={paymentMethod === "CREDIT"}
-                >
+              <div className="flex items-center gap-2 text-sm">
+                <label className="w-20 shrink-0 text-slate-600">Cliente{paymentMethod === "CREDIT" ? " *" : ""}:</label>
+                <Select className="flex-1" value={customerId} onChange={(e) => setCustomerId(e.target.value)} required={paymentMethod === "CREDIT"}>
                   <option value="">{paymentMethod === "CREDIT" ? "Seleccionar..." : "Consumidor final"}</option>
                   {customers?.data.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               {paymentMethod === "CREDIT" && (
-                <div className="mb-2 flex items-center gap-2 text-sm">
-                  <label className="text-gray-600">Vence:</label>
-                  <input
-                    type="date"
-                    className="rounded border border-gray-200 px-2 py-1"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    placeholder="30 dias por defecto"
-                  />
+                <div className="flex items-center gap-2 text-sm">
+                  <label className="w-20 shrink-0 text-slate-600">Vence:</label>
+                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} placeholder="30 dias por defecto" />
                 </div>
               )}
-              <div className="mb-2 flex items-center gap-2 text-sm">
-                <label className="text-gray-600">Moneda:</label>
-                <select
-                  className="rounded border border-gray-200 px-2 py-1"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                >
+              <div className="flex items-center gap-2 text-sm">
+                <label className="w-20 shrink-0 text-slate-600">Moneda:</label>
+                <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   <option value="COP">COP</option>
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
-                </select>
+                </Select>
                 {currency !== "COP" && (
-                  <input
+                  <Input
                     type="number"
                     min={0}
                     step="0.01"
                     placeholder="TRM (COP por 1 unidad)"
-                    className="w-40 rounded border border-gray-200 px-2 py-1"
+                    className="w-40"
                     value={exchangeRate}
                     onChange={(e) => setExchangeRate(e.target.value)}
                   />
@@ -382,23 +360,23 @@ export function POSPage() {
             </div>
           )}
 
-          <div className="mt-2 space-y-1 border-t border-gray-100 pt-3 text-sm text-gray-600">
+          <div className="mt-2 space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
             <div className="flex justify-between">
               <span>Subtotal</span>
               <span>{formatCOP(subtotal)}</span>
             </div>
             {retentionTotal > 0 && (
-              <div className="flex justify-between text-red-600">
+              <div className="flex justify-between text-danger-600">
                 <span>Retenciones</span>
                 <span>-{formatCOP(retentionTotal)}</span>
               </div>
             )}
             <div className="flex items-center justify-between pt-1">
-              <span className="font-semibold text-gray-900">{paymentMethod === "CREDIT" ? "Total a credito" : "Total a cobrar"}</span>
-              <span className="font-semibold text-gray-900">{formatCOP(netTotal)}</span>
+              <span className="font-semibold text-slate-900">{paymentMethod === "CREDIT" ? "Total a credito" : "Total a cobrar"}</span>
+              <span className="text-lg font-semibold text-slate-900">{formatCOP(netTotal)}</span>
             </div>
             {currency !== "COP" && Number(exchangeRate) > 0 && (
-              <div className="flex justify-between text-gray-500">
+              <div className="flex justify-between text-slate-500">
                 <span>Referencia en {currency}</span>
                 <span>{formatCurrency(round2(netTotal / Number(exchangeRate)), currency)}</span>
               </div>
@@ -413,6 +391,7 @@ export function POSPage() {
                 (paymentMethod === "CREDIT" && !customerId) ||
                 (currency !== "COP" && !(Number(exchangeRate) > 0))
               }
+              loading={saleMutation.isPending}
               onClick={() => saleMutation.mutate()}
             >
               {paymentMethod === "CREDIT" ? "Vender a credito" : "Cobrar"}
@@ -420,10 +399,10 @@ export function POSPage() {
           </div>
 
           {sale?.status === "COMPLETED" && (
-            <>
-              <p className="mt-3 text-sm text-green-600">Venta #{sale.number} completada.</p>
+            <div className="mt-3">
+              <Alert tone="success">Venta #{sale.number} completada.</Alert>
               {sale.customerId && <SaleWhatsAppStatus saleId={sale.id} />}
-            </>
+            </div>
           )}
         </Card>
       </div>
@@ -457,19 +436,14 @@ function SaleWhatsAppStatus({ saleId }: { saleId: string }) {
   if (!latest) return null;
 
   return (
-    <p className="mt-1 text-sm text-gray-500">
+    <p className="mt-2 text-sm text-slate-500">
       {latest.success ? (
         "Factura enviada por WhatsApp."
       ) : (
         <>
           No se pudo enviar la factura por WhatsApp ({latest.errorMessage}).
           {hasPermission("electronic-invoicing.manage") && (
-            <Button
-              variant="secondary"
-              disabled={resendMutation.isPending}
-              onClick={() => resendMutation.mutate()}
-              className="ml-2"
-            >
+            <Button size="sm" variant="secondary" loading={resendMutation.isPending} onClick={() => resendMutation.mutate()} className="ml-2">
               Reenviar
             </Button>
           )}

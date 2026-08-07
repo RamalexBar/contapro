@@ -5,6 +5,11 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listWithholdingConcepts } from "../../accounting/api/accounting.api";
 import {
@@ -38,8 +43,7 @@ function SuppliersSection() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      createSupplier({ ...form, municipalityCode: form.municipalityCode || undefined }),
+    mutationFn: () => createSupplier({ ...form, municipalityCode: form.municipalityCode || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       setForm({ name: "", nit: "", contactName: "", phone: "", isObligatedToInvoice: true, documentType: "NIT", municipalityCode: "" });
@@ -47,9 +51,8 @@ function SuppliersSection() {
   });
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Nuevo proveedor</h2>
+    <div className="space-y-6">
+      <Card title="Nuevo proveedor">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-4"
           onSubmit={(e) => {
@@ -58,15 +61,11 @@ function SuppliersSection() {
           }}
         >
           <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.documentType}
-            onChange={(e) => setForm({ ...form, documentType: e.target.value })}
-          >
+          <Select value={form.documentType} onChange={(e) => setForm({ ...form, documentType: e.target.value })}>
             <option value="NIT">NIT</option>
             <option value="CC">CC</option>
             <option value="CE">CE</option>
-          </select>
+          </Select>
           <Input placeholder="NIT / documento" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} required />
           <Input placeholder="Contacto" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
           <Input placeholder="Telefono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -75,7 +74,7 @@ function SuppliersSection() {
             value={form.municipalityCode}
             onChange={(e) => setForm({ ...form, municipalityCode: e.target.value })}
           />
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
               checked={form.isObligatedToInvoice}
@@ -83,39 +82,48 @@ function SuppliersSection() {
             />
             Obligado a facturar electronicamente
           </label>
-          <Button type="submit" disabled={createMutation.isPending}>
+          <Button type="submit" loading={createMutation.isPending}>
             Crear
           </Button>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Nombre</th>
-              <th>NIT</th>
-              <th>Contacto</th>
-              <th>Obligado a facturar</th>
-              <th>Municipio (DANE)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((s) => (
-              <tr key={s.id} className="border-b border-gray-100">
-                <td className="py-2">{s.name}</td>
-                <td>{s.nit}</td>
-                <td>{s.contactName ?? "-"}</td>
-                <td>{s.isObligatedToInvoice ? "Si" : "No"}</td>
-                <td className={s.municipalityCode ? "" : "text-yellow-600"}>{s.municipalityCode ?? "Sin asignar"}</td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Nombre</Th>
+                <Th>NIT</Th>
+                <Th>Contacto</Th>
+                <Th>Obligado a facturar</Th>
+                <Th>Municipio (DANE)</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((s) => (
+                <TableRow key={s.id}>
+                  <Td className="font-medium text-slate-900">{s.name}</Td>
+                  <Td>{s.nit}</Td>
+                  <Td>{s.contactName ?? "-"}</Td>
+                  <Td>{s.isObligatedToInvoice ? "Si" : "No"}</Td>
+                  <Td>
+                    {s.municipalityCode ?? <Badge tone="warning">Sin asignar</Badge>}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -186,9 +194,8 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
   }
 
   return (
-    <>
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Registrar compra</h2>
+    <div className="space-y-6">
+      <Card title="Registrar compra">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-6"
           onSubmit={(e) => {
@@ -196,19 +203,14 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
             createMutation.mutate();
           }}
         >
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.supplierId}
-            onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
-            required
-          >
+          <Select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} required>
             <option value="">Proveedor...</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
           <Input
             placeholder="Numero factura"
             value={form.invoiceNumber}
@@ -224,15 +226,11 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
           />
           <Input type="number" placeholder="IVA" value={form.taxTotal} onChange={(e) => setForm({ ...form, taxTotal: e.target.value })} />
           <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} required />
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.currency}
-            onChange={(e) => setForm({ ...form, currency: e.target.value })}
-          >
+          <Select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
             <option value="COP">COP</option>
             <option value="USD">USD</option>
             <option value="EUR">EUR</option>
-          </select>
+          </Select>
           {form.currency !== "COP" && (
             <Input
               type="number"
@@ -246,25 +244,26 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
           )}
           <Button
             type="submit"
-            disabled={createMutation.isPending || (form.currency !== "COP" && !(Number(form.exchangeRate) > 0))}
+            disabled={form.currency !== "COP" && !(Number(form.exchangeRate) > 0)}
+            loading={createMutation.isPending}
           >
             {retentionTotal > 0 ? `Neto a pagar: ${formatCOP(netTotal)}` : `Total: ${formatCOP(total)}`}
           </Button>
         </form>
         {form.currency !== "COP" && Number(form.exchangeRate) > 0 && (
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-slate-500">
             Referencia en {form.currency}: {formatCurrency(round2(total / Number(form.exchangeRate)), form.currency)}
           </p>
         )}
 
         {canApplyWithholdings && Number(form.subtotal) > 0 && (
-          <div className="mt-3 border-t border-gray-100 pt-3">
+          <div className="mt-3 border-t border-slate-100 pt-3">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-700">Retenciones al proveedor</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Retenciones al proveedor</h3>
               {activeConcepts.length > 0 && (
                 <button
                   type="button"
-                  className="text-xs font-medium text-blue-600 hover:underline"
+                  className="text-xs font-medium text-brand-600 hover:underline"
                   onClick={() => {
                     const first = activeConcepts[0];
                     if (!first) return;
@@ -277,13 +276,11 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
             </div>
             {withholdings.map((w, i) => (
               <div key={i} className="mb-2 flex items-center gap-2 text-sm">
-                <select
-                  className="flex-1 rounded border border-gray-200 px-2 py-1"
+                <Select
+                  className="flex-1"
                   value={w.withholdingConceptId}
                   onChange={(e) =>
-                    setWithholdings((prev) =>
-                      prev.map((row, idx) => (idx === i ? { ...row, withholdingConceptId: e.target.value } : row))
-                    )
+                    setWithholdings((prev) => prev.map((row, idx) => (idx === i ? { ...row, withholdingConceptId: e.target.value } : row)))
                   }
                 >
                   {activeConcepts.map((c) => (
@@ -291,21 +288,19 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
                       {c.name} ({c.ratePercent}%)
                     </option>
                   ))}
-                </select>
-                <input
+                </Select>
+                <Input
                   type="number"
                   min={0}
                   max={Number(form.subtotal)}
                   value={w.base}
                   title="Base de retencion"
-                  className="w-28 rounded border border-gray-200 px-2 py-1"
-                  onChange={(e) =>
-                    setWithholdings((prev) => prev.map((row, idx) => (idx === i ? { ...row, base: Number(e.target.value) } : row)))
-                  }
+                  className="w-28"
+                  onChange={(e) => setWithholdings((prev) => prev.map((row, idx) => (idx === i ? { ...row, base: Number(e.target.value) } : row)))}
                 />
                 <button
                   type="button"
-                  className="text-xs text-red-500 hover:underline"
+                  className="text-xs text-danger-500 hover:underline"
                   onClick={() => setWithholdings((prev) => prev.filter((_, idx) => idx !== i))}
                 >
                   Quitar
@@ -313,55 +308,64 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
               </div>
             ))}
             {retentionTotal > 0 && (
-              <p className="text-sm text-gray-600">
-                Retencion total: <span className="text-red-600">-{formatCOP(retentionTotal)}</span> · Neto a pagar al proveedor:{" "}
-                <span className="font-semibold">{formatCOP(netTotal)}</span>
+              <p className="text-sm text-slate-600">
+                Retencion total: <span className="text-danger-600">-{formatCOP(retentionTotal)}</span> · Neto a pagar al proveedor:{" "}
+                <span className="font-semibold text-slate-900">{formatCOP(netTotal)}</span>
               </p>
             )}
           </div>
         )}
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Factura</th>
-              <th>Proveedor</th>
-              <th>Total</th>
-              <th>Neto (retencion)</th>
-              <th>Estado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((p) => (
-              <tr key={p.id} className="border-b border-gray-100">
-                <td className="py-2">{p.invoiceNumber}</td>
-                <td>{supplierName(p.supplierId)}</td>
-                <td>
-                  {formatCOP(p.total)}
-                  {p.currency !== "COP" && p.foreignTotal !== null && (
-                    <span className="block text-xs text-gray-400">{formatCurrency(p.foreignTotal, p.currency)}</span>
-                  )}
-                </td>
-                <td>{p.retentionTotal > 0 ? formatCOP(p.total - p.retentionTotal) : "-"}</td>
-                <td>{p.status}</td>
-                <td className="text-right">
-                  {p.status === "REGISTERED" && (
-                    <Button variant="danger" onClick={() => cancelMutation.mutate(p.id)} disabled={cancelMutation.isPending}>
-                      Cancelar
-                    </Button>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Factura</Th>
+                <Th>Proveedor</Th>
+                <Th>Total</Th>
+                <Th>Neto (retencion)</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((p) => (
+                <TableRow key={p.id}>
+                  <Td className="font-medium text-slate-900">{p.invoiceNumber}</Td>
+                  <Td>{supplierName(p.supplierId)}</Td>
+                  <Td>
+                    {formatCOP(p.total)}
+                    {p.currency !== "COP" && p.foreignTotal !== null && (
+                      <span className="block text-xs text-slate-400">{formatCurrency(p.foreignTotal, p.currency)}</span>
+                    )}
+                  </Td>
+                  <Td>{p.retentionTotal > 0 ? formatCOP(p.total - p.retentionTotal) : "-"}</Td>
+                  <Td>
+                    <Badge tone={p.status === "CANCELLED" ? "danger" : "neutral"}>{p.status}</Badge>
+                  </Td>
+                  <Td className="text-right">
+                    {p.status === "REGISTERED" && (
+                      <Button size="sm" variant="danger" onClick={() => cancelMutation.mutate(p.id)} loading={cancelMutation.isPending}>
+                        Cancelar
+                      </Button>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -385,62 +389,63 @@ function AccountsPayableSection({ suppliers }: { suppliers: SupplierRecord[] }) 
   }
 
   return (
-    <Card>
-      {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-gray-500">
-            <th className="py-2">Proveedor</th>
-            <th>Saldo</th>
-            <th>Vencimiento</th>
-            <th>Estado</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.data.map((ap) => (
-            <tr key={ap.id} className="border-b border-gray-100">
-              <td className="py-2">{supplierName(ap.supplierId)}</td>
-              <td>{formatCOP(ap.balance)}</td>
-              <td>{ap.dueDate.slice(0, 10)}</td>
-              <td>{ap.status}</td>
-              <td className="text-right">
-                {ap.status !== "PAID" && ap.status !== "CANCELLED" && payingId !== ap.id && (
-                  <Button variant="secondary" onClick={() => setPayingId(ap.id)}>
-                    Abonar
-                  </Button>
-                )}
-                {payingId === ap.id && (
-                  <span className="inline-flex items-center gap-2">
-                    <input
-                      type="number"
-                      className="w-24 rounded border border-gray-200 px-2 py-1"
-                      placeholder="Monto"
-                      value={payForm.amount}
-                      onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
-                    />
-                    <select
-                      className="rounded border border-gray-200 px-2 py-1"
-                      value={payForm.method}
-                      onChange={(e) => setPayForm({ ...payForm, method: e.target.value })}
-                    >
-                      <option value="CASH">Efectivo</option>
-                      <option value="CARD">Tarjeta</option>
-                      <option value="TRANSFER">Transferencia</option>
-                    </select>
-                    <Button onClick={() => payMutation.mutate(ap.id)} disabled={!payForm.amount || payMutation.isPending}>
-                      Confirmar
-                    </Button>
-                    <Button variant="secondary" onClick={() => setPayingId(null)}>
-                      Cancelar
-                    </Button>
-                  </span>
-                )}
-              </td>
+    <Card noPadding>
+      {isLoading ? (
+        <Spinner />
+      ) : (
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Proveedor</Th>
+              <Th>Saldo</Th>
+              <Th>Vencimiento</Th>
+              <Th>Estado</Th>
+              <Th></Th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </TableHead>
+          <TableBody>
+            {data?.data.map((ap) => (
+              <TableRow key={ap.id}>
+                <Td className="font-medium text-slate-900">{supplierName(ap.supplierId)}</Td>
+                <Td>{formatCOP(ap.balance)}</Td>
+                <Td>{ap.dueDate.slice(0, 10)}</Td>
+                <Td>
+                  <Badge tone={ap.status === "PAID" ? "success" : ap.status === "CANCELLED" ? "danger" : "neutral"}>{ap.status}</Badge>
+                </Td>
+                <Td className="text-right">
+                  {ap.status !== "PAID" && ap.status !== "CANCELLED" && payingId !== ap.id && (
+                    <Button size="sm" variant="secondary" onClick={() => setPayingId(ap.id)}>
+                      Abonar
+                    </Button>
+                  )}
+                  {payingId === ap.id && (
+                    <span className="inline-flex items-center gap-2">
+                      <Input
+                        type="number"
+                        className="w-24"
+                        placeholder="Monto"
+                        value={payForm.amount}
+                        onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
+                      />
+                      <Select value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })}>
+                        <option value="CASH">Efectivo</option>
+                        <option value="CARD">Tarjeta</option>
+                        <option value="TRANSFER">Transferencia</option>
+                      </Select>
+                      <Button size="sm" disabled={!payForm.amount} loading={payMutation.isPending} onClick={() => payMutation.mutate(ap.id)}>
+                        Confirmar
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => setPayingId(null)}>
+                        Cancelar
+                      </Button>
+                    </span>
+                  )}
+                </Td>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </Card>
   );
 }
@@ -453,15 +458,15 @@ export function SuppliersPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold">Proveedores / Compras</h1>
-      <div className="mb-6 flex gap-2">
-        <Button variant={section === "suppliers" ? "primary" : "secondary"} onClick={() => setSection("suppliers")}>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Proveedores / Compras</h1>
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <Button size="sm" variant={section === "suppliers" ? "primary" : "secondary"} onClick={() => setSection("suppliers")}>
           Proveedores
         </Button>
-        <Button variant={section === "purchases" ? "primary" : "secondary"} onClick={() => setSection("purchases")}>
+        <Button size="sm" variant={section === "purchases" ? "primary" : "secondary"} onClick={() => setSection("purchases")}>
           Compras
         </Button>
-        <Button variant={section === "payable" ? "primary" : "secondary"} onClick={() => setSection("payable")}>
+        <Button size="sm" variant={section === "payable" ? "primary" : "secondary"} onClick={() => setSection("payable")}>
           Cuentas por pagar
         </Button>
       </div>

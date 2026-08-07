@@ -3,6 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Alert } from "../../../components/ui/Alert";
+import { Spinner } from "../../../components/ui/Spinner";
 import { PlatformAdminLayout } from "../components/PlatformAdminLayout";
 import {
   createSubscription,
@@ -59,10 +63,9 @@ export function SubscriptionsPage() {
 
   return (
     <PlatformAdminLayout>
-      <h1 className="mb-4 text-lg font-semibold">Suscripciones</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Suscripciones</h1>
 
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Asignar suscripcion manual</h2>
+      <Card title="Asignar suscripcion manual" className="mb-6">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-6"
           onSubmit={(e) => {
@@ -70,40 +73,26 @@ export function SubscriptionsPage() {
             createMutation.mutate();
           }}
         >
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.companyId}
-            onChange={(e) => setForm({ ...form, companyId: e.target.value })}
-            required
-          >
+          <Select value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })} required>
             <option value="">Empresa...</option>
             {companies?.data.map((c) => (
               <option key={c.companyId} value={c.companyId}>
                 {c.companyName}
               </option>
             ))}
-          </select>
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.planId}
-            onChange={(e) => setForm({ ...form, planId: e.target.value })}
-            required
-          >
+          </Select>
+          <Select value={form.planId} onChange={(e) => setForm({ ...form, planId: e.target.value })} required>
             <option value="">Plan...</option>
             {plans?.data.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-          </select>
-          <select
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.billingCycle}
-            onChange={(e) => setForm({ ...form, billingCycle: e.target.value as "MONTHLY" | "YEARLY" })}
-          >
+          </Select>
+          <Select value={form.billingCycle} onChange={(e) => setForm({ ...form, billingCycle: e.target.value as "MONTHLY" | "YEARLY" })}>
             <option value="MONTHLY">Mensual</option>
             <option value="YEARLY">Anual</option>
-          </select>
+          </Select>
           <Input type="date" label="Inicio" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
           <Input
             type="date"
@@ -111,75 +100,78 @@ export function SubscriptionsPage() {
             value={form.currentPeriodEnd}
             onChange={(e) => setForm({ ...form, currentPeriodEnd: e.target.value })}
           />
-          <Button type="submit" disabled={createMutation.isPending}>
+          <Button type="submit" loading={createMutation.isPending}>
             Crear
           </Button>
         </form>
-        {createMutation.isError && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
+        {createMutation.isError && (
+          <Alert tone="danger" className="mt-2">
+            {(createMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
 
-      <Card>
-        {isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2">Empresa</th>
-              <th>Plan</th>
-              <th>Estado</th>
-              <th>Vence</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.data.map((s) => (
-              <tr key={s.id} className="border-b border-gray-100">
-                <td className="py-2">{s.companyName}</td>
-                <td>{s.planName}</td>
-                <td>{STATUS_LABELS[s.status]}</td>
-                <td>{s.currentPeriodEnd.slice(0, 10)}</td>
-                <td className="text-right">
-                  {payingId !== s.id && (
-                    <Button variant="secondary" onClick={() => setPayingId(s.id)}>
-                      Registrar pago
-                    </Button>
-                  )}
-                  {payingId === s.id && (
-                    <span className="inline-flex items-center gap-2">
-                      <input
-                        type="number"
-                        className="w-24 rounded border border-gray-200 px-2 py-1"
-                        placeholder="Monto"
-                        value={payForm.amount}
-                        onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
-                      />
-                      <select
-                        className="rounded border border-gray-200 px-2 py-1"
-                        value={payForm.method}
-                        onChange={(e) => setPayForm({ ...payForm, method: e.target.value })}
-                      >
-                        <option value="CASH">Efectivo</option>
-                        <option value="TRANSFER">Transferencia</option>
-                        <option value="CARD">Tarjeta</option>
-                      </select>
-                      <input
-                        className="w-24 rounded border border-gray-200 px-2 py-1"
-                        placeholder="Referencia"
-                        value={payForm.reference}
-                        onChange={(e) => setPayForm({ ...payForm, reference: e.target.value })}
-                      />
-                      <Button onClick={() => payMutation.mutate(s.id)} disabled={!payForm.amount || payMutation.isPending}>
-                        Confirmar
-                      </Button>
-                      <Button variant="secondary" onClick={() => setPayingId(null)}>
-                        Cancelar
-                      </Button>
-                    </span>
-                  )}
-                </td>
+      <Card noPadding>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>Empresa</Th>
+                <Th>Plan</Th>
+                <Th>Estado</Th>
+                <Th>Vence</Th>
+                <Th></Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </TableHead>
+            <TableBody>
+              {data?.data.map((s) => (
+                <TableRow key={s.id}>
+                  <Td>{s.companyName}</Td>
+                  <Td>{s.planName}</Td>
+                  <Td>{STATUS_LABELS[s.status]}</Td>
+                  <Td>{s.currentPeriodEnd.slice(0, 10)}</Td>
+                  <Td className="text-right">
+                    {payingId !== s.id && (
+                      <Button size="sm" variant="secondary" onClick={() => setPayingId(s.id)}>
+                        Registrar pago
+                      </Button>
+                    )}
+                    {payingId === s.id && (
+                      <span className="inline-flex items-center gap-2">
+                        <Input
+                          type="number"
+                          className="w-24"
+                          placeholder="Monto"
+                          value={payForm.amount}
+                          onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
+                        />
+                        <Select value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })}>
+                          <option value="CASH">Efectivo</option>
+                          <option value="TRANSFER">Transferencia</option>
+                          <option value="CARD">Tarjeta</option>
+                        </Select>
+                        <Input
+                          className="w-24"
+                          placeholder="Referencia"
+                          value={payForm.reference}
+                          onChange={(e) => setPayForm({ ...payForm, reference: e.target.value })}
+                        />
+                        <Button size="sm" disabled={!payForm.amount} loading={payMutation.isPending} onClick={() => payMutation.mutate(s.id)}>
+                          Confirmar
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setPayingId(null)}>
+                          Cancelar
+                        </Button>
+                      </span>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </PlatformAdminLayout>
   );
