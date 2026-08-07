@@ -10,3 +10,4 @@ stockRouter.post("/stock/entries", requirePermission("stock.entry.create"), stoc
 stockRouter.post("/stock/adjustments", requirePermission("stock.adjust"), stockController.adjust);
 stockRouter.post("/stock/transfers", requirePermission("stock.transfer"), stockController.transfer);
 stockRouter.get("/kardex", requirePermission("product.read"), stockController.listKardex);
+stockRouter.get("/stock/branch-stock", requirePermission("product.read"), stockController.listBranchStock);

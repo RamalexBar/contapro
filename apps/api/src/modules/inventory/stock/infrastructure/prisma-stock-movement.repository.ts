@@ -124,6 +124,16 @@ export class PrismaStockMovementRepository implements IStockRepository {
     return { quantity: Number(stock.quantity), minStock: Number(stock.minStock), maxStock: Number(stock.maxStock) };
   }
 
+  async listBranchStock(branchId: string) {
+    const rows = await prisma.productBranchStock.findMany({ where: { branchId } });
+    return rows.map((row) => ({
+      productId: row.productId,
+      quantity: Number(row.quantity),
+      minStock: Number(row.minStock),
+      maxStock: Number(row.maxStock),
+    }));
+  }
+
   async receiveGoods(items: ReceiveGoodsItem[], referenceType: string, referenceId: string, userId: string): Promise<StockMovementRecord[]> {
     const companyId = getTenantContext().companyId;
 

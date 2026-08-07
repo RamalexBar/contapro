@@ -6,6 +6,7 @@ import { RegisterStockEntryUseCase } from "./application/use-cases/register-stoc
 import { AdjustStockUseCase } from "./application/use-cases/adjust-stock.use-case";
 import { TransferStockUseCase } from "./application/use-cases/transfer-stock.use-case";
 import { ListKardexUseCase } from "./application/use-cases/list-kardex.use-case";
+import { ListBranchStockUseCase } from "./application/use-cases/list-branch-stock.use-case";
 import { StockController } from "./interfaces/stock.controller";
 
 const repo = new PrismaStockMovementRepository();
@@ -20,5 +21,6 @@ export const stockController = new StockController(
   new RegisterStockEntryUseCase(repo, auditService),
   new AdjustStockUseCase(repo, auditService),
   new TransferStockUseCase(repo, auditService),
-  new ListKardexUseCase(kardexRepo)
+  new ListKardexUseCase(kardexRepo),
+  new ListBranchStockUseCase(repo)
 );

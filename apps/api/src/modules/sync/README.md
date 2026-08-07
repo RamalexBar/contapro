@@ -1,8 +1,10 @@
 # Modulo: Sincronizacion Offline
 
-Estado: **motor real implementado para ventas (patron outbox), iteracion 18.** El resto de
-entidades mencionadas en el modelo original (`CashMovement`, `StockMovement`) siguen sin
-soporte -- ver "Que falta implementar".
+Estado: **motor real implementado para ventas (patron outbox), iteracion 18.** Extendido a
+movimientos de caja (`CashMovement`) en la iteracion 42 (item 42 de docs/ALCANCE.md, app movil
+completa) -- ver "Registro por entityType" mas abajo. `StockMovement` sigue sin soporte de
+escritura offline: la pantalla Inventario del movil es de solo lectura (ver
+`GET /stock/branch-stock`, modulo `inventory/stock`), no pasa por este modulo.
 
 ## Modelos (`packages/database/prisma/schema/sync.prisma`)
 
@@ -58,6 +60,27 @@ soporte -- ver "Que falta implementar".
    hacen exactamente lo mismo que `POST /sales`/`GET /products`, solo en lote desde el cliente
    móvil.
 
+## Registro por entityType (iteración 42)
+
+`PushSyncEventsUseCase` dejó de estar hardcodeado a `SALE` — internamente arma un registro
+`entityType -> {requiredPermission, apply}` (`SALE`/`CASH_MOVEMENT` hoy, agregar uno nuevo es una
+entrada más en ese registro, reusando su caso de uso REST equivalente, mismo criterio que ya se
+usó con `Sale`). **Hallazgo real corregido en esta extensión**: `POST /sync/push` se gatea con UN
+solo permiso a nivel de ruta (`sale.create`) para TODO el batch — antes de agregar un segundo tipo
+esto no importaba, pero con `CASH_MOVEMENT` un usuario con `sale.create` sin `cash.movement.create`
+habría podido empujar movimientos de caja por sync sin que `RegisterCashMovementUseCase` lo note
+(no valida permisos internamente, confía en el middleware de la ruta REST, que el sync bypassea).
+Se corrigió agregando `requiredPermission` por entrada del registro, chequeado contra
+`getTenantContext().permissions` antes de aplicar cada evento — un evento sin el permiso requerido
+devuelve `ERROR` sin tocar el caso de uso, sin bloquear los demás eventos del mismo batch.
+
+`CASH_MOVEMENT` reusa `RegisterCashMovementUseCase` (mismo caso de uso que
+`POST /cash/sessions/:id/movements`), con el payload de sync llevando `cashSessionId` embebido
+(en la ruta REST va en la URL, el endpoint genérico de push no tiene ese path param — ver
+`cashMovementSyncPayloadSchema` en `packages/shared-types/src/cash.ts`). `registerMovement`
+(`ICashSessionRepository`) pasó de devolver `void` a `{id: string}` para poder reportar `entityId`
+en el resultado de sync, igual que `CreateSaleUseCase` con `SaleRecord.id`.
+
 ## Cliente móvil (`apps/mobile/src/lib`)
 
 - `local-db/sqlite.ts`: además de `products_cache`/`sales_outbox` (ya existían como scaffold),
@@ -101,11 +124,11 @@ emulador disponible en este entorno):
 
 ## Que falta implementar
 
-1. **`CashMovement`/`StockMovement` como entidades sincronizables** — el modelo (`SyncOutbox.
-   entityType`) ya lo contempla, pero el scaffold móvil actual (`apps/mobile`) solo tiene pantalla
-   de POS/ventas; no hay UI ni tabla local para movimientos de caja o ajustes de inventario
-   offline todavía. `PushSyncEventsUseCase.SUPPORTED_ENTITY_TYPES` es donde se agregaría cada
-   nuevo tipo, reusando su caso de uso REST equivalente igual que se hizo con `Sale`.
+1. **`StockMovement` como entidad sincronizable** — sigue sin soporte, y no está planeado: el
+   móvil solo puede LEER inventario (`GET /stock/branch-stock`, sin outbox), nunca ajustarlo
+   (CAJERO no tiene `stock.adjust`/`stock.entry.create`/`stock.transfer`), así que no hay nada que
+   encolar desde ese rol. Si en el futuro un rol con esos permisos usa el móvil, el mismo patrón de
+   registro por `entityType` de `PushSyncEventsUseCase` es el punto de extensión.
 2. **NetInfo real** para detección de reconexión en vez del intervalo de 30s — ver aviso arriba.
 3. **Persistencia de sesión en el móvil**: `useAuthStore` sigue siendo solo en memoria (ver su
    propio comentario) — cerrar la app pierde la sesión, lo cual interrumpe el ciclo de sync en la

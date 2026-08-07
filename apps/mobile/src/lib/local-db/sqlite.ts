@@ -37,6 +37,28 @@ export async function initLocalDatabase(): Promise<void> {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS cash_movements_outbox (
+      id TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      synced_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS active_cash_session_cache (
+      cash_register_id TEXT PRIMARY KEY,
+      session_json TEXT,
+      cached_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS stock_cache (
+      product_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      min_stock REAL NOT NULL,
+      max_stock REAL NOT NULL,
+      cached_at TEXT NOT NULL,
+      PRIMARY KEY (product_id, branch_id)
+    );
   `);
 }
 
@@ -130,6 +152,117 @@ export async function upsertCachedProducts(products: PulledProductInput[]): Prom
 export async function listCachedProducts(): Promise<CachedProduct[]> {
   const db = await getDb();
   return db.getAllAsync<CachedProduct>("SELECT * FROM products_cache ORDER BY name ASC");
+}
+
+// ---- cash_movements_outbox (item 42 de docs/ALCANCE.md) ----
+
+export interface OutboxCashMovementRow {
+  id: string;
+  payload: string;
+  status: "PENDING" | "SYNCED" | "ERROR" | "CONFLICT";
+  error_message: string | null;
+  created_at: string;
+  synced_at: string | null;
+}
+
+/** `id` es el clientEventId que se envia al servidor -- ver lib/sync/id.ts. `payload` incluye
+ * cashSessionId (ver cashMovementSyncPayloadSchema en @erp/shared-types). */
+export async function enqueueOfflineCashMovement(id: string, payload: unknown): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    "INSERT INTO cash_movements_outbox (id, payload, status, created_at) VALUES (?, ?, 'PENDING', ?)",
+    id,
+    JSON.stringify(payload),
+    new Date().toISOString()
+  );
+}
+
+export async function listPendingOutboxCashMovements(): Promise<OutboxCashMovementRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<OutboxCashMovementRow>("SELECT * FROM cash_movements_outbox WHERE status = 'PENDING' ORDER BY created_at ASC");
+}
+
+export async function countPendingOutboxCashMovements(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM cash_movements_outbox WHERE status = 'PENDING'");
+  return row?.count ?? 0;
+}
+
+export async function markOutboxCashMovementSynced(id: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync("UPDATE cash_movements_outbox SET status = 'SYNCED', synced_at = ? WHERE id = ?", new Date().toISOString(), id);
+}
+
+export async function markOutboxCashMovementFailed(id: string, status: "ERROR" | "CONFLICT", message: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync("UPDATE cash_movements_outbox SET status = ?, error_message = ? WHERE id = ?", status, message, id);
+}
+
+// ---- active_cash_session_cache (item 42) ----
+
+/** Una fila por cashRegisterId -- guarda la ultima sesion activa conocida (o null si se sabe que
+ * no hay ninguna) para que CashScreen muestre algo aunque este offline. Se limpia al cerrar una
+ * sesion con exito (clearCachedActiveCashSession). */
+export async function cacheActiveCashSession(cashRegisterId: string, session: unknown): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT INTO active_cash_session_cache (cash_register_id, session_json, cached_at) VALUES (?, ?, ?)
+     ON CONFLICT(cash_register_id) DO UPDATE SET session_json = excluded.session_json, cached_at = excluded.cached_at`,
+    cashRegisterId,
+    session === null ? null : JSON.stringify(session),
+    new Date().toISOString()
+  );
+}
+
+export async function getCachedActiveCashSession<T>(cashRegisterId: string): Promise<T | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ session_json: string | null }>(
+    "SELECT session_json FROM active_cash_session_cache WHERE cash_register_id = ?",
+    cashRegisterId
+  );
+  if (!row?.session_json) return null;
+  return JSON.parse(row.session_json) as T;
+}
+
+export async function clearCachedActiveCashSession(cashRegisterId: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync("DELETE FROM active_cash_session_cache WHERE cash_register_id = ?", cashRegisterId);
+}
+
+// ---- stock_cache (item 42) ----
+
+export interface CachedStock {
+  product_id: string;
+  branch_id: string;
+  quantity: number;
+  min_stock: number;
+  max_stock: number;
+}
+
+export async function upsertCachedStock(branchId: string, items: Array<{ productId: string; quantity: number; minStock: number; maxStock: number }>): Promise<void> {
+  const db = await getDb();
+  const now = new Date().toISOString();
+  await db.withTransactionAsync(async () => {
+    for (const item of items) {
+      await db.runAsync(
+        `INSERT INTO stock_cache (product_id, branch_id, quantity, min_stock, max_stock, cached_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(product_id, branch_id) DO UPDATE SET
+           quantity = excluded.quantity, min_stock = excluded.min_stock, max_stock = excluded.max_stock, cached_at = excluded.cached_at`,
+        item.productId,
+        branchId,
+        item.quantity,
+        item.minStock,
+        item.maxStock,
+        now
+      );
+    }
+  });
+}
+
+export async function listCachedStock(branchId: string): Promise<CachedStock[]> {
+  const db = await getDb();
+  return db.getAllAsync<CachedStock>("SELECT * FROM stock_cache WHERE branch_id = ?", branchId);
 }
 
 // ---- sync_meta ----

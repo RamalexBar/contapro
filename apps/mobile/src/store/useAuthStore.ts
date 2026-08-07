@@ -11,6 +11,10 @@ interface AuthState {
   setSession: (accessToken: string, refreshToken: string, user: AuthenticatedUser) => void;
   clearSession: () => void;
   setHasHydrated: (value: boolean) => void;
+  /** Item 42 de docs/ALCANCE.md: mismo patron que apps/web/src/features/auth/hooks/useAuthStore.ts
+   * -- gatea las acciones de Caja/Inventario (no todos los roles que usen el movil en el futuro
+   * tienen por que tener todos los permisos de CAJERO). */
+  hasPermission: (code: string) => boolean;
 }
 
 /**
@@ -21,7 +25,7 @@ interface AuthState {
  */
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       accessToken: null,
       refreshToken: null,
       user: null,
@@ -29,6 +33,7 @@ export const useAuthStore = create<AuthState>()(
       setSession: (accessToken, refreshToken, user) => set({ accessToken, refreshToken, user }),
       clearSession: () => set({ accessToken: null, refreshToken: null, user: null }),
       setHasHydrated: (value) => set({ hasHydrated: value }),
+      hasPermission: (code) => get().user?.permissions.includes(code) ?? false,
     }),
     {
       name: "erp-mobile-auth",

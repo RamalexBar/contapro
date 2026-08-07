@@ -7,7 +7,7 @@ export const pushSyncEventsSchema = z.object({
     .array(
       z.object({
         clientEventId: z.string().min(1),
-        entityType: z.enum(["SALE"]),
+        entityType: z.enum(["SALE", "CASH_MOVEMENT"]),
         payload: z.unknown(),
       })
     )

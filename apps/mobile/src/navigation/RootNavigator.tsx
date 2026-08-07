@@ -2,19 +2,42 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { DashboardScreen } from "../screens/dashboard/DashboardScreen";
 import { POSScreen } from "../screens/pos/POSScreen";
+import { CashScreen } from "../screens/cash/CashScreen";
+import { InventoryScreen } from "../screens/inventory/InventoryScreen";
 import { refreshAccessToken } from "../lib/api-client";
 import { useAuthStore } from "../store/useAuthStore";
 
 export type RootStackParamList = {
   Login: undefined;
+  Main: undefined;
+};
+
+export type MainTabParamList = {
   Dashboard: undefined;
   POS: undefined;
+  Caja: undefined;
+  Inventario: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
+
+/** Item 42 de docs/ALCANCE.md: pasar de 2 a 4 pantallas de primer nivel amerita tabs en vez del
+ * stack plano anterior. Login se queda como pantalla de stack pre-autenticacion. */
+function MainTabs() {
+  return (
+    <Tab.Navigator>
+      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen name="POS" component={POSScreen} options={{ title: "Punto de venta" }} />
+      <Tab.Screen name="Caja" component={CashScreen} />
+      <Tab.Screen name="Inventario" component={InventoryScreen} />
+    </Tab.Navigator>
+  );
+}
 
 /**
  * Mientras el store de auth persistido (AsyncStorage) todavia no termino de leerse en disco, no
@@ -53,10 +76,9 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName={isLoggedIn ? "Dashboard" : "Login"}>
-        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Dashboard" }} />
-        <Stack.Screen name="POS" component={POSScreen} options={{ title: "Punto de venta" }} />
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={isLoggedIn ? "Main" : "Login"}>
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Main" component={MainTabs} />
       </Stack.Navigator>
     </NavigationContainer>
   );

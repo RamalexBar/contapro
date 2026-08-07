@@ -3,14 +3,16 @@ import type { RegisterStockEntryUseCase } from "../application/use-cases/registe
 import type { AdjustStockUseCase } from "../application/use-cases/adjust-stock.use-case";
 import type { TransferStockUseCase } from "../application/use-cases/transfer-stock.use-case";
 import type { ListKardexUseCase } from "../application/use-cases/list-kardex.use-case";
-import { listKardexQuerySchema, stockAdjustSchema, stockEntrySchema, transferStockSchema } from "./stock.validators";
+import type { ListBranchStockUseCase } from "../application/use-cases/list-branch-stock.use-case";
+import { listBranchStockQuerySchema, listKardexQuerySchema, stockAdjustSchema, stockEntrySchema, transferStockSchema } from "./stock.validators";
 
 export class StockController {
   constructor(
     private readonly registerEntryUseCase: RegisterStockEntryUseCase,
     private readonly adjustUseCase: AdjustStockUseCase,
     private readonly transferUseCase: TransferStockUseCase,
-    private readonly listKardexUseCase: ListKardexUseCase
+    private readonly listKardexUseCase: ListKardexUseCase,
+    private readonly listBranchStockUseCase: ListBranchStockUseCase
   ) {}
 
   registerEntry = async (req: Request, res: Response, next: NextFunction) => {
@@ -45,6 +47,15 @@ export class StockController {
     try {
       const query = listKardexQuerySchema.parse(req.query);
       res.json({ data: await this.listKardexUseCase.execute(query) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listBranchStock = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const query = listBranchStockQuerySchema.parse(req.query);
+      res.json({ data: await this.listBranchStockUseCase.execute(query.branchId) });
     } catch (err) {
       next(err);
     }

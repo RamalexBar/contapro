@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CreateSaleInput } from "@erp/shared-types";
+import { tenantStorage } from "../../../../shared/context/request-context";
 import type { SaleRecord } from "../../../pos/sale/domain/sale.repository";
 import type {
   CreateOutboxPendingData,
@@ -9,7 +10,7 @@ import type {
   SyncOutboxStatus,
   UpsertDeviceData,
 } from "../../domain/sync.repository";
-import { ISaleCreator, PushSyncEventsUseCase } from "./push-sync-events.use-case";
+import { ICashMovementCreator, ISaleCreator, PushSyncEventsUseCase } from "./push-sync-events.use-case";
 
 function makeSalePayload(overrides: Partial<CreateSaleInput> = {}): CreateSaleInput {
   return {
@@ -119,19 +120,41 @@ class FakeSaleCreator implements ISaleCreator {
   }
 }
 
+class FakeCashMovementCreator implements ICashMovementCreator {
+  calls: Array<{ cashSessionId: string; input: { type: string; amount: number; concept: string } }> = [];
+  shouldFail = false;
+
+  async execute(cashSessionId: string, input: { type: string; amount: number; concept: string }): Promise<{ id: string }> {
+    this.calls.push({ cashSessionId, input });
+    if (this.shouldFail) throw new Error("La caja ya esta cerrada");
+    return { id: `movement-${this.calls.length}` };
+  }
+}
+
+const ALL_PERMISSIONS = new Set(["sale.create", "cash.movement.create"]);
+
+function withTenantContext<T>(permissions: Set<string>, fn: () => Promise<T>): Promise<T> {
+  return tenantStorage.run(
+    { companyId: "company-1", branchId: null, userId: "user-1", roles: [], permissions },
+    fn
+  );
+}
+
 describe("PushSyncEventsUseCase", () => {
   it("creates the sale and marks the outbox event SYNCED", async () => {
     const syncRepo = new FakeSyncRepository();
     const saleCreator = new FakeSaleCreator();
-    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator);
+    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator, new FakeCashMovementCreator());
 
-    const results = await useCase.execute({
-      deviceIdentifier: "device-1",
-      platform: "ANDROID",
-      branchId: "branch-1",
-      userId: "user-1",
-      events: [{ clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload() }],
-    });
+    const results = await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [{ clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload() }],
+      })
+    );
 
     expect(results).toEqual([{ clientEventId: "evt-1", status: "SYNCED", entityId: "sale-1" }]);
     expect(saleCreator.calls).toHaveLength(1);
@@ -142,17 +165,21 @@ describe("PushSyncEventsUseCase", () => {
   it("does not recreate the sale when the same clientEventId is pushed again", async () => {
     const syncRepo = new FakeSyncRepository();
     const saleCreator = new FakeSaleCreator();
-    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator);
+    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator, new FakeCashMovementCreator());
     const event = { clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload() };
 
-    await useCase.execute({ deviceIdentifier: "device-1", platform: "ANDROID", branchId: "branch-1", userId: "user-1", events: [event] });
-    const secondRun = await useCase.execute({
-      deviceIdentifier: "device-1",
-      platform: "ANDROID",
-      branchId: "branch-1",
-      userId: "user-1",
-      events: [event],
-    });
+    await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({ deviceIdentifier: "device-1", platform: "ANDROID", branchId: "branch-1", userId: "user-1", events: [event] })
+    );
+    const secondRun = await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [event],
+      })
+    );
 
     expect(saleCreator.calls).toHaveLength(1);
     expect(secondRun).toEqual([{ clientEventId: "evt-1", status: "SYNCED", entityId: "sale-1" }]);
@@ -161,7 +188,7 @@ describe("PushSyncEventsUseCase", () => {
   it("treats a retry as idempotent even if the stored payload's key order differs (Postgres JSONB does not preserve it)", async () => {
     const syncRepo = new FakeSyncRepository();
     const saleCreator = new FakeSaleCreator();
-    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator);
+    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator, new FakeCashMovementCreator());
     const original = makeSalePayload();
     // Mismo contenido, orden de claves distinto -- simula lo que Postgres JSONB devuelve al
     // releer el payload guardado (ver stableStringify en el caso de uso).
@@ -174,20 +201,24 @@ describe("PushSyncEventsUseCase", () => {
       exchangeRate: original.exchangeRate,
     };
 
-    await useCase.execute({
-      deviceIdentifier: "device-1",
-      platform: "ANDROID",
-      branchId: "branch-1",
-      userId: "user-1",
-      events: [{ clientEventId: "evt-1", entityType: "SALE", payload: original }],
-    });
-    const secondRun = await useCase.execute({
-      deviceIdentifier: "device-1",
-      platform: "ANDROID",
-      branchId: "branch-1",
-      userId: "user-1",
-      events: [{ clientEventId: "evt-1", entityType: "SALE", payload: reordered }],
-    });
+    await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [{ clientEventId: "evt-1", entityType: "SALE", payload: original }],
+      })
+    );
+    const secondRun = await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [{ clientEventId: "evt-1", entityType: "SALE", payload: reordered }],
+      })
+    );
 
     expect(saleCreator.calls).toHaveLength(1);
     expect(secondRun[0].status).toBe("SYNCED");
@@ -196,22 +227,26 @@ describe("PushSyncEventsUseCase", () => {
   it("flags a conflict when the same clientEventId arrives with a different payload", async () => {
     const syncRepo = new FakeSyncRepository();
     const saleCreator = new FakeSaleCreator();
-    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator);
+    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator, new FakeCashMovementCreator());
 
-    await useCase.execute({
-      deviceIdentifier: "device-1",
-      platform: "ANDROID",
-      branchId: "branch-1",
-      userId: "user-1",
-      events: [{ clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload({ items: [{ productId: "22222222-2222-2222-2222-222222222222", quantity: 2, discountPercent: 0 }] }) }],
-    });
-    const results = await useCase.execute({
-      deviceIdentifier: "device-1",
-      platform: "ANDROID",
-      branchId: "branch-1",
-      userId: "user-1",
-      events: [{ clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload({ items: [{ productId: "22222222-2222-2222-2222-222222222222", quantity: 99, discountPercent: 0 }] }) }],
-    });
+    await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [{ clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload({ items: [{ productId: "22222222-2222-2222-2222-222222222222", quantity: 2, discountPercent: 0 }] }) }],
+      })
+    );
+    const results = await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [{ clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload({ items: [{ productId: "22222222-2222-2222-2222-222222222222", quantity: 99, discountPercent: 0 }] }) }],
+      })
+    );
 
     expect(results[0].status).toBe("CONFLICT");
     expect(saleCreator.calls).toHaveLength(1);
@@ -222,15 +257,17 @@ describe("PushSyncEventsUseCase", () => {
     const syncRepo = new FakeSyncRepository();
     const saleCreator = new FakeSaleCreator();
     saleCreator.shouldFail = true;
-    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator);
+    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator, new FakeCashMovementCreator());
 
-    const results = await useCase.execute({
-      deviceIdentifier: "device-1",
-      platform: "ANDROID",
-      branchId: "branch-1",
-      userId: "user-1",
-      events: [{ clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload() }],
-    });
+    const results = await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [{ clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload() }],
+      })
+    );
 
     expect(results[0]).toMatchObject({ clientEventId: "evt-1", status: "ERROR", error: "stock insuficiente" });
     expect(syncRepo.outbox.get("evt-1")?.status).toBe("ERROR");
@@ -240,29 +277,90 @@ describe("PushSyncEventsUseCase", () => {
     const syncRepo = new FakeSyncRepository();
     const saleCreator = new FakeSaleCreator();
     saleCreator.shouldFail = true;
-    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator);
+    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator, new FakeCashMovementCreator());
     const event = { clientEventId: "evt-1", entityType: "SALE", payload: makeSalePayload() };
 
-    await useCase.execute({ deviceIdentifier: "device-1", platform: "ANDROID", branchId: "branch-1", userId: "user-1", events: [event] });
-    await useCase.execute({ deviceIdentifier: "device-1", platform: "ANDROID", branchId: "branch-1", userId: "user-1", events: [event] });
+    await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({ deviceIdentifier: "device-1", platform: "ANDROID", branchId: "branch-1", userId: "user-1", events: [event] })
+    );
+    await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({ deviceIdentifier: "device-1", platform: "ANDROID", branchId: "branch-1", userId: "user-1", events: [event] })
+    );
 
     expect(saleCreator.calls).toHaveLength(1);
   });
 
-  it("rejects unsupported entity types without touching the sale creator", async () => {
+  it("rejects unsupported entity types without touching either creator", async () => {
     const syncRepo = new FakeSyncRepository();
     const saleCreator = new FakeSaleCreator();
-    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator);
+    const cashMovementCreator = new FakeCashMovementCreator();
+    const useCase = new PushSyncEventsUseCase(syncRepo, saleCreator, cashMovementCreator);
 
-    const results = await useCase.execute({
-      deviceIdentifier: "device-1",
-      platform: "ANDROID",
-      branchId: "branch-1",
-      userId: "user-1",
-      events: [{ clientEventId: "evt-1", entityType: "CASH_MOVEMENT", payload: {} }],
-    });
+    const results = await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [{ clientEventId: "evt-1", entityType: "STOCK_MOVEMENT", payload: {} }],
+      })
+    );
 
     expect(results[0].status).toBe("ERROR");
     expect(saleCreator.calls).toHaveLength(0);
+    expect(cashMovementCreator.calls).toHaveLength(0);
+  });
+
+  it("registers a cash movement and marks the outbox event SYNCED", async () => {
+    const syncRepo = new FakeSyncRepository();
+    const cashMovementCreator = new FakeCashMovementCreator();
+    const useCase = new PushSyncEventsUseCase(syncRepo, new FakeSaleCreator(), cashMovementCreator);
+
+    const results = await withTenantContext(ALL_PERMISSIONS, () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [
+          {
+            clientEventId: "evt-1",
+            entityType: "CASH_MOVEMENT",
+            payload: { cashSessionId: "33333333-3333-3333-3333-333333333333", type: "INCOME", amount: 5000, concept: "Venta al menudeo" },
+          },
+        ],
+      })
+    );
+
+    expect(results).toEqual([{ clientEventId: "evt-1", status: "SYNCED", entityId: "movement-1" }]);
+    expect(cashMovementCreator.calls).toEqual([
+      { cashSessionId: "33333333-3333-3333-3333-333333333333", input: { cashSessionId: "33333333-3333-3333-3333-333333333333", type: "INCOME", amount: 5000, concept: "Venta al menudeo" } },
+    ]);
+  });
+
+  it("rejects a CASH_MOVEMENT event when the user lacks cash.movement.create, without touching the creator", async () => {
+    const syncRepo = new FakeSyncRepository();
+    const cashMovementCreator = new FakeCashMovementCreator();
+    const useCase = new PushSyncEventsUseCase(syncRepo, new FakeSaleCreator(), cashMovementCreator);
+
+    const results = await withTenantContext(new Set(["sale.create"]), () =>
+      useCase.execute({
+        deviceIdentifier: "device-1",
+        platform: "ANDROID",
+        branchId: "branch-1",
+        userId: "user-1",
+        events: [
+          {
+            clientEventId: "evt-1",
+            entityType: "CASH_MOVEMENT",
+            payload: { cashSessionId: "33333333-3333-3333-3333-333333333333", type: "INCOME", amount: 5000, concept: "Venta al menudeo" },
+          },
+        ],
+      })
+    );
+
+    expect(results[0].status).toBe("ERROR");
+    expect(results[0].error).toContain("cash.movement.create");
+    expect(cashMovementCreator.calls).toHaveLength(0);
   });
 });

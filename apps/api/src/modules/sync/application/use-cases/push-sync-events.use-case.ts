@@ -1,4 +1,5 @@
-import { createSaleSchema, type CreateSaleInput } from "@erp/shared-types";
+import { cashMovementSyncPayloadSchema, createSaleSchema, type CreateSaleInput, type PermissionCode } from "@erp/shared-types";
+import { getTenantContext } from "../../../../shared/context/request-context";
 import type { SaleRecord } from "../../../pos/sale/domain/sale.repository";
 import type { ISyncRepository } from "../../domain/sync.repository";
 
@@ -7,6 +8,12 @@ import type { ISyncRepository } from "../../domain/sync.repository";
  * repositorios del codebase. */
 export interface ISaleCreator {
   execute(input: CreateSaleInput): Promise<SaleRecord>;
+}
+
+/** Recorte de RegisterCashMovementUseCase (mismo caso de uso que
+ * POST /cash/sessions/:id/movements). */
+export interface ICashMovementCreator {
+  execute(cashSessionId: string, input: { type: string; amount: number; concept: string }): Promise<{ id: string }>;
 }
 
 export interface PushSyncEventInput {
@@ -30,7 +37,22 @@ export interface PushSyncEventsInput {
   events: PushSyncEventInput[];
 }
 
-const SUPPORTED_ENTITY_TYPES = new Set(["SALE"]);
+/**
+ * Un handler por entityType soportado (clave del wire, ej. "SALE"). entityTypeInternal es el
+ * valor guardado en SyncOutbox.entityType (mismo criterio que ya usaba "Sale" antes de este
+ * refactor). requiredPermission se chequea ANTES de intentar aplicar el evento: POST /sync/push
+ * se gatea con un solo permiso a nivel de ruta para TODO el batch (sale.create, reusado) -- sin
+ * este chequeo por tipo, un usuario con sale.create pero SIN cash.movement.create podria empujar
+ * movimientos de caja por sync sin que RegisterCashMovementUseCase lo note (no valida permisos
+ * internamente, confia en el middleware de la ruta REST, que el sync bypassea). Hoy no es
+ * explotable (CAJERO tiene ambos permisos), pero es la misma clase de fuga que se ha encontrado y
+ * corregido proactivamente en items anteriores -- se corrige aqui antes de introducirla.
+ */
+interface EntitySyncHandler {
+  entityTypeInternal: string;
+  requiredPermission: PermissionCode;
+  apply(payload: unknown): Promise<{ id: string }>;
+}
 
 /**
  * JSON.stringify normal es sensible al orden de las claves -- Postgres JSONB NO preserva el
@@ -52,15 +74,39 @@ function stableStringify(value: unknown): string {
 
 /**
  * Aplica cada evento encolado offline reusando el MISMO caso de uso que el endpoint REST
- * equivalente (CreateSaleUseCase, ver POST /sales) -- ningun caso de uso nuevo, tal como preve
- * el diseño original del modulo (ver README). Idempotente por clientEventId: reenviar el mismo
- * push (ej. la respuesta anterior se perdio por la red) no vuelve a crear la venta.
+ * equivalente (CreateSaleUseCase para SALE, RegisterCashMovementUseCase para CASH_MOVEMENT) --
+ * ningun caso de uso nuevo, tal como preve el diseño original del modulo (ver README). Idempotente
+ * por clientEventId: reenviar el mismo push (ej. la respuesta anterior se perdio por la red) no
+ * vuelve a aplicar el evento.
  */
 export class PushSyncEventsUseCase {
+  private readonly handlers: Record<string, EntitySyncHandler>;
+
   constructor(
     private readonly syncRepo: ISyncRepository,
-    private readonly createSaleUseCase: ISaleCreator
-  ) {}
+    createSaleUseCase: ISaleCreator,
+    registerCashMovementUseCase: ICashMovementCreator
+  ) {
+    this.handlers = {
+      SALE: {
+        entityTypeInternal: "Sale",
+        requiredPermission: "sale.create",
+        apply: async (payload) => {
+          const parsed = createSaleSchema.parse(payload);
+          const sale = await createSaleUseCase.execute(parsed);
+          return { id: sale.id };
+        },
+      },
+      CASH_MOVEMENT: {
+        entityTypeInternal: "CashMovement",
+        requiredPermission: "cash.movement.create",
+        apply: async (payload) => {
+          const parsed = cashMovementSyncPayloadSchema.parse(payload);
+          return registerCashMovementUseCase.execute(parsed.cashSessionId, parsed);
+        },
+      },
+    };
+  }
 
   async execute(input: PushSyncEventsInput): Promise<PushSyncEventResult[]> {
     await this.syncRepo.upsertDevice({
@@ -86,8 +132,16 @@ export class PushSyncEventsUseCase {
     branchId: string,
     deviceIdentifier: string
   ): Promise<PushSyncEventResult> {
-    if (!SUPPORTED_ENTITY_TYPES.has(event.entityType)) {
+    const handler = this.handlers[event.entityType];
+    if (!handler) {
       return { clientEventId: event.clientEventId, status: "ERROR", error: `Tipo de entidad no soportado: ${event.entityType}` };
+    }
+    if (!getTenantContext().permissions.has(handler.requiredPermission)) {
+      return {
+        clientEventId: event.clientEventId,
+        status: "ERROR",
+        error: `Requiere el permiso: ${handler.requiredPermission}`,
+      };
     }
 
     const existing = await this.syncRepo.findOutboxByClientEventId(event.clientEventId);
@@ -106,34 +160,31 @@ export class PushSyncEventsUseCase {
         return { clientEventId: event.clientEventId, status: "SYNCED", entityId: existing.entityId ?? undefined };
       }
       if (existing.status === "ERROR") {
-        // No se reintenta automaticamente: si la venta original ya alcanzo a crearse antes de
-        // que fallara un paso posterior (ver limitacion conocida de CreateSaleUseCase, la
-        // contabilizacion no esta en la misma transaccion), reintentar podria duplicarla.
-        // Queda para revision manual.
+        // No se reintenta automaticamente: si la entidad original ya alcanzo a crearse antes de
+        // que fallara un paso posterior, reintentar podria duplicarla. Queda para revision manual.
         return { clientEventId: event.clientEventId, status: "ERROR", error: existing.errorMessage ?? "Fallo previamente, revisar manualmente" };
       }
       // status === "PENDING": el proceso se interrumpio a mitad de camino (ej. crash del
-      // servidor) sin haber creado la venta todavia -- seguro reintentar.
-      return this.replay(existing.id, event);
+      // servidor) sin haber aplicado el evento todavia -- seguro reintentar.
+      return this.replay(existing.id, event, handler);
     }
 
     const outboxEntry = await this.syncRepo.createOutboxPending({
       clientEventId: event.clientEventId,
       branchId,
-      entityType: "Sale",
+      entityType: handler.entityTypeInternal,
       operation: "CREATE",
       payload: event.payload,
       originDeviceId: deviceIdentifier,
     });
-    return this.replay(outboxEntry.id, event);
+    return this.replay(outboxEntry.id, event, handler);
   }
 
-  private async replay(outboxId: string, event: PushSyncEventInput): Promise<PushSyncEventResult> {
+  private async replay(outboxId: string, event: PushSyncEventInput, handler: EntitySyncHandler): Promise<PushSyncEventResult> {
     try {
-      const parsed = createSaleSchema.parse(event.payload);
-      const sale = await this.createSaleUseCase.execute(parsed);
-      await this.syncRepo.markOutboxSynced(outboxId, sale.id);
-      return { clientEventId: event.clientEventId, status: "SYNCED", entityId: sale.id };
+      const result = await handler.apply(event.payload);
+      await this.syncRepo.markOutboxSynced(outboxId, result.id);
+      return { clientEventId: event.clientEventId, status: "SYNCED", entityId: result.id };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error desconocido";
       await this.syncRepo.markOutboxError(outboxId, message);

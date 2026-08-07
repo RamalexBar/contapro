@@ -15,3 +15,7 @@ export const listKardexQuerySchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
 });
+
+export const listBranchStockQuerySchema = z.object({
+  branchId: z.string().uuid(),
+});

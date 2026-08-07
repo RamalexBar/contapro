@@ -3,9 +3,13 @@ import { apiFetch } from "../api-client";
 import { useAuthStore } from "../../store/useAuthStore";
 import {
   countPendingOutboxSales,
+  countPendingOutboxCashMovements,
   getLastPullSyncedAt,
   getOrCreateDeviceId,
   listPendingOutboxSales,
+  listPendingOutboxCashMovements,
+  markOutboxCashMovementFailed,
+  markOutboxCashMovementSynced,
   markOutboxSaleFailed,
   markOutboxSaleSynced,
   setLastPullSyncedAt,
@@ -85,15 +89,49 @@ export async function pushOutbox(): Promise<void> {
   }
 }
 
-/** Mejor esfuerzo: cada mitad (pull/push) se intenta aunque la otra falle, y ningun fallo se
- * propaga -- se reintenta en el siguiente tick de startBackgroundSync. */
+/**
+ * Sube los movimientos de caja encolados en cash_movements_outbox (item 42 de docs/ALCANCE.md) --
+ * mismo mecanismo exacto que pushOutbox(), solo cambia entityType y la tabla local. Idempotente
+ * del lado del servidor igual que las ventas (ver PushSyncEventsUseCase).
+ */
+export async function pushCashMovementsOutbox(): Promise<void> {
+  const pending = await listPendingOutboxCashMovements();
+  if (pending.length === 0) return;
+
+  const deviceId = await getOrCreateDeviceId();
+  const res = await apiFetch<{ data: PushResult[] }>("/sync/push", {
+    method: "POST",
+    body: {
+      deviceId,
+      platform: platformCode(),
+      events: pending.map((row) => ({
+        clientEventId: row.id,
+        entityType: "CASH_MOVEMENT",
+        payload: JSON.parse(row.payload),
+      })),
+    },
+  });
+
+  for (const result of res.data) {
+    if (result.status === "SYNCED") {
+      await markOutboxCashMovementSynced(result.clientEventId);
+    } else {
+      await markOutboxCashMovementFailed(result.clientEventId, result.status, result.error ?? "Error desconocido");
+    }
+  }
+}
+
+/** Mejor esfuerzo: cada mitad se intenta aunque las demas fallen, y ningun fallo se propaga -- se
+ * reintenta en el siguiente tick de startBackgroundSync. */
 export async function runSync(): Promise<void> {
   await pullProducts().catch((err) => console.warn("[sync] pull fallo:", err));
-  await pushOutbox().catch((err) => console.warn("[sync] push fallo:", err));
+  await pushOutbox().catch((err) => console.warn("[sync] push de ventas fallo:", err));
+  await pushCashMovementsOutbox().catch((err) => console.warn("[sync] push de movimientos de caja fallo:", err));
 }
 
 export async function getPendingSyncCount(): Promise<number> {
-  return countPendingOutboxSales();
+  const [sales, cashMovements] = await Promise.all([countPendingOutboxSales(), countPendingOutboxCashMovements()]);
+  return sales + cashMovements;
 }
 
 /**

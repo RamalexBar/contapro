@@ -7,14 +7,15 @@ import type { ICashSessionRepository } from "../../domain/cash-session.repositor
 export class RegisterCashMovementUseCase {
   constructor(private readonly repo: ICashSessionRepository, private readonly audit: AuditService) {}
 
-  async execute(cashSessionId: string, input: CashMovementInput): Promise<void> {
+  async execute(cashSessionId: string, input: CashMovementInput): Promise<{ id: string }> {
     const userId = getTenantContext().userId;
-    await this.repo.registerMovement(cashSessionId, input.type, input.amount, input.concept, userId);
+    const movement = await this.repo.registerMovement(cashSessionId, input.type, input.amount, input.concept, userId);
     await this.audit.record({
       action: "CASH_MOVEMENT_REGISTERED",
       entityType: "CashSession",
       entityId: cashSessionId,
       description: `${input.type} de ${input.amount}: ${input.concept}`,
     });
+    return movement;
   }
 }

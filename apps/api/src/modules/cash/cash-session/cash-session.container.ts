@@ -11,9 +11,13 @@ import { CashSessionController } from "./interfaces/cash-session.controller";
 const repo = new PrismaCashSessionRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
+/** Usado tambien por sync.container.ts para aplicar movimientos de caja encolados offline desde
+ * el movil (item 42 de docs/ALCANCE.md) -- mismo caso de uso que POST /cash/sessions/:id/movements. */
+export const registerCashMovementUseCase = new RegisterCashMovementUseCase(repo, auditService);
+
 export const cashSessionController = new CashSessionController(
   new OpenCashSessionUseCase(repo, auditService),
   new CloseCashSessionUseCase(repo, postCashSessionAdjustmentJournalEntryUseCase, auditService),
   new GetActiveSessionUseCase(repo),
-  new RegisterCashMovementUseCase(repo, auditService)
+  registerCashMovementUseCase
 );

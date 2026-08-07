@@ -101,12 +101,13 @@ export class PrismaCashSessionRepository implements ICashSessionRepository {
     return toRecord(row);
   }
 
-  async registerMovement(cashSessionId: string, type: string, amount: number, concept: string, userId: string): Promise<void> {
+  async registerMovement(cashSessionId: string, type: string, amount: number, concept: string, userId: string): Promise<{ id: string }> {
     const session = await this.findByIdOrThrow(cashSessionId);
     if (session.status !== "OPEN") throw new ValidationError("No se pueden registrar movimientos en una caja cerrada");
-    await prisma.cashMovement.create({
+    const movement = await prisma.cashMovement.create({
       data: { cashSessionId, type, amount, concept, createdByUserId: userId },
     });
+    return { id: movement.id };
   }
 
   async sumMovements(cashSessionId: string): Promise<number> {

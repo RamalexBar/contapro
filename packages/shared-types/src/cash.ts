@@ -25,3 +25,12 @@ export const cashMovementSchema = z.object({
   concept: z.string().min(1),
 });
 export type CashMovementInput = z.infer<typeof cashMovementSchema>;
+
+/** Item 42 de docs/ALCANCE.md: payload de un movimiento de caja encolado offline en el movil y
+ * empujado via POST /sync/push -- mismos campos que cashMovementSchema mas cashSessionId, que en
+ * la ruta REST (POST /cash/sessions/:id/movements) viaja en la URL, pero el endpoint generico de
+ * sync no tiene ese path param. */
+export const cashMovementSyncPayloadSchema = cashMovementSchema.extend({
+  cashSessionId: z.string().uuid(),
+});
+export type CashMovementSyncPayload = z.infer<typeof cashMovementSyncPayloadSchema>;
