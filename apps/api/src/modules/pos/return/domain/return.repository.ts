@@ -35,6 +35,10 @@ export interface ReturnRecord {
     total: number;
     restockedToBranch: boolean;
   }>;
+  // Costo real de lo que fisicamente volvio a inventario (solo items con restockedToBranch),
+  // calculado por PrismaReturnRepository con el mismo costo ponderado que ya usaba para
+  // reingresar el stock -- ver post-return-journal-entry.
+  costTotal: number;
 }
 
 export interface IReturnRepository {

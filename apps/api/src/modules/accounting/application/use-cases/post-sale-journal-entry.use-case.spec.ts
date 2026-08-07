@@ -256,6 +256,58 @@ describe("PostSaleJournalEntryUseCase", () => {
     expect(lines.find((l) => l.accountId === "acc-135518")).toMatchObject({ debit: 2_850, credit: 0 });
   });
 
+  it("adds the cost-of-goods-sold mirror entry (debit 6135, credit 1435) when costOfGoodsSold is provided", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+
+    await withTenantContext(() =>
+      useCase.execute({
+        saleId: "sale-1",
+        branchId: "branch-1",
+        date: new Date("2026-08-05"),
+        number: 1,
+        subtotal: 100_000,
+        discountTotal: 0,
+        taxTotal: 19_000,
+        total: 119_000,
+        retentionTotal: 0,
+        withholdingsByType: NO_WITHHOLDINGS,
+        payments: [{ method: "CASH", amount: 119_000 }],
+        costOfGoodsSold: 60_000,
+      })
+    );
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-6135")).toMatchObject({ debit: 60_000, credit: 0 });
+    expect(lines.find((l) => l.accountId === "acc-1435")).toMatchObject({ debit: 0, credit: 60_000 });
+    const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
+    const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+    expect(totalDebit).toBe(totalCredit);
+  });
+
+  it("omits the cost-of-goods-sold lines when costOfGoodsSold is not provided (backward compatible)", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+
+    await withTenantContext(() =>
+      useCase.execute({
+        saleId: "sale-1",
+        branchId: "branch-1",
+        date: new Date("2026-08-05"),
+        number: 1,
+        subtotal: 100_000,
+        discountTotal: 0,
+        taxTotal: 19_000,
+        total: 119_000,
+        retentionTotal: 0,
+        withholdingsByType: NO_WITHHOLDINGS,
+        payments: [{ method: "CASH", amount: 119_000 }],
+      })
+    );
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-6135")).toBeUndefined();
+    expect(lines.find((l) => l.accountId === "acc-1435")).toBeUndefined();
+  });
+
   it("still generates receivable (Clientes) on top of a retained credit sale", async () => {
     const { useCase, journalRepo } = makeUseCase();
 

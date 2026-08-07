@@ -199,6 +199,50 @@ describe("PostReturnJournalEntryUseCase", () => {
     expect(bancosLine).toMatchObject({ debit: 0, credit: 119_000 });
   });
 
+  it("adds the cost-of-goods-sold reversal (debit 1435, credit 6135) when costOfGoodsSold is provided", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+
+    await withTenantContext(() =>
+      useCase.execute({
+        returnId: "return-1",
+        branchId: "branch-1",
+        date: new Date("2026-08-02"),
+        subtotal: 100_000,
+        taxTotal: 19_000,
+        total: 119_000,
+        refundMethod: "CASH",
+        costOfGoodsSold: 30_000,
+      })
+    );
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-1435")).toMatchObject({ debit: 30_000, credit: 0 });
+    expect(lines.find((l) => l.accountId === "acc-6135")).toMatchObject({ debit: 0, credit: 30_000 });
+    const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
+    const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+    expect(totalDebit).toBe(totalCredit);
+  });
+
+  it("omits the cost-of-goods-sold lines when costOfGoodsSold is not provided (backward compatible)", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+
+    await withTenantContext(() =>
+      useCase.execute({
+        returnId: "return-1",
+        branchId: "branch-1",
+        date: new Date("2026-08-02"),
+        subtotal: 100_000,
+        taxTotal: 19_000,
+        total: 119_000,
+        refundMethod: "CASH",
+      })
+    );
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-1435")).toBeUndefined();
+    expect(lines.find((l) => l.accountId === "acc-6135")).toBeUndefined();
+  });
+
   it("credits Clientes when the refund method is CREDIT_TO_ACCOUNT", async () => {
     const { useCase, journalRepo } = makeUseCase();
 

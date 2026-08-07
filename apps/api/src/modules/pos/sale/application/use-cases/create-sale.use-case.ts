@@ -191,6 +191,7 @@ export class CreateSaleUseCase {
         payments: sale.payments,
         currency: sale.currency,
         exchangeRate: sale.exchangeRate,
+        costOfGoodsSold: sale.costTotal,
       });
 
       try {

@@ -147,6 +147,9 @@ class FakeSaleRepository implements Partial<ISaleRepository> {
         discountAuthorizationId: null,
       })),
       payments: data.payments.map((p) => ({ method: p.method, amount: p.amount })),
+      // Costo fijo arbitrario por unidad (distinto del costo real de PRODUCT, 3000) para que un
+      // test pueda distinguir "el numero que llego" de cualquier otro monto de la venta.
+      costTotal: data.items.reduce((sum, item) => sum + item.quantity * 1000, 0),
     };
   }
 }
@@ -279,6 +282,19 @@ describe("CreateSaleUseCase — retenciones", () => {
         })
       )
     ).rejects.toThrow(/no puede superar el subtotal/);
+  });
+});
+
+describe("CreateSaleUseCase — costo de venta", () => {
+  it("pasa el costTotal que devuelve el repositorio como costOfGoodsSold al comprobante contable", async () => {
+    const { useCase, postSaleJournalEntry } = makeUseCase();
+
+    await withTenantContext(() =>
+      useCase.execute({ ...BASE_INPUT, payments: [{ method: "CASH", amount: 11_900 }], withholdings: [] })
+    );
+
+    // BASE_INPUT vende 2 unidades -> FakeSaleRepository.create() calcula costTotal = 2 * 1000.
+    expect(postSaleJournalEntry.execute).toHaveBeenCalledWith(expect.objectContaining({ costOfGoodsSold: 2000 }));
   });
 });
 

@@ -5,7 +5,7 @@ import { NotFoundError } from "../../../../shared/errors/app-error";
 import type { CreateSaleData, ISaleRepository, SaleRecord } from "../domain/sale.repository";
 import { recordKardexEntry } from "../../../inventory/stock/infrastructure/kardex-writer";
 
-function toRecord(row: any): SaleRecord {
+function toRecord(row: any, costTotal = 0): SaleRecord {
   return {
     id: row.id,
     companyId: row.companyId,
@@ -49,6 +49,7 @@ function toRecord(row: any): SaleRecord {
       discountAuthorizationId: item.discountAuthorizationId,
     })),
     payments: row.payments.map((p: any) => ({ method: p.method, amount: Number(p.amount) })),
+    costTotal,
   };
 }
 
@@ -62,6 +63,7 @@ const SALE_INCLUDE = {
 export class PrismaSaleRepository implements ISaleRepository {
   async create(data: CreateSaleData): Promise<SaleRecord> {
     const companyId = getTenantContext().companyId;
+    let costTotal = 0;
 
     const row = await prisma.$transaction(async (tx) => {
       // NOTA: consecutivo simple por conteo. Para alta concurrencia real se recomienda una
@@ -115,7 +117,7 @@ export class PrismaSaleRepository implements ISaleRepository {
       });
 
       if (data.status === "COMPLETED") {
-        await this.applyCompletionSideEffects(tx, sale.id, data.branchId, data.cashSessionId, sale.items, sale.total, sale.sellerUserId);
+        costTotal = await this.applyCompletionSideEffects(tx, sale.id, data.branchId, data.cashSessionId, sale.items, sale.total, sale.sellerUserId);
       }
 
       // AccountReceivable (item 31, modulo `collections`) dentro de la MISMA transaccion que la
@@ -139,7 +141,7 @@ export class PrismaSaleRepository implements ISaleRepository {
       return sale;
     });
 
-    return toRecord(row);
+    return toRecord(row, costTotal);
   }
 
   async findByIdOrThrow(id: string): Promise<SaleRecord> {
@@ -149,6 +151,7 @@ export class PrismaSaleRepository implements ISaleRepository {
   }
 
   async authorizeItemDiscount(saleId: string, saleItemId: string, discountAuthorizationId: string): Promise<SaleRecord> {
+    let costTotal = 0;
     const row = await prisma.$transaction(async (tx) => {
       // Sale esta en TENANT_MODELS (auto-scoped por findFirst) -- se valida ANTES de tocar el
       // SaleItem, y se confirma que saleItemId realmente pertenece a esta venta. SaleItem no
@@ -171,7 +174,7 @@ export class PrismaSaleRepository implements ISaleRepository {
       const stillPending = updatedSale.items.some((item) => item.requiresDiscountAuthorization);
       if (!stillPending && updatedSale.status === "PENDING_AUTHORIZATION") {
         await tx.sale.update({ where: { id: saleId }, data: { status: "COMPLETED" } });
-        await this.applyCompletionSideEffects(
+        costTotal = await this.applyCompletionSideEffects(
           tx,
           updatedSale.id,
           updatedSale.branchId,
@@ -184,7 +187,7 @@ export class PrismaSaleRepository implements ISaleRepository {
       }
       return updatedSale;
     });
-    return toRecord(row);
+    return toRecord(row, costTotal);
   }
 
   async cancel(id: string, reason: string): Promise<SaleRecord> {
@@ -233,7 +236,14 @@ export class PrismaSaleRepository implements ISaleRepository {
   /**
    * Efectos que solo deben ocurrir cuando una venta queda COMPLETED (de entrada, o al
    * autorizarse el ultimo descuento pendiente): descontar stock por sucursal, registrar
-   * StockMovement SALE_OUT y, si hay caja activa, un CashMovement de tipo SALE_IN.
+   * StockMovement SALE_OUT y, si hay caja activa, un CashMovement de tipo SALE_IN. Devuelve el
+   * costo real total de lo vendido (para el asiento de costo de venta, ver
+   * post-sale-journal-entry.use-case.ts) -- bajo FIFO, la suma de los lotes realmente
+   * consumidos (`segment.unitCost`, el mismo costo real que ya guarda StockMovement para FIFO);
+   * sin FIFO, `Product.currentCost` al momento de la venta, NO `item.unitPrice` (StockMovement si
+   * usa el precio de venta como unitCost para AVERAGE/LAST, limitacion preexistente documentada
+   * en el modulo de proveedores -- no se reutiliza ese valor aqui para no heredar el mismo error
+   * en la contabilidad).
    */
   private async applyCompletionSideEffects(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -244,8 +254,9 @@ export class PrismaSaleRepository implements ISaleRepository {
     items: Array<{ productId: string; quantity: unknown; unitPrice: unknown }>,
     total: unknown,
     sellerUserId: string
-  ): Promise<void> {
+  ): Promise<number> {
     const companyId = getTenantContext().companyId;
+    let costTotal = 0;
 
     for (const item of items) {
       const quantity = Number(item.quantity);
@@ -255,15 +266,18 @@ export class PrismaSaleRepository implements ISaleRepository {
         select: { costMethod: true, tracksBatches: true, currentCost: true },
       });
       const useFifo = product?.costMethod === "FIFO" && product?.tracksBatches;
+      const averageCost = Number(product?.currentCost ?? 0);
 
       // Bajo FIFO se genera una linea de StockMovement (y su Kardex) POR LOTE realmente
       // consumido, no una sola linea agregada por item -- para trazabilidad fina (que lote
       // exacto salio en esta venta). Sin FIFO/tracksBatches, un solo segmento igual que antes.
       const segments = useFifo
-        ? await this.consumeFifoBatches(tx, item.productId, branchId, quantity, Number(product.currentCost))
+        ? await this.consumeFifoBatches(tx, item.productId, branchId, quantity, averageCost)
         : [{ batchId: null, quantity, unitCost: Number(item.unitPrice) }];
 
       for (const segment of segments) {
+        costTotal += segment.quantity * (useFifo ? segment.unitCost : averageCost);
+
         await tx.productBranchStock.updateMany({
           where: { productId: item.productId, branchId },
           data: { quantity: { decrement: segment.quantity } },
@@ -299,6 +313,8 @@ export class PrismaSaleRepository implements ISaleRepository {
         },
       });
     }
+
+    return round2(costTotal);
   }
 
   /**

@@ -23,6 +23,11 @@ const STANDARD_ACCOUNTS = {
   anticipoRetefuente: { code: "135515", name: "Anticipo de impuestos - Retencion en la fuente", type: "ASSET" as const },
   anticipoReteica: { code: "135517", name: "Anticipo de impuestos - Retencion de ICA", type: "ASSET" as const },
   anticipoReteiva: { code: "135518", name: "Anticipo de impuestos - Retencion de IVA", type: "ASSET" as const },
+  // Mismo par de cuentas que PostPurchaseJournalEntryUseCase usa para el lado del debito al
+  // comprar (1435) -- resueltas por codigo via upsertByCode, asi que apuntan a la misma fila sin
+  // importar cual de los dos casos de uso la crea primero.
+  costoVenta: { code: "6135", name: "Costo de ventas", type: "EXPENSE" as const },
+  inventario: { code: "1435", name: "Inventarios - mercancias no fabricadas por la empresa", type: "ASSET" as const },
 };
 
 const WITHHOLDING_ACCOUNT_KEY: Record<WithholdingType, "anticipoRetefuente" | "anticipoReteica" | "anticipoReteiva"> = {
@@ -48,6 +53,10 @@ export interface SaleJournalEntryInput {
   // debito/credito de este comprobante SIEMPRE son en COP, sin importar estos dos campos.
   currency?: string;
   exchangeRate?: number;
+  // Costo real de lo vendido (FIFO: suma de los lotes realmente consumidos; promedio/ultimo: al
+  // costo del producto al momento de la venta) -- opcional para no romper callers/fixtures
+  // existentes; sin el, el comprobante sigue contabilizando solo el ingreso, igual que antes.
+  costOfGoodsSold?: number;
 }
 
 /**
@@ -58,6 +67,11 @@ export interface SaleJournalEntryInput {
  * factura -- lo que cambia con retencion es como se reparte ese debito entre caja/bancos/clientes
  * (neto de lo retenido, `netTotal`) y las 3 cuentas de anticipo. Las cuentas estandar se crean
  * solas la primera vez que se usan (upsertByCode), igual que en PostPayrollJournalEntryUseCase.
+ *
+ * Si `costOfGoodsSold` viene con un valor, agrega ademas el asiento espejo del costo: debito
+ * "Costo de ventas" (6135), credito "Inventarios" (1435) -- mismo par de cuentas que
+ * PostPurchaseJournalEntryUseCase debita al comprar. Sin este campo (fixtures/callers viejos), el
+ * comprobante queda identico a como era antes de que existiera este campo.
  */
 export class PostSaleJournalEntryUseCase {
   constructor(
@@ -114,6 +128,8 @@ export class PostSaleJournalEntryUseCase {
         ...withholdingLines,
         { accountId: accounts.ingresosPorVentas.id, debit: 0, credit: taxableBase, description: "Ingreso por ventas" },
         { accountId: accounts.ivaPorPagar.id, debit: 0, credit: input.taxTotal, description: "IVA generado" },
+        { accountId: accounts.costoVenta.id, debit: round2(input.costOfGoodsSold ?? 0), credit: 0, description: "Costo de venta" },
+        { accountId: accounts.inventario.id, debit: 0, credit: round2(input.costOfGoodsSold ?? 0), description: "Salida de inventario" },
       ].filter((line) => line.debit > 0 || line.credit > 0),
     });
 

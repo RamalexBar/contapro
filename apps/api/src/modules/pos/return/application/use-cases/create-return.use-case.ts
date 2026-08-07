@@ -109,6 +109,7 @@ export class CreateReturnUseCase {
       taxTotal,
       total,
       refundMethod: input.refundMethod,
+      costOfGoodsSold: created.costTotal,
     });
 
     return created;

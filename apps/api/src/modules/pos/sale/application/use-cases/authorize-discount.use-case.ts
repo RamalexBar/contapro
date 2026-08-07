@@ -89,6 +89,7 @@ export class AuthorizeDiscountUseCase {
         payments: updatedSale.payments,
         currency: updatedSale.currency,
         exchangeRate: updatedSale.exchangeRate,
+        costOfGoodsSold: updatedSale.costTotal,
       });
 
       // AccountReceivable (item 31): esta venta no la creo al momento de CreateSaleUseCase

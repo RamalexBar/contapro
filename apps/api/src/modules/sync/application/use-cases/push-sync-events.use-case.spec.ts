@@ -51,6 +51,7 @@ function makeSaleRecord(id: string): SaleRecord {
     withholdings: [],
     items: [],
     payments: [],
+    costTotal: 0,
   };
 }
 

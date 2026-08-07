@@ -49,6 +49,7 @@ const SALE: SaleRecord = {
     },
   ],
   payments: [{ method: "CASH", amount: 238_000 }],
+  costTotal: 120_000,
 };
 
 class FakeSaleRepository implements ISaleRepository {
@@ -91,6 +92,9 @@ class FakeReturnRepository implements IReturnRepository {
       total: data.total,
       createdAt: new Date("2026-08-02T00:00:00.000Z"),
       items: data.items.map((item, i) => ({ id: `return-item-${i}`, ...item })),
+      // Costo fijo arbitrario por unidad restockeada (60_000, la mitad del unitPrice de SALE) --
+      // distinto de cualquier otro monto para que un test pueda distinguirlo.
+      costTotal: data.items.filter((i) => i.restockedToBranch).reduce((sum, i) => sum + i.quantity * 60_000, 0),
     };
   }
   list(): Promise<ReturnRecord[]> {
@@ -207,7 +211,7 @@ describe("CreateReturnUseCase", () => {
 
     expect(auditRepo.entries).toEqual([expect.objectContaining({ action: "RETURN_CREATED" })]);
     expect(postReturnJournalEntry.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ subtotal: 100_000, taxTotal: 19_000, total: 119_000, refundMethod: "CASH" })
+      expect.objectContaining({ subtotal: 100_000, taxTotal: 19_000, total: 119_000, refundMethod: "CASH", costOfGoodsSold: 60_000 })
     );
     expect(result.id).toBe("return-1");
   });

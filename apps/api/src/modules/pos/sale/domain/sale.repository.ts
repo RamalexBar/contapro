@@ -99,6 +99,13 @@ export interface SaleRecord {
     discountAuthorizationId: string | null;
   }>;
   payments: Array<{ method: string; amount: number }>;
+  // Costo real de lo vendido (FIFO: suma de los lotes realmente consumidos; promedio/ultimo: al
+  // costo del producto al momento de la venta), calculado por PrismaSaleRepository al completar
+  // la venta -- ver applyCompletionSideEffects. Queda en 0 cuando la venta todavia no se
+  // completo (PENDING_AUTHORIZATION) o para metodos del repositorio que no lo recalculan
+  // (findByIdOrThrow/list/etc.), ya que solo lo consumen CreateSaleUseCase/AuthorizeDiscountUseCase
+  // justo al completarse, para contabilizar el costo de venta (ver post-sale-journal-entry).
+  costTotal: number;
 }
 
 export interface ISaleRepository {

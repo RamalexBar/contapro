@@ -135,6 +135,7 @@ function makeSale(overrides: Partial<SaleRecord>): SaleRecord {
     withholdings: [],
     items: [],
     payments: [],
+    costTotal: 0,
     ...overrides,
   };
 }

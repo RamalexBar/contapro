@@ -90,6 +90,7 @@ const FAKE_SALE: SaleRecord = {
   withholdings: [],
   items: [],
   payments: [{ method: "CREDIT", amount: 100_000 }],
+  costTotal: 0,
 };
 
 function withTenantContext<T>(fn: () => Promise<T>): Promise<T> {
