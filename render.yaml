@@ -79,8 +79,12 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      # onboarding@resend.dev: remitente de pruebas de Resend, funciona sin verificar un dominio
+      # propio -- pero Resend en modo sandbox solo entrega a la direccion con la que te registraste
+      # en Resend, no a destinatarios arbitrarios. Cambiar por un remitente en un dominio propio ya
+      # verificado en Resend (ej. no-reply@tudominio.com) para poder enviar a cualquier destinatario.
       - key: RESEND_FROM_EMAIL
-        value: no-reply@contapro.demo
+        value: onboarding@resend.dev
       - key: WOMPI_ENVIRONMENT
         value: production
       - key: WOMPI_PUBLIC_KEY
