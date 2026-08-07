@@ -133,6 +133,13 @@ export class PrismaUserRepository implements IUserRepository {
       await tx.userBranch.create({ data: { userId: admin.id, branchId: branch.id, isDefault: true } });
       await tx.userRole.create({ data: { userId: admin.id, roleId: adminRole.id } });
 
+      // Sin esto ninguna empresa nueva puede abrir caja: no existia ningun flujo (UI ni script)
+      // para crear CashRegister -- la unica que tenia una era la demo, insertada a mano en algun
+      // momento del desarrollo. Mismo criterio que la sucursal principal: se crea una por defecto.
+      await tx.cashRegister.create({
+        data: { companyId: company.id, branchId: branch.id, code: "CAJA1", name: "Caja principal" },
+      });
+
       return { companyId: company.id, branchId: branch.id, adminUserId: admin.id };
     });
   }
