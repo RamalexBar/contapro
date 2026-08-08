@@ -10,7 +10,7 @@ import { Alert } from "../../../components/ui/Alert";
 import { listProducts } from "../../inventory/api/product.api";
 import { getActiveSession, listCashRegisters } from "../../cash/api/cash.api";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
-import { authorizeDiscount, createSale, listSaleWhatsAppDeliveries, resendSaleWhatsApp, type SaleResponse } from "../api/sale.api";
+import { authorizeDiscount, createSale, listSaleWhatsAppDeliveries, printThermalReceipt, resendSaleWhatsApp, type SaleResponse } from "../api/sale.api";
 import { DiscountAuthorizationModal } from "../components/DiscountAuthorizationModal";
 import { listWithholdingConcepts } from "../../accounting/api/accounting.api";
 import { listCustomers } from "../../customers/api/customer.api";
@@ -150,6 +150,10 @@ export function POSPage() {
         setSelectedPriceListId("");
       }
     },
+  });
+
+  const printMutation = useMutation({
+    mutationFn: (saleId: string) => printThermalReceipt(saleId),
   });
 
   const authorizeMutation = useMutation({
@@ -437,6 +441,18 @@ export function POSPage() {
           {sale?.status === "COMPLETED" && (
             <div className="mt-3">
               <Alert tone="success">Venta #{sale.number} completada.</Alert>
+              <div className="mt-2 flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  loading={printMutation.isPending}
+                  onClick={() => printMutation.mutate(sale.id)}
+                >
+                  Imprimir tirilla
+                </Button>
+                {printMutation.isError && (
+                  <span className="text-xs text-danger-600">No se pudo generar la tirilla. Intenta de nuevo.</span>
+                )}
+              </div>
               {sale.customerId && <SaleWhatsAppStatus saleId={sale.id} />}
             </div>
           )}

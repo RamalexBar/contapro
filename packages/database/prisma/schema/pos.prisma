@@ -69,6 +69,25 @@ model Sale {
   @@map("sales")
 }
 
+/**
+ * Consecutivo real por sucursal para Sale.number -- reemplaza el `count()+1` original (que bajo
+ * varios cajeros vendiendo al mismo tiempo en la misma sucursal chocaba contra
+ * `Sale.@@unique([branchId, number])` con un 500, verificado en vivo con 8 ventas disparadas en
+ * paralelo). Se incrementa con un UPDATE atomico (`lastNumber: { increment: 1 }`) dentro de la
+ * misma transaccion de la venta -- Postgres serializa updates concurrentes sobre la misma fila
+ * via lock de fila, asi que dos transacciones nunca pueden leer el mismo valor. Ver
+ * PrismaSaleRepository.getNextSaleNumber().
+ */
+model BranchSaleCounter {
+  id         String @id @default(uuid())
+  companyId  String
+  branchId   String
+  lastNumber Int    @default(0)
+
+  @@unique([companyId, branchId])
+  @@map("branch_sale_counters")
+}
+
 model SaleItem {
   id                            String  @id @default(uuid())
   saleId                        String

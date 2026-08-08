@@ -1,4 +1,5 @@
 import { round2 } from "@erp/shared-utils";
+import { Prisma } from "@erp/database";
 import { prisma } from "../../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { NotFoundError } from "../../../../shared/errors/app-error";
@@ -61,20 +62,65 @@ const SALE_INCLUDE = {
 } as const;
 
 export class PrismaSaleRepository implements ISaleRepository {
+  /**
+   * Consecutivo real via BranchSaleCounter en vez del `count()+1` original -- ese calculo leia
+   * el conteo de Sale y, bajo dos cajeros vendiendo en la misma sucursal casi al mismo instante,
+   * ambas transacciones podian leer el mismo numero y una de las dos chocaba con
+   * `Sale.@@unique([branchId, number])`, devolviendo un 500 (confirmado en vivo disparando 8
+   * ventas en paralelo contra la misma sucursal: varias fallaron). El UPDATE con `increment` es
+   * atomico a nivel de fila en Postgres -- dos transacciones concurrentes se serializan solas
+   * (la segunda espera el lock de fila de la primera), asi que nunca pueden devolver el mismo
+   * numero, sin necesidad de reintentos.
+   */
+  private async getNextSaleNumber(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx: any,
+    companyId: string,
+    branchId: string
+  ): Promise<number> {
+    try {
+      const counter = await tx.branchSaleCounter.update({
+        where: { companyId_branchId: { companyId, branchId } },
+        data: { lastNumber: { increment: 1 } },
+      });
+      return counter.lastNumber;
+    } catch (err) {
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025")) throw err;
+      // Primera venta de esta sucursal: la fila del contador todavia no existe. La sembramos con
+      // el maximo Sale.number ya usado (0 si nunca vendio, para continuar donde iba el
+      // count()+1 anterior sin chocar con ventas ya numeradas antes de este cambio).
+      //
+      // Bug real encontrado y corregido aqui: la primera version usaba create() + catch(P2002) +
+      // otro update() de respaldo -- pero en Postgres, una violacion de unique constraint (el
+      // create() chocando) ABORTA la transaccion completa, no solo esa sentencia. Cualquier query
+      // posterior en el mismo tx (el update() de respaldo) fallaba con "current transaction is
+      // aborted, commands ignored until end of transaction block" (confirmado en vivo disparando
+      // 25 ventas en paralelo la primera vez que corria esta sucursal). upsert() en Postgres
+      // compila a un solo INSERT ... ON CONFLICT DO UPDATE atomico -- nunca lanza un P2002 por
+      // una carrera, asi que no hay una segunda sentencia que pueda heredar una transaccion ya
+      // envenenada.
+      const maxSale = await tx.sale.aggregate({ where: { branchId }, _max: { number: true } });
+      const counter = await tx.branchSaleCounter.upsert({
+        where: { companyId_branchId: { companyId, branchId } },
+        create: { companyId, branchId, lastNumber: (maxSale._max.number ?? 0) + 1 },
+        update: { lastNumber: { increment: 1 } },
+      });
+      return counter.lastNumber;
+    }
+  }
+
   async create(data: CreateSaleData): Promise<SaleRecord> {
     const companyId = getTenantContext().companyId;
     let costTotal = 0;
 
     const row = await prisma.$transaction(async (tx) => {
-      // NOTA: consecutivo simple por conteo. Para alta concurrencia real se recomienda una
-      // secuencia dedicada por sucursal (fase 2); aceptable para el volumen de un POS pequeño.
-      const count = await tx.sale.count({ where: { branchId: data.branchId } });
+      const number = await this.getNextSaleNumber(tx, companyId, data.branchId);
 
       const sale = await tx.sale.create({
         data: {
           companyId,
           branchId: data.branchId,
-          number: count + 1,
+          number,
           customerId: data.customerId,
           cashSessionId: data.cashSessionId,
           sellerUserId: data.sellerUserId,

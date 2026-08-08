@@ -216,6 +216,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "dashboard.read",
     "timetracking.clock",
     "timeoff.request",
+    // Necesario para el boton "Imprimir tirilla" del POS (GET .../sales/:id/pdf) -- el cajero es
+    // quien imprime el recibo al cliente en cada venta, no solo quien la crea.
+    "electronic-invoicing.read",
   ],
   EMPLEADO: ["dashboard.read", "timetracking.clock", "timeoff.request"],
 };

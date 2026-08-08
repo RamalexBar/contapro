@@ -11,7 +11,7 @@ import type {
   ElectronicDocumentAwaitingStatus,
   ElectronicDocumentPendingSubmission,
 } from "../domain/electronic-document-submission.repository";
-import { computeNextInvoiceNumber } from "../application/numbering-claim";
+import { claimNextDocumentNumber } from "../application/numbering-claim";
 
 function toRecord(row: {
   id: string;
@@ -65,12 +65,7 @@ export class PrismaElectronicSupportDocumentRepository implements IElectronicSup
         throw new ConflictError("No hay una resolucion de numeracion DIAN vigente para documentos soporte en esta sucursal");
       }
 
-      const { number, fullNumber } = computeNextInvoiceNumber(resolution);
-
-      await tx.invoiceNumberingResolution.update({
-        where: { id: resolution.id },
-        data: { currentNumber: { increment: 1 } },
-      });
+      const { number, fullNumber } = await claimNextDocumentNumber(tx, resolution);
 
       const { cuds, xmlContent } = build(fullNumber, resolution.prefix, number);
 

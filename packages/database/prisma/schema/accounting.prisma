@@ -187,3 +187,19 @@ model BankReconciliationItem {
 
   @@map("bank_reconciliation_items")
 }
+
+/**
+ * Consecutivo real de JournalEntry.number (una sola secuencia por empresa, no por sucursal) --
+ * reemplaza el `findFirst(orderBy desc)+1` original, que bajo varias ventas/compras/nominas
+ * contabilizandose al mismo tiempo (cualquier sucursal, todas comparten la misma secuencia)
+ * chocaba contra `JournalEntry.@@unique([companyId, number])` con un 500 -- confirmado en vivo.
+ * Mismo patron de UPDATE atomico que BranchSaleCounter, ver
+ * PrismaJournalEntryRepository.getNextEntryNumber().
+ */
+model CompanyJournalEntryCounter {
+  id         String @id @default(uuid())
+  companyId  String @unique
+  lastNumber Int    @default(0)
+
+  @@map("company_journal_entry_counters")
+}

@@ -1,3 +1,4 @@
+import { Prisma } from "@erp/database";
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { NotFoundError } from "../../../shared/errors/app-error";
@@ -51,13 +52,51 @@ function toRecord(row: EntryRow): JournalEntryRecord {
  * las consultas se filtran a mano via la relacion journalEntry.companyId.
  */
 export class PrismaJournalEntryRepository implements IJournalEntryRepository {
+  /**
+   * Consecutivo atomico via CompanyJournalEntryCounter -- ver el comentario del modelo en
+   * accounting.prisma. Mismo patron de UPDATE con increment que
+   * PrismaSaleRepository.getNextSaleNumber(), con la misma semilla perezosa (P2025 -> siembra
+   * desde el MAX(number) actual) para no chocar con comprobantes ya numerados antes de este
+   * cambio.
+   */
+  private async getNextEntryNumber(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx: any,
+    companyId: string
+  ): Promise<number> {
+    try {
+      const counter = await tx.companyJournalEntryCounter.update({
+        where: { companyId },
+        data: { lastNumber: { increment: 1 } },
+      });
+      return counter.lastNumber;
+    } catch (err) {
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025")) throw err;
+      // Bug real encontrado y corregido aqui (confirmado en vivo con contencion real: 25 ventas
+      // en paralelo la primera vez que corria contra una empresa sin fila de contador todavia):
+      // un create() que choca por unique constraint ABORTA la transaccion Postgres completa, no
+      // solo esa sentencia -- cualquier query posterior en el mismo tx (el update() de respaldo
+      // que habia antes aqui) fallaba con "current transaction is aborted, commands ignored
+      // until end of transaction block". upsert() compila a un solo INSERT ... ON CONFLICT DO
+      // UPDATE atomico en Postgres -- nunca lanza P2002 por una carrera, sin necesidad de una
+      // segunda sentencia de respaldo que pueda heredar una transaccion ya envenenada.
+      const maxEntry = await tx.journalEntry.aggregate({ where: { companyId }, _max: { number: true } });
+      const counter = await tx.companyJournalEntryCounter.upsert({
+        where: { companyId },
+        create: { companyId, lastNumber: (maxEntry._max.number ?? 0) + 1 },
+        update: { lastNumber: { increment: 1 } },
+      });
+      return counter.lastNumber;
+    }
+  }
+
   async create(data: CreateJournalEntryData): Promise<JournalEntryRecord> {
+    const companyId = getTenantContext().companyId;
     return prisma.$transaction(async (tx) => {
-      const last = await tx.journalEntry.findFirst({ orderBy: { number: "desc" } });
-      const number = (last?.number ?? 0) + 1;
+      const number = await this.getNextEntryNumber(tx, companyId);
       const entry = await tx.journalEntry.create({
         data: {
-          companyId: getTenantContext().companyId,
+          companyId,
           branchId: data.branchId,
           number,
           date: data.date,

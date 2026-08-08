@@ -12,7 +12,8 @@ import type { ResubmitElectronicSupportDocumentUseCase } from "../application/us
 import type { GetElectronicPayrollUseCase } from "../application/use-cases/get-electronic-payroll.use-case";
 import type { ResubmitElectronicPayrollUseCase } from "../application/use-cases/resubmit-electronic-payroll.use-case";
 import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSupportDocumentToRideData } from "../application/ride-data-mapper";
-import { renderRidePdf } from "../infrastructure/pdfkit-ride-renderer";
+import { renderRidePdf, renderThermalReceiptPdf } from "../infrastructure/pdfkit-ride-renderer";
+import type { RideDocumentData } from "../application/ride-data-mapper";
 import type { SendInvoiceWhatsAppUseCase } from "../application/use-cases/send-invoice-whatsapp.use-case";
 import type { ISaleRepository } from "../../pos/sale/domain/sale.repository";
 import type { IWhatsAppDeliveryLogRepository } from "../../whatsapp/domain/whatsapp-delivery-log.repository";
@@ -196,12 +197,18 @@ export class ElectronicInvoicingController {
   };
 
   // ---- RIDE (representacion grafica en PDF), ver application/ride-data-mapper.ts +
-  // infrastructure/pdfkit-ride-renderer.ts. Reusa el mismo Get*UseCase que ya sirve el XML. ----
+  // infrastructure/pdfkit-ride-renderer.ts. Reusa el mismo Get*UseCase que ya sirve el XML.
+  // `?format=thermal` cambia al layout de tirilla de 80mm (renderThermalReceiptPdf) pensado para
+  // imprimirse en una impresora termica de mostrador; sin el query param, el A4 de siempre. ----
+
+  private async renderPdf(data: RideDocumentData, req: Request): Promise<Buffer> {
+    return req.query.format === "thermal" ? renderThermalReceiptPdf(data) : renderRidePdf(data);
+  }
 
   getPdfBySale = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const invoice = await this.getInvoiceUseCase.execute(req.params.saleId);
-      const pdf = await renderRidePdf(mapInvoiceToRideData(invoice));
+      const pdf = await this.renderPdf(mapInvoiceToRideData(invoice), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -211,7 +218,7 @@ export class ElectronicInvoicingController {
   getPdfByCreditNote = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const note = await this.getCreditNoteUseCase.execute(req.params.creditNoteId);
-      const pdf = await renderRidePdf(mapNoteToRideData(note, "CREDIT"));
+      const pdf = await this.renderPdf(mapNoteToRideData(note, "CREDIT"), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -221,7 +228,7 @@ export class ElectronicInvoicingController {
   getPdfByDebitNote = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const note = await this.getDebitNoteUseCase.execute(req.params.debitNoteId);
-      const pdf = await renderRidePdf(mapNoteToRideData(note, "DEBIT"));
+      const pdf = await this.renderPdf(mapNoteToRideData(note, "DEBIT"), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -231,7 +238,7 @@ export class ElectronicInvoicingController {
   getPdfBySupportDocument = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const doc = await this.getSupportDocumentUseCase.execute(req.params.purchaseId);
-      const pdf = await renderRidePdf(mapSupportDocumentToRideData(doc));
+      const pdf = await this.renderPdf(mapSupportDocumentToRideData(doc), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -241,7 +248,7 @@ export class ElectronicInvoicingController {
   getPdfByPayrollDetail = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const doc = await this.getPayrollUseCase.execute(req.params.payrollDetailId);
-      const pdf = await renderRidePdf(mapPayrollToRideData(doc));
+      const pdf = await this.renderPdf(mapPayrollToRideData(doc), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
