@@ -66,8 +66,13 @@ export function POSPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [withholdings, setWithholdings] = useState<CartWithholding[]>([]);
   // "CREDIT" reusa el mecanismo de pago que ya existia (ver resolve-receivable-input.ts, item 31)
-  // -- elegirlo genera una AccountReceivable en vez de cobrar de una vez.
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CREDIT">("CASH");
+  // -- elegirlo genera una AccountReceivable en vez de cobrar de una vez. "TRANSFER" ya lo
+  // entendia el backend (contabiliza a Bancos en vez de Caja) pero el POS nunca lo ofrecia.
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "TRANSFER" | "CREDIT">("CASH");
+  // Solo para calcular el vuelto en pantalla -- nunca se envia al backend. La venta siempre se
+  // cobra/contabiliza por el total exacto (netTotal); "recibido" es una calculadora para el
+  // cajero, no una segunda fuente de verdad del monto de la venta.
+  const [amountReceived, setAmountReceived] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [dueDate, setDueDate] = useState("");
   // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- solo etiqueta el total con una
@@ -119,6 +124,9 @@ export function POSPage() {
     }, 0)
   );
   const netTotal = round2(total - retentionTotal);
+  const receivedAmount = Number(amountReceived);
+  const hasReceivedAmount = amountReceived.trim() !== "" && !Number.isNaN(receivedAmount);
+  const changeDue = hasReceivedAmount ? round2(receivedAmount - netTotal) : null;
 
   const saleMutation = useMutation({
     mutationFn: () =>
@@ -143,6 +151,7 @@ export function POSPage() {
         setCart([]);
         setWithholdings([]);
         setPaymentMethod("CASH");
+        setAmountReceived("");
         setCustomerId("");
         setDueDate("");
         setCurrency("COP");
@@ -353,11 +362,38 @@ export function POSPage() {
             <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
               <div className="flex items-center gap-2 text-sm">
                 <label className="w-20 shrink-0 text-slate-600">Pago:</label>
-                <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as "CASH" | "CREDIT")}>
-                  <option value="CASH">Efectivo (de una vez)</option>
+                <Select
+                  value={paymentMethod}
+                  onChange={(e) => {
+                    setPaymentMethod(e.target.value as "CASH" | "TRANSFER" | "CREDIT");
+                    setAmountReceived("");
+                  }}
+                >
+                  <option value="CASH">Efectivo</option>
+                  <option value="TRANSFER">Transferencia</option>
                   <option value="CREDIT">A credito</option>
                 </Select>
               </div>
+              {paymentMethod === "CASH" && (
+                <div className="flex items-center gap-2 text-sm">
+                  <label className="w-20 shrink-0 text-slate-600">Recibido:</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="Si paga exacto, deja vacio"
+                    className="w-40"
+                    value={amountReceived}
+                    onChange={(e) => setAmountReceived(e.target.value)}
+                  />
+                  {changeDue !== null && changeDue >= 0 && (
+                    <span className="font-medium text-brand-700">Vuelto: {formatCOP(changeDue)}</span>
+                  )}
+                  {changeDue !== null && changeDue < 0 && (
+                    <span className="font-medium text-danger-600">Faltan {formatCOP(-changeDue)}</span>
+                  )}
+                </div>
+              )}
               {/* Cliente: opcional para pago de contado (venta a "consumidor final"), obligatorio
                   a credito -- el backend genera la AccountReceivable (item 31) contra este
                   cliente. */}
@@ -429,6 +465,7 @@ export function POSPage() {
                 cart.length === 0 ||
                 saleMutation.isPending ||
                 (paymentMethod === "CREDIT" && !customerId) ||
+                (paymentMethod === "CASH" && changeDue !== null && changeDue < 0) ||
                 (currency !== "COP" && !(Number(exchangeRate) > 0))
               }
               loading={saleMutation.isPending}
