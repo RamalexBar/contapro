@@ -2,7 +2,6 @@ import { useState, type PropsWithChildren } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Banknote,
-  Blocks,
   Building2,
   CalendarDays,
   Clock,
@@ -31,6 +30,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../../features/auth/hooks/useAuthStore";
 import { Button } from "./Button";
+import { Logo } from "./Logo";
 
 interface NavItem {
   to: string;
@@ -114,16 +114,6 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-function Logo() {
-  return (
-    <div className="flex items-center gap-2 px-2">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-        <Blocks size={18} />
-      </div>
-      <span className="text-base font-semibold text-slate-900">Contapro</span>
-    </div>
-  );
-}
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -176,7 +166,7 @@ export function AppLayout({ children }: PropsWithChildren) {
     <div className="flex min-h-screen bg-slate-50">
       {/* Sidebar de escritorio -- siempre visible en md+. */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="border-b border-slate-200 py-4">
+        <div className="border-b border-slate-200 px-4 py-4">
           <Logo />
         </div>
         <SidebarContent />
@@ -193,7 +183,7 @@ export function AppLayout({ children }: PropsWithChildren) {
         <div className="fixed inset-0 z-40 flex md:hidden">
           <div className="fixed inset-0 bg-slate-900/40" onClick={() => setMobileNavOpen(false)} />
           <aside className="relative flex w-72 max-w-[80vw] flex-col bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 py-4 pr-3">
+            <div className="flex items-center justify-between border-b border-slate-200 py-4 pl-4 pr-3">
               <Logo />
               <button
                 type="button"

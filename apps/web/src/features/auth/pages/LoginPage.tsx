@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Blocks } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Card } from "../../../components/ui/Card";
 import { Alert } from "../../../components/ui/Alert";
+import { Logo } from "../../../components/ui/Logo";
 import { login } from "../api/auth.api";
 import { useAuthStore } from "../hooks/useAuthStore";
 import { ApiError } from "../../../lib/api-client";
@@ -36,10 +36,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-2">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
-            <Blocks size={22} />
-          </div>
-          <span className="text-lg font-semibold text-slate-900">Contapro</span>
+          <Logo className="h-14" />
         </div>
         <Card>
           <h1 className="mb-1 text-lg font-semibold text-slate-900">Ingresa a tu empresa</h1>

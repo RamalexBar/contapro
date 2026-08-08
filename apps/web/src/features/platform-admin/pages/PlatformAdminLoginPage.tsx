@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Blocks } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Card } from "../../../components/ui/Card";
 import { Alert } from "../../../components/ui/Alert";
+import { Logo } from "../../../components/ui/Logo";
 import { ApiError } from "../../../lib/api-client";
 import { loginPlatformAdmin } from "../api/saas-admin.api";
 import { usePlatformAuthStore } from "../hooks/usePlatformAuthStore";
@@ -35,11 +35,8 @@ export function PlatformAdminLoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2 text-white">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600">
-            <Blocks size={18} className="text-white" />
-          </span>
-          <span className="text-lg font-semibold">Contapro</span>
+        <div className="mb-6 flex items-center justify-center">
+          <Logo className="h-12" />
         </div>
         <Card>
           <h1 className="mb-1 text-xl font-semibold text-slate-900">Panel Administrador SaaS</h1>

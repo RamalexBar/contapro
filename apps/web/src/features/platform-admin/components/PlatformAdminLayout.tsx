@@ -1,8 +1,8 @@
 import type { PropsWithChildren } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Blocks } from "lucide-react";
 import { usePlatformAuthStore } from "../hooks/usePlatformAuthStore";
 import { Button } from "../../../components/ui/Button";
+import { Logo } from "../../../components/ui/Logo";
 
 const NAV_ITEMS = [
   { to: "/admin", label: "Dashboard" },
@@ -32,8 +32,8 @@ export function PlatformAdminLayout({ children }: PropsWithChildren) {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <nav className="flex items-center gap-6">
             <span className="flex items-center gap-2 font-semibold text-white">
-              <Blocks size={18} className="text-brand-400" />
-              Contapro <span className="font-normal text-slate-400">· Plataforma</span>
+              <Logo className="h-8" />
+              <span className="font-normal text-slate-400">· Plataforma</span>
             </span>
             <div className="flex items-center gap-1">
               {NAV_ITEMS.map((item) => (
