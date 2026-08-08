@@ -99,28 +99,43 @@ export function BillingPage() {
             )}
           </Card>
 
-          {data.plan.code === "TRIAL" && data.availablePlans.length > 0 && (
+          {/* Mientras la suscripcion siga en TRIALING se puede elegir/cambiar de plan libremente,
+              sin importar cual quedo asignado de un intento anterior -- antes esto se gateaba por
+              `data.plan.code === "TRIAL"`, que dejaba de ser cierto apenas alguien elegia un plan
+              pago (createOwnCheckout cambia Subscription.planId ANTES de cobrar, para que el
+              monto del checkout sea el correcto), asi que si esa persona no llegaba a pagar
+              quedaba con un solo boton "Pagar ahora" y sin forma de volver a la lista. */}
+          {data.subscription.status === "TRIALING" && data.availablePlans.length > 0 && (
             <Card title="Elegi un plan para empezar a pagar">
               <div className="grid gap-4 sm:grid-cols-3">
-                {data.availablePlans.map((plan: PlanRecord) => (
-                  <div key={plan.id} className="rounded-lg border border-slate-200 p-4">
-                    <p className="font-semibold text-slate-900">{plan.name}</p>
-                    <p className="mt-1 text-xl font-bold text-brand-700">{formatCOP(plan.priceMonthly)}</p>
-                    <p className="text-xs text-slate-500">/mes</p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      Hasta {plan.maxBranches} sucursal{plan.maxBranches === 1 ? "" : "es"}, {plan.maxUsers} usuarios
-                    </p>
-                    <Button
-                      variant="secondary"
-                      className="mt-3 w-full"
-                      loading={payingPlanId === plan.id}
-                      disabled={payingPlanId !== null}
-                      onClick={() => pay(plan.id)}
+                {data.availablePlans.map((plan: PlanRecord) => {
+                  const isSelected = plan.id === data.plan.id;
+                  return (
+                    <div
+                      key={plan.id}
+                      className={`rounded-lg border p-4 ${isSelected ? "border-brand-400 bg-brand-50" : "border-slate-200"}`}
                     >
-                      Elegir este plan
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold text-slate-900">{plan.name}</p>
+                        {isSelected && <Badge tone="info">Seleccionado</Badge>}
+                      </div>
+                      <p className="mt-1 text-xl font-bold text-brand-700">{formatCOP(plan.priceMonthly)}</p>
+                      <p className="text-xs text-slate-500">/mes</p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Hasta {plan.maxBranches} sucursal{plan.maxBranches === 1 ? "" : "es"}, {plan.maxUsers} usuarios
+                      </p>
+                      <Button
+                        variant="secondary"
+                        className="mt-3 w-full"
+                        loading={payingPlanId === plan.id}
+                        disabled={payingPlanId !== null}
+                        onClick={() => pay(plan.id)}
+                      >
+                        {isSelected ? "Pagar este plan" : "Cambiar a este plan"}
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             </Card>
           )}

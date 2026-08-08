@@ -73,7 +73,7 @@ export function RegisterPage() {
         </div>
         <Card>
         <h1 className="mb-1 text-lg font-semibold text-slate-900">Crear tu cuenta</h1>
-        <p className="mb-6 text-sm text-slate-500">30 dias de prueba gratis, sin tarjeta de credito.</p>
+        <p className="mb-6 text-sm text-slate-500">14 dias de prueba gratis, sin tarjeta de credito.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Nombre comercial"
