@@ -76,7 +76,7 @@ hace falta — es un upsert por email.)
 2. `POST https://contapro-api.onrender.com/api/auth/register-company` con los datos de una
    empresa de prueba (`companyName`, `legalName`, `nit`, `companyEmail`, `adminFullName`,
    `adminEmail`, `adminPassword` — ver `apps/api/src/modules/auth/interfaces/auth.validators.ts`)
-   → debe crear la empresa con una suscripción `TRIALING` de 30 días contra el plan `TRIAL`.
+   → debe crear la empresa con una suscripción `TRIALING` de 14 días contra el plan `TRIAL`.
 3. Entrar a `https://contapro-web.onrender.com` y loguearse con ese usuario.
 
 También podés probar directo desde la web (iteración 27): entrar a

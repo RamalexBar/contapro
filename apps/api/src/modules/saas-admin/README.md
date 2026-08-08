@@ -41,7 +41,7 @@ El panel es transversal a todas las empresas: no usa `tenantContextMiddleware` (
    pertenece a ninguna empresa, `AuditLog.companyId` es obligatorio).
 2. **Suscripciones**: `POST/GET /admin/subscriptions`, `GET /admin/subscriptions/:id`. Al
    registrar una empresa (`RegisterCompanyUseCase`, `modules/auth`), se crea automaticamente una
-   suscripcion `TRIALING` contra el plan `TRIAL` por **30 dias** — el spec original no especifica
+   suscripcion `TRIALING` contra el plan `TRIAL` por **14 dias** — el spec original no especifica
    la duracion exacta del periodo de prueba, es un valor asumido y documentado como tal
    (`register-company.use-case.ts`).
 3. **Cobro/renovacion**: `POST /admin/subscriptions/:id/payments` — crea el `SubscriptionPayment`

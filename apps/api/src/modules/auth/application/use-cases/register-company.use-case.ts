@@ -10,9 +10,9 @@ import type { ISubscriptionRepository } from "../../../saas-admin/domain/subscri
  * en la tabla Plan (ver seed.ts). Si no existe, el registro sigue funcionando igual (la empresa
  * queda sin suscripcion, recuperable a mano desde el panel admin) en vez de bloquear el alta. */
 const TRIAL_PLAN_CODE = "TRIAL";
-/** 30 dias: el spec original no especifica la duracion exacta del periodo de prueba -- valor
+/** 14 dias: el spec original no especifica la duracion exacta del periodo de prueba -- valor
  * asumido, documentado aqui para poder ajustarlo sin buscar en todo el codigo. */
-const TRIAL_PERIOD_DAYS = 30;
+const TRIAL_PERIOD_DAYS = 14;
 
 export class RegisterCompanyUseCase {
   constructor(

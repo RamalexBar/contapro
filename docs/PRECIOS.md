@@ -37,7 +37,7 @@ escala con el precio es `maxBranches`/`maxUsers`, no qué módulos están prendi
 
 | Plan | Código | Mensual | Anual (10% desc.) | Sucursales | Usuarios | Referencia de precio |
 |---|---|---|---|---|---|---|
-| Prueba gratuita | `TRIAL` | $0 | $0 | 1 | 3 | 30 días, todo habilitado (ver `register-company.use-case.ts`) |
+| Prueba gratuita | `TRIAL` | $0 | $0 | 1 | 3 | 14 días, todo habilitado (ver `register-company.use-case.ts`) |
 | Plan Emprendedor | `BASICO` | $39.900 | $430.900 | 1 | 3 | vs. $145.993 Siigo / $163.900 Alegra completo |
 | Plan Pyme | `PYME` | $79.900 | $862.900 | 3 | 10 | vs. $250.900 Alegra Pro |
 | Plan Plus | `PRO` | $149.900 | $1.618.900 | 10 | 50 | vs. $319.900 Alegra Plus / $182.750 World Office Enterprise |

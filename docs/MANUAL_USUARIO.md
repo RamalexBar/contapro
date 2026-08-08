@@ -44,7 +44,7 @@ Administrador/Propietario), aunque un Administrador puede hacer todo.
 
 1. Entra a la pantalla de registro y completa el nombre de la empresa, NIT y los datos del primer
    usuario (quedará como Administrador).
-2. Al registrarte, tu empresa queda automáticamente en un **plan de prueba gratuito de 30 días**
+2. Al registrarte, tu empresa queda automáticamente en un **plan de prueba gratuito de 14 días**
    con todos los módulos habilitados — no necesitas tarjeta para empezar.
 3. El sistema crea tu primera sucursal automáticamente. Puedes agregar más sucursales después
    desde Configuración si tu negocio tiene varios puntos de venta.
