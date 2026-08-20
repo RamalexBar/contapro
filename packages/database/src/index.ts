@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 export * from "@prisma/client";
 export * from "./seed-withholding-concepts";
 export * from "./seed-expense-categories";
+export * from "./seed-chart-of-accounts";
 
 declare global {
   // eslint-disable-next-line no-var

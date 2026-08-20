@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCOP } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
@@ -10,14 +10,17 @@ import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../componen
 import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
+import { AccountCombobox } from "../components/AccountCombobox";
 import {
   type AccountType,
   type WithholdingType,
+  activateAccount,
   closeFinancialPeriod,
   createAccount,
   createCostCenter,
   createEntry,
   createWithholdingConcept,
+  deactivateAccount,
   deactivateCostCenter,
   deactivateWithholdingConcept,
   getBalanceSheet,
@@ -75,6 +78,11 @@ function AccountsSection() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
   const [form, setForm] = useState({ code: "", name: "", type: "ASSET" as AccountType, parentId: "", acceptsEntries: true });
+  const [search, setSearch] = useState("");
+
+  function invalidate() {
+    return queryClient.invalidateQueries({ queryKey: ["accounting", "accounts"] });
+  }
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -86,14 +94,31 @@ function AccountsSection() {
         acceptsEntries: form.acceptsEntries,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["accounting", "accounts"] });
+      invalidate();
       setForm({ code: "", name: "", type: "ASSET", parentId: "", acceptsEntries: true });
     },
   });
 
+  const activateMutation = useMutation({ mutationFn: activateAccount, onSuccess: invalidate });
+  const deactivateMutation = useMutation({ mutationFn: deactivateAccount, onSuccess: invalidate });
+
+  const accounts = data?.data ?? [];
+  const filtered = useMemo(() => {
+    const sorted = [...accounts].sort((a, b) => a.code.localeCompare(b.code));
+    const q = search.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((a) => a.code.startsWith(q) || a.name.toLowerCase().includes(q));
+  }, [accounts, search]);
+
   return (
     <div className="space-y-6">
       <Card title="Nueva cuenta">
+        <p className="mb-3 text-sm text-slate-500">
+          El plan de cuentas estandar ya viene precargado abajo -- usa esta seccion solo para agregar una subcuenta o
+          auxiliar que no este en el catalogo. Si eliges como padre una cuenta base (clase/grupo/cuenta) que hoy admite
+          movimientos, al crear su primera subcuenta esa cuenta base deja de admitirlos -- el movimiento pasa al
+          detalle nuevo.
+        </p>
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-5"
           onSubmit={(e) => {
@@ -110,14 +135,13 @@ function AccountsSection() {
               </option>
             ))}
           </Select>
-          <Select value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })}>
-            <option value="">(sin cuenta padre)</option>
-            {data?.data.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code} {a.name}
-              </option>
-            ))}
-          </Select>
+          <AccountCombobox
+            accounts={accounts}
+            value={form.parentId}
+            onChange={(id) => setForm({ ...form, parentId: id })}
+            filter={() => true}
+            placeholder="(sin cuenta padre)"
+          />
           <Button type="submit" loading={createMutation.isPending}>
             Crear
           </Button>
@@ -129,7 +153,18 @@ function AccountsSection() {
         )}
       </Card>
 
-      <Card noPadding>
+      <Card title="Plan unico de cuentas (PUC)">
+        <p className="mb-3 text-sm text-slate-500">
+          Catalogo estandar precargado con toda la jerarquia (clase, grupo, cuenta, subcuenta). Busca por codigo -- por
+          ejemplo "15" muestra ese grupo y todas sus cuentas -- y activa con un clic las que vayas a usar, sin
+          necesidad de crearlas ni escribir el nombre.
+        </p>
+        <Input
+          placeholder="Buscar por codigo o nombre..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="mb-3"
+        />
         {isLoading ? (
           <Spinner />
         ) : (
@@ -139,23 +174,44 @@ function AccountsSection() {
                 <Th>Codigo</Th>
                 <Th>Nombre</Th>
                 <Th>Tipo</Th>
-                <Th>Nivel</Th>
                 <Th>Admite movimientos</Th>
+                <Th>Estado</Th>
+                <Th></Th>
               </tr>
             </TableHead>
             <TableBody>
-              {data?.data.map((a) => (
+              {filtered.map((a) => (
                 <TableRow key={a.id}>
-                  <Td className="font-medium text-slate-900">{a.code}</Td>
-                  <Td>{a.name}</Td>
+                  <Td className="font-mono text-xs text-slate-900">{a.code}</Td>
+                  <Td style={{ paddingLeft: 12 + (a.level - 1) * 16 }}>{a.name}</Td>
                   <Td>{ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type}</Td>
-                  <Td>{a.level}</Td>
                   <Td>{a.acceptsEntries ? "Si" : "No"}</Td>
+                  <Td>
+                    <ActiveBadge active={a.isActive} />
+                  </Td>
+                  <Td className="text-right">
+                    {a.acceptsEntries &&
+                      (a.isActive ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={deactivateMutation.isPending}
+                          onClick={() => deactivateMutation.mutate(a.id)}
+                        >
+                          Desactivar
+                        </Button>
+                      ) : (
+                        <Button size="sm" loading={activateMutation.isPending} onClick={() => activateMutation.mutate(a.id)}>
+                          Activar
+                        </Button>
+                      ))}
+                  </Td>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
+        {!isLoading && filtered.length === 0 && <p className="p-4 text-sm text-slate-400">Sin resultados.</p>}
       </Card>
     </div>
   );
@@ -568,16 +624,11 @@ function EntriesSection() {
               {lines.map((line, i) => (
                 <TableRow key={i} className="hover:bg-transparent">
                   <Td className="pr-2">
-                    <Select value={line.accountId} onChange={(e) => updateLine(i, "accountId", e.target.value)}>
-                      <option value="">Seleccionar...</option>
-                      {accounts?.data
-                        .filter((a) => a.acceptsEntries)
-                        .map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.code} {a.name}
-                          </option>
-                        ))}
-                    </Select>
+                    <AccountCombobox
+                      accounts={accounts?.data ?? []}
+                      value={line.accountId}
+                      onChange={(id) => updateLine(i, "accountId", id)}
+                    />
                   </Td>
                   <Td className="pr-2">
                     <Input type="number" className="w-28" value={line.debit} onChange={(e) => updateLine(i, "debit", e.target.value)} />
@@ -816,14 +867,10 @@ function ReportsSection() {
       {reportTab === "ledger" && (
         <Card>
           <div className="mb-4 flex flex-wrap items-end gap-3">
-            <Select label="Cuenta" value={ledgerAccountId} onChange={(e) => setLedgerAccountId(e.target.value)}>
-              <option value="">Seleccionar cuenta...</option>
-              {accounts?.data.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} {a.name}
-                </option>
-              ))}
-            </Select>
+            <div className="w-64">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Cuenta</span>
+              <AccountCombobox accounts={accounts?.data ?? []} value={ledgerAccountId} onChange={setLedgerAccountId} />
+            </div>
             <Input type="date" label="Desde" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input type="date" label="Hasta" value={to} onChange={(e) => setTo(e.target.value)} />
             <Select label="Centro de costo" value={ledgerCostCenterId} onChange={(e) => setLedgerCostCenterId(e.target.value)}>

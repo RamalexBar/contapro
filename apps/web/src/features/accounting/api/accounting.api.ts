@@ -123,6 +123,14 @@ export function createAccount(input: CreateAccountInput): Promise<AccountRecord>
   return apiFetch("/chart-of-accounts", { method: "POST", body: input });
 }
 
+export function activateAccount(id: string): Promise<AccountRecord> {
+  return apiFetch(`/chart-of-accounts/${id}/activate`, { method: "POST" });
+}
+
+export function deactivateAccount(id: string): Promise<AccountRecord> {
+  return apiFetch(`/chart-of-accounts/${id}/deactivate`, { method: "POST" });
+}
+
 export function listEntries(status?: string): Promise<{ data: JournalEntryRecord[] }> {
   return apiFetch(`/journal-entries${status ? `?status=${encodeURIComponent(status)}` : ""}`);
 }

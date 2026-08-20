@@ -15,9 +15,11 @@ const prisma = new PrismaClient();
  */
 async function main() {
   console.log("Seed de produccion: sembrando permisos, roles y planes...");
+  // timeout explicito: seedBase() hace backfill sobre TODAS las empresas existentes (ver el
+  // mismo ajuste en seed.ts), el default de Prisma (5000ms) no alcanza mas alla de un puñado.
   await prisma.$transaction(async (tx) => {
     await seedBase(tx);
-  });
+  }, { timeout: 300_000 });
   console.log("Listo. Siguiente paso: crear el primer PlatformAdmin con create-platform-admin.ts");
 }
 

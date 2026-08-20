@@ -50,6 +50,9 @@ export class CreateJournalEntryUseCase {
       if (!account.acceptsEntries) {
         throw new ValidationError(`La cuenta ${account.code} ${account.name} no acepta movimientos directos`);
       }
+      if (!account.isActive) {
+        throw new ValidationError(`La cuenta ${account.code} ${account.name} esta inactiva, actívala en el Plan de cuentas`);
+      }
       if (line.debit > 0 && line.credit > 0) {
         throw new ValidationError("Cada movimiento debe ser debito O credito, no ambos");
       }

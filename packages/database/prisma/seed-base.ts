@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS, SYSTEM_ROLES } from "@erp/shared-types";
 import { seedDefaultWithholdingConcepts } from "../src/seed-withholding-concepts";
 import { seedDefaultExpenseCategories } from "../src/seed-expense-categories";
+import { seedDefaultChartOfAccounts } from "../src/seed-chart-of-accounts";
 
 /**
  * Precios reales de mercado investigados en 2026-08 contra Siigo/Alegra/World Office/Loggro (ver
@@ -73,12 +74,13 @@ export async function seedBase(prisma: Prisma.TransactionClient) {
     update: { name: "Plan Plus", priceMonthly: 149900, priceYearly: 1618900, maxBranches: 10, maxUsers: 50, features: FULL_FEATURES },
   });
 
-  // ---- Backfill de conceptos de retencion / categorias de gasto para empresas que ya existian
-  // antes de estos items (empresas nuevas los reciben directo en RegisterCompanyUseCase, sin
-  // esperar a un re-seed) ----
+  // ---- Backfill de conceptos de retencion / categorias de gasto / plan de cuentas para empresas
+  // que ya existian antes de estos items (empresas nuevas los reciben directo en
+  // RegisterCompanyUseCase, sin esperar a un re-seed) ----
   const companies = await prisma.company.findMany({ select: { id: true } });
   for (const company of companies) {
     await seedDefaultWithholdingConcepts(prisma, company.id);
     await seedDefaultExpenseCategories(prisma, company.id);
+    await seedDefaultChartOfAccounts(prisma, company.id);
   }
 }

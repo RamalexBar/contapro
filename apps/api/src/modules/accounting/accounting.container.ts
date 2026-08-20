@@ -15,6 +15,7 @@ import { PrismaWithholdingConceptRepository } from "./infrastructure/prisma-with
 import { PrismaCostCenterRepository } from "./infrastructure/prisma-cost-center.repository";
 import { AccountingReportsService } from "./application/accounting-reports.service";
 import { CreateAccountUseCase } from "./application/use-cases/create-account.use-case";
+import { SetAccountActiveUseCase } from "./application/use-cases/set-account-active.use-case";
 import { CreateJournalEntryUseCase } from "./application/use-cases/create-journal-entry.use-case";
 import { PostJournalEntryUseCase } from "./application/use-cases/post-journal-entry.use-case";
 import { VoidJournalEntryUseCase } from "./application/use-cases/void-journal-entry.use-case";
@@ -63,6 +64,7 @@ const auditService = new AuditService(new PrismaAuditLogRepository());
 const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessionRepo, bankTransactionRepo);
 
 const createAccountUseCase = new CreateAccountUseCase(accountRepo, auditService);
+const setAccountActiveUseCase = new SetAccountActiveUseCase(accountRepo, auditService);
 const createEntryUseCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, financialPeriodRepo, costCenterRepo, auditService);
 const postEntryUseCase = new PostJournalEntryUseCase(journalRepo, auditService);
 
@@ -76,6 +78,7 @@ export const accountingController = new AccountingController(
   financialPeriodRepo,
   reports,
   createAccountUseCase,
+  setAccountActiveUseCase,
   createEntryUseCase,
   postEntryUseCase,
   voidJournalEntryUseCase,

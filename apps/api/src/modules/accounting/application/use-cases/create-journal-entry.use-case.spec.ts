@@ -73,6 +73,7 @@ class FakeChartOfAccountsRepository implements Partial<IChartOfAccountsRepositor
   accounts: AccountRecord[] = [
     { id: "acc-1", code: "1105", name: "Caja", type: "ASSET", parentId: null, level: 1, isActive: true, acceptsEntries: true },
     { id: "acc-2", code: "4135", name: "Ingresos", type: "INCOME", parentId: null, level: 1, isActive: true, acceptsEntries: true },
+    { id: "acc-3", code: "1110", name: "Bancos", type: "ASSET", parentId: null, level: 1, isActive: false, acceptsEntries: true },
   ];
   async create(data: CreateAccountData): Promise<AccountRecord> {
     const account: AccountRecord = { id: "acc-new", parentId: null, level: 1, isActive: true, acceptsEntries: true, ...data };
@@ -160,5 +161,23 @@ describe("CreateJournalEntryUseCase — centro de costo (item 34 de docs/ALCANCE
     await expect(
       withTenantContext(() => useCase.execute({ ...BASE_INPUT, costCenterId: INACTIVE_COST_CENTER.id }))
     ).rejects.toThrow(/inactivo/);
+  });
+});
+
+describe("CreateJournalEntryUseCase — cuenta inactiva del catalogo PUC", () => {
+  it("rejects a line posted to an inactive account", async () => {
+    const { useCase } = makeUseCase();
+
+    await expect(
+      withTenantContext(() =>
+        useCase.execute({
+          ...BASE_INPUT,
+          lines: [
+            { accountId: "acc-3", debit: 1000, credit: 0 },
+            { accountId: "acc-2", debit: 0, credit: 1000 },
+          ],
+        })
+      )
+    ).rejects.toThrow(/inactiva/);
   });
 });

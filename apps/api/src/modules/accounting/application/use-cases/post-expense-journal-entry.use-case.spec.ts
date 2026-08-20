@@ -109,6 +109,16 @@ class FakeChartOfAccountsRepository implements IChartOfAccountsRepository {
   async upsertByCode(data: CreateAccountData): Promise<AccountRecord> {
     return (await this.findByCode(data.code)) ?? this.create(data);
   }
+  async setActive(id: string, isActive: boolean): Promise<AccountRecord> {
+    const account = await this.findByIdOrThrow(id);
+    account.isActive = isActive;
+    return account;
+  }
+  async disableDirectEntries(id: string): Promise<AccountRecord> {
+    const account = await this.findByIdOrThrow(id);
+    account.acceptsEntries = false;
+    return account;
+  }
 }
 
 class FakeAuditLogRepository implements IAuditLogRepository {

@@ -46,8 +46,27 @@ export class PrismaChartOfAccountsRepository implements IChartOfAccountsReposito
 
   async upsertByCode(data: CreateAccountData): Promise<AccountRecord> {
     const existing = await this.findByCode(data.code);
-    if (existing) return existing;
+    if (existing) {
+      // Si el usuario la desactivo a mano desde el catalogo PUC (setActive) pero el motor
+      // contable la sigue necesitando para un asiento automatico, se reactiva sola -- mismo
+      // criterio que "se crean solas la primera vez que se usan".
+      if (!existing.isActive) return this.setActive(existing.id, true);
+      return existing;
+    }
     return this.create(data);
+  }
+
+  async setActive(id: string, isActive: boolean): Promise<AccountRecord> {
+    await this.findByIdOrThrow(id);
+    const row = await prisma.chartOfAccounts.update({ where: { id }, data: { isActive } });
+    return this.toRecord(row);
+  }
+
+  async disableDirectEntries(id: string): Promise<AccountRecord> {
+    const existing = await this.findByIdOrThrow(id);
+    if (!existing.acceptsEntries) return existing;
+    const row = await prisma.chartOfAccounts.update({ where: { id }, data: { acceptsEntries: false } });
+    return this.toRecord(row);
   }
 
   private toRecord(row: {

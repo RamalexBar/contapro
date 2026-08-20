@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { seedBase } from "./seed-base";
+import { seedDefaultChartOfAccounts } from "../src/seed-chart-of-accounts";
+import { seedDefaultExpenseCategories } from "../src/seed-expense-categories";
+import { seedDefaultWithholdingConcepts } from "../src/seed-withholding-concepts";
 
 const prisma = new PrismaClient();
 
@@ -48,6 +51,14 @@ async function main() {
       },
       update: {},
     });
+
+    // seedBase() ya corrio (linea de arriba) y su backfill de retenciones/categorias de gasto/
+    // plan de cuentas solo alcanza a empresas que YA existian -- en una base de datos nueva esta
+    // empresa demo se crea recien aca, asi que necesita su propia llamada explicita para no
+    // quedar sin estos catalogos en el primer `pnpm db:seed`.
+    await seedDefaultWithholdingConcepts(tx, company.id);
+    await seedDefaultExpenseCategories(tx, company.id);
+    await seedDefaultChartOfAccounts(tx, company.id);
 
     const periodStart = new Date();
     const periodEnd = new Date();
@@ -269,7 +280,10 @@ async function main() {
       },
       update: {},
     });
-  });
+  }, { timeout: 300_000 }); // backfill de seedBase() itera TODAS las empresas existentes (permisos/
+  // retenciones/categorias de gasto/plan de cuentas, ~115 upserts secuenciales cada una) -- el
+  // timeout default de Prisma (5000ms) no alcanza ni con un puñado de empresas ya creadas en la
+  // base de desarrollo.
 
   console.log("Seed completado.");
   console.log(`  Admin  -> admin@demo.com / ${DEMO_PASSWORD}`);

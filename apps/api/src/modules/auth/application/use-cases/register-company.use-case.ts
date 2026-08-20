@@ -2,7 +2,7 @@ import type { RegisterCompanyInput } from "@erp/shared-types";
 import type { IUserRepository } from "../../domain/user.repository";
 import { hashSecret } from "../../infrastructure/password-hasher.service";
 import { ConflictError } from "../../../../shared/errors/app-error";
-import { basePrisma, seedDefaultExpenseCategories, seedDefaultWithholdingConcepts } from "@erp/database";
+import { basePrisma, seedDefaultChartOfAccounts, seedDefaultExpenseCategories, seedDefaultWithholdingConcepts } from "@erp/database";
 import type { IPlanRepository } from "../../../saas-admin/domain/plan.repository";
 import type { ISubscriptionRepository } from "../../../saas-admin/domain/subscription.repository";
 
@@ -46,6 +46,7 @@ export class RegisterCompanyUseCase {
     // conceptos por alguna otra razon, el backfill de seedBase() los completa despues.
     await seedDefaultWithholdingConcepts(basePrisma, result.companyId);
     await seedDefaultExpenseCategories(basePrisma, result.companyId);
+    await seedDefaultChartOfAccounts(basePrisma, result.companyId);
 
     const trialPlan = await this.planRepo.findByCode(TRIAL_PLAN_CODE);
     if (trialPlan) {

@@ -26,4 +26,13 @@ export interface IChartOfAccountsRepository {
   findByIdOrThrow(id: string): Promise<AccountRecord>;
   /** Crea la cuenta si el codigo no existe todavia; usado para las cuentas estandar de nomina. */
   upsertByCode(data: CreateAccountData): Promise<AccountRecord>;
+  /** Activa/desactiva una cuenta del catalogo PUC (ver seedDefaultChartOfAccounts en
+   * @erp/database) -- una cuenta inactiva no se puede usar en comprobantes nuevos, ver el
+   * chequeo en CreateJournalEntryUseCase. */
+  setActive(id: string, isActive: boolean): Promise<AccountRecord>;
+  /** Baja acceptsEntries a false -- usado por CreateAccountUseCase cuando a una cuenta base
+   * (clase/grupo/cuenta) se le agrega una subcuenta/auxiliar hija: la cuenta base pasa a ser solo
+   * de clasificacion, el movimiento real queda en el hijo (convencion PUC). No-op si ya era
+   * false. */
+  disableDirectEntries(id: string): Promise<AccountRecord>;
 }

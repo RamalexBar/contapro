@@ -25,8 +25,10 @@ compras y centros de costo, todo implementado.**
 ## Implementado
 
 1. CRUD del plan de cuentas (`ChartOfAccountsRepository` + `CreateAccountUseCase`).
-   Jerarquia por `parentId`, `level` calculado automaticamente. Sin plantilla PUC precargada
-   todavia (las cuentas se crean a mano o vienen del seed que use cada caso de uso).
+   Jerarquia por `parentId`, `level` calculado automaticamente. **PUC precargado y activacion por
+   catalogo** (iteracion 43, item 44 de docs/ALCANCE.md, ver punto 11 mas abajo) — cada empresa
+   arranca con la jerarquia completa del plan de cuentas ya creada; una cuenta se crea a mano solo
+   si el usuario necesita algo fuera del catalogo estandar.
 2. Comprobantes manuales: creacion con validacion de partida doble (debitos = creditos, no
    ambos en la misma linea, cuenta debe `acceptsEntries`), posteo (`DRAFT -> POSTED`) y
    anulacion (`PostJournalEntryUseCase` / `VoidJournalEntryUseCase`).
@@ -223,6 +225,69 @@ compras y centros de costo, todo implementado.**
       `create-expense.use-case.spec.ts` y `post-expense-journal-entry.use-case.spec.ts`
       extendidos).
 
+11. **PUC precargado y activacion por catalogo** (`seedDefaultChartOfAccounts`,
+    `packages/database/src/seed-chart-of-accounts.ts`, iteracion 43, item 44 de
+    `docs/ALCANCE.md`):
+    - Cada empresa nueva arranca con la jerarquia completa del PUC ya creada (clase -> grupo ->
+      cuenta -> subcuenta), sembrada por `RegisterCompanyUseCase` y con backfill en `seedBase()`
+      para empresas que ya existian (mismo patron que `seedDefaultWithholdingConcepts`/
+      `seedDefaultExpenseCategories`, con las mismas dos llamadas agregadas ademas a mano en
+      `seed.ts` para la empresa demo — su `company.upsert` corre DESPUES de `seedBase()`, asi que
+      el backfill de ese archivo no la alcanza en un `pnpm db:seed` desde cero).
+    - **No es la codificacion oficial completa del Decreto 2650** (esa tiene miles de cuentas
+      auxiliares irrelevantes para una pyme de comercio) — es un PUC simplificado para pymes de
+      comercio/servicios, sin verificar contra un contador real (mismo criterio de honestidad que
+      `DEFAULT_WITHHOLDING_CONCEPTS`/`DEFAULT_EXPENSE_CATEGORIES`). Cubre clases 1-6; se omiten
+      clase 7 (costos de produccion/manufactura) y 8-9 (cuentas de orden), fuera del alcance
+      actual del producto. Los ~25 codigos que el motor contable ya usaba de antemano
+      (`STANDARD_ACCOUNTS` en cada `Post*JournalEntryUseCase`) quedan **activos desde el
+      registro**; el resto del catalogo (unas 65 cuentas mas) queda **inactivo** hasta que el
+      usuario lo active.
+    - `ChartOfAccounts.isActive` ya existia en el schema (default `true`) pero no se usaba en
+      ningun lado — ni un endpoint para cambiarlo ni un chequeo que lo respetara. Ahora
+      `CreateJournalEntryUseCase` rechaza (422) un comprobante que use una cuenta inactiva, y
+      `POST /chart-of-accounts/:id/activate` / `.../deactivate` (permiso `accounting.manage`,
+      `SetAccountActiveUseCase`) permiten cambiarla desde el catalogo.
+    - `upsertByCode` (usado por todos los `Post*JournalEntryUseCase` para resolver sus cuentas
+      estandar) ahora reactiva sola una cuenta que el usuario haya desactivado a mano si el motor
+      contable la vuelve a necesitar — mismo criterio que "se crean solas la primera vez que se
+      usan", ahora extendido a "se reactivan solas si hace falta".
+    - UI web (`/accounting`, pestaña "Plan de cuentas"): buscador por codigo o nombre
+      (`AccountCombobox`, cascada por prefijo — escribir "15" filtra ese grupo y todas sus
+      cuentas) que reemplaza el `<select>` plano en los tres lugares donde se elegia una cuenta
+      (cuenta padre al crear una cuenta nueva, lineas de un comprobante manual, filtro de cuenta
+      del libro mayor); tabla del catalogo con boton "Activar"/"Desactivar" por fila (solo en
+      cuentas que admiten movimientos).
+    - El codigo `5135` tiene una tension pre-existente entre `PostCommissionJournalEntryUseCase`
+      ("Comisiones") y la categoria de gasto "Servicios publicos" de
+      `DEFAULT_EXPENSE_CATEGORIES` (mismo codigo, dos nombres distintos segun quien lo cree
+      primero via `upsertByCode`) — el PUC precargado le da el nombre "Comisiones" por ser el que
+      ya estaba activo de antemano; no afecta el registro de un gasto de esa categoria porque la
+      descripcion de esa linea del comprobante toma el nombre de la categoria, no el de la
+      cuenta.
+    - Verificado con `tsc --noEmit` + `vitest run` (268 tests, 1 nuevo: rechazo de una linea
+      contra una cuenta inactiva) en todo `apps/api`, y `tsc -b && vite build` en `apps/web`.
+    - **Cuenta base vs. subcuenta/auxiliar** (mismo dia, a pedido del usuario): convencion PUC
+      real — la cuenta base (clase/grupo/cuenta) es solo de clasificacion, el movimiento
+      transaccional queda en la subcuenta/auxiliar. `CreateAccountUseCase` ahora, al crear una
+      cuenta con `parentId`, desactiva `acceptsEntries` de la cuenta padre si esta en nivel
+      clase/grupo/cuenta (nivel ≤ 3) y hoy admite movimientos (`disableDirectEntries`, nuevo en
+      `IChartOfAccountsRepository`, idempotente). **Alcance deliberadamente acotado** (decidido
+      con el usuario via pregunta explicita, para no reescribir el motor ya verificado): las ~20
+      cuentas de 4 digitos que los 9 `Post*JournalEntryUseCase` usan de antemano
+      (`ENGINE_MANAGED_ACCOUNT_CODES` en `create-account.use-case.ts`) quedan exentas — si el
+      usuario les agrega una subcuenta propia, la cuenta base sigue admitiendo movimientos
+      directos para no romper la contabilizacion automatica de ventas/compras/nomina/etc. Una
+      subcuenta (nivel 4, `111005` por ejemplo) o auxiliar (nivel 5+) que gane su propio hijo NO
+      se desactiva — solo la cuenta base de 4 digitos pierde `acceptsEntries`, subcuentas y
+      auxiliares pueden seguir admitiendo movimiento segun la necesidad del usuario, tengan o no
+      mas detalle debajo. Auditado (`ACCOUNT_ENTRIES_DISABLED`). UI: nota explicativa agregada en
+      el formulario "Nueva cuenta"; el resto de la UI (buscador, boton Activar/Desactivar) no
+      necesito cambios porque ya filtraba por `acceptsEntries`. Verificado en vivo: crear una
+      subcuenta bajo `1524 Equipo de oficina` (no gestionada por el motor) desactivo `1524`; crear
+      una bajo `1105 Caja general` (si gestionada) no la desactivo. 5 tests nuevos
+      (`create-account.use-case.spec.ts`, no existia antes) — 273 en total.
+
 ## Que falta implementar
 
 1. Flujo de caja como Estado de Flujo de Efectivo formal (metodo indirecto desde el Estado de
@@ -233,3 +298,5 @@ compras y centros de costo, todo implementado.**
 4. Centro de costo solo se puede etiquetar en comprobantes manuales y gastos operativos — no en
    venta/compra/nomina/devolucion/abono/cobro/ajuste de caja (ver punto 10, decision de alcance
    explicita). Balance General y Flujo de caja tampoco filtran por centro de costo.
+5. El PUC precargado (punto 11) es un catalogo simplificado, no la codificacion oficial completa
+   del Decreto 2650 — sin verificar contra un contador real.

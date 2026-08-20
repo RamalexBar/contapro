@@ -16,6 +16,16 @@ accountingRouter.post(
   requirePermission("accounting.manage"),
   accountingController.createAccount
 );
+accountingRouter.post(
+  "/chart-of-accounts/:id/activate",
+  requirePermission("accounting.manage"),
+  accountingController.activateAccount
+);
+accountingRouter.post(
+  "/chart-of-accounts/:id/deactivate",
+  requirePermission("accounting.manage"),
+  accountingController.deactivateAccount
+);
 
 accountingRouter.get("/journal-entries", requirePermission("accounting.read"), accountingController.listEntries);
 accountingRouter.get("/journal-entries/:id", requirePermission("accounting.read"), accountingController.getEntry);

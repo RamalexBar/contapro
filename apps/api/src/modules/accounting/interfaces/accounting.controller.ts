@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { AccountingReportsService } from "../application/accounting-reports.service";
 import type { CreateAccountUseCase } from "../application/use-cases/create-account.use-case";
+import type { SetAccountActiveUseCase } from "../application/use-cases/set-account-active.use-case";
 import type { CreateJournalEntryUseCase } from "../application/use-cases/create-journal-entry.use-case";
 import type { PostJournalEntryUseCase } from "../application/use-cases/post-journal-entry.use-case";
 import type { VoidJournalEntryUseCase } from "../application/use-cases/void-journal-entry.use-case";
@@ -48,6 +49,7 @@ export class AccountingController {
     private readonly periodRepo: IFinancialPeriodRepository,
     private readonly reports: AccountingReportsService,
     private readonly createAccountUseCase: CreateAccountUseCase,
+    private readonly setAccountActiveUseCase: SetAccountActiveUseCase,
     private readonly createEntryUseCase: CreateJournalEntryUseCase,
     private readonly postEntryUseCase: PostJournalEntryUseCase,
     private readonly voidEntryUseCase: VoidJournalEntryUseCase,
@@ -85,6 +87,22 @@ export class AccountingController {
     try {
       const body = createAccountSchema.parse(req.body);
       res.status(201).json(await this.createAccountUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  activateAccount = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.setAccountActiveUseCase.execute(req.params.id, true));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  deactivateAccount = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.setAccountActiveUseCase.execute(req.params.id, false));
     } catch (err) {
       next(err);
     }
