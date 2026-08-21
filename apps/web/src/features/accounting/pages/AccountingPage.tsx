@@ -14,6 +14,7 @@ import { AccountCombobox } from "../components/AccountCombobox";
 import {
   type AccountType,
   type WithholdingType,
+  MAX_PRINCIPAL_ACCOUNT_LEVEL,
   activateAccount,
   closeFinancialPeriod,
   createAccount,
@@ -34,6 +35,7 @@ import {
   listWithholdingConcepts,
   postEntry,
   reopenFinancialPeriod,
+  updateAccount,
   updateCostCenter,
   updateWithholdingConcept,
   voidEntry,
@@ -79,6 +81,8 @@ function AccountsSection() {
   const { data, isLoading } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
   const [form, setForm] = useState({ code: "", name: "", type: "ASSET" as AccountType, parentId: "", acceptsEntries: true });
   const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   function invalidate() {
     return queryClient.invalidateQueries({ queryKey: ["accounting", "accounts"] });
@@ -101,6 +105,13 @@ function AccountsSection() {
 
   const activateMutation = useMutation({ mutationFn: activateAccount, onSuccess: invalidate });
   const deactivateMutation = useMutation({ mutationFn: deactivateAccount, onSuccess: invalidate });
+  const updateMutation = useMutation({
+    mutationFn: (id: string) => updateAccount(id, { name: editName }),
+    onSuccess: () => {
+      invalidate();
+      setEditingId(null);
+    },
+  });
 
   const accounts = data?.data ?? [];
   const filtered = useMemo(() => {
@@ -180,34 +191,69 @@ function AccountsSection() {
               </tr>
             </TableHead>
             <TableBody>
-              {filtered.map((a) => (
-                <TableRow key={a.id}>
-                  <Td className="font-mono text-xs text-slate-900">{a.code}</Td>
-                  <Td style={{ paddingLeft: 12 + (a.level - 1) * 16 }}>{a.name}</Td>
-                  <Td>{ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type}</Td>
-                  <Td>{a.acceptsEntries ? "Si" : "No"}</Td>
-                  <Td>
-                    <ActiveBadge active={a.isActive} />
-                  </Td>
-                  <Td className="text-right">
-                    {a.acceptsEntries &&
-                      (a.isActive ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          loading={deactivateMutation.isPending}
-                          onClick={() => deactivateMutation.mutate(a.id)}
-                        >
-                          Desactivar
-                        </Button>
+              {filtered.map((a) => {
+                const isEditable = a.level > MAX_PRINCIPAL_ACCOUNT_LEVEL;
+                const isEditing = editingId === a.id;
+                return (
+                  <TableRow key={a.id}>
+                    <Td className="font-mono text-xs text-slate-900">{a.code}</Td>
+                    <Td style={{ paddingLeft: 12 + (a.level - 1) * 16 }}>
+                      {isEditing ? (
+                        <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
                       ) : (
-                        <Button size="sm" loading={activateMutation.isPending} onClick={() => activateMutation.mutate(a.id)}>
-                          Activar
-                        </Button>
-                      ))}
-                  </Td>
-                </TableRow>
-              ))}
+                        a.name
+                      )}
+                    </Td>
+                    <Td>{ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type}</Td>
+                    <Td>{a.acceptsEntries ? "Si" : "No"}</Td>
+                    <Td>
+                      <ActiveBadge active={a.isActive} />
+                    </Td>
+                    <Td className="space-x-2 text-right">
+                      {isEditing ? (
+                        <>
+                          <Button size="sm" loading={updateMutation.isPending} onClick={() => updateMutation.mutate(a.id)}>
+                            Guardar
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
+                            Cancelar
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          {isEditable && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setEditingId(a.id);
+                                setEditName(a.name);
+                              }}
+                            >
+                              Editar
+                            </Button>
+                          )}
+                          {a.acceptsEntries &&
+                            (a.isActive ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                loading={deactivateMutation.isPending}
+                                onClick={() => deactivateMutation.mutate(a.id)}
+                              >
+                                Desactivar
+                              </Button>
+                            ) : (
+                              <Button size="sm" loading={activateMutation.isPending} onClick={() => activateMutation.mutate(a.id)}>
+                                Activar
+                              </Button>
+                            ))}
+                        </>
+                      )}
+                    </Td>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}

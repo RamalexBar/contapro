@@ -287,6 +287,17 @@ compras y centros de costo, todo implementado.**
       subcuenta bajo `1524 Equipo de oficina` (no gestionada por el motor) desactivo `1524`; crear
       una bajo `1105 Caja general` (si gestionada) no la desactivo. 5 tests nuevos
       (`create-account.use-case.spec.ts`, no existia antes) — 273 en total.
+    - **Editar cuenta bloqueado para cuentas principales** (mismo dia, a pedido del usuario):
+      `PATCH /chart-of-accounts/:id` (`UpdateAccountUseCase`, solo renombra `name`) rechaza
+      (422) cualquier cuenta de nivel ≤ `MAX_PRINCIPAL_ACCOUNT_LEVEL` (clase/grupo/cuenta, la
+      misma constante que ya usaba `CreateAccountUseCase` para decidir si desactivar
+      `acceptsEntries` del padre — se extrajo a `chart-of-accounts.repository.ts` para que ambos
+      casos de uso compartan la misma frontera). Solo subcuentas/auxiliares (nivel > 3) se pueden
+      renombrar. UI: boton "Editar" nuevo en el catalogo, visible solo en esas filas; edicion en
+      linea igual que Retenciones/Centros de costo. Auditado (`ACCOUNT_UPDATED`). Verificado en
+      vivo: renombrar `135515` (subcuenta) funciono, renombrar `1105 Caja general` (cuenta
+      principal) fue rechazado con el mensaje esperado. 5 tests nuevos
+      (`update-account.use-case.spec.ts`, no existia antes) — 278 en total.
 
 ## Que falta implementar
 

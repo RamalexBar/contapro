@@ -732,7 +732,10 @@ cuando se implemente, mismo criterio que la lista de arriba:
     cuanto se le crea una subcuenta/auxiliar propia — convención PUC real. Acotado a cuentas
     creadas a mano: las ~20 cuentas de 4 dígitos que el motor contable ya usa automáticamente
     quedan exentas (decidido con el usuario para no reescribir los 9 `Post*JournalEntryUseCase`
-    ya verificados). Ver `apps/api/src/modules/accounting/README.md` punto 11 para el detalle.
+    ya verificados). **También a pedido del usuario**: solo subcuentas/auxiliares (nivel > 3) se
+    pueden renombrar (`PATCH /chart-of-accounts/:id`) — las cuentas principales (clase/grupo/
+    cuenta) quedan fijas, sin botón de editar. Ver `apps/api/src/modules/accounting/README.md`
+    punto 11 para el detalle.
 45. **IA (categorización automática, asistente conversacional, insights)** — gancho de marketing
     de Alegra/Siigo en 2026. Prioridad deliberadamente más baja: no es funcionalidad ERP core, es
     percepción de producto — revisar solo después de cerrar el 29-39.

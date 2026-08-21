@@ -11,6 +11,11 @@ export const createAccountSchema = z.object({
 });
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
 
+export const updateAccountSchema = z.object({
+  name: z.string().min(1),
+});
+export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
+
 export const journalEntryLineSchema = z.object({
   accountId: z.string().uuid(),
   debit: z.number().nonnegative().default(0),

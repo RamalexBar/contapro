@@ -2,7 +2,13 @@ import { Prisma } from "@erp/database";
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { ConflictError, NotFoundError } from "../../../shared/errors/app-error";
-import type { AccountRecord, AccountType, CreateAccountData, IChartOfAccountsRepository } from "../domain/chart-of-accounts.repository";
+import type {
+  AccountRecord,
+  AccountType,
+  CreateAccountData,
+  IChartOfAccountsRepository,
+  UpdateAccountData,
+} from "../domain/chart-of-accounts.repository";
 
 export class PrismaChartOfAccountsRepository implements IChartOfAccountsRepository {
   async create(data: CreateAccountData): Promise<AccountRecord> {
@@ -66,6 +72,12 @@ export class PrismaChartOfAccountsRepository implements IChartOfAccountsReposito
     const existing = await this.findByIdOrThrow(id);
     if (!existing.acceptsEntries) return existing;
     const row = await prisma.chartOfAccounts.update({ where: { id }, data: { acceptsEntries: false } });
+    return this.toRecord(row);
+  }
+
+  async update(id: string, data: UpdateAccountData): Promise<AccountRecord> {
+    await this.findByIdOrThrow(id);
+    const row = await prisma.chartOfAccounts.update({ where: { id }, data: { name: data.name } });
     return this.toRecord(row);
   }
 

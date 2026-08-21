@@ -19,6 +19,17 @@ export interface CreateAccountData {
   acceptsEntries?: boolean;
 }
 
+export interface UpdateAccountData {
+  name: string;
+}
+
+/** Nivel maximo (clase=1/grupo=2/cuenta=3) que se considera "cuenta principal" del PUC -- fija,
+ * no editable, siempre creada por el seed estandar (ver seedDefaultChartOfAccounts en
+ * @erp/database). De nivel 4 (subcuenta) para abajo es detalle que el usuario administra
+ * libremente: editar el nombre (UpdateAccountUseCase) y agregar hijos sin apagar
+ * `acceptsEntries` del padre (CreateAccountUseCase) -- misma frontera para ambas reglas. */
+export const MAX_PRINCIPAL_ACCOUNT_LEVEL = 3;
+
 export interface IChartOfAccountsRepository {
   create(data: CreateAccountData): Promise<AccountRecord>;
   list(): Promise<AccountRecord[]>;
@@ -35,4 +46,7 @@ export interface IChartOfAccountsRepository {
    * de clasificacion, el movimiento real queda en el hijo (convencion PUC). No-op si ya era
    * false. */
   disableDirectEntries(id: string): Promise<AccountRecord>;
+  /** Renombra una cuenta -- solo subcuentas/auxiliares (nivel > MAX_PRINCIPAL_ACCOUNT_LEVEL), la
+   * validacion vive en UpdateAccountUseCase, no aca. */
+  update(id: string, data: UpdateAccountData): Promise<AccountRecord>;
 }

@@ -119,6 +119,11 @@ class FakeChartOfAccountsRepository implements IChartOfAccountsRepository {
     account.acceptsEntries = false;
     return account;
   }
+  async update(id: string, data: { name: string }): Promise<AccountRecord> {
+    const account = await this.findByIdOrThrow(id);
+    account.name = data.name;
+    return account;
+  }
 }
 
 class FakeAuditLogRepository implements IAuditLogRepository {

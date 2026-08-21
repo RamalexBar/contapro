@@ -21,6 +21,15 @@ export interface CreateAccountInput {
   acceptsEntries?: boolean;
 }
 
+export interface UpdateAccountInput {
+  name: string;
+}
+
+/** Nivel maximo (clase=1/grupo=2/cuenta=3) que se considera "cuenta principal" del PUC -- fija,
+ * no editable. Misma frontera que MAX_PRINCIPAL_ACCOUNT_LEVEL en el backend
+ * (apps/api/src/modules/accounting/domain/chart-of-accounts.repository.ts). */
+export const MAX_PRINCIPAL_ACCOUNT_LEVEL = 3;
+
 export interface JournalEntryLine {
   id: string;
   accountId: string;
@@ -121,6 +130,10 @@ export function listAccounts(): Promise<{ data: AccountRecord[] }> {
 
 export function createAccount(input: CreateAccountInput): Promise<AccountRecord> {
   return apiFetch("/chart-of-accounts", { method: "POST", body: input });
+}
+
+export function updateAccount(id: string, input: UpdateAccountInput): Promise<AccountRecord> {
+  return apiFetch(`/chart-of-accounts/${id}`, { method: "PATCH", body: input });
 }
 
 export function activateAccount(id: string): Promise<AccountRecord> {

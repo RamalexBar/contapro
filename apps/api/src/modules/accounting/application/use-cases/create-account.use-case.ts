@@ -1,5 +1,10 @@
 import type { AuditService } from "../../../audit/application/audit.service";
-import type { AccountRecord, CreateAccountData, IChartOfAccountsRepository } from "../../domain/chart-of-accounts.repository";
+import {
+  MAX_PRINCIPAL_ACCOUNT_LEVEL,
+  type AccountRecord,
+  type CreateAccountData,
+  type IChartOfAccountsRepository,
+} from "../../domain/chart-of-accounts.repository";
 
 /** Codigos de 4 digitos ("cuenta") que el motor contable ya postea directamente en comprobantes
  * automaticos (ventas, compras, nomina, abonos, etc. -- ver STANDARD_ACCOUNTS en cada
@@ -30,17 +35,10 @@ const ENGINE_MANAGED_ACCOUNT_CODES = new Set([
   "6135",
 ]);
 
-/** Nivel maximo (clase=1/grupo=2/cuenta=3) que deja de admitir movimientos directos al ganar una
- * subcuenta/auxiliar hija. De nivel 4 (subcuenta) para abajo sigue admitiendo movimientos aunque
- * tenga sus propios auxiliares -- convencion PUC: la cuenta base de 4 digitos es solo
- * clasificacion, pero una subcuenta/auxiliar puede seguir usandose directamente segun la
- * necesidad del usuario. */
-const MAX_LEVEL_DISABLED_BY_CHILD = 3;
-
 /**
  * Crea una cuenta del plan de cuentas. Si tiene cuenta padre, ademas de crearla verifica si la
  * cuenta padre debe dejar de admitir movimientos directos (ver ENGINE_MANAGED_ACCOUNT_CODES /
- * MAX_LEVEL_DISABLED_BY_CHILD arriba) -- una cuenta base que gana una subcuenta/auxiliar pasa a
+ * MAX_PRINCIPAL_ACCOUNT_LEVEL arriba) -- una cuenta base que gana una subcuenta/auxiliar pasa a
  * ser solo de clasificacion.
  */
 export class CreateAccountUseCase {
@@ -66,7 +64,7 @@ export class CreateAccountUseCase {
   private async disableParentDirectEntriesIfNeeded(parentId: string): Promise<void> {
     const parent = await this.repo.findByIdOrThrow(parentId);
     if (!parent.acceptsEntries) return;
-    if (parent.level > MAX_LEVEL_DISABLED_BY_CHILD) return;
+    if (parent.level > MAX_PRINCIPAL_ACCOUNT_LEVEL) return;
     if (ENGINE_MANAGED_ACCOUNT_CODES.has(parent.code)) return;
 
     const updated = await this.repo.disableDirectEntries(parent.id);

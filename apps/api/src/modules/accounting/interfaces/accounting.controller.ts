@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { AccountingReportsService } from "../application/accounting-reports.service";
 import type { CreateAccountUseCase } from "../application/use-cases/create-account.use-case";
+import type { UpdateAccountUseCase } from "../application/use-cases/update-account.use-case";
 import type { SetAccountActiveUseCase } from "../application/use-cases/set-account-active.use-case";
 import type { CreateJournalEntryUseCase } from "../application/use-cases/create-journal-entry.use-case";
 import type { PostJournalEntryUseCase } from "../application/use-cases/post-journal-entry.use-case";
@@ -31,6 +32,7 @@ import type { IFinancialPeriodRepository } from "../domain/financial-period.repo
 import { ValidationError } from "../../../shared/errors/app-error";
 import {
   createAccountSchema,
+  updateAccountSchema,
   createBankAccountSchema,
   createJournalEntrySchema,
   matchBankReconciliationItemSchema,
@@ -49,6 +51,7 @@ export class AccountingController {
     private readonly periodRepo: IFinancialPeriodRepository,
     private readonly reports: AccountingReportsService,
     private readonly createAccountUseCase: CreateAccountUseCase,
+    private readonly updateAccountUseCase: UpdateAccountUseCase,
     private readonly setAccountActiveUseCase: SetAccountActiveUseCase,
     private readonly createEntryUseCase: CreateJournalEntryUseCase,
     private readonly postEntryUseCase: PostJournalEntryUseCase,
@@ -87,6 +90,15 @@ export class AccountingController {
     try {
       const body = createAccountSchema.parse(req.body);
       res.status(201).json(await this.createAccountUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateAccount = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = updateAccountSchema.parse(req.body);
+      res.json(await this.updateAccountUseCase.execute(req.params.id, body));
     } catch (err) {
       next(err);
     }

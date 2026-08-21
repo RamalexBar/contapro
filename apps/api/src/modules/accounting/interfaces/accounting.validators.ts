@@ -1,5 +1,6 @@
 export {
   createAccountSchema,
+  updateAccountSchema,
   createJournalEntrySchema,
   createBankAccountSchema,
   registerBankTransactionSchema,
