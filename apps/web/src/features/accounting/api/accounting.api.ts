@@ -72,6 +72,9 @@ export interface AccountBalance {
   code: string;
   name: string;
   balance: number;
+  /** Presente solo cuando getBalanceSheet se llama con byThirdParty:true, para cuentas de
+   * Clientes/Proveedores -- una fila por tercero en vez del total agregado de la cuenta. */
+  thirdPartyName?: string;
 }
 
 export interface BalanceSheet {
@@ -160,8 +163,12 @@ export function voidEntry(id: string): Promise<JournalEntryRecord> {
   return apiFetch(`/journal-entries/${id}/void`, { method: "POST" });
 }
 
-export function getBalanceSheet(asOf?: string): Promise<BalanceSheet> {
-  return apiFetch(`/reports/balance-sheet${asOf ? `?asOf=${asOf}` : ""}`);
+export function getBalanceSheet(asOf?: string, byThirdParty?: boolean): Promise<BalanceSheet> {
+  const params = new URLSearchParams();
+  if (asOf) params.set("asOf", asOf);
+  if (byThirdParty) params.set("byThirdParty", "true");
+  const query = params.toString();
+  return apiFetch(`/reports/balance-sheet${query ? `?${query}` : ""}`);
 }
 
 export function getIncomeStatement(from: string, to: string, costCenterId?: string): Promise<IncomeStatement> {

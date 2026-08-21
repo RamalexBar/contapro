@@ -734,8 +734,11 @@ cuando se implemente, mismo criterio que la lista de arriba:
     quedan exentas (decidido con el usuario para no reescribir los 9 `Post*JournalEntryUseCase`
     ya verificados). **También a pedido del usuario**: solo subcuentas/auxiliares (nivel > 3) se
     pueden renombrar (`PATCH /chart-of-accounts/:id`) — las cuentas principales (clase/grupo/
-    cuenta) quedan fijas, sin botón de editar. Ver `apps/api/src/modules/accounting/README.md`
-    punto 11 para el detalle.
+    cuenta) quedan fijas, sin botón de editar. **También a pedido del usuario**: el Balance
+    General gana toggles "Mostrar código" (solo UI) y "Con terceros" — este último desglosa
+    `1305 Clientes`/`2205 Proveedores` en una fila por cliente/proveedor (las únicas dos cuentas
+    con un tercero identificable de punta a punta en el schema); el resto del catálogo no cambia.
+    Ver `apps/api/src/modules/accounting/README.md` punto 11 para el detalle.
 45. **IA (categorización automática, asistente conversacional, insights)** — gancho de marketing
     de Alegra/Siigo en 2026. Prioridad deliberadamente más baja: no es funcionalidad ERP core, es
     percepción de producto — revisar solo después de cerrar el 29-39.

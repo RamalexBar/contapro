@@ -14,6 +14,7 @@ import { PrismaBankReconciliationRepository } from "./infrastructure/prisma-bank
 import { PrismaWithholdingConceptRepository } from "./infrastructure/prisma-withholding-concept.repository";
 import { PrismaCostCenterRepository } from "./infrastructure/prisma-cost-center.repository";
 import { AccountingReportsService } from "./application/accounting-reports.service";
+import { PrismaThirdPartyResolver } from "./infrastructure/prisma-third-party-resolver";
 import { CreateAccountUseCase } from "./application/use-cases/create-account.use-case";
 import { UpdateAccountUseCase } from "./application/use-cases/update-account.use-case";
 import { SetAccountActiveUseCase } from "./application/use-cases/set-account-active.use-case";
@@ -62,7 +63,8 @@ const financialPeriodRepo = new PrismaFinancialPeriodRepository();
 const withholdingConceptRepo = new PrismaWithholdingConceptRepository();
 const costCenterRepo = new PrismaCostCenterRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
-const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessionRepo, bankTransactionRepo);
+const thirdPartyResolver = new PrismaThirdPartyResolver();
+const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessionRepo, bankTransactionRepo, thirdPartyResolver);
 
 const createAccountUseCase = new CreateAccountUseCase(accountRepo, auditService);
 const updateAccountUseCase = new UpdateAccountUseCase(accountRepo, auditService);

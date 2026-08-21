@@ -1,14 +1,20 @@
 import { round2 } from "@erp/shared-utils";
 import type { IChartOfAccountsRepository } from "../domain/chart-of-accounts.repository";
-import type { IJournalEntryRepository } from "../domain/journal-entry.repository";
+import type { IJournalEntryRepository, PostedLineAggregate } from "../domain/journal-entry.repository";
 import type { IBankTransactionRepository } from "../domain/bank-transaction.repository";
 import type { ICashSessionRepository } from "../../cash/cash-session/domain/cash-session.repository";
+import { THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES, type IThirdPartyResolver } from "../domain/third-party-resolver";
 
 export interface AccountBalance {
   accountId: string;
   code: string;
   name: string;
   balance: number;
+  /** Presente solo cuando getBalanceSheet se pide con byThirdParty:true para una cuenta de
+   * THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES -- una fila por cliente/proveedor en vez del total
+   * agregado de la cuenta. "Sin tercero identificado" agrupa las lineas cuyo sourceType/sourceId
+   * no resolvio a ningun cliente/proveedor (ej. venta de consumidor final). */
+  thirdPartyName?: string;
 }
 
 export interface BalanceSheet {
@@ -75,13 +81,24 @@ export class AccountingReportsService {
     private readonly journalRepo: IJournalEntryRepository,
     private readonly accountRepo: IChartOfAccountsRepository,
     private readonly cashSessionRepo: ICashSessionRepository,
-    private readonly bankTransactionRepo: IBankTransactionRepository
+    private readonly bankTransactionRepo: IBankTransactionRepository,
+    private readonly thirdPartyResolver: IThirdPartyResolver
   ) {}
 
-  async getBalanceSheet(asOf: Date): Promise<BalanceSheet> {
+  /** byThirdParty (nuevo, a pedido del usuario): en vez de un solo total por cuenta, las cuentas
+   * de THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES (Clientes/Proveedores) se desglosan en una fila por
+   * tercero -- ver third-party-resolver.ts para por que solo esas dos cuentas. */
+  async getBalanceSheet(asOf: Date, options: { byThirdParty?: boolean } = {}): Promise<BalanceSheet> {
     const accounts = await this.accountRepo.list();
+    const accountById = new Map(accounts.map((a) => [a.id, a]));
     const lines = await this.journalRepo.listPostedLines({ to: asOf });
-    const byAccount = this.aggregateByAccount(lines);
+    const isBreakdownAccount = (accountId: string) => {
+      const account = accountById.get(accountId);
+      return !!account && THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES.has(account.code);
+    };
+
+    const aggregateLines = options.byThirdParty ? lines.filter((l) => !isBreakdownAccount(l.accountId)) : lines;
+    const byAccount = this.aggregateByAccount(aggregateLines);
 
     const assets: AccountBalance[] = [];
     const liabilities: AccountBalance[] = [];
@@ -90,6 +107,7 @@ export class AccountingReportsService {
     let totalExpense = 0;
 
     for (const account of accounts) {
+      if (options.byThirdParty && THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES.has(account.code)) continue;
       const agg = byAccount.get(account.id);
       if (!agg) continue;
 
@@ -106,6 +124,20 @@ export class AccountingReportsService {
       }
     }
 
+    if (options.byThirdParty) {
+      const breakdownLines = lines.filter((l) => isBreakdownAccount(l.accountId));
+      const thirdPartyByKey = await this.thirdPartyResolver.resolveForLines(breakdownLines);
+      for (const account of accounts) {
+        if (!THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES.has(account.code)) continue;
+        const rows = this.aggregateByThirdParty(
+          breakdownLines.filter((l) => l.accountId === account.id),
+          thirdPartyByKey,
+          account
+        );
+        (account.type === "ASSET" ? assets : liabilities).push(...rows);
+      }
+    }
+
     const netIncome = round2(totalIncome - totalExpense);
     return {
       asOf: asOf.toISOString(),
@@ -117,6 +149,50 @@ export class AccountingReportsService {
       totalEquity: round2(equity.reduce((sum, a) => sum + a.balance, 0) + netIncome),
       netIncome,
     };
+  }
+
+  private aggregateByThirdParty(
+    lines: PostedLineAggregate[],
+    thirdPartyByKey: Map<string, { id: string; name: string }>,
+    account: { id: string; code: string; name: string; type: string }
+  ): AccountBalance[] {
+    const isAsset = account.type === "ASSET";
+    const byThirdPartyId = new Map<string, { debit: number; credit: number; name: string }>();
+    let unidentifiedDebit = 0;
+    let unidentifiedCredit = 0;
+
+    for (const line of lines) {
+      const key = line.sourceType && line.sourceId ? `${line.sourceType}:${line.sourceId}` : null;
+      const thirdParty = key ? thirdPartyByKey.get(key) : undefined;
+      if (thirdParty) {
+        const agg = byThirdPartyId.get(thirdParty.id) ?? { debit: 0, credit: 0, name: thirdParty.name };
+        agg.debit += line.debit;
+        agg.credit += line.credit;
+        byThirdPartyId.set(thirdParty.id, agg);
+      } else {
+        unidentifiedDebit += line.debit;
+        unidentifiedCredit += line.credit;
+      }
+    }
+
+    const rows: AccountBalance[] = [];
+    for (const agg of byThirdPartyId.values()) {
+      const balance = round2(isAsset ? agg.debit - agg.credit : agg.credit - agg.debit);
+      if (balance !== 0) {
+        rows.push({ accountId: account.id, code: account.code, name: account.name, balance, thirdPartyName: agg.name });
+      }
+    }
+    const unidentifiedBalance = round2(isAsset ? unidentifiedDebit - unidentifiedCredit : unidentifiedCredit - unidentifiedDebit);
+    if (unidentifiedBalance !== 0) {
+      rows.push({
+        accountId: account.id,
+        code: account.code,
+        name: account.name,
+        balance: unidentifiedBalance,
+        thirdPartyName: "Sin tercero identificado",
+      });
+    }
+    return rows.sort((a, b) => (a.thirdPartyName ?? "").localeCompare(b.thirdPartyName ?? ""));
   }
 
   async getIncomeStatement(from: Date, to: Date, costCenterId?: string): Promise<IncomeStatement> {

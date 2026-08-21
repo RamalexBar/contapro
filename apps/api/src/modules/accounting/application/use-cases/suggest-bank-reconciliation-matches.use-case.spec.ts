@@ -124,6 +124,8 @@ function makeLine(overrides: Partial<PostedLineAggregate> = {}): PostedLineAggre
     entryId: "entry-1",
     entryNumber: 1,
     description: "Comprobante de venta",
+    sourceType: null,
+    sourceId: null,
     ...overrides,
   };
 }

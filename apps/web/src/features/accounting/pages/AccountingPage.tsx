@@ -764,12 +764,14 @@ function ReportsSection() {
   const [ledgerAccountId, setLedgerAccountId] = useState("");
   const [incomeCostCenterId, setIncomeCostCenterId] = useState("");
   const [ledgerCostCenterId, setLedgerCostCenterId] = useState("");
+  const [showCode, setShowCode] = useState(true);
+  const [byThirdParty, setByThirdParty] = useState(false);
 
   const { data: accounts } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
   const { data: costCenters } = useQuery({ queryKey: ["cost-centers"], queryFn: listCostCenters });
   const balanceQuery = useQuery({
-    queryKey: ["accounting", "balance-sheet", asOf],
-    queryFn: () => getBalanceSheet(asOf),
+    queryKey: ["accounting", "balance-sheet", asOf, byThirdParty],
+    queryFn: () => getBalanceSheet(asOf, byThirdParty),
     enabled: reportTab === "balance",
   });
   const incomeQuery = useQuery({
@@ -800,24 +802,36 @@ function ReportsSection() {
 
       {reportTab === "balance" && (
         <Card>
-          <div className="mb-4">
+          <div className="mb-4 flex flex-wrap items-end gap-4">
             <Input type="date" label="Fecha de corte" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} />
+              Mostrar código
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={byThirdParty} onChange={(e) => setByThirdParty(e.target.checked)} />
+              Con terceros (Clientes/Proveedores por cliente/proveedor)
+            </label>
           </div>
           {balanceQuery.data && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
               <div>
                 <h3 className="mb-2 text-sm font-semibold text-slate-900">Activos ({formatCOP(balanceQuery.data.totalAssets)})</h3>
-                {balanceQuery.data.assets.map((a) => (
-                  <p key={a.accountId} className="text-sm text-slate-600">
-                    {a.name}: {formatCOP(a.balance)}
+                {balanceQuery.data.assets.map((a, i) => (
+                  <p key={`${a.accountId}-${a.thirdPartyName ?? i}`} className="text-sm text-slate-600">
+                    {showCode ? `${a.code} ` : ""}
+                    {a.name}
+                    {a.thirdPartyName ? ` — ${a.thirdPartyName}` : ""}: {formatCOP(a.balance)}
                   </p>
                 ))}
               </div>
               <div>
                 <h3 className="mb-2 text-sm font-semibold text-slate-900">Pasivos ({formatCOP(balanceQuery.data.totalLiabilities)})</h3>
-                {balanceQuery.data.liabilities.map((a) => (
-                  <p key={a.accountId} className="text-sm text-slate-600">
-                    {a.name}: {formatCOP(a.balance)}
+                {balanceQuery.data.liabilities.map((a, i) => (
+                  <p key={`${a.accountId}-${a.thirdPartyName ?? i}`} className="text-sm text-slate-600">
+                    {showCode ? `${a.code} ` : ""}
+                    {a.name}
+                    {a.thirdPartyName ? ` — ${a.thirdPartyName}` : ""}: {formatCOP(a.balance)}
                   </p>
                 ))}
               </div>
@@ -827,6 +841,7 @@ function ReportsSection() {
                 </h3>
                 {balanceQuery.data.equity.map((a) => (
                   <p key={a.accountId} className="text-sm text-slate-600">
+                    {showCode ? `${a.code} ` : ""}
                     {a.name}: {formatCOP(a.balance)}
                   </p>
                 ))}

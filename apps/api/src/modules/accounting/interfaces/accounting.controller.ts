@@ -165,7 +165,8 @@ export class AccountingController {
   getBalanceSheet = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const asOf = typeof req.query.asOf === "string" ? new Date(req.query.asOf) : new Date();
-      res.json(await this.reports.getBalanceSheet(asOf));
+      const byThirdParty = req.query.byThirdParty === "true";
+      res.json(await this.reports.getBalanceSheet(asOf, { byThirdParty }));
     } catch (err) {
       next(err);
     }

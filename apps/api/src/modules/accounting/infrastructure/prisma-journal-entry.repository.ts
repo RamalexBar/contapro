@@ -170,6 +170,8 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
       entryId: r.journalEntryId,
       entryNumber: r.journalEntry.number,
       description: r.description,
+      sourceType: r.journalEntry.sourceType,
+      sourceId: r.journalEntry.sourceId,
     }));
   }
 

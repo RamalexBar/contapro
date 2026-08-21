@@ -51,6 +51,10 @@ export interface PostedLineAggregate {
   entryId: string;
   entryNumber: number;
   description: string | null;
+  // Del JournalEntry padre -- usado por AccountingReportsService/IThirdPartyResolver para
+  // desglosar el Balance General por tercero (item nuevo, ver third-party-resolver.ts).
+  sourceType: string | null;
+  sourceId: string | null;
 }
 
 export interface IJournalEntryRepository {

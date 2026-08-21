@@ -298,6 +298,25 @@ compras y centros de costo, todo implementado.**
       vivo: renombrar `135515` (subcuenta) funciono, renombrar `1105 Caja general` (cuenta
       principal) fue rechazado con el mensaje esperado. 5 tests nuevos
       (`update-account.use-case.spec.ts`, no existia antes) — 278 en total.
+    - **Balance General con/sin código y con/sin terceros** (mismo día, a pedido del usuario):
+      `GET /reports/balance-sheet?byThirdParty=true` desglosa las cuentas `1305 Clientes` y
+      `2205 Proveedores` en una fila por tercero en vez de un solo total —
+      `THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES` en `domain/third-party-resolver.ts` limita el alcance
+      a esas dos cuentas porque son las únicas con un cliente/proveedor identificable de punta a
+      punta en el schema; el resto de cuentas (Caja, Bancos, Inventarios, Gastos, etc.) no tienen
+      ningún tercero asociado. `IThirdPartyResolver`/`PrismaThirdPartyResolver` resuelven el
+      tercero de cada línea según el `sourceType`/`sourceId` de su comprobante (`Sale`, `Return`,
+      `Purchase` directo; `SupplierPayment`→`AccountPayable`, `AccountReceivablePayment`→
+      `AccountReceivable` con un salto extra) — batcheado, sin N+1. Una línea cuyo origen no
+      resuelve a ningún tercero (venta de consumidor final, ajuste manual, etc.) cae en la fila
+      "Sin tercero identificado" en vez de perderse; la suma de todas las filas de una cuenta
+      siempre cuadra con el total agregado (verificado en `accounting-reports.service.spec.ts`,
+      no existía antes — 4 tests nuevos, 282 en total). `PostedLineAggregate` ganó `sourceType`/
+      `sourceId` (ya se traían del join con `journalEntry`, solo faltaba exponerlos). "Con
+      código" es un toggle puramente de UI (`AccountingReportsService` siempre devuelve `code` y
+      `name` por separado, no hace falta tocar el backend). Verificado en vivo contra la empresa
+      demo: el desglose por tercero de `1305`/`2205` suma exactamente el mismo total que la vista
+      agregada.
 
 ## Que falta implementar
 
