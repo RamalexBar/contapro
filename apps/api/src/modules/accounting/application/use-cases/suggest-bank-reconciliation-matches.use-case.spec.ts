@@ -225,4 +225,45 @@ describe("SuggestBankReconciliationMatchesUseCase", () => {
     const suggestions = await useCase.execute("recon-1");
     expect(suggestions).toEqual([expect.objectContaining({ confidence: "EXACT" })]);
   });
+
+  it("breaks a same-amount, same-date tie by description similarity instead of array order", async () => {
+    // Dos comprobantes con el mismo monto y la misma fecha (empate total por fecha) -- la
+    // transaccion del banco menciona al proveedor "Acme", que solo coincide con line-acme.
+    // Antes de este cambio se quedaba con "line-otro" por ser la primera en la lista.
+    const useCase = new SuggestBankReconciliationMatchesUseCase(
+      new FakeBankReconciliationRepo(),
+      new FakeBankTransactionRepo([makeTx({ description: "Transferencia Proveedor Acme SAS" })]),
+      new FakeJournalEntryRepo([
+        makeLine({ id: "line-otro", description: "Comprobante de venta" }),
+        makeLine({ id: "line-acme", description: "Compra Proveedor Acme SAS" }),
+      ])
+    );
+
+    const suggestions = await useCase.execute("recon-1");
+
+    expect(suggestions).toEqual([
+      expect.objectContaining({ journalEntryLineId: "line-acme", confidence: "EXACT" }),
+    ]);
+  });
+
+  it("still prefers the closer date over a same-amount but textually similar candidate further away", async () => {
+    // La cercania de fecha sigue siendo la señal principal: aunque "line-lejos" describe mejor la
+    // transaccion, "line-cerca" esta el mismo dia y no deberia perder por texto.
+    const useCase = new SuggestBankReconciliationMatchesUseCase(
+      new FakeBankReconciliationRepo(),
+      new FakeBankTransactionRepo([
+        makeTx({ date: new Date("2026-07-10"), description: "Transferencia Proveedor Acme SAS" }),
+      ]),
+      new FakeJournalEntryRepo([
+        makeLine({ id: "line-cerca", date: new Date("2026-07-10"), description: "Comprobante generico" }),
+        makeLine({ id: "line-lejos", date: new Date("2026-07-13"), description: "Compra Proveedor Acme SAS" }),
+      ])
+    );
+
+    const suggestions = await useCase.execute("recon-1");
+
+    expect(suggestions).toEqual([
+      expect.objectContaining({ journalEntryLineId: "line-cerca", confidence: "EXACT", daysApart: 0 }),
+    ]);
+  });
 });

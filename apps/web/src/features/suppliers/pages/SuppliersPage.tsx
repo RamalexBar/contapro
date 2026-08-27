@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { calculateTax, formatCOP, formatCurrency, round2 } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
@@ -16,13 +16,30 @@ import {
   cancelPurchase,
   createPurchase,
   createSupplier,
+  extractPurchaseInvoice,
   listAccountsPayable,
   listPurchases,
   listSuppliers,
   registerSupplierPayment,
+  type ExtractPurchaseInvoiceResult,
   type PurchaseWithholdingInput,
   type SupplierRecord,
 } from "../api/supplier.api";
+
+const ACCEPTED_INVOICE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // FileReader.readAsDataURL da "data:<mime>;base64,<datos>" -- la API solo quiere <datos>.
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
+}
 
 function todayStr(): string {
   const d = new Date();
@@ -154,6 +171,43 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
     exchangeRate: "",
   });
   const [withholdings, setWithholdings] = useState<PurchaseWithholdingInput[]>([]);
+  const [extractResult, setExtractResult] = useState<ExtractPurchaseInvoiceResult | null>(null);
+  const [fileTypeError, setFileTypeError] = useState(false);
+  const invoiceFileInputRef = useRef<HTMLInputElement>(null);
+
+  const extractMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fileBase64 = await fileToBase64(file);
+      return extractPurchaseInvoice(fileBase64, file.type);
+    },
+    onSuccess: (result) => {
+      setExtractResult(result);
+      const { extracted, matchedSupplier, suggestedDueDate } = result;
+      setForm((prev) => ({
+        ...prev,
+        supplierId: matchedSupplier?.id ?? prev.supplierId,
+        invoiceNumber: extracted.invoiceNumber ?? prev.invoiceNumber,
+        subtotal: extracted.subtotal != null ? String(extracted.subtotal) : prev.subtotal,
+        taxTotal: extracted.taxTotal != null ? String(extracted.taxTotal) : prev.taxTotal,
+        dueDate: suggestedDueDate ?? prev.dueDate,
+        currency: extracted.currency || prev.currency,
+      }));
+    },
+  });
+
+  function handleInvoiceFileSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo si se corrige algo y se reintenta
+    if (!file) return;
+    if (!ACCEPTED_INVOICE_TYPES.includes(file.type)) {
+      setFileTypeError(true);
+      return;
+    }
+    setFileTypeError(false);
+    setExtractResult(null);
+    extractMutation.mutate(file);
+  }
+
   const total = (Number(form.subtotal) || 0) + (Number(form.taxTotal) || 0);
   const retentionTotal = round2(
     withholdings.reduce((sum, w) => {
@@ -181,6 +235,7 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
       queryClient.invalidateQueries({ queryKey: ["accounts-payable"] });
       setForm({ supplierId: "", invoiceNumber: "", subtotal: "", taxTotal: "", dueDate: todayStr(), currency: "COP", exchangeRate: "" });
       setWithholdings([]);
+      setExtractResult(null);
     },
   });
 
@@ -195,6 +250,48 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
 
   return (
     <div className="space-y-6">
+      <Card title="Leer factura automaticamente">
+        <p className="mb-3 text-sm text-slate-500">
+          Sube una foto o el PDF de la factura del proveedor y el formulario de abajo se precarga solo. Siempre revisa los datos antes
+          de registrar la compra.
+        </p>
+        <input
+          ref={invoiceFileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          className="hidden"
+          onChange={handleInvoiceFileSelected}
+        />
+        <Button type="button" loading={extractMutation.isPending} onClick={() => invoiceFileInputRef.current?.click()}>
+          Leer factura (foto/PDF)
+        </Button>
+
+        {fileTypeError && (
+          <Alert tone="danger" className="mt-3">
+            Ese tipo de archivo no se puede leer. Sube una foto (JPG/PNG/WEBP) o un PDF.
+          </Alert>
+        )}
+        {extractMutation.isError && (
+          <Alert tone="danger" className="mt-3">
+            {(extractMutation.error as Error).message}
+          </Alert>
+        )}
+        {extractResult && (
+          <div className="mt-3 space-y-2">
+            {extractResult.matchedSupplier ? (
+              <Alert tone="success">Proveedor identificado: {extractResult.matchedSupplier.name}. Revisa el resto de los datos abajo.</Alert>
+            ) : (
+              <Alert tone="warning">No se pudo identificar el proveedor automaticamente -- eligelo a mano abajo.</Alert>
+            )}
+            {extractResult.extracted.warnings.map((w, i) => (
+              <Alert key={i} tone="warning">
+                {w}
+              </Alert>
+            ))}
+          </div>
+        )}
+      </Card>
+
       <Card title="Registrar compra">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-6"

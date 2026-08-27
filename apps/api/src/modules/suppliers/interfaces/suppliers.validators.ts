@@ -1,6 +1,16 @@
 import { z } from "zod";
 import { withholdingApplicationSchema } from "@erp/shared-types";
 
+// ~13MB en base64 (base64 pesa ~4/3 del binario, asi que esto son ~10MB reales) -- generoso para
+// una foto de celular o un PDF escaneado de una sola factura, con margen bajo el limite de 20mb
+// del body JSON completo (ver express.json({ limit }) en app.ts).
+const MAX_INVOICE_BASE64_LENGTH = 13_000_000;
+
+export const extractPurchaseInvoiceSchema = z.object({
+  fileBase64: z.string().min(1).max(MAX_INVOICE_BASE64_LENGTH),
+  mediaType: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
+});
+
 export const createSupplierSchema = z.object({
   name: z.string().min(2),
   nit: z.string().min(3),

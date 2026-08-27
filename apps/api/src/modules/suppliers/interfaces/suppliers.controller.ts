@@ -13,10 +13,12 @@ import type { GetGoodsReceiptUseCase } from "../application/use-cases/get-goods-
 import type { ListAccountsPayableUseCase } from "../application/use-cases/list-accounts-payable.use-case";
 import type { RegisterSupplierPaymentUseCase } from "../application/use-cases/register-supplier-payment.use-case";
 import type { CancelPurchaseUseCase } from "../application/use-cases/cancel-purchase.use-case";
+import type { ExtractPurchaseInvoiceUseCase } from "../application/use-cases/extract-purchase-invoice.use-case";
 import {
   createPurchaseOrderSchema,
   createPurchaseSchema,
   createSupplierSchema,
+  extractPurchaseInvoiceSchema,
   receiveGoodsSchema,
   registerSupplierPaymentSchema,
 } from "./suppliers.validators";
@@ -36,7 +38,8 @@ export class SuppliersController {
     private readonly getGoodsReceiptUseCase: GetGoodsReceiptUseCase,
     private readonly listAccountsPayableUseCase: ListAccountsPayableUseCase,
     private readonly registerSupplierPaymentUseCase: RegisterSupplierPaymentUseCase,
-    private readonly cancelPurchaseUseCase: CancelPurchaseUseCase
+    private readonly cancelPurchaseUseCase: CancelPurchaseUseCase,
+    private readonly extractPurchaseInvoiceUseCase: ExtractPurchaseInvoiceUseCase
   ) {}
 
   createSupplier = async (req: Request, res: Response, next: NextFunction) => {
@@ -61,6 +64,15 @@ export class SuppliersController {
     try {
       const body = createPurchaseSchema.parse(req.body);
       res.status(201).json(await this.createPurchaseUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  extractPurchaseInvoice = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = extractPurchaseInvoiceSchema.parse(req.body);
+      res.json(await this.extractPurchaseInvoiceUseCase.execute({ base64: body.fileBase64, mediaType: body.mediaType }));
     } catch (err) {
       next(err);
     }

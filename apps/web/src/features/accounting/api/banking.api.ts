@@ -86,6 +86,22 @@ export function startBankReconciliation(input: StartBankReconciliationInput): Pr
   return apiFetch("/bank-reconciliations", { method: "POST", body: input });
 }
 
+export interface SuggestedBankMatch {
+  bankTransactionId: string;
+  journalEntryLineId: string;
+  amount: number;
+  bankTransactionDate: string;
+  journalEntryDate: string;
+  journalEntryNumber: number;
+  daysApart: number;
+  confidence: "EXACT" | "PROBABLE";
+  descriptionSimilarity: number;
+}
+
+export function getSuggestedBankReconciliationMatches(id: string): Promise<{ data: SuggestedBankMatch[] }> {
+  return apiFetch(`/bank-reconciliations/${id}/suggested-matches`);
+}
+
 export function matchBankReconciliationItem(
   id: string,
   data: { bankTransactionId?: string; journalEntryLineId?: string }

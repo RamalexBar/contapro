@@ -93,11 +93,29 @@ compras y centros de costo, todo implementado.**
      la cuenta contra las lineas de comprobantes `POSTED` de la empresa dentro de una ventana de
      ±5 dias del periodo de la conciliacion, por **monto exacto** (no hay forma de filtrar por
      cuenta contable, ver punto anterior). `confidence: "EXACT"` si ademas la fecha coincide
-     exactamente, `"PROBABLE"` si esta dentro de la ventana. Heuristica greedy (una linea no se
-     sugiere dos veces; ver comentario en el caso de uso) — es de solo lectura, no crea ningun
-     `BankReconciliationItem`, el usuario confirma cada sugerencia con el endpoint de match de
-     abajo. Excluye transacciones ya `reconciled` y lineas ya usadas en cualquier conciliacion
-     `matched: true` de la empresa.
+     exactamente, `"PROBABLE"` si esta dentro de la ventana. **Desempate por similitud de texto**
+     (iteracion 44, `description-similarity.ts`): cuando varias lineas candidatas quedan a la
+     misma distancia de fecha (o muy cerca), el candidato elegido ya no es "el primero que
+     aparezca en la lista" sino el que comparte mas palabras con la descripcion de la transaccion
+     bancaria (indice de Jaccard sobre tokens, sin tildes/mayusculas/conectores comunes) — una
+     coincidencia de texto perfecta puede compensar como maximo 1 dia de diferencia de fecha,
+     nunca mas (`SIMILARITY_TIEBREAK_WEIGHT`), asi que la fecha sigue siendo la señal principal.
+     Cada sugerencia expone `descriptionSimilarity` (0..1), aunque la UI (ver mas abajo) no lo
+     muestra en pantalla -- es una señal interna de desempate, no algo que un contador necesite
+     leer directamente. **Conectado a la UI** (`BankingPage.tsx` → pestaña "Conciliaciones", al
+     expandir una conciliacion `IN_PROGRESS`): lista cada sugerencia con monto/fechas/comprobante y
+     una pildora "Exacta"/"Probable", con un boton "Confirmar" que llama al endpoint de match de
+     abajo con los ids ya resueltos (el formulario de ids a mano sigue disponible debajo, para los
+     casos que el sugeridor no cubre). Al confirmar se refresca tambien la lista de sugerencias, asi
+     que el item confirmado desaparece solo.
+     Heuristica greedy (una linea no se sugiere dos veces; ver comentario en el caso de uso) — es
+     de solo lectura, no crea ningun `BankReconciliationItem`, el usuario confirma cada sugerencia
+     con el endpoint de match de abajo. Excluye transacciones ya `reconciled` y lineas ya usadas en
+     cualquier conciliacion `matched: true` de la empresa. Sigue siendo estrictamente 1 a 1 — una
+     transaccion que en la realidad corresponde a la suma de varios comprobantes (pago partido, o
+     el banco descontando una comision aparte) no se sugiere; soportarlo requeriria que
+     `BankReconciliationItem` deje de ser un par 1:1 y tocar tambien el endpoint de match, no solo
+     el sugeridor.
    - `POST /bank-reconciliations/:id/match` — el usuario elige que `BankTransaction` corresponde
      a que `JournalEntryLine` (ambos opcionales/independientes, tipicamente a partir de una
      sugerencia de arriba, pero tambien se puede llamar a mano); crea el
@@ -330,3 +348,8 @@ compras y centros de costo, todo implementado.**
    explicita). Balance General y Flujo de caja tampoco filtran por centro de costo.
 5. El PUC precargado (punto 11) es un catalogo simplificado, no la codificacion oficial completa
    del Decreto 2650 — sin verificar contra un contador real.
+6. El sugeridor sigue siendo estrictamente 1 a 1 (una transaccion ↔ un comprobante). No sugiere
+   pagos partidos (una transaccion que en la realidad corresponde a la suma de varios
+   comprobantes, o viceversa) — soportarlo requeriria que `BankReconciliationItem` deje de ser un
+   par 1:1, tocando tambien `AddBankReconciliationMatchData`/el endpoint de match, no solo el
+   sugeridor.

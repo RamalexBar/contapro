@@ -1,9 +1,19 @@
 import type { IBankReconciliationRepository } from "../../domain/bank-reconciliation.repository";
 import type { IBankTransactionRepository } from "../../domain/bank-transaction.repository";
 import type { IJournalEntryRepository } from "../../domain/journal-entry.repository";
+import { descriptionSimilarity } from "../description-similarity";
 
 const MAX_DAYS_APART = 5;
 const DAY_MS = 86_400_000;
+
+/**
+ * Cuanto puede "pagar" una similitud de texto perfecta (1.0) en dias de diferencia de fecha al
+ * elegir el mejor candidato dentro de `execute` mas abajo. Con 1.0, una coincidencia de
+ * descripcion perfecta compensa como maximo 1 dia de distancia; nunca hace ganar a un candidato
+ * mas lejano que el mas cercano por mas de eso. La cercania de fecha sigue siendo la señal
+ * principal, el texto solo desempata entre candidatos con fechas parecidas.
+ */
+const SIMILARITY_TIEBREAK_WEIGHT = 1;
 
 export interface SuggestedBankMatch {
   bankTransactionId: string;
@@ -14,19 +24,27 @@ export interface SuggestedBankMatch {
   journalEntryNumber: number;
   daysApart: number;
   confidence: "EXACT" | "PROBABLE";
+  /** 0..1, similitud de texto entre la descripcion de la transaccion y la del comprobante --
+   * informativo (se usa para desempatar, no para decidir si hay match). */
+  descriptionSimilarity: number;
 }
 
 /**
- * Sugerencias de conciliacion por monto exacto + cercania de fecha (maximo 5 dias de diferencia).
- * No filtra por cuenta contable porque no hay enlace en el schema entre BankAccount y una cuenta
- * de ChartOfAccounts (ver domain/bank-reconciliation.repository.ts) -- compara el monto de la
- * transaccion contra cualquier linea de comprobante POSTED de la empresa dentro de la ventana de
- * fechas. Es de solo lectura: no crea ningun BankReconciliationItem, el usuario confirma cada
- * sugerencia con POST /bank-reconciliations/:id/match (ya existente).
+ * Sugerencias de conciliacion por monto exacto + cercania de fecha (maximo 5 dias de diferencia),
+ * desempatado por similitud de texto entre la descripcion del banco y la del comprobante cuando
+ * hay varios candidatos con fechas parecidas (ver SIMILARITY_TIEBREAK_WEIGHT y
+ * `description-similarity.ts`). No filtra por cuenta contable porque no hay enlace en el schema
+ * entre BankAccount y una cuenta de ChartOfAccounts (ver domain/bank-reconciliation.repository.ts)
+ * -- compara el monto de la transaccion contra cualquier linea de comprobante POSTED de la
+ * empresa dentro de la ventana de fechas. Es de solo lectura: no crea ningun
+ * BankReconciliationItem, el usuario confirma cada sugerencia con POST
+ * /bank-reconciliations/:id/match (ya existente).
  *
  * Heuristica greedy (una linea candidata se usa como maximo en una sugerencia, la transaccion mas
  * temprana de la lista se queda con su mejor candidato primero) -- no es un matching optimo, es
- * una sugerencia para que el usuario confirme o descarte.
+ * una sugerencia para que el usuario confirme o descarte. Sigue siendo estrictamente 1 a 1: una
+ * transaccion que en la realidad corresponde a la suma de varios comprobantes (o viceversa) no se
+ * sugiere -- ver "Que sigue" en el README del modulo.
  */
 export class SuggestBankReconciliationMatchesUseCase {
   constructor(
@@ -57,7 +75,7 @@ export class SuggestBankReconciliationMatchesUseCase {
     const suggestions: SuggestedBankMatch[] = [];
 
     for (const tx of unreconciledTransactions) {
-      let best: { line: (typeof candidateLines)[number]; daysApart: number } | null = null;
+      let best: { line: (typeof candidateLines)[number]; daysApart: number; similarity: number; score: number } | null = null;
 
       for (const line of candidateLines) {
         if (usedLineIds.has(line.id)) continue;
@@ -67,7 +85,12 @@ export class SuggestBankReconciliationMatchesUseCase {
         const daysApart = Math.round(Math.abs(tx.date.getTime() - line.date.getTime()) / DAY_MS);
         if (daysApart > MAX_DAYS_APART) continue;
 
-        if (!best || daysApart < best.daysApart) best = { line, daysApart };
+        const similarity = descriptionSimilarity(tx.description, line.description);
+        // Puntaje mas bajo = mejor candidato. La similitud de texto solo desempata entre
+        // candidatos con fechas parecidas -- ver SIMILARITY_TIEBREAK_WEIGHT arriba.
+        const score = daysApart - SIMILARITY_TIEBREAK_WEIGHT * similarity;
+
+        if (!best || score < best.score) best = { line, daysApart, similarity, score };
       }
 
       if (!best) continue;
@@ -81,6 +104,7 @@ export class SuggestBankReconciliationMatchesUseCase {
         journalEntryNumber: best.line.entryNumber,
         daysApart: best.daysApart,
         confidence: best.daysApart === 0 ? "EXACT" : "PROBABLE",
+        descriptionSimilarity: Math.round(best.similarity * 100) / 100,
       });
     }
 

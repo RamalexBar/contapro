@@ -103,6 +103,32 @@ implementado. Consumo FIFO real (modulo POS) documentado abajo.
     necesitaron ningun cambio, ya operaban solo sobre `AccountPayable.balance`. Verificado en
     vivo: compra con ReteICA, `AccountPayable` neto correcto, abono contra ese saldo neto, y
     cancelacion con reverso completo del abono y del comprobante -- los tres sin tocar código.
+11. **Lectura automatica de facturas de compra con IA** (iteracion 45, `POST /purchases/extract`,
+    permiso `suppliers.manage`, mismo que `POST /purchases`): el usuario sube la foto o el PDF de
+    la factura del proveedor (`fileBase64` + `mediaType` en el body, hasta ~10MB reales) y
+    `ExtractPurchaseInvoiceUseCase` devuelve un borrador -- proveedor/NIT, numero de factura,
+    fecha, subtotal, IVA, total, moneda y una lista de `warnings` en español para lo que no se
+    pudo leer con confianza -- **nunca crea el `Purchase`**, el usuario lo revisa/corrige y lo
+    confirma con el `POST /purchases` de siempre (punto 2). Intenta emparejar con un proveedor ya
+    existente por NIT exacto o, si no hay NIT, por nombre pero solo cuando el resultado es
+    inequivoco (un unico proveedor coincide) -- con varios candidatos devuelve `null` en vez de
+    adivinar, igual que el sugeridor de conciliacion bancaria (`modules/accounting/README.md`).
+    Tambien sugiere `dueDate` = fecha de emision + 30 dias (mismo plazo por defecto que
+    `create-purchase.use-case.ts`), editable.
+
+    Implementado con `ClaudeInvoiceExtractionService`
+    (`infrastructure/claude-invoice-extraction.service.ts`, puerto `IInvoiceExtractionService`):
+    Claude API (`claude-opus-5`, vision + salida estructurada validada con Zod,
+    `client.messages.parse` + `zodOutputFormat`) via el SDK oficial `@anthropic-ai/sdk`, sin
+    credenciales configuradas responde `422` con mensaje claro ("ANTHROPIC_API_KEY no esta
+    configurada"), mismo criterio que DIAN_*/RESEND_API_KEY/WOMPI_*/WHATSAPP_* (ver
+    `config/env.ts`). **NO PROBADO contra facturas reales variadas** en este entorno -- el
+    prompt/schema siguen la documentacion de la API al momento de escribir esto, sin contrastar
+    contra letra manuscrita, facturas borrosas, o formatos de factura fuera de lo tipico
+    colombiano. El body JSON global subio de 100kb a 20mb (`app.ts`) porque este es el primer
+    endpoint de todo el proyecto que recibe un archivo -- no hay parser por ruta, se afecta toda
+    la API por igual. UI conectada en `apps/web/src/features/suppliers` (boton "Leer factura
+    (foto/PDF)" en el formulario de "Registrar factura de compra").
 
 ## Consumo FIFO real (iteracion 16, `modules/pos/sale`)
 

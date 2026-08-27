@@ -85,6 +85,11 @@ services:
       # verificado en Resend (ej. no-reply@tudominio.com) para poder enviar a cualquier destinatario.
       - key: RESEND_FROM_EMAIL
         value: onboarding@resend.dev
+      # Sin esta llave, POST /purchases/extract (lectura automatica de facturas de compra,
+      # modules/suppliers/README.md) responde con un mensaje claro en vez de fallar en silencio --
+      # mismo criterio que RESEND_API_KEY/DIAN_* de arriba. Completar a mano en el dashboard.
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: WOMPI_ENVIRONMENT
         value: production
       - key: WOMPI_PUBLIC_KEY

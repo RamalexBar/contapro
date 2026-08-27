@@ -66,6 +66,13 @@ const envSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: z.string().default(""),
   WHATSAPP_PHONE_NUMBER_ID: z.string().default(""),
   WHATSAPP_API_VERSION: z.string().default("v21.0"),
+
+  // ---- Lectura automatica de facturas de compra con IA (ver modules/suppliers/README.md) ----
+  // Vacio por defecto = POST /purchases/extract falla con mensaje claro (mismo criterio que
+  // DIAN_*/RESEND_*/WOMPI_*/WHATSAPP_* de arriba). Nunca se usa para nada mas que extraer datos
+  // de la imagen/PDF que el propio usuario sube -- el registro de la compra sigue siendo manual
+  // (POST /purchases), esto solo prellena el formulario.
+  ANTHROPIC_API_KEY: z.string().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);

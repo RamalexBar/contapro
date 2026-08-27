@@ -49,7 +49,10 @@ export const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
-app.use(express.json());
+// 20mb: el default (100kb) rechazaria de entrada la foto/PDF en base64 de
+// POST /purchases/extract (lectura automatica de facturas, ver suppliers.container.ts) -- unico
+// endpoint que hoy manda un archivo en el body, no hay parser JSON por ruta en este proyecto.
+app.use(express.json({ limit: "20mb" }));
 app.use(morgan(env.NODE_ENV === "development" ? "dev" : "combined"));
 app.use("/api", apiRateLimiter);
 

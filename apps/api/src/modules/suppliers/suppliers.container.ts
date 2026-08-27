@@ -32,9 +32,12 @@ import { GetGoodsReceiptUseCase } from "./application/use-cases/get-goods-receip
 import { ListAccountsPayableUseCase } from "./application/use-cases/list-accounts-payable.use-case";
 import { RegisterSupplierPaymentUseCase } from "./application/use-cases/register-supplier-payment.use-case";
 import { CancelPurchaseUseCase } from "./application/use-cases/cancel-purchase.use-case";
+import { ExtractPurchaseInvoiceUseCase } from "./application/use-cases/extract-purchase-invoice.use-case";
+import { ClaudeInvoiceExtractionService } from "./infrastructure/claude-invoice-extraction.service";
 import { SuppliersController } from "./interfaces/suppliers.controller";
 
 const supplierRepo = new PrismaSupplierRepository();
+const invoiceExtractionService = new ClaudeInvoiceExtractionService();
 const purchaseRepo = new PrismaPurchaseRepository();
 const purchaseOrderRepo = new PrismaPurchaseOrderRepository();
 const goodsReceiptRepo = new PrismaGoodsReceiptRepository();
@@ -63,5 +66,6 @@ export const suppliersController = new SuppliersController(
   new GetGoodsReceiptUseCase(goodsReceiptRepo),
   new ListAccountsPayableUseCase(accountPayableRepo),
   new RegisterSupplierPaymentUseCase(accountPayableRepo, supplierRepo, postSupplierPaymentJournalEntryUseCase, auditService),
-  new CancelPurchaseUseCase(purchaseRepo, accountPayableRepo, journalRepo, voidJournalEntryUseCase, auditService)
+  new CancelPurchaseUseCase(purchaseRepo, accountPayableRepo, journalRepo, voidJournalEntryUseCase, auditService),
+  new ExtractPurchaseInvoiceUseCase(invoiceExtractionService, supplierRepo)
 );

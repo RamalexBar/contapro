@@ -90,6 +90,28 @@ export function createPurchase(input: CreatePurchaseInput): Promise<PurchaseReco
   return apiFetch("/purchases", { method: "POST", body: input });
 }
 
+export interface ExtractedPurchaseInvoice {
+  supplierName: string | null;
+  supplierNit: string | null;
+  invoiceNumber: string | null;
+  issueDate: string | null;
+  subtotal: number | null;
+  taxTotal: number | null;
+  total: number | null;
+  currency: string;
+  warnings: string[];
+}
+
+export interface ExtractPurchaseInvoiceResult {
+  extracted: ExtractedPurchaseInvoice;
+  matchedSupplier: { id: string; name: string; nit: string } | null;
+  suggestedDueDate: string | null;
+}
+
+export function extractPurchaseInvoice(fileBase64: string, mediaType: string): Promise<ExtractPurchaseInvoiceResult> {
+  return apiFetch("/purchases/extract", { method: "POST", body: { fileBase64, mediaType } });
+}
+
 export function cancelPurchase(id: string): Promise<PurchaseRecord> {
   return apiFetch(`/purchases/${id}/cancel`, { method: "POST" });
 }

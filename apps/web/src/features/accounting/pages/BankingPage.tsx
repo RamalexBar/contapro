@@ -13,6 +13,7 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import {
   closeBankReconciliation,
   createBankAccount,
+  getSuggestedBankReconciliationMatches,
   listBankAccounts,
   listBankReconciliations,
   listBankTransactions,
@@ -200,6 +201,55 @@ function BankTransactionsSection() {
   );
 }
 
+function SuggestedMatchesList({
+  reconciliationId,
+  onConfirm,
+  confirming,
+}: {
+  reconciliationId: string;
+  onConfirm: (bankTransactionId: string, journalEntryLineId: string) => void;
+  confirming: boolean;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["banking", "suggested-matches", reconciliationId],
+    queryFn: () => getSuggestedBankReconciliationMatches(reconciliationId),
+  });
+
+  const suggestions = data?.data ?? [];
+
+  return (
+    <div>
+      <p className="mb-1 text-xs font-semibold text-slate-500">Sugerencias de conciliacion</p>
+      {isLoading ? (
+        <Spinner />
+      ) : suggestions.length === 0 ? (
+        <p className="text-xs text-slate-400">Sin sugerencias por ahora (monto exacto dentro de &plusmn;5 dias).</p>
+      ) : (
+        <div className="space-y-2">
+          {suggestions.map((s) => (
+            <div
+              key={`${s.bankTransactionId}-${s.journalEntryLineId}`}
+              className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-white px-3 py-2"
+            >
+              <div className="text-xs text-slate-600">
+                <span className="font-medium text-slate-900">{formatCOP(s.amount)}</span> &middot; banco {s.bankTransactionDate.slice(0, 10)}{" "}
+                &middot; comprobante #{s.journalEntryNumber} ({s.journalEntryDate.slice(0, 10)})
+                {s.daysApart > 0 && <span> &middot; {s.daysApart} dia(s) de diferencia</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge tone={s.confidence === "EXACT" ? "success" : "warning"}>{s.confidence === "EXACT" ? "Exacta" : "Probable"}</Badge>
+                <Button size="sm" onClick={() => onConfirm(s.bankTransactionId, s.journalEntryLineId)} loading={confirming}>
+                  Confirmar
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReconciliationsSection() {
   const queryClient = useQueryClient();
   const { data: accounts } = useQuery({ queryKey: ["banking", "accounts"], queryFn: listBankAccounts });
@@ -228,13 +278,11 @@ function ReconciliationsSection() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [matchForm, setMatchForm] = useState({ bankTransactionId: "", journalEntryLineId: "" });
   const matchMutation = useMutation({
-    mutationFn: (id: string) =>
-      matchBankReconciliationItem(id, {
-        bankTransactionId: matchForm.bankTransactionId || undefined,
-        journalEntryLineId: matchForm.journalEntryLineId || undefined,
-      }),
-    onSuccess: () => {
+    mutationFn: ({ id, bankTransactionId, journalEntryLineId }: { id: string; bankTransactionId?: string; journalEntryLineId?: string }) =>
+      matchBankReconciliationItem(id, { bankTransactionId, journalEntryLineId }),
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["banking", "reconciliations"] });
+      queryClient.invalidateQueries({ queryKey: ["banking", "suggested-matches", variables.id] });
       setMatchForm({ bankTransactionId: "", journalEntryLineId: "" });
     },
   });
@@ -329,24 +377,45 @@ function ReconciliationsSection() {
                         {r.items.length === 0 && <p className="text-xs text-slate-400">Sin items todavia.</p>}
 
                         {r.status === "IN_PROGRESS" && (
-                          <div className="mt-3 flex flex-wrap items-end gap-2">
-                            <Input
-                              placeholder="bankTransactionId"
-                              value={matchForm.bankTransactionId}
-                              onChange={(e) => setMatchForm({ ...matchForm, bankTransactionId: e.target.value })}
+                          <>
+                            <SuggestedMatchesList
+                              reconciliationId={r.id}
+                              onConfirm={(bankTransactionId, journalEntryLineId) =>
+                                matchMutation.mutate({ id: r.id, bankTransactionId, journalEntryLineId })
+                              }
+                              confirming={matchMutation.isPending}
                             />
-                            <Input
-                              placeholder="journalEntryLineId"
-                              value={matchForm.journalEntryLineId}
-                              onChange={(e) => setMatchForm({ ...matchForm, journalEntryLineId: e.target.value })}
-                            />
-                            <Button size="sm" onClick={() => matchMutation.mutate(r.id)} loading={matchMutation.isPending}>
-                              Emparejar
-                            </Button>
-                            <Button size="sm" variant="danger" onClick={() => closeMutation.mutate(r.id)} loading={closeMutation.isPending}>
-                              Cerrar conciliacion
-                            </Button>
-                          </div>
+
+                            <p className="mb-1 mt-4 text-xs font-semibold text-slate-500">Emparejar a mano</p>
+                            <div className="flex flex-wrap items-end gap-2">
+                              <Input
+                                placeholder="bankTransactionId"
+                                value={matchForm.bankTransactionId}
+                                onChange={(e) => setMatchForm({ ...matchForm, bankTransactionId: e.target.value })}
+                              />
+                              <Input
+                                placeholder="journalEntryLineId"
+                                value={matchForm.journalEntryLineId}
+                                onChange={(e) => setMatchForm({ ...matchForm, journalEntryLineId: e.target.value })}
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  matchMutation.mutate({
+                                    id: r.id,
+                                    bankTransactionId: matchForm.bankTransactionId || undefined,
+                                    journalEntryLineId: matchForm.journalEntryLineId || undefined,
+                                  })
+                                }
+                                loading={matchMutation.isPending}
+                              >
+                                Emparejar
+                              </Button>
+                              <Button size="sm" variant="danger" onClick={() => closeMutation.mutate(r.id)} loading={closeMutation.isPending}>
+                                Cerrar conciliacion
+                              </Button>
+                            </div>
+                          </>
                         )}
                       </td>
                     </tr>
