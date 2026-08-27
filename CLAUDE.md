@@ -93,32 +93,66 @@ buffer. Para el móvil, sin emulador/dispositivo en este entorno: se verifica co
 únicamente y se dice explícitamente que no se probó en runtime — nunca reportar como "probado"
 algo que solo compiló.
 
-## Resumen de lo implementado en esta sesión (iteraciones 13–18)
+## Estado actual (actualizado 2026-08-27) — LEER ESTO PRIMERO EN UNA SESIÓN NUEVA
 
-Punto de partida: iteración 12 (panel administrador SaaS backend) recién cerrada. Se completó
-**todo** lo que quedaba pendiente en `docs/ALCANCE.md`:
+Historial completo iteración por iteración: `docs/ALCANCE.md`. Esto es solo el resumen de **por
+dónde íbamos** en la conversación más reciente, para retomarla en otra máquina sin perder
+contexto (el código y los commits ya están en GitHub, esto es solo la narrativa).
 
-1. **Iteración 13** — UI web de Contabilidad, Proveedores y Panel administrador SaaS (hasta
-   entonces solo tenían API). Más el endpoint `GET /api/purchases` que faltaba.
-2. **Iteración 14** — PDF del desprendible de nómina (`GET /payslips/:id/pdf`, `pdfkit`, generado
-   al vuelo desde `PayslipDocument.summaryJson`) — distinto del RIDE de nómina electrónica DIAN.
-3. **Iteración 15** — Cierre de período contable (`FinancialPeriod`): bloquea comprobantes nuevos
-   (manuales y automáticos) con fecha dentro de un mes cerrado; no genera asiento de cierre
-   formal (el Balance General ya calcula la utilidad acumulada dinámicamente).
-4. **Iteración 16** — Proveedores: cancelar una compra con abonos ya no responde `409`, los
-   reversa primero (`SupplierPayment.status`, anula el comprobante de cada uno). POS: consumo
-   FIFO real (antes solo existía el dato de entrada por lote, nada lo consumía) — corrige además
-   que el costo registrado en `StockMovement` de una venta FIFO sea el costo real de los lotes
-   consumidos, no el precio de venta.
-5. **Iteración 17** — Envío real de recordatorios de vencimiento de suscripción por correo
-   (`IReminderNotifier` / `ResendEmailNotifier`, vía Resend). El log de recordatorio enviado ahora
-   solo se crea si el envío tuvo éxito (antes se creaba siempre, sin enviar nada realmente).
-6. **Iteración 18** — Sincronización offline real en el móvil (solo ventas): `POST /sync/push`
-   (idempotente, reusa `CreateSaleUseCase`) y `GET /sync/pull`. Se encontró y corrigió un bug real
-   en la comparación de payloads (Postgres JSONB no preserva el orden de las claves). `POSScreen`
-   pasó a leer siempre de la cache local (offline-first real).
+### Contexto de negocio
 
-Todos los ítems de la lista "Próximos pasos sugeridos" de `docs/ALCANCE.md` quedaron resueltos o
-explícitamente fuera de alcance con su razón documentada (WhatsApp real, NetInfo, Kardex,
-credenciales DIAN de producción). Ver ese archivo para el detalle punto por punto y qué queda
-como trabajo futuro dentro de módulos ya implementados.
+Se hizo un comparativo de Contapro contra Alegra/Siigo/World Office/Loggro (funcionalidad +
+precio) — Contapro gana en precio (todo incluido, sin fragmentar módulos) y en varios módulos
+(comisiones, activos fijos, CRM, cobranza con Wompi nativo), pierde en trayectoria (cero clientes
+reales) y en amplitud de IA (Alegra tiene 38 funciones, Contapro apenas 1). Ver `docs/PRECIOS.md`
+para el snapshot de precios de la competencia (2026-08-03).
+
+**Esta semana** se está conectando la facturación electrónica DIAN con un **proveedor
+tecnológico** externo (reemplaza la integración directa SOAP+XAdES propia, nunca verificada
+contra el servicio real de la DIAN) — es la pieza de mayor riesgo que queda abierta. Sin novedades
+de esto todavía en esta conversación, quedó como plan, no como trabajo iniciado aquí.
+
+### Lo que se implementó en esta sesión (commit `68044a3`, ya subido a `origin/master`)
+
+1. **Conciliación bancaria — desempate por texto** (`SuggestBankReconciliationMatchesUseCase`,
+   `apps/api/src/modules/accounting/application/description-similarity.ts`): cuando varios
+   comprobantes candidatos quedan a fechas parecidas de una transacción, ya no gana "el primero de
+   la lista" sino el que comparte más palabras con la descripción del banco (índice de Jaccard).
+   Conectado a la UI (`BankingPage.tsx`, pestaña Conciliaciones → expandir una en progreso):
+   sugerencias con botón "Confirmar", ya no hay que pegar IDs a mano (el formulario manual sigue
+   ahí como respaldo). Sigue siendo 1 a 1, no soporta pagos partidos (documentado como pendiente
+   en el README del módulo).
+2. **Lectura automática de facturas de compra con IA** (`POST /purchases/extract`,
+   `ExtractPurchaseInvoiceUseCase`, `ClaudeInvoiceExtractionService`): sube una foto/PDF de
+   factura, Claude (`claude-opus-5`, visión + salida estructurada con Zod) extrae proveedor/NIT/
+   número/fecha/subtotal/IVA/total, intenta emparejar con un proveedor ya existente por NIT o
+   nombre inequívoco, y sugiere fecha de vencimiento a 30 días. **Nunca crea la compra sola** — el
+   usuario revisa y confirma con el `POST /purchases` de siempre. Conectado a la UI
+   (`SuppliersPage.tsx` → Registrar compra → botón "Leer factura (foto/PDF)").
+
+### Pendiente — lo primero que hay que retomar
+
+- **`ANTHROPIC_API_KEY` sin configurar todavía** (ni local ni en Render) — sin esto,
+  `POST /purchases/extract` responde 422 con mensaje claro, no se puede probar. El usuario iba a
+  crear la llave en console.anthropic.com y no había terminado ese paso cuando cambió de equipo.
+- **La lectura de facturas nunca se probó contra una factura real.** Había dos candidatas
+  encontradas en `C:\Users\alexa\Downloads` de la máquina anterior (`factura chec manizales.pdf`,
+  el usuario eligió esa) — en la máquina nueva hay que ubicar el archivo de nuevo (Downloads no se
+  clona con git) o pedirle otra factura al usuario.
+- **Fase "conciliación bancaria con IA" del plan original todavía no se hizo** (usar IA para los
+  casos que el desempate por texto no resuelve) — se decidió dejarla para después de facturas.
+- El proveedor tecnológico de facturación electrónica DIAN (ver "Contexto de negocio" arriba)
+  sigue siendo un plan del usuario, no algo que se haya trabajado en esta conversación.
+
+### Artifacts publicados (viven en la cuenta de Claude, no en este repo — se ven desde cualquier PC logueado)
+
+- **Contapro vs. El Mercado** — comparativo con Alegra/Siigo/World Office/Loggro, actualizado tras
+  agregar lectura de facturas.
+- **Contapro en Marcha** — manual de instalación en Render, lenguaje no técnico.
+- **Manual de Funcionamiento Contapro** — manual de uso diario, navegable por módulo (también
+  guardado como HTML/PDF/Word en `C:\Users\alexa\Documents\Contapro-Manuales\` de la máquina
+  anterior — esos archivos locales sí hay que volver a generarlos o copiarlos a mano en el PC
+  nuevo, no viven en git).
+
+Buscar estos tres por nombre en `/artifacts` o en claude.ai/code/artifacts si hace falta el link
+de nuevo — no hace falta regenerarlos desde cero, ya existen.
