@@ -1,5 +1,6 @@
 import { useState, type PropsWithChildren } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
   Building2,
@@ -29,6 +30,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuthStore } from "../../features/auth/hooks/useAuthStore";
+import { getOwnSubscription } from "../../features/billing/api/billing.api";
 import { Button } from "./Button";
 import { Logo } from "./Logo";
 
@@ -115,6 +117,41 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 
+/** Aviso corto dentro de la app cuando la suscripcion esta por vencer -- antes el unico
+ * recordatorio era por correo (8/5/3/1/0 dias, ver saas-admin/README.md), asi que si el cliente
+ * no revisaba el correo nunca se enteraba usando el sistema mismo. Solo lo ve quien administra la
+ * suscripcion (`billing.manage`, mismo permiso que el link "Mi suscripcion" del sidebar) para no
+ * alarmar a cajeros/empleados que no pueden hacer nada al respecto. */
+function SubscriptionBanner() {
+  const canManageBilling = useAuthStore((s) => s.hasPermission("billing.manage"));
+  const { data } = useQuery({
+    queryKey: ["own-subscription"],
+    queryFn: getOwnSubscription,
+    enabled: canManageBilling,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (!data) return null;
+  if (data.subscription.status !== "TRIALING" && data.subscription.status !== "ACTIVE") return null;
+
+  const daysRemaining = Math.ceil((new Date(data.subscription.currentPeriodEnd).getTime() - Date.now()) / 86_400_000);
+  if (daysRemaining > 3 || daysRemaining < 0) return null;
+
+  const label =
+    daysRemaining === 0
+      ? "Tu suscripcion vence hoy"
+      : `Tu suscripcion vence en ${daysRemaining} dia${daysRemaining === 1 ? "" : "s"}`;
+
+  return (
+    <div className={`flex items-center justify-center gap-3 px-4 py-2 text-sm font-medium text-white ${daysRemaining <= 1 ? "bg-danger-600" : "bg-warning-600"}`}>
+      <span>{label}.</span>
+      <NavLink to="/billing" className="underline hover:no-underline">
+        Renovar ahora
+      </NavLink>
+    </div>
+  );
+}
+
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const hasPermission = useAuthStore((s) => s.hasPermission);
 
@@ -163,7 +200,9 @@ export function AppLayout({ children }: PropsWithChildren) {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-50">
+      <SubscriptionBanner />
+      <div className="flex min-h-0 flex-1">
       {/* Sidebar de escritorio -- siempre visible en md+. */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
         <div className="border-b border-slate-200 px-4 py-4">
@@ -218,6 +257,7 @@ export function AppLayout({ children }: PropsWithChildren) {
           <Logo />
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8">{children}</main>
+      </div>
       </div>
     </div>
   );
