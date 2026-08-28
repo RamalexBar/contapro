@@ -3,7 +3,7 @@ import { useAuthStore } from "../features/auth/hooks/useAuthStore";
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api";
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public details?: unknown) {
+  constructor(public status: number, message: string, public details?: unknown, public code?: string) {
     super(message);
   }
 }
@@ -52,13 +52,13 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   if (!res.ok) {
-    let payload: { message?: string; details?: unknown } = {};
+    let payload: { message?: string; details?: unknown; error?: string } = {};
     try {
       payload = await res.json();
     } catch {
       // sin cuerpo JSON
     }
-    throw new ApiError(res.status, payload.message ?? res.statusText, payload.details);
+    throw new ApiError(res.status, payload.message ?? res.statusText, payload.details, payload.error);
   }
 
   if (res.status === 204) return undefined as T;

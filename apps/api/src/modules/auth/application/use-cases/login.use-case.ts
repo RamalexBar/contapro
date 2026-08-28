@@ -1,4 +1,4 @@
-import { UnauthorizedError } from "../../../../shared/errors/app-error";
+import { MultipleCompaniesError, UnauthorizedError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IUserRepository } from "../../domain/user.repository";
 import { signAccessToken, signRefreshToken } from "../../infrastructure/jwt.service";
@@ -8,6 +8,10 @@ import crypto from "node:crypto";
 export interface LoginUseCaseInput {
   email: string;
   password: string;
+  /** Explicito cuando el email ya disparo un MultipleCompaniesError antes y el usuario eligio
+   * una empresa en el selector del frontend. Si no se manda y el email es ambiguo, se lanza
+   * MultipleCompaniesError de nuevo en vez de adivinar (ver findByEmailWithAccess mas abajo). */
+  companyId?: string;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -30,7 +34,19 @@ export class LoginUseCase {
   constructor(private readonly userRepo: IUserRepository, private readonly audit: AuditService) {}
 
   async execute(input: LoginUseCaseInput): Promise<LoginUseCaseOutput> {
-    const user = await this.userRepo.findByEmailWithAccess(undefined, input.email);
+    // El email es unico solo POR empresa, nunca globalmente -- sin companyId explicito, se
+    // verifica primero si hay mas de una empresa con ese email antes de intentar autenticar,
+    // en vez de resolver a una arbitraria via findFirst (comportamiento previo, no
+    // determinista: podia autenticar contra la empresa equivocada segun el orden que Postgres
+    // devolviera, ver hallazgo documentado al probar el registro en produccion).
+    if (!input.companyId) {
+      const matches = await this.userRepo.findCompaniesByEmail(input.email);
+      if (matches.length > 1) {
+        throw new MultipleCompaniesError(matches);
+      }
+    }
+
+    const user = await this.userRepo.findByEmailWithAccess(input.companyId, input.email);
 
     if (!user) {
       throw new UnauthorizedError("Credenciales invalidas");

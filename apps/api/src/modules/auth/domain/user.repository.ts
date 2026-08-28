@@ -30,8 +30,18 @@ export interface CreatedCompanyWithAdmin {
   adminUserId: string;
 }
 
+export interface CompanyMatch {
+  companyId: string;
+  companyName: string;
+}
+
 export interface IUserRepository {
   findByEmailWithAccess(companyId: string | undefined, email: string): Promise<UserWithAccess | null>;
+  /** El email solo es unico POR empresa (@@unique([companyId, email])), no globalmente -- dos
+   * empresas distintas pueden tener un usuario con el mismo email. Usado por LoginUseCase para
+   * detectar esa ambiguedad ANTES de intentar autenticar, en vez de resolver a una empresa
+   * arbitraria via findFirst (ver login.use-case.ts). */
+  findCompaniesByEmail(email: string): Promise<CompanyMatch[]>;
   findByIdWithAccess(userId: string): Promise<UserWithAccess | null>;
   registerFailedLogin(userId: string): Promise<void>;
   resetFailedLogins(userId: string): Promise<void>;

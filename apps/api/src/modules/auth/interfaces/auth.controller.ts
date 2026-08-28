@@ -23,6 +23,7 @@ export class AuthController {
       const result = await this.loginUseCase.execute({
         email: body.email,
         password: body.password,
+        companyId: body.companyId,
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       });

@@ -40,6 +40,18 @@ export class ConflictError extends AppError {
   }
 }
 
+/** El email de un usuario solo es unico POR empresa (ver User.@@unique([companyId, email])),
+ * no globalmente -- si el mismo email existe en mas de una empresa, el login no puede saber cual
+ * quiso el usuario sin preguntar. `companies` va en `details` para que el frontend muestre un
+ * selector y reintente el login con `companyId` explicito. */
+export class MultipleCompaniesError extends AppError {
+  constructor(companies: { companyId: string; companyName: string }[]) {
+    super("Este correo esta registrado en mas de una empresa. Selecciona con cual deseas ingresar.", 409, "MULTIPLE_COMPANIES", {
+      companies,
+    });
+  }
+}
+
 export class CertificateError extends AppError {
   constructor(message: string) {
     super(message, 500, "CERTIFICATE_ERROR");

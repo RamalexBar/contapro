@@ -3,6 +3,9 @@ import { z } from "zod";
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  /** Explicito cuando el email ya disparo un error MULTIPLE_COMPANIES antes (ver
+   * MultipleCompaniesError) y el usuario eligio una empresa en el selector del frontend. */
+  companyId: z.string().uuid().optional(),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 

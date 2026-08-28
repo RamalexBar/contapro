@@ -44,11 +44,12 @@ export function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    let companyId: string;
     try {
       // branchName no se pide en el formulario (menos campos = mas facil de llenar) -- el
       // backend igual lo exige explicito porque RegisterCompanyInput se infiere del schema zod
       // con .default() aplicado, que zod resuelve en el output pero no hace opcional el tipo.
-      await registerCompany({ ...form, branchName: "Sucursal principal" });
+      companyId = (await registerCompany({ ...form, branchName: "Sucursal principal" })).companyId;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Error de conexion");
       setLoading(false);
@@ -57,11 +58,11 @@ export function RegisterPage() {
     try {
       // El registro no devuelve sesion (solo ids) -- se loguea aparte con las mismas
       // credenciales para llevar al usuario directo al Dashboard, sin que tenga que volver a
-      // escribir el correo/contraseña que acaba de elegir. Si este paso falla (ej. el login
-      // busca por email SIN companyId y otra empresa ya tenia el mismo correo -- ver
-      // findByEmailWithAccess -- puede resolver al usuario equivocado y el password no matchea),
-      // la cuenta YA se creo bien; no se debe mostrar un error que sugiera que el registro fallo.
-      const result = await login({ email: form.adminEmail, password: form.adminPassword });
+      // escribir el correo/contraseña que acaba de elegir. Se pasa companyId explicito (ya lo
+      // conocemos, se acaba de crear) para que el login nunca dispare MultipleCompaniesError
+      // aunque el email ya exista en otra empresa -- si aun asi este paso falla, la cuenta YA
+      // se creo bien; no se debe mostrar un error que sugiera que el registro fallo.
+      const result = await login({ email: form.adminEmail, password: form.adminPassword, companyId });
       setSession(result.accessToken, result.refreshToken, result.user);
       navigate("/dashboard");
     } catch {

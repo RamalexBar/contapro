@@ -1,5 +1,6 @@
 import { basePrisma } from "@erp/database";
 import type {
+  CompanyMatch,
   CreateCompanyWithAdminInput,
   CreatedCompanyWithAdmin,
   IUserRepository,
@@ -25,6 +26,14 @@ export class PrismaUserRepository implements IUserRepository {
     });
     if (!user) return null;
     return this.toUserWithAccess(user);
+  }
+
+  async findCompaniesByEmail(email: string): Promise<CompanyMatch[]> {
+    const users = await basePrisma.user.findMany({
+      where: { email },
+      select: { companyId: true, company: { select: { name: true } } },
+    });
+    return users.map((u) => ({ companyId: u.companyId, companyName: u.company.name }));
   }
 
   async findByIdWithAccess(userId: string): Promise<UserWithAccess | null> {
