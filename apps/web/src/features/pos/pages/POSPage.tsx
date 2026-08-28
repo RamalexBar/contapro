@@ -447,9 +447,9 @@ export function POSPage() {
                 <span>-{formatCOP(retentionTotal)}</span>
               </div>
             )}
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-semibold text-slate-900">{paymentMethod === "CREDIT" ? "Total a credito" : "Total a cobrar"}</span>
-              <span className="text-lg font-semibold text-slate-900">{formatCOP(netTotal)}</span>
+            <div className="mt-1 flex items-center justify-between rounded-lg bg-brand-50 px-3 py-3">
+              <span className="text-sm font-semibold text-brand-900">{paymentMethod === "CREDIT" ? "Total a credito" : "Total a cobrar"}</span>
+              <span className="text-3xl font-bold tabular-nums text-brand-900">{formatCOP(netTotal)}</span>
             </div>
             {currency !== "COP" && Number(exchangeRate) > 0 && (
               <div className="flex justify-between text-slate-500">

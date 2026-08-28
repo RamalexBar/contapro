@@ -1,5 +1,4 @@
 import { createBrowserRouter } from "react-router-dom";
-import { LandingPage } from "../features/marketing/pages/LandingPage";
 import { HomeRoute } from "./HomeRoute";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { RegisterPage } from "../features/auth/pages/RegisterPage";

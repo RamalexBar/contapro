@@ -8,6 +8,7 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
 import { Alert } from "../../../components/ui/Alert";
+import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listProducts } from "../../inventory/api/product.api";
@@ -20,7 +21,28 @@ import {
   listDebitNotes,
   listQuotes,
 } from "../api/notes.api";
-import { getSale, listSales } from "../api/sale.api";
+import { getElectronicInvoiceBySale, getSale, listSales, type ElectronicInvoiceStatus } from "../api/sale.api";
+
+const DIAN_STATUS_LABEL: Record<ElectronicInvoiceStatus["status"], string> = {
+  GENERATED: "Generada",
+  PENDING_SIGNATURE: "Pendiente DIAN",
+  PENDING_SUBMISSION: "Pendiente DIAN",
+  ACCEPTED: "Aceptada DIAN",
+  REJECTED: "Rechazada DIAN",
+};
+
+const DIAN_STATUS_TONE: Record<ElectronicInvoiceStatus["status"], "neutral" | "success" | "warning" | "danger"> = {
+  GENERATED: "neutral",
+  PENDING_SIGNATURE: "warning",
+  PENDING_SUBMISSION: "warning",
+  ACCEPTED: "success",
+  REJECTED: "danger",
+};
+
+function DianStatusBadge({ invoice }: { invoice: ElectronicInvoiceStatus | null | undefined }) {
+  if (!invoice) return <Badge tone="neutral">Sin factura electrónica</Badge>;
+  return <Badge tone={DIAN_STATUS_TONE[invoice.status]}>{DIAN_STATUS_LABEL[invoice.status]}</Badge>;
+}
 import { createReturn, listReturns, type RefundMethod } from "../api/return.api";
 
 const RETURNABLE_SALE_STATUSES = new Set(["COMPLETED", "RETURNED_PARTIAL"]);
@@ -292,6 +314,11 @@ function ReturnSection() {
     queryFn: () => listReturns(saleId),
     enabled: canCreate && Boolean(saleId),
   });
+  const { data: electronicInvoice } = useQuery({
+    queryKey: ["electronic-invoice", saleId],
+    queryFn: () => getElectronicInvoiceBySale(saleId),
+    enabled: canCreate && Boolean(saleId),
+  });
 
   const returnableSales = (sales?.data ?? []).filter((s) => RETURNABLE_SALE_STATUSES.has(s.status));
   const productName = (id: string) => products?.data.find((p) => p.id === id)?.name ?? id;
@@ -347,6 +374,10 @@ function ReturnSection() {
 
           {sale && (
             <>
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <span>Venta #{sale.number}</span>
+                <DianStatusBadge invoice={electronicInvoice} />
+              </div>
               <Table>
                 <TableHead>
                   <tr>

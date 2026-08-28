@@ -1,5 +1,5 @@
 import type { AuthorizeDiscountInput, CreateSaleInput } from "@erp/shared-types";
-import { apiFetch, BASE_URL } from "../../../lib/api-client";
+import { apiFetch, ApiError, BASE_URL } from "../../../lib/api-client";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 
 export interface SaleResponse {
@@ -37,6 +37,23 @@ export function getSale(saleId: string): Promise<SaleResponse> {
 
 export function listSales(): Promise<{ data: SaleResponse[] }> {
   return apiFetch("/sales");
+}
+
+export interface ElectronicInvoiceStatus {
+  status: "GENERATED" | "PENDING_SIGNATURE" | "PENDING_SUBMISSION" | "ACCEPTED" | "REJECTED";
+  fullNumber: string;
+  rejectionReason: string | null;
+}
+
+/** null = la venta todavia no tiene factura electronica generada (404), en vez de tratarlo como
+ * un error -- es el estado normal para una venta recien creada o para consumidor final. */
+export async function getElectronicInvoiceBySale(saleId: string): Promise<ElectronicInvoiceStatus | null> {
+  try {
+    return await apiFetch(`/electronic-invoicing/sales/${saleId}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 export interface WhatsAppDeliveryRecord {
