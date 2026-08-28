@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Card } from "../../../components/ui/Card";
@@ -11,9 +11,11 @@ import { ApiError } from "../../../lib/api-client";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const registeredEmail = (location.state as { registeredEmail?: string } | null)?.registeredEmail;
   const setSession = useAuthStore((s) => s.setSession);
-  const [email, setEmail] = useState("admin@demo.com");
-  const [password, setPassword] = useState("Demo1234!");
+  const [email, setEmail] = useState(registeredEmail ?? "admin@demo.com");
+  const [password, setPassword] = useState(registeredEmail ? "" : "Demo1234!");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -41,6 +43,11 @@ export function LoginPage() {
         <Card>
           <h1 className="mb-1 text-lg font-semibold text-slate-900">Ingresa a tu empresa</h1>
           <p className="mb-6 text-sm text-slate-500">Contabilidad, facturación y punto de venta en un solo lugar.</p>
+          {registeredEmail && (
+            <Alert tone="success" className="mb-4">
+              Tu cuenta se creó correctamente. Ingresa con tu contraseña para continuar.
+            </Alert>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <div>

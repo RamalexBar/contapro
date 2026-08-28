@@ -49,14 +49,23 @@ export function RegisterPage() {
       // backend igual lo exige explicito porque RegisterCompanyInput se infiere del schema zod
       // con .default() aplicado, que zod resuelve en el output pero no hace opcional el tipo.
       await registerCompany({ ...form, branchName: "Sucursal principal" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Error de conexion");
+      setLoading(false);
+      return;
+    }
+    try {
       // El registro no devuelve sesion (solo ids) -- se loguea aparte con las mismas
       // credenciales para llevar al usuario directo al Dashboard, sin que tenga que volver a
-      // escribir el correo/contraseña que acaba de elegir.
+      // escribir el correo/contraseña que acaba de elegir. Si este paso falla (ej. el login
+      // busca por email SIN companyId y otra empresa ya tenia el mismo correo -- ver
+      // findByEmailWithAccess -- puede resolver al usuario equivocado y el password no matchea),
+      // la cuenta YA se creo bien; no se debe mostrar un error que sugiera que el registro fallo.
       const result = await login({ email: form.adminEmail, password: form.adminPassword });
       setSession(result.accessToken, result.refreshToken, result.user);
       navigate("/dashboard");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Error de conexion");
+    } catch {
+      navigate("/login", { state: { registeredEmail: form.adminEmail } });
     } finally {
       setLoading(false);
     }
