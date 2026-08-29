@@ -1,18 +1,21 @@
 import { basePrisma } from "@erp/database";
 import { NotFoundError } from "../../../shared/errors/app-error";
-import type {
-  ApplyPaymentData,
-  ApplyPaymentResult,
-  CompanyWithSubscriptionRecord,
-  CreatePendingPaymentData,
-  CreateSubscriptionData,
-  ISubscriptionRepository,
-  SaasDashboardStats,
-  SubscriptionForLifecycleCheck,
-  SubscriptionPaymentRecord,
-  SubscriptionRecord,
-  SubscriptionStatus,
-  SubscriptionWithDetails,
+import {
+  type ApplyPaymentData,
+  type ApplyPaymentResult,
+  AUTO_CHARGE_METHOD,
+  type CompanyWithSubscriptionRecord,
+  type CreatePendingPaymentData,
+  type CreateSubscriptionData,
+  type ISubscriptionRepository,
+  type SaasDashboardStats,
+  type SavePaymentSourceData,
+  type SubscriptionDueForAutoCharge,
+  type SubscriptionForLifecycleCheck,
+  type SubscriptionPaymentRecord,
+  type SubscriptionRecord,
+  type SubscriptionStatus,
+  type SubscriptionWithDetails,
 } from "../domain/subscription.repository";
 
 type SubscriptionRow = {
@@ -26,6 +29,10 @@ type SubscriptionRow = {
   graceEndsAt: Date | null;
   cancelledAt: Date | null;
   createdAt: Date;
+  autoRenew: boolean;
+  wompiPaymentSourceId: string | null;
+  cardLastFour: string | null;
+  cardBrand: string | null;
 };
 
 function toRecord(row: SubscriptionRow): SubscriptionRecord {
@@ -40,6 +47,10 @@ function toRecord(row: SubscriptionRow): SubscriptionRecord {
     graceEndsAt: row.graceEndsAt,
     cancelledAt: row.cancelledAt,
     createdAt: row.createdAt,
+    autoRenew: row.autoRenew,
+    wompiPaymentSourceId: row.wompiPaymentSourceId,
+    cardLastFour: row.cardLastFour,
+    cardBrand: row.cardBrand,
   };
 }
 
@@ -282,5 +293,45 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
       upcomingRenewals,
       monthlyRevenueConfirmed: Number(revenueAgg._sum.amount ?? 0),
     };
+  }
+
+  async savePaymentSource(id: string, data: SavePaymentSourceData): Promise<SubscriptionRecord> {
+    await this.findByIdOrThrow(id);
+    const row = await basePrisma.subscription.update({
+      where: { id },
+      data: {
+        autoRenew: true,
+        wompiPaymentSourceId: data.wompiPaymentSourceId,
+        cardLastFour: data.cardLastFour,
+        cardBrand: data.cardBrand,
+      },
+    });
+    return toRecord(row);
+  }
+
+  async disableAutoRenew(id: string): Promise<SubscriptionRecord> {
+    await this.findByIdOrThrow(id);
+    const row = await basePrisma.subscription.update({ where: { id }, data: { autoRenew: false } });
+    return toRecord(row);
+  }
+
+  async listDueForAutoCharge(asOf: Date): Promise<SubscriptionDueForAutoCharge[]> {
+    const rows = await basePrisma.subscription.findMany({
+      where: { autoRenew: true, status: { in: ["ACTIVE", "GRACE_PERIOD"] }, currentPeriodEnd: { lte: asOf } },
+      include: { company: { select: { email: true } }, plan: { select: { priceMonthly: true, priceYearly: true } } },
+    });
+    return rows.map((row) => ({
+      ...toRecord(row),
+      companyEmail: row.company.email,
+      planPriceMonthly: Number(row.plan.priceMonthly),
+      planPriceYearly: Number(row.plan.priceYearly),
+    }));
+  }
+
+  async hasAutoChargeAttemptSince(subscriptionId: string, since: Date): Promise<boolean> {
+    const row = await basePrisma.subscriptionPayment.findFirst({
+      where: { subscriptionId, method: AUTO_CHARGE_METHOD, createdAt: { gte: since } },
+    });
+    return row !== null;
   }
 }

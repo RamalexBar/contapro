@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { AuditService } from "../../../audit/application/audit.service";
 import type { AuditLogEntry, CreateAuditLogInput, IAuditLogRepository } from "../../../audit/domain/audit-log.repository";
-import type { CreateCheckoutInput, IPaymentGateway, WompiCheckoutLink, WompiWebhookEvent } from "../../domain/payment-gateway";
+import type {
+  ChargePaymentSourceInput,
+  CreateCheckoutInput,
+  CreatePaymentSourceInput,
+  IPaymentGateway,
+  WompiChargeResult,
+  WompiCheckoutLink,
+  WompiPaymentSource,
+  WompiWebhookEvent,
+} from "../../domain/payment-gateway";
 import type {
   ApplyPaymentResult,
   CompanyWithSubscriptionRecord,
   CreatePendingPaymentData,
   ISubscriptionRepository,
   SaasDashboardStats,
+  SubscriptionDueForAutoCharge,
   SubscriptionForLifecycleCheck,
   SubscriptionPaymentRecord,
   SubscriptionRecord,
@@ -27,6 +37,10 @@ function makeSubscription(overrides: Partial<SubscriptionRecord> = {}): Subscrip
     graceEndsAt: null,
     cancelledAt: null,
     createdAt: new Date("2026-01-01"),
+    autoRenew: false,
+    wompiPaymentSourceId: null,
+    cardLastFour: null,
+    cardBrand: null,
     ...overrides,
   };
 }
@@ -121,6 +135,18 @@ class FakeSubscriptionRepository implements ISubscriptionRepository {
   async getDashboardStats(): Promise<SaasDashboardStats> {
     throw new Error("not implemented");
   }
+  async savePaymentSource(): Promise<SubscriptionRecord> {
+    throw new Error("not implemented");
+  }
+  async disableAutoRenew(): Promise<SubscriptionRecord> {
+    throw new Error("not implemented");
+  }
+  async listDueForAutoCharge(): Promise<SubscriptionDueForAutoCharge[]> {
+    throw new Error("not implemented");
+  }
+  async hasAutoChargeAttemptSince(): Promise<boolean> {
+    throw new Error("not implemented");
+  }
 }
 
 class FakePaymentGateway implements IPaymentGateway {
@@ -130,6 +156,12 @@ class FakePaymentGateway implements IPaymentGateway {
   }
   verifyWebhookSignature(_event: WompiWebhookEvent): boolean {
     return this.shouldVerify;
+  }
+  async createPaymentSource(_input: CreatePaymentSourceInput): Promise<WompiPaymentSource> {
+    throw new Error("not implemented");
+  }
+  async chargePaymentSource(_input: ChargePaymentSourceInput): Promise<WompiChargeResult> {
+    throw new Error("not implemented");
   }
 }
 

@@ -8,3 +8,5 @@ billingRouter.use(tenantContextMiddleware);
 
 billingRouter.get("/subscription", requirePermission("billing.manage"), billingController.getOwnSubscription);
 billingRouter.post("/subscription/checkout", requirePermission("billing.manage"), billingController.createOwnCheckout);
+billingRouter.post("/subscription/payment-source", requirePermission("billing.manage"), billingController.savePaymentSource);
+billingRouter.post("/subscription/disable-auto-renew", requirePermission("billing.manage"), billingController.disableAutoRenew);

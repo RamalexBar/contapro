@@ -18,6 +18,9 @@ import { GetSaasDashboardUseCase } from "./application/use-cases/get-saas-dashbo
 import { RunSubscriptionLifecycleUseCase } from "./application/use-cases/run-subscription-lifecycle.use-case";
 import { CreateSubscriptionCheckoutUseCase } from "./application/use-cases/create-subscription-checkout.use-case";
 import { ConfirmWompiPaymentUseCase } from "./application/use-cases/confirm-wompi-payment.use-case";
+import { SavePaymentSourceUseCase } from "./application/use-cases/save-payment-source.use-case";
+import { DisableAutoRenewUseCase } from "./application/use-cases/disable-auto-renew.use-case";
+import { RunSubscriptionAutoChargesUseCase } from "./application/use-cases/run-subscription-auto-charges.use-case";
 import { whatsAppSender } from "../whatsapp/whatsapp.container";
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
 
@@ -32,6 +35,11 @@ export const subscriptionRepo = new PrismaSubscriptionRepository();
 export const paymentGateway = new WompiPaymentGateway();
 
 export const createSubscriptionCheckoutUseCase = new CreateSubscriptionCheckoutUseCase(subscriptionRepo, planRepo, paymentGateway);
+/** Exportados por el mismo motivo que planRepo/subscriptionRepo/paymentGateway arriba: modules/billing
+ * los reusa para que la propia empresa guarde su tarjeta / desactive la renovacion automatica sin
+ * pasar por el panel de plataforma. */
+export const savePaymentSourceUseCase = new SavePaymentSourceUseCase(subscriptionRepo, paymentGateway, auditService);
+export const disableAutoRenewUseCase = new DisableAutoRenewUseCase(subscriptionRepo, auditService);
 
 export const saasAdminController = new SaasAdminController(
   new LoginPlatformAdminUseCase(platformAdminRepo),
@@ -55,3 +63,7 @@ export const runSubscriptionLifecycleUseCase = new RunSubscriptionLifecycleUseCa
   whatsAppSender,
   auditService
 );
+
+/** Usado por server.ts para arrancar el poller de renovacion automatica (item nuevo: cobro
+ * recurrente real via payment_source de Wompi, ver run-subscription-auto-charges.use-case.ts). */
+export const runSubscriptionAutoChargesUseCase = new RunSubscriptionAutoChargesUseCase(subscriptionRepo, paymentGateway, auditService);

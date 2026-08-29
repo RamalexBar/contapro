@@ -20,6 +20,28 @@ export interface SubscriptionRecord {
   graceEndsAt: Date | null;
   cancelledAt: Date | null;
   createdAt: Date;
+  autoRenew: boolean;
+  wompiPaymentSourceId: string | null;
+  cardLastFour: string | null;
+  cardBrand: string | null;
+}
+
+export interface SavePaymentSourceData {
+  wompiPaymentSourceId: string;
+  cardLastFour: string | null;
+  cardBrand: string | null;
+}
+
+/** method fijo usado por RunSubscriptionAutoChargesUseCase -- distingue estos intentos de los
+ * pagos manuales ("WOMPI", generados desde el checkout por redireccion) sin agregar una columna
+ * nueva, mismo criterio que distinguir tipos de comprobante por su `type` en vez de una tabla
+ * aparte (ver journal-entry.repository.ts). */
+export const AUTO_CHARGE_METHOD = "WOMPI_AUTO";
+
+export interface SubscriptionDueForAutoCharge extends SubscriptionRecord {
+  companyEmail: string;
+  planPriceMonthly: number;
+  planPriceYearly: number;
 }
 
 export interface SubscriptionWithDetails extends SubscriptionRecord {
@@ -135,4 +157,20 @@ export interface ISubscriptionRepository {
    * GET /admin/companies. */
   listCompaniesWithSubscription(): Promise<CompanyWithSubscriptionRecord[]>;
   getDashboardStats(): Promise<SaasDashboardStats>;
+  /** Guarda la payment_source de Wompi y activa autoRenew -- usado por SavePaymentSourceUseCase
+   * despues de que el frontend tokeniza la tarjeta y el backend la registra en Wompi. */
+  savePaymentSource(id: string, data: SavePaymentSourceData): Promise<SubscriptionRecord>;
+  /** Apaga autoRenew (no toca status/currentPeriodEnd) -- "cancelar" la renovacion automatica en
+   * el sentido de RunSubscriptionAutoChargesUseCase: deja de intentar cobros futuros, la
+   * suscripcion sigue vigente hasta que venza normalmente. No borra la payment_source guardada en
+   * Wompi (queda huerfana ahi, fuera del alcance de este repo). */
+  disableAutoRenew(id: string): Promise<SubscriptionRecord>;
+  /** Suscripciones con autoRenew activo, vencidas o en periodo de gracia -- candidatas a que el
+   * poller intente cobrarlas. Incluye companyEmail (lo exige Wompi en cada transaccion) y los
+   * precios del plan (para no depender de un IPlanRepository aparte solo para esto). */
+  listDueForAutoCharge(asOf: Date): Promise<SubscriptionDueForAutoCharge[]>;
+  /** true si ya existe un SubscriptionPayment (cualquier estado) con method WOMPI_AUTO creado
+   * despues de `since` -- evita que el poller (corre cada hora) reintente el mismo cobro varias
+   * veces el mismo dia tras un DECLINED. */
+  hasAutoChargeAttemptSince(subscriptionId: string, since: Date): Promise<boolean>;
 }

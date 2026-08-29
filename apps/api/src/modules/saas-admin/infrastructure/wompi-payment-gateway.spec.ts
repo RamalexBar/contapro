@@ -10,6 +10,8 @@ const envMock = vi.hoisted(() => ({
   WOMPI_PUBLIC_KEY: "",
   WOMPI_INTEGRITY_SECRET: "",
   WOMPI_EVENTS_SECRET: "",
+  WOMPI_PRIVATE_KEY: "",
+  WOMPI_ENVIRONMENT: "sandbox" as "sandbox" | "production",
 }));
 
 vi.mock("../../../config/env", () => ({ env: envMock }));
@@ -19,6 +21,9 @@ describe("WompiPaymentGateway", () => {
     envMock.WOMPI_PUBLIC_KEY = "";
     envMock.WOMPI_INTEGRITY_SECRET = "";
     envMock.WOMPI_EVENTS_SECRET = "";
+    envMock.WOMPI_PRIVATE_KEY = "";
+    envMock.WOMPI_ENVIRONMENT = "sandbox";
+    vi.unstubAllGlobals();
   });
 
   describe("buildCheckoutUrl", () => {
@@ -120,6 +125,121 @@ describe("WompiPaymentGateway", () => {
 
       const gateway = new WompiPaymentGateway();
       expect(gateway.verifyWebhookSignature(event)).toBe(false);
+    });
+  });
+
+  describe("createPaymentSource / chargePaymentSource", () => {
+    function stubFetch(status: number, body: unknown) {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: "",
+        json: async () => body,
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+
+    it("lanza si falta WOMPI_PRIVATE_KEY (createPaymentSource)", async () => {
+      const gateway = new WompiPaymentGateway();
+      await expect(
+        gateway.createPaymentSource({ cardToken: "tok_1", customerEmail: "a@b.com", acceptanceToken: "acc_1" })
+      ).rejects.toThrow(/WOMPI_PRIVATE_KEY/);
+    });
+
+    it("lanza si falta WOMPI_PRIVATE_KEY (chargePaymentSource)", async () => {
+      const gateway = new WompiPaymentGateway();
+      await expect(
+        gateway.chargePaymentSource({ reference: "r", amountInCents: 100, customerEmail: "a@b.com", paymentSourceId: "ps-1" })
+      ).rejects.toThrow(/WOMPI_PRIVATE_KEY/);
+    });
+
+    it("createPaymentSource llama a POST /payment_sources con Bearer + body correcto y mapea la respuesta", async () => {
+      envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      const fetchMock = stubFetch(201, { data: { id: 12345, public_data: { last_four: "4242", card_brand: "VISA" } } });
+
+      const gateway = new WompiPaymentGateway();
+      const result = await gateway.createPaymentSource({
+        cardToken: "tok_test_123",
+        customerEmail: "cliente@demo.com",
+        acceptanceToken: "acc_token_123",
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe("https://sandbox.wompi.co/v1/payment_sources");
+      expect(init.method).toBe("POST");
+      expect(init.headers.Authorization).toBe("Bearer prv_test_x");
+      expect(JSON.parse(init.body)).toEqual({
+        type: "CARD",
+        token: "tok_test_123",
+        customer_email: "cliente@demo.com",
+        acceptance_token: "acc_token_123",
+      });
+      expect(result).toEqual({ paymentSourceId: "12345", cardLastFour: "4242", cardBrand: "VISA" });
+    });
+
+    it("createPaymentSource usa la URL de produccion si WOMPI_ENVIRONMENT es production", async () => {
+      envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      envMock.WOMPI_ENVIRONMENT = "production";
+      const fetchMock = stubFetch(201, { data: { id: 1 } });
+
+      const gateway = new WompiPaymentGateway();
+      await gateway.createPaymentSource({ cardToken: "t", customerEmail: "a@b.com", acceptanceToken: "acc" });
+
+      expect(fetchMock.mock.calls[0][0]).toBe("https://production.wompi.co/v1/payment_sources");
+    });
+
+    it("chargePaymentSource llama a POST /transactions con payment_source_id numerico y mapea el resultado", async () => {
+      envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      const fetchMock = stubFetch(201, { data: { id: 999, status: "PENDING" } });
+
+      const gateway = new WompiPaymentGateway();
+      const result = await gateway.chargePaymentSource({
+        reference: "sub-auto-1",
+        amountInCents: 7990000,
+        customerEmail: "cliente@demo.com",
+        paymentSourceId: "12345",
+      });
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe("https://sandbox.wompi.co/v1/transactions");
+      expect(JSON.parse(init.body)).toEqual({
+        amount_in_cents: 7990000,
+        currency: "COP",
+        customer_email: "cliente@demo.com",
+        reference: "sub-auto-1",
+        payment_source_id: 12345,
+      });
+      expect(result).toEqual({ transactionId: "999", status: "PENDING" });
+    });
+
+    it("lanza con el `reason` de Wompi cuando la API responde con error", async () => {
+      envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      stubFetch(422, { error: { reason: "TOKEN_INVALID_OR_EXPIRED" } });
+
+      const gateway = new WompiPaymentGateway();
+      await expect(
+        gateway.createPaymentSource({ cardToken: "bad", customerEmail: "a@b.com", acceptanceToken: "acc" })
+      ).rejects.toThrow(/TOKEN_INVALID_OR_EXPIRED/);
+    });
+
+    it("lanza un error legible si Wompi responde con un cuerpo no-JSON", async () => {
+      envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: async () => {
+          throw new Error("not json");
+        },
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const gateway = new WompiPaymentGateway();
+      await expect(
+        gateway.chargePaymentSource({ reference: "r", amountInCents: 1, customerEmail: "a@b.com", paymentSourceId: "1" })
+      ).rejects.toThrow(/HTTP 500/);
     });
   });
 });

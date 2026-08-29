@@ -7,6 +7,7 @@ import type {
   CreatePendingPaymentData,
   ISubscriptionRepository,
   SaasDashboardStats,
+  SubscriptionDueForAutoCharge,
   SubscriptionForLifecycleCheck,
   SubscriptionPaymentRecord,
   SubscriptionRecord,
@@ -26,6 +27,10 @@ function makeSubscription(overrides: Partial<SubscriptionRecord> = {}): Subscrip
     graceEndsAt: null,
     cancelledAt: null,
     createdAt: new Date("2026-01-01"),
+    autoRenew: false,
+    wompiPaymentSourceId: null,
+    cardLastFour: null,
+    cardBrand: null,
     ...overrides,
   };
 }
@@ -97,6 +102,18 @@ class FakeSubscriptionRepository implements ISubscriptionRepository {
     throw new Error("not implemented");
   }
   async getDashboardStats(): Promise<SaasDashboardStats> {
+    throw new Error("not implemented");
+  }
+  async savePaymentSource(): Promise<SubscriptionRecord> {
+    throw new Error("not implemented");
+  }
+  async disableAutoRenew(): Promise<SubscriptionRecord> {
+    throw new Error("not implemented");
+  }
+  async listDueForAutoCharge(): Promise<SubscriptionDueForAutoCharge[]> {
+    throw new Error("not implemented");
+  }
+  async hasAutoChargeAttemptSince(): Promise<boolean> {
     throw new Error("not implemented");
   }
 }

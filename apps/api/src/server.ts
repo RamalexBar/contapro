@@ -9,7 +9,8 @@ import {
   pollDianSupportDocumentSubmissionsUseCase,
 } from "./modules/electronic-invoicing/electronic-invoicing.container";
 import { startSubscriptionLifecyclePoller } from "./modules/saas-admin/infrastructure/subscription-lifecycle-poller";
-import { runSubscriptionLifecycleUseCase } from "./modules/saas-admin/saas-admin.container";
+import { startSubscriptionAutoChargePoller } from "./modules/saas-admin/infrastructure/subscription-auto-charge-poller";
+import { runSubscriptionLifecycleUseCase, runSubscriptionAutoChargesUseCase } from "./modules/saas-admin/saas-admin.container";
 import { startCollectionsReminderPoller } from "./modules/collections/infrastructure/collections-reminder-poller";
 import { runCollectionsRemindersUseCase } from "./modules/collections/collections.container";
 import { startRecurringInvoicePoller } from "./modules/recurring-invoices/infrastructure/recurring-invoice-poller";
@@ -32,6 +33,14 @@ if (env.DIAN_CERTIFICATE_PATH) {
 // A diferencia del poller DIAN, no depende de ningun certificado/config opcional -- arranca
 // siempre (ver aviso de cabecera en subscription-lifecycle-poller.ts).
 startSubscriptionLifecyclePoller(runSubscriptionLifecycleUseCase);
+
+// Gateado por WOMPI_PRIVATE_KEY: sin ella chargePaymentSource siempre fallaria (mismo criterio
+// que RESEND_API_KEY/DIAN_CERTIFICATE_PATH arriba) -- sin la llave tampoco puede existir ninguna
+// suscripcion con autoRenew=true (SavePaymentSourceUseCase ya habria fallado antes), asi que el
+// poller no tendria nada que hacer de todos modos.
+if (env.WOMPI_PRIVATE_KEY) {
+  startSubscriptionAutoChargePoller(runSubscriptionAutoChargesUseCase);
+}
 
 // Gateado por RESEND_API_KEY (igual criterio que el poller DIAN con su certificado): sin
 // credenciales de Resend el poller no tiene nada util que hacer, ver

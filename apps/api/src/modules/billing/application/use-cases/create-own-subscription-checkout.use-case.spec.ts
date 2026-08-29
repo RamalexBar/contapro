@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { tenantStorage } from "../../../../shared/context/request-context";
-import type { CreateCheckoutInput, IPaymentGateway, WompiCheckoutLink, WompiWebhookEvent } from "../../../saas-admin/domain/payment-gateway";
+import type {
+  CreateCheckoutInput,
+  IPaymentGateway,
+  WompiChargeResult,
+  WompiCheckoutLink,
+  WompiPaymentSource,
+  WompiWebhookEvent,
+} from "../../../saas-admin/domain/payment-gateway";
 import type { IPlanRepository, PlanRecord } from "../../../saas-admin/domain/plan.repository";
 import type {
   ApplyPaymentResult,
@@ -8,6 +15,7 @@ import type {
   CreatePendingPaymentData,
   ISubscriptionRepository,
   SaasDashboardStats,
+  SubscriptionDueForAutoCharge,
   SubscriptionForLifecycleCheck,
   SubscriptionPaymentRecord,
   SubscriptionRecord,
@@ -28,6 +36,10 @@ function makeSubscription(overrides: Partial<SubscriptionRecord> = {}): Subscrip
     graceEndsAt: null,
     cancelledAt: null,
     createdAt: new Date("2026-01-01"),
+    autoRenew: false,
+    wompiPaymentSourceId: null,
+    cardLastFour: null,
+    cardBrand: null,
     ...overrides,
   };
 }
@@ -115,6 +127,18 @@ class FakeSubscriptionRepository implements ISubscriptionRepository {
   async getDashboardStats(): Promise<SaasDashboardStats> {
     throw new Error("not implemented");
   }
+  async savePaymentSource(): Promise<SubscriptionRecord> {
+    throw new Error("not implemented");
+  }
+  async disableAutoRenew(): Promise<SubscriptionRecord> {
+    throw new Error("not implemented");
+  }
+  async listDueForAutoCharge(): Promise<SubscriptionDueForAutoCharge[]> {
+    throw new Error("not implemented");
+  }
+  async hasAutoChargeAttemptSince(): Promise<boolean> {
+    throw new Error("not implemented");
+  }
 }
 
 class FakePlanRepository implements IPlanRepository {
@@ -145,6 +169,12 @@ class FakePaymentGateway implements IPaymentGateway {
     return { checkoutUrl: `https://checkout.wompi.co/p/?reference=${input.reference}` };
   }
   verifyWebhookSignature(_event: WompiWebhookEvent): boolean {
+    throw new Error("not implemented");
+  }
+  async createPaymentSource(): Promise<WompiPaymentSource> {
+    throw new Error("not implemented");
+  }
+  async chargePaymentSource(): Promise<WompiChargeResult> {
     throw new Error("not implemented");
   }
 }

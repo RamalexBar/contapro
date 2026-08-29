@@ -1,9 +1,25 @@
 import crypto from "node:crypto";
 import { env } from "../../../config/env";
 import { ValidationError } from "../../../shared/errors/app-error";
-import type { CreateCheckoutInput, IPaymentGateway, WompiCheckoutLink, WompiWebhookEvent } from "../domain/payment-gateway";
+import type {
+  ChargePaymentSourceInput,
+  CreateCheckoutInput,
+  CreatePaymentSourceInput,
+  IPaymentGateway,
+  WompiChargeResult,
+  WompiCheckoutLink,
+  WompiPaymentSource,
+  WompiWebhookEvent,
+} from "../domain/payment-gateway";
 
 const CHECKOUT_BASE_URL = "https://checkout.wompi.co/p/";
+
+/** Base de la API REST (distinta del dominio de checkout.wompi.co de arriba) -- sandbox vs
+ * produccion segun WOMPI_ENVIRONMENT, mismo criterio que DIAN_ENVIRONMENT en dian-soap-client.ts. */
+const API_BASE_URL: Record<"sandbox" | "production", string> = {
+  sandbox: "https://sandbox.wompi.co/v1",
+  production: "https://production.wompi.co/v1",
+};
 
 /**
  * Integracion real con Wompi (Bancolombia) -- sin SDK, mismo criterio que
@@ -61,6 +77,72 @@ export class WompiPaymentGateway implements IPaymentGateway {
 
     return timingSafeEqualHex(expected, event.signature.checksum);
   }
+
+  async createPaymentSource(input: CreatePaymentSourceInput): Promise<WompiPaymentSource> {
+    if (!env.WOMPI_PRIVATE_KEY) {
+      throw new ValidationError("WOMPI_PRIVATE_KEY no esta configurada -- no se puede guardar la tarjeta para pagos automaticos");
+    }
+
+    const json = await wompiRequest("/payment_sources", {
+      type: "CARD",
+      token: input.cardToken,
+      customer_email: input.customerEmail,
+      acceptance_token: input.acceptanceToken,
+    });
+
+    return {
+      paymentSourceId: String(json.data.id),
+      cardLastFour: json.data.public_data?.last_four ?? null,
+      cardBrand: json.data.public_data?.card_brand ?? null,
+    };
+  }
+
+  async chargePaymentSource(input: ChargePaymentSourceInput): Promise<WompiChargeResult> {
+    if (!env.WOMPI_PRIVATE_KEY) {
+      throw new ValidationError("WOMPI_PRIVATE_KEY no esta configurada -- no se puede cobrar automaticamente");
+    }
+
+    const json = await wompiRequest("/transactions", {
+      amount_in_cents: input.amountInCents,
+      currency: "COP",
+      customer_email: input.customerEmail,
+      reference: input.reference,
+      payment_source_id: Number(input.paymentSourceId),
+    });
+
+    return { transactionId: String(json.data.id), status: String(json.data.status) };
+  }
+}
+
+/** POST autenticado con la llave privada (server-to-server) contra la API REST de Wompi --
+ * distinto de buildCheckoutUrl (calculo local) y verifyWebhookSignature (tambien local): estas dos
+ * llamadas SI salen a la red real. NO PROBADO contra el servicio real de Wompi en este entorno
+ * (mismo aviso que el resto de la clase) -- el shape de la respuesta (data.id/data.status/
+ * data.public_data) sigue la documentacion publica de Wompi al momento de escribir esto. */
+async function wompiRequest(path: string, body: Record<string, unknown>): Promise<{ data: Record<string, any> }> {
+  const baseUrl = API_BASE_URL[env.WOMPI_ENVIRONMENT];
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.WOMPI_PRIVATE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  let json: { data?: Record<string, any>; error?: { reason?: string; messages?: unknown } };
+  try {
+    json = await res.json();
+  } catch {
+    throw new ValidationError(`Wompi respondio con un cuerpo invalido (HTTP ${res.status})`);
+  }
+
+  if (!res.ok || !json.data) {
+    const reason = json.error?.reason ?? JSON.stringify(json.error?.messages ?? {}) ?? res.statusText;
+    throw new ValidationError(`Wompi rechazo la solicitud: ${reason}`);
+  }
+
+  return { data: json.data };
 }
 
 function getByPath(obj: unknown, path: string): string {

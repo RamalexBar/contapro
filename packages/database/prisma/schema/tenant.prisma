@@ -88,6 +88,20 @@ model Subscription {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
+  // ---- Cobro recurrente automatico via Wompi (ver RunSubscriptionAutoChargesUseCase) ----
+  // true solo despues de que el cliente tokeniza su tarjeta y consiente guardarla
+  // (SavePaymentSourceUseCase); false = el flujo sigue siendo el link de pago manual de siempre.
+  autoRenew            Boolean @default(false)
+  // Id de la "fuente de pago" (payment_source) que Wompi devuelve al guardar la tarjeta -- se usa
+  // para cobrar sin que el cliente este presente (POST /transactions con payment_source_id, sin
+  // redireccion). Nunca se guarda el numero de tarjeta ni el token de un solo uso, solo esta
+  // referencia reutilizable.
+  wompiPaymentSourceId String?
+  // Solo para mostrarle al usuario que tarjeta tiene guardada (ej. "Visa terminada en 4242") --
+  // dato publico que Wompi devuelve junto con el payment_source, no PCI-sensible.
+  cardLastFour         String?
+  cardBrand            String?
+
   payments  SubscriptionPayment[]
   reminders SubscriptionReminderLog[]
 

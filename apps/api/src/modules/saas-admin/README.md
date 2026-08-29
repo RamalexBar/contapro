@@ -113,6 +113,56 @@ datos de tarjeta, evitando alcance PCI-DSS.
   la documentacion oficial al pie de la letra, pero esa pieza especifica quedo verificada solo por
   autoconsistencia (mismo codigo genera y verifica), no contra el servicio real.
 
+## Cobro automatico recurrente (tarjeta guardada, iteracion 26)
+
+Hasta la iteracion 25 cada periodo requeria que el cliente volviera a hacer clic en un link de
+checkout. Esto agrega **pago recurrente de verdad**: una vez el cliente guarda su tarjeta, la
+suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a redirigir a nadie a
+`checkout.wompi.co`.
+
+- `Subscription.autoRenew`/`wompiPaymentSourceId`/`cardLastFour`/`cardBrand` (nuevas columnas,
+  `20260829120000_add_subscription_auto_renew`).
+- `IPaymentGateway.createPaymentSource`/`chargePaymentSource` (nuevos, junto a los ya existentes
+  `buildCheckoutUrl`/`verifyWebhookSignature`): a diferencia de Web Checkout, estos **si son
+  llamadas HTTP salientes reales** de `WompiPaymentGateway` contra la API REST de Wompi
+  (`POST /payment_sources`, `POST /transactions` con `payment_source_id`), autenticadas con
+  `WOMPI_PRIVATE_KEY` (Bearer). Ninguno de los dos requiere SDK, mismo criterio que el resto del
+  modulo.
+- **El numero de tarjeta NUNCA toca este backend** (alcance PCI): el frontend
+  (`apps/web/src/features/billing/lib/wompi.ts`) llama directo a la API publica de Wompi desde el
+  navegador con la llave PUBLICA (`VITE_WOMPI_PUBLIC_KEY`) para tokenizar (`POST /tokens/cards`) y
+  obtener el `acceptance_token` del comercio (`GET /merchants/:publicKey`); solo el **token**
+  resultante (nunca el numero/cvc) llega a `POST /subscription/payment-source`.
+- `SavePaymentSourceUseCase`: recibe `{ cardToken, customerEmail, acceptanceToken }`, tokeniza
+  contra Wompi (`createPaymentSource`), guarda el `payment_source_id`/marca/ultimos 4 digitos y
+  activa `autoRenew`. Audita `SUBSCRIPTION_AUTO_RENEW_ENABLED`.
+- `DisableAutoRenewUseCase`: apaga `autoRenew` sin tocar `status`/`currentPeriodEnd` — la
+  suscripcion sigue vigente hasta que venza normalmente, solo deja de renovarse sola. Audita
+  `SUBSCRIPTION_AUTO_RENEW_DISABLED`.
+- `RunSubscriptionAutoChargesUseCase` + `infrastructure/subscription-auto-charge-poller.ts`
+  (arrancado desde `server.ts` solo si `WOMPI_PRIVATE_KEY` esta configurada, intervalo de 1 hora,
+  mismo patron que el poller de iteracion 17): busca suscripciones `autoRenew=true` con
+  `currentPeriodEnd` vencido (`listDueForAutoCharge`), evita reintentar mas de una vez por dia
+  (`hasAutoChargeAttemptSince`), crea un `SubscriptionPayment PENDING` con `method="WOMPI_AUTO"` y
+  cobra contra el `payment_source_id` guardado. **No confirma el pago el mismo** — deja que el
+  webhook `transaction.updated` existente (`ConfirmWompiPaymentUseCase`, iteracion 25) lo procese
+  por `reference`, exactamente igual que el checkout manual, para no duplicar la logica de aplicar
+  el pago/recalcular `currentPeriodEnd`. Si Wompi rechaza sincronicamente (tarjeta vencida,
+  fondos insuficientes, etc.), marca el pago `FAILED` y audita
+  `SUBSCRIPTION_AUTO_CHARGE_FAILED` sin tumbar el resto del batch.
+- Modulo `billing` (tenant-facing, `apps/web/src/features/billing`): `SaveOwnPaymentSourceUseCase`/
+  `DisableOwnAutoRenewUseCase` resuelven la suscripcion de la propia empresa (via
+  `findLatestByCompanyId`, nunca un id externo) y delegan en los casos de uso de arriba —
+  `POST /subscription/payment-source` y `POST /subscription/disable-auto-renew`. La pagina
+  `/billing` muestra "Renovacion automatica" (marca/ultimos 4 digitos si esta activa, formulario de
+  tarjeta si no) — se oculta si `VITE_WOMPI_PUBLIC_KEY` no esta configurada.
+- **NO PROBADO end-to-end contra Wompi real** (mismo aviso que Web Checkout en su momento antes de
+  la verificacion en vivo): 316 tests unitarios pasando (incluye tokenizacion/cobro mockeando
+  `fetch`, ver `wompi-payment-gateway.spec.ts`), build/lint limpios, pero falta completar un
+  guardado de tarjeta real por navegador contra el sandbox de Wompi (requiere una tarjeta de prueba
+  de las que documenta Wompi) para confirmar el shape exacto de `payment_sources`/`transactions`
+  contra el servicio real.
+
 ## Envio real de recordatorios (iteracion 17)
 
 `IReminderNotifier` (`domain/reminder-notifier.ts`) es el puerto que arma y envia el correo;
@@ -163,4 +213,11 @@ datos de tarjeta, evitando alcance PCI-DSS.
 5. Wompi: no hay reconciliacion automatica para pagos cuyo webhook se pierda (Wompi reintenta
    webhooks fallidos por su cuenta, pero no hay un job propio que consulte
    `GET /v1/transactions/:id` con `WOMPI_PRIVATE_KEY` para pagos que quedaron `PENDING` demasiado
-   tiempo) — la llave privada esta preparada en `config/env.ts` para esto, pero no se uso todavia.
+   tiempo) — la llave privada ya se usa para el cobro recurrente (iteracion 26) pero no para esto.
+6. Cobro automatico recurrente (iteracion 26): falta guardar una tarjeta real por navegador contra
+   el sandbox de Wompi para confirmar el shape de `payment_sources`/`transactions` (ver seccion
+   dedicada arriba) — el mismo aviso que tuvo Web Checkout antes de su verificacion en vivo.
+7. Cobro automatico recurrente: si `chargePaymentSource` falla varias veces seguidas (tarjeta
+   vencida) no hay una notificacion al cliente pidiendole actualizar el medio de pago — solo queda
+   auditado (`SUBSCRIPTION_AUTO_CHARGE_FAILED`) y la suscripcion sigue su curso normal hacia
+   `GRACE_PERIOD`/`SUSPENDED` via el poller de la iteracion 17.

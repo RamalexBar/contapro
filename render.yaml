@@ -120,6 +120,14 @@ services:
       # Ajustar tras el primer deploy si Render le asigna otra URL a "contapro-api".
       - key: VITE_API_BASE_URL
         value: https://contapro-api.onrender.com/api
+      # Llave PUBLICA de Wompi (no la privada) -- se usa para tokenizar tarjetas directo desde el
+      # navegador (apps/web/src/features/billing/lib/wompi.ts), nunca toca nuestro backend. Debe
+      # ser la misma llave que WOMPI_PUBLIC_KEY en contapro-api. Sin valor, el bloque "Renovacion
+      # automatica" de /billing se oculta (isWompiConfigured()).
+      - key: VITE_WOMPI_PUBLIC_KEY
+        sync: false
+      - key: VITE_WOMPI_ENVIRONMENT
+        value: production
     routes:
       # SPA: cualquier ruta que no sea un archivo estatico real cae a index.html -- sin esto,
       # refrescar el navegador en /pos o /accounting da 404 (React Router nunca llega a manejarlo).
