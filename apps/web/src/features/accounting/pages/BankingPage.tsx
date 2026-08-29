@@ -22,6 +22,8 @@ import {
   startBankReconciliation,
 } from "../api/banking.api";
 
+const RECONCILIATION_STATUS_LABEL: Record<string, string> = { IN_PROGRESS: "En progreso", COMPLETED: "Cerrada" };
+
 function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -357,7 +359,7 @@ function ReconciliationsSection() {
                     <Td>{formatCOP(r.bookBalance)}</Td>
                     <Td>{formatCOP(r.statementBalance - r.bookBalance)}</Td>
                     <Td>
-                      <Badge tone={r.status === "CLOSED" ? "success" : "neutral"}>{r.status}</Badge>
+                      <Badge tone={r.status === "COMPLETED" ? "success" : "neutral"}>{RECONCILIATION_STATUS_LABEL[r.status] ?? r.status}</Badge>
                     </Td>
                     <Td className="text-right">
                       <Button size="sm" variant="secondary" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>

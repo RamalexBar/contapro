@@ -28,6 +28,16 @@ import {
 
 const ACCEPTED_INVOICE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
+const PURCHASE_STATUS_LABEL: Record<string, string> = { REGISTERED: "Registrada", CANCELLED: "Anulada" };
+
+const ACCOUNT_PAYABLE_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Pendiente",
+  PARTIAL: "Abono parcial",
+  PAID: "Pagada",
+  OVERDUE: "Vencida",
+  CANCELLED: "Anulada",
+};
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -447,7 +457,7 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
                   </Td>
                   <Td>{p.retentionTotal > 0 ? formatCOP(p.total - p.retentionTotal) : "-"}</Td>
                   <Td>
-                    <Badge tone={p.status === "CANCELLED" ? "danger" : "neutral"}>{p.status}</Badge>
+                    <Badge tone={p.status === "CANCELLED" ? "danger" : "neutral"}>{PURCHASE_STATUS_LABEL[p.status] ?? p.status}</Badge>
                   </Td>
                   <Td className="text-right">
                     {p.status === "REGISTERED" && (
@@ -507,7 +517,9 @@ function AccountsPayableSection({ suppliers }: { suppliers: SupplierRecord[] }) 
                 <Td>{formatCOP(ap.balance)}</Td>
                 <Td>{ap.dueDate.slice(0, 10)}</Td>
                 <Td>
-                  <Badge tone={ap.status === "PAID" ? "success" : ap.status === "CANCELLED" ? "danger" : "neutral"}>{ap.status}</Badge>
+                  <Badge tone={ap.status === "PAID" ? "success" : ap.status === "CANCELLED" ? "danger" : "neutral"}>
+                    {ACCOUNT_PAYABLE_STATUS_LABEL[ap.status] ?? ap.status}
+                  </Badge>
                 </Td>
                 <Td className="text-right">
                   {ap.status !== "PAID" && ap.status !== "CANCELLED" && payingId !== ap.id && (

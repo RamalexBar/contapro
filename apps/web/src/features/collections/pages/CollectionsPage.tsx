@@ -21,6 +21,14 @@ function statusTone(status: string): "success" | "danger" | "warning" | "neutral
   return "warning";
 }
 
+const RECEIVABLE_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Pendiente",
+  PARTIAL: "Abono parcial",
+  PAID: "Pagada",
+  OVERDUE: "Vencida",
+  CANCELLED: "Anulada",
+};
+
 export function CollectionsPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["accounts-receivable"], queryFn: () => listAccountsReceivable() });
@@ -104,7 +112,7 @@ export function CollectionsPage() {
                   <Td>{formatCOP(ar.balance)}</Td>
                   <Td>{ar.dueDate.slice(0, 10)}</Td>
                   <Td>
-                    <Badge tone={statusTone(ar.status)}>{ar.status}</Badge>
+                    <Badge tone={statusTone(ar.status)}>{RECEIVABLE_STATUS_LABEL[ar.status] ?? ar.status}</Badge>
                   </Td>
                   <Td className="text-right">
                     {ar.status !== "PAID" && ar.status !== "CANCELLED" && payingId !== ar.id && (

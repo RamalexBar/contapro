@@ -22,6 +22,8 @@ import {
   updateExpenseCategory,
 } from "../api/expense.api";
 
+const EXPENSE_STATUS_LABEL: Record<string, string> = { REGISTERED: "Registrado", CANCELLED: "Anulado" };
+
 function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -311,7 +313,7 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
                   <Td>{e.paymentMethod}</Td>
                   <Td>{costCenterName(e.costCenterId)}</Td>
                   <Td>
-                    <Badge tone={e.status === "CANCELLED" ? "danger" : "neutral"}>{e.status}</Badge>
+                    <Badge tone={e.status === "CANCELLED" ? "danger" : "neutral"}>{EXPENSE_STATUS_LABEL[e.status] ?? e.status}</Badge>
                   </Td>
                   <Td className="text-right">
                     {e.status === "REGISTERED" && (

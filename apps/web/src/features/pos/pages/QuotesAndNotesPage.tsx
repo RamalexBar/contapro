@@ -43,6 +43,34 @@ function DianStatusBadge({ invoice }: { invoice: ElectronicInvoiceStatus | null 
   if (!invoice) return <Badge tone="neutral">Sin factura electrónica</Badge>;
   return <Badge tone={DIAN_STATUS_TONE[invoice.status]}>{DIAN_STATUS_LABEL[invoice.status]}</Badge>;
 }
+
+const QUOTE_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  SENT: "Enviada",
+  ACCEPTED: "Aceptada",
+  EXPIRED: "Vencida",
+  CONVERTED: "Convertida en venta",
+};
+const QUOTE_STATUS_TONE: Record<string, "neutral" | "success" | "warning" | "danger" | "info"> = {
+  DRAFT: "neutral",
+  SENT: "info",
+  ACCEPTED: "success",
+  EXPIRED: "danger",
+  CONVERTED: "success",
+};
+
+const NOTE_STATUS_LABEL: Record<string, string> = { ISSUED: "Emitida" };
+
+const SALE_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  PENDING_AUTHORIZATION: "Pendiente de autorización",
+  COMPLETED: "Completada",
+  CANCELLED: "Anulada",
+  RETURNED_PARTIAL: "Con devolución parcial",
+  RETURNED_FULL: "Devuelta completa",
+};
+
+const RETURN_STATUS_LABEL: Record<string, string> = { PENDING: "Registrada" };
 import { createReturn, listReturns, type RefundMethod } from "../api/return.api";
 
 const RETURNABLE_SALE_STATUSES = new Set(["COMPLETED", "RETURNED_PARTIAL"]);
@@ -171,7 +199,9 @@ function QuoteSection() {
             <TableBody>
               {quotes?.data.map((q) => (
                 <TableRow key={q.id}>
-                  <Td>{q.status}</Td>
+                  <Td>
+                    <Badge tone={QUOTE_STATUS_TONE[q.status] ?? "neutral"}>{QUOTE_STATUS_LABEL[q.status] ?? q.status}</Badge>
+                  </Td>
                   <Td>{formatCOP(q.subtotal)}</Td>
                   <Td>{formatCOP(q.total)}</Td>
                   <Td>{q.validUntil.slice(0, 10)}</Td>
@@ -279,7 +309,9 @@ function NoteSection({
                 <TableRow key={n.id}>
                   <Td>{n.reason}</Td>
                   <Td>{formatCOP(n.amount)}</Td>
-                  <Td>{n.status}</Td>
+                  <Td>
+                    <Badge tone="success">{NOTE_STATUS_LABEL[n.status] ?? n.status}</Badge>
+                  </Td>
                 </TableRow>
               ))}
             </TableBody>
@@ -367,7 +399,7 @@ function ReturnSection() {
             <option value="">Seleccionar venta...</option>
             {returnableSales.map((s) => (
               <option key={s.id} value={s.id}>
-                Venta #{s.number} - {formatCOP(s.total)} - {s.status}
+                Venta #{s.number} - {formatCOP(s.total)} - {SALE_STATUS_LABEL[s.status] ?? s.status}
               </option>
             ))}
           </Select>
@@ -463,7 +495,9 @@ function ReturnSection() {
                 <TableRow key={r.id}>
                   <Td>{r.reason}</Td>
                   <Td>{formatCOP(r.total)}</Td>
-                  <Td>{r.status}</Td>
+                  <Td>
+                    <Badge tone="success">{RETURN_STATUS_LABEL[r.status] ?? r.status}</Badge>
+                  </Td>
                   <Td>{r.createdAt.slice(0, 10)}</Td>
                 </TableRow>
               ))}

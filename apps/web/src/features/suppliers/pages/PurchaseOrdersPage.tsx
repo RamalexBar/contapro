@@ -30,6 +30,14 @@ interface ItemRow extends PurchaseOrderItemInput {
 
 const EMPTY_ITEM: ItemRow = { productId: "", quantity: 1, unitCost: 0 };
 
+const PURCHASE_ORDER_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  SENT: "Enviada",
+  PARTIALLY_RECEIVED: "Recibida parcial",
+  RECEIVED: "Recibida completa",
+  CANCELLED: "Anulada",
+};
+
 function ItemsEditor({
   items,
   onChange,
@@ -185,7 +193,7 @@ function PurchaseOrdersSection({ suppliers, products }: { suppliers: SupplierRec
                     <Td className="font-medium text-slate-900">{supplierName(po.supplierId)}</Td>
                     <Td>{formatCOP(po.total)}</Td>
                     <Td>
-                      <Badge tone={po.status === "DRAFT" ? "neutral" : "success"}>{po.status}</Badge>
+                      <Badge tone={po.status === "DRAFT" ? "neutral" : "success"}>{PURCHASE_ORDER_STATUS_LABEL[po.status] ?? po.status}</Badge>
                     </Td>
                     <Td className="space-x-2 text-right">
                       {po.status === "DRAFT" && (
