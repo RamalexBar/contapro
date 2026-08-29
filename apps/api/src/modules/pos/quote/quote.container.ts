@@ -8,5 +8,6 @@ import { QuoteController } from "./interfaces/quote.controller";
 const repo = new PrismaQuoteRepository(priceListRepository);
 export const quoteController = new QuoteController(
   new CreateQuoteUseCase(repo, customerRepo, priceListRepository),
-  new ListQuotesUseCase(repo)
+  new ListQuotesUseCase(repo),
+  repo
 );

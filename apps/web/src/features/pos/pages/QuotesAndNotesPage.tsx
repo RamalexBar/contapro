@@ -20,6 +20,7 @@ import {
   listCreditNotes,
   listDebitNotes,
   listQuotes,
+  printQuotePdf,
 } from "../api/notes.api";
 import { getElectronicInvoiceBySale, getSale, listSales, type ElectronicInvoiceStatus } from "../api/sale.api";
 
@@ -120,6 +121,7 @@ function QuoteSection() {
       setValidUntil("");
     },
   });
+  const printMutation = useMutation({ mutationFn: printQuotePdf });
 
   return (
     <Card title="Cotizaciones" className="mb-6">
@@ -194,6 +196,7 @@ function QuoteSection() {
                 <Th>Subtotal</Th>
                 <Th>Total</Th>
                 <Th>Valida hasta</Th>
+                <Th></Th>
               </tr>
             </TableHead>
             <TableBody>
@@ -205,6 +208,16 @@ function QuoteSection() {
                   <Td>{formatCOP(q.subtotal)}</Td>
                   <Td>{formatCOP(q.total)}</Td>
                   <Td>{q.validUntil.slice(0, 10)}</Td>
+                  <Td className="text-right">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => printMutation.mutate(q.id)}
+                      loading={printMutation.isPending && printMutation.variables === q.id}
+                    >
+                      Imprimir
+                    </Button>
+                  </Td>
                 </TableRow>
               ))}
             </TableBody>

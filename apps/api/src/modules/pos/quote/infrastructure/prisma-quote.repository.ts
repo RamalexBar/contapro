@@ -1,9 +1,10 @@
 import { prisma } from "../../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { applyDiscount, round2 } from "@erp/shared-utils";
+import { NotFoundError } from "../../../../shared/errors/app-error";
 import type { IPriceListRepository } from "../../../inventory/price-list/domain/price-list.repository";
 import { resolveEffectivePrice } from "../../../inventory/price-list/application/resolve-effective-price";
-import type { CreateQuoteData, IQuoteRepository, QuoteRecord } from "../domain/quote.repository";
+import type { CreateQuoteData, IQuoteRepository, QuoteDetail, QuoteRecord } from "../domain/quote.repository";
 
 export class PrismaQuoteRepository implements IQuoteRepository {
   constructor(private readonly priceListRepo: IPriceListRepository) {}
@@ -53,6 +54,38 @@ export class PrismaQuoteRepository implements IQuoteRepository {
       validUntil: quote.validUntil,
       createdAt: quote.createdAt,
       priceListId: quote.priceListId,
+    };
+  }
+
+  async findByIdOrThrow(id: string): Promise<QuoteDetail> {
+    // Quote/QuoteItem no declaran relacion Prisma hacia Customer/Product (evita acoplar el schema
+    // de pos/quote a esos otros dominios) -- se resuelven los nombres con consultas separadas, en
+    // vez de "include", mismo criterio ya usado en suppliers para el PDF de orden de compra.
+    const row = await prisma.quote.findFirst({ where: { id }, include: { items: true } });
+    if (!row) throw new NotFoundError("Quote", id);
+
+    const [customer, products] = await Promise.all([
+      row.customerId ? prisma.customer.findFirst({ where: { id: row.customerId }, select: { name: true } }) : null,
+      prisma.product.findMany({ where: { id: { in: row.items.map((i) => i.productId) } }, select: { id: true, name: true } }),
+    ]);
+    const productName = (productId: string) => products.find((p) => p.id === productId)?.name ?? "(producto no encontrado)";
+
+    return {
+      id: row.id,
+      status: row.status,
+      subtotal: Number(row.subtotal),
+      total: Number(row.total),
+      validUntil: row.validUntil,
+      createdAt: row.createdAt,
+      priceListId: row.priceListId,
+      customerName: customer?.name ?? null,
+      items: row.items.map((item) => ({
+        productName: productName(item.productId),
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        discountPercent: Number(item.discountPercent),
+        total: Number(item.total),
+      })),
     };
   }
 

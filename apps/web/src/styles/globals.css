@@ -24,3 +24,13 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background-color: theme("colors.slate.400");
 }
+
+/* Usado por el boton "Imprimir" de los reportes contables (Balance General, Estado de
+   Resultados, Flujo de caja, Libro mayor): oculta el sidebar/navbar y los controles de filtro al
+   imprimir, para que solo salga el reporte mismo -- no genera un PDF en el backend como los demas
+   documentos (comprobante, cotizacion, etc.), reusa la vista ya renderizada en pantalla. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

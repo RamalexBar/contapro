@@ -14,6 +14,14 @@ import type { ListAccountsPayableUseCase } from "../application/use-cases/list-a
 import type { RegisterSupplierPaymentUseCase } from "../application/use-cases/register-supplier-payment.use-case";
 import type { CancelPurchaseUseCase } from "../application/use-cases/cancel-purchase.use-case";
 import type { ExtractPurchaseInvoiceUseCase } from "../application/use-cases/extract-purchase-invoice.use-case";
+import type { ISupplierRepository } from "../domain/supplier.repository";
+import type { IAccountPayableRepository } from "../domain/account-payable.repository";
+import { basePrisma } from "@erp/database";
+import { prisma } from "../../../shared/prisma/prisma-client";
+import { formatCOP } from "@erp/shared-utils";
+import { getTenantContext } from "../../../shared/context/request-context";
+import { NotFoundError } from "../../../shared/errors/app-error";
+import { renderSimpleDocumentPdf } from "../../../shared/pdf/simple-document-renderer";
 import {
   createPurchaseOrderSchema,
   createPurchaseSchema,
@@ -39,8 +47,16 @@ export class SuppliersController {
     private readonly listAccountsPayableUseCase: ListAccountsPayableUseCase,
     private readonly registerSupplierPaymentUseCase: RegisterSupplierPaymentUseCase,
     private readonly cancelPurchaseUseCase: CancelPurchaseUseCase,
-    private readonly extractPurchaseInvoiceUseCase: ExtractPurchaseInvoiceUseCase
+    private readonly extractPurchaseInvoiceUseCase: ExtractPurchaseInvoiceUseCase,
+    private readonly supplierRepo: ISupplierRepository,
+    private readonly accountPayableRepo: IAccountPayableRepository
   ) {}
+
+  private async getCompanyOrThrow() {
+    const company = await basePrisma.company.findFirst({ where: { id: getTenantContext().companyId } });
+    if (!company) throw new NotFoundError("Company", getTenantContext().companyId);
+    return company;
+  }
 
   createSupplier = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -165,6 +181,65 @@ export class SuppliersController {
     try {
       const body = registerSupplierPaymentSchema.parse(req.body);
       res.status(201).json(await this.registerSupplierPaymentUseCase.execute({ accountPayableId: req.params.id, ...body }));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPurchaseOrderPdf = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const po = await this.getPurchaseOrderUseCase.execute(req.params.id);
+      const [company, supplier, products] = await Promise.all([
+        this.getCompanyOrThrow(),
+        this.supplierRepo.findByIdOrThrow(po.supplierId),
+        prisma.product.findMany({ where: { id: { in: po.items.map((i) => i.productId) } }, select: { id: true, name: true } }),
+      ]);
+      const productName = (id: string) => products.find((p) => p.id === id)?.name ?? "(producto no encontrado)";
+
+      const pdf = await renderSimpleDocumentPdf({
+        company: { name: company.name, nit: company.nit },
+        title: "Orden de compra",
+        fields: [
+          { label: "Proveedor", value: supplier.name },
+          { label: "Fecha", value: po.createdAt.toISOString().slice(0, 10) },
+          ...(po.expectedDate ? [{ label: "Fecha esperada", value: po.expectedDate.toISOString().slice(0, 10) }] : []),
+        ],
+        items: po.items.map((item) => ({
+          description: productName(item.productId),
+          quantity: String(item.quantity),
+          unitPrice: formatCOP(item.unitCost),
+          amount: formatCOP(item.total),
+        })),
+        totalLabel: "Total",
+        total: formatCOP(po.total),
+        generatedAt: new Date(),
+      });
+      res.type("application/pdf").send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getSupplierPaymentPdf = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const payment = await this.accountPayableRepo.findPaymentByIdOrThrow(req.params.id);
+      const accountPayable = await this.accountPayableRepo.findByIdOrThrow(payment.accountPayableId);
+      const [company, supplier] = await Promise.all([this.getCompanyOrThrow(), this.supplierRepo.findByIdOrThrow(accountPayable.supplierId)]);
+
+      const pdf = await renderSimpleDocumentPdf({
+        company: { name: company.name, nit: company.nit },
+        title: "Recibo de pago a proveedor",
+        fields: [
+          { label: "Proveedor", value: supplier.name },
+          { label: "Fecha de pago", value: payment.paidAt.toISOString().slice(0, 10) },
+          { label: "Medio de pago", value: payment.method },
+          { label: "Estado", value: payment.status === "REVERSED" ? "Reversado" : "Registrado" },
+        ],
+        totalLabel: "Monto pagado",
+        total: formatCOP(payment.amount),
+        generatedAt: new Date(),
+      });
+      res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
     }

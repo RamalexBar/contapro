@@ -20,6 +20,7 @@ import {
   listCommissionSettlements,
   listSellers,
   payCommissionSettlement,
+  printCommissionSettlementPdf,
 } from "../api/commissions.api";
 
 function SchemesSection() {
@@ -162,6 +163,7 @@ function SettlementsSection() {
       setPaymentMethod("CASH");
     },
   });
+  const printMutation = useMutation({ mutationFn: printCommissionSettlementPdf });
 
   function sellerName(id: string): string {
     return sellers?.data.find((s) => s.id === id)?.fullName ?? id;
@@ -213,7 +215,17 @@ function SettlementsSection() {
                   <Td>
                     <Badge tone={s.status === "PAID" ? "success" : "warning"}>{s.status === "PAID" ? "Pagada" : "Calculada"}</Badge>
                   </Td>
-                  <Td className="text-right">
+                  <Td className="space-x-2 text-right">
+                    {payingId !== s.id && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => printMutation.mutate(s.id)}
+                        loading={printMutation.isPending && printMutation.variables === s.id}
+                      >
+                        Imprimir
+                      </Button>
+                    )}
                     {canManage && s.status === "CALCULATED" && payingId !== s.id && (
                       <Button size="sm" variant="secondary" onClick={() => setPayingId(s.id)}>
                         Pagar

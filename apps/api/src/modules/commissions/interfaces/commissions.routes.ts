@@ -23,3 +23,8 @@ commissionsRouter.post(
   requirePermission("commission.manage"),
   commissionsController.pay
 );
+commissionsRouter.get(
+  "/commissions/settlements/:id/pdf",
+  requirePermission("commission.read"),
+  commissionsController.getSettlementPdf
+);

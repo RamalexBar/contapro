@@ -33,6 +33,10 @@ export interface ReversePaymentsResult {
 export interface IAccountPayableRepository {
   list(filter?: { status?: string }): Promise<AccountPayableRecord[]>;
   findByIdOrThrow(id: string): Promise<AccountPayableRecord>;
+  /** Usado por el boton "Imprimir" del recibo de abono (GET /supplier-payments/:id/pdf) --
+   * ninguna otra ruta necesitaba consultar un abono individual por id hasta ahora (registerPayment
+   * ya devuelve el creado inline). */
+  findPaymentByIdOrThrow(id: string): Promise<SupplierPaymentRecord>;
   /** PENDING/PARTIAL/OVERDUE -- usado por el reporte de informacion exogena DIAN (item 37,
    * formato 1009: saldos de cuentas por pagar) para sumar el saldo actual por proveedor, mismo
    * criterio que IAccountReceivableRepository.listActive(). */

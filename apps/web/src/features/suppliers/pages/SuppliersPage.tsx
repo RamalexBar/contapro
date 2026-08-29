@@ -20,6 +20,7 @@ import {
   listAccountsPayable,
   listPurchases,
   listSuppliers,
+  printSupplierPaymentPdf,
   registerSupplierPayment,
   type ExtractPurchaseInvoiceResult,
   type PurchaseWithholdingInput,
@@ -481,15 +482,21 @@ function AccountsPayableSection({ suppliers }: { suppliers: SupplierRecord[] }) 
   const { data, isLoading } = useQuery({ queryKey: ["accounts-payable"], queryFn: () => listAccountsPayable() });
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payForm, setPayForm] = useState({ amount: "", method: "CASH" });
+  // Recibo imprimible solo del ultimo abono recien registrado por cada cuenta -- no hay un
+  // historial de pagos en esta pantalla, asi que "imprimir" solo tiene sentido justo despues de
+  // pagar (mismo patron que "Imprimir tirilla" en el POS tras completar una venta).
+  const [lastPaymentByAccountPayable, setLastPaymentByAccountPayable] = useState<Record<string, string>>({});
 
   const payMutation = useMutation({
     mutationFn: (id: string) => registerSupplierPayment(id, { amount: Number(payForm.amount), method: payForm.method }),
-    onSuccess: () => {
+    onSuccess: (result, accountPayableId) => {
       queryClient.invalidateQueries({ queryKey: ["accounts-payable"] });
       setPayingId(null);
       setPayForm({ amount: "", method: "CASH" });
+      setLastPaymentByAccountPayable((prev) => ({ ...prev, [accountPayableId]: result.payment.id }));
     },
   });
+  const printMutation = useMutation({ mutationFn: printSupplierPaymentPdf });
 
   function supplierName(id: string): string {
     return suppliers.find((s) => s.id === id)?.name ?? id;
@@ -511,7 +518,9 @@ function AccountsPayableSection({ suppliers }: { suppliers: SupplierRecord[] }) 
             </tr>
           </TableHead>
           <TableBody>
-            {data?.data.map((ap) => (
+            {data?.data.map((ap) => {
+              const lastPaymentId = lastPaymentByAccountPayable[ap.id];
+              return (
               <TableRow key={ap.id}>
                 <Td className="font-medium text-slate-900">{supplierName(ap.supplierId)}</Td>
                 <Td>{formatCOP(ap.balance)}</Td>
@@ -549,9 +558,21 @@ function AccountsPayableSection({ suppliers }: { suppliers: SupplierRecord[] }) 
                       </Button>
                     </span>
                   )}
+                  {lastPaymentId && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="ml-2"
+                      onClick={() => printMutation.mutate(lastPaymentId)}
+                      loading={printMutation.isPending && printMutation.variables === lastPaymentId}
+                    >
+                      Imprimir recibo
+                    </Button>
+                  )}
                 </Td>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       )}

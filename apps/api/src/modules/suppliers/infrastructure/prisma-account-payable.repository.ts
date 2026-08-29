@@ -76,6 +76,12 @@ export class PrismaAccountPayableRepository implements IAccountPayableRepository
     return toRecord(row);
   }
 
+  async findPaymentByIdOrThrow(id: string): Promise<SupplierPaymentRecord> {
+    const row = await prisma.supplierPayment.findFirst({ where: { id } });
+    if (!row) throw new NotFoundError("SupplierPayment", id);
+    return toPaymentRecord(row);
+  }
+
   async registerPayment(accountPayableId: string, amount: number, method: string, userId: string): Promise<RegisterPaymentResult> {
     return prisma.$transaction(async (tx) => {
       const current = await tx.accountPayable.findFirst({ where: { id: accountPayableId }, include: INCLUDE });

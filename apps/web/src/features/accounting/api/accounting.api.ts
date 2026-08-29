@@ -1,5 +1,4 @@
-import { apiFetch, BASE_URL } from "../../../lib/api-client";
-import { useAuthStore } from "../../auth/hooks/useAuthStore";
+import { apiFetch, openPdfInNewTab } from "../../../lib/api-client";
 
 export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
 
@@ -168,16 +167,8 @@ export function voidEntry(id: string): Promise<JournalEntryRecord> {
  * pos/api/sale.api.ts) -- el endpoint exige el token en el header Authorization, asi que no sirve
  * un <a href> directo. Desde ahi el usuario imprime con Ctrl+P / el icono de impresora del lector
  * de PDF del navegador. */
-export async function printJournalEntryPdf(entryId: string): Promise<void> {
-  const { accessToken } = useAuthStore.getState();
-  const res = await fetch(`${BASE_URL}/journal-entries/${entryId}/pdf`, {
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-  });
-  if (!res.ok) throw new Error("No se pudo generar el PDF del comprobante");
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+export function printJournalEntryPdf(entryId: string): Promise<void> {
+  return openPdfInNewTab(`/journal-entries/${entryId}/pdf`);
 }
 
 export function getBalanceSheet(asOf?: string, byThirdParty?: boolean): Promise<BalanceSheet> {

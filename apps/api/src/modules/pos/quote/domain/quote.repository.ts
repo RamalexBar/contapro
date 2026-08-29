@@ -25,7 +25,23 @@ export interface QuoteRecord {
   priceListId: string | null;
 }
 
+export interface QuoteItemDetail {
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  total: number;
+}
+
+export interface QuoteDetail extends QuoteRecord {
+  customerName: string | null;
+  items: QuoteItemDetail[];
+}
+
 export interface IQuoteRepository {
   create(data: CreateQuoteData): Promise<QuoteRecord>;
   list(): Promise<QuoteRecord[]>;
+  /** Usado por el boton "Imprimir" (GET /quotes/:id/pdf) -- resuelve nombre de cliente/producto
+   * para que el PDF no muestre ids crudos. */
+  findByIdOrThrow(id: string): Promise<QuoteDetail>;
 }

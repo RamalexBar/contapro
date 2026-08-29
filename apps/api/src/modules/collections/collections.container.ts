@@ -35,7 +35,9 @@ export const collectionsController = new CollectionsController(
   new ListAccountsReceivableUseCase(accountReceivableRepo),
   new RegisterReceivablePaymentUseCase(accountReceivableRepo, customerRepo, postReceivableCollectionJournalEntryUseCase, auditService),
   new CreateReceivableCheckoutUseCase(accountReceivableRepo, customerRepo, paymentGateway, auditService),
-  confirmReceivableWompiPaymentUseCase
+  confirmReceivableWompiPaymentUseCase,
+  accountReceivableRepo,
+  customerRepo
 );
 
 /** Usado por server.ts para arrancar el poller de recordatorios de cobro. */

@@ -12,7 +12,12 @@ import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { listCustomers } from "../../customers/api/customer.api";
-import { createReceivableCheckout, listAccountsReceivable, registerReceivablePayment } from "../api/collections.api";
+import {
+  createReceivableCheckout,
+  listAccountsReceivable,
+  printReceivablePaymentPdf,
+  registerReceivablePayment,
+} from "../api/collections.api";
 
 function statusTone(status: string): "success" | "danger" | "warning" | "neutral" {
   if (status === "PAID") return "success";
@@ -42,14 +47,20 @@ export function CollectionsPage() {
     return queryClient.invalidateQueries({ queryKey: ["accounts-receivable"] });
   }
 
+  // Recibo imprimible solo del ultimo pago recien registrado por cada cuenta -- no hay historial
+  // de pagos en esta pantalla, mismo criterio que el recibo de abono a proveedor.
+  const [lastPaymentByReceivable, setLastPaymentByReceivable] = useState<Record<string, string>>({});
+
   const payMutation = useMutation({
     mutationFn: (id: string) => registerReceivablePayment(id, { amount: Number(payForm.amount), method: payForm.method }),
-    onSuccess: () => {
+    onSuccess: (result, accountReceivableId) => {
       invalidate();
       setPayingId(null);
       setPayForm({ amount: "", method: "CASH" });
+      setLastPaymentByReceivable((prev) => ({ ...prev, [accountReceivableId]: result.payment.id }));
     },
   });
+  const printMutation = useMutation({ mutationFn: printReceivablePaymentPdf });
 
   const checkoutMutation = useMutation({
     mutationFn: (id: string) => createReceivableCheckout(id),
@@ -106,7 +117,9 @@ export function CollectionsPage() {
               </tr>
             </TableHead>
             <TableBody>
-              {data?.data.map((ar) => (
+              {data?.data.map((ar) => {
+                const lastPaymentId = lastPaymentByReceivable[ar.id];
+                return (
                 <TableRow key={ar.id}>
                   <Td>{customerName(ar.customerId)}</Td>
                   <Td>{formatCOP(ar.balance)}</Td>
@@ -152,9 +165,21 @@ export function CollectionsPage() {
                         </Button>
                       </span>
                     )}
+                    {lastPaymentId && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="ml-2"
+                        onClick={() => printMutation.mutate(lastPaymentId)}
+                        loading={printMutation.isPending && printMutation.variables === lastPaymentId}
+                      >
+                        Imprimir recibo
+                      </Button>
+                    )}
                   </Td>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

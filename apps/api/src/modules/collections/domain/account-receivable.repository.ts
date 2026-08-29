@@ -49,6 +49,8 @@ export interface IAccountReceivableRepository {
   create(data: CreateAccountReceivableData): Promise<AccountReceivableRecord>;
   list(filter?: { status?: string }): Promise<AccountReceivableRecord[]>;
   findByIdOrThrow(id: string): Promise<AccountReceivableRecord>;
+  /** Usado por el boton "Imprimir" del recibo de cobro (GET /receivable-payments/:id/pdf). */
+  findPaymentByIdOrThrow(id: string): Promise<AccountReceivablePaymentRecord>;
   /** PENDING/PARTIAL, para el poller de recordatorios. */
   listActive(): Promise<AccountReceivableRecord[]>;
   /** Abono en persona: crea el pago ya REGISTERED y decrementa balance en la misma transaccion

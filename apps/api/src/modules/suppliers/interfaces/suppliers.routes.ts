@@ -17,6 +17,7 @@ suppliersRouter.post("/purchases/:id/cancel", requirePermission("suppliers.manag
 suppliersRouter.post("/purchase-orders", requirePermission("suppliers.manage"), suppliersController.createPurchaseOrder);
 suppliersRouter.get("/purchase-orders", requirePermission("suppliers.read"), suppliersController.listPurchaseOrders);
 suppliersRouter.get("/purchase-orders/:id", requirePermission("suppliers.read"), suppliersController.getPurchaseOrder);
+suppliersRouter.get("/purchase-orders/:id/pdf", requirePermission("suppliers.read"), suppliersController.getPurchaseOrderPdf);
 suppliersRouter.post("/purchase-orders/:id/send", requirePermission("suppliers.manage"), suppliersController.sendPurchaseOrder);
 
 suppliersRouter.post("/goods-receipts", requirePermission("suppliers.manage"), suppliersController.receiveGoods);
@@ -25,3 +26,4 @@ suppliersRouter.get("/goods-receipts/:id", requirePermission("suppliers.read"), 
 
 suppliersRouter.get("/accounts-payable", requirePermission("suppliers.read"), suppliersController.listAccountsPayable);
 suppliersRouter.post("/accounts-payable/:id/payments", requirePermission("suppliers.manage"), suppliersController.registerSupplierPayment);
+suppliersRouter.get("/supplier-payments/:id/pdf", requirePermission("suppliers.read"), suppliersController.getSupplierPaymentPdf);

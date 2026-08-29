@@ -96,6 +96,12 @@ export class PrismaAccountReceivableRepository implements IAccountReceivableRepo
     return rows.map(toRecord);
   }
 
+  async findPaymentByIdOrThrow(id: string): Promise<AccountReceivablePaymentRecord> {
+    const row = await prisma.accountReceivablePayment.findFirst({ where: { id } });
+    if (!row) throw new NotFoundError("AccountReceivablePayment", id);
+    return toPaymentRecord(row);
+  }
+
   async registerPayment(accountReceivableId: string, amount: number, method: string, userId: string): Promise<RegisterReceivablePaymentResult> {
     return prisma.$transaction(async (tx) => {
       const current = await tx.accountReceivable.findFirst({ where: { id: accountReceivableId }, include: INCLUDE });

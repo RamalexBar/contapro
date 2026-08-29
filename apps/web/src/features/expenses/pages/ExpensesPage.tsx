@@ -19,6 +19,7 @@ import {
   deactivateExpenseCategory,
   listExpenseCategories,
   listExpenses,
+  printExpensePdf,
   updateExpenseCategory,
 } from "../api/expense.api";
 
@@ -214,6 +215,7 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
     mutationFn: cancelExpense,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expenses"] }),
   });
+  const printMutation = useMutation({ mutationFn: printExpensePdf });
 
   function categoryName(id: string): string {
     return categories.find((c) => c.id === id)?.name ?? id;
@@ -315,7 +317,15 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
                   <Td>
                     <Badge tone={e.status === "CANCELLED" ? "danger" : "neutral"}>{EXPENSE_STATUS_LABEL[e.status] ?? e.status}</Badge>
                   </Td>
-                  <Td className="text-right">
+                  <Td className="space-x-2 text-right">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => printMutation.mutate(e.id)}
+                      loading={printMutation.isPending && printMutation.variables === e.id}
+                    >
+                      Imprimir
+                    </Button>
                     {e.status === "REGISTERED" && (
                       <Button size="sm" variant="danger" onClick={() => cancelMutation.mutate(e.id)} loading={cancelMutation.isPending}>
                         Cancelar

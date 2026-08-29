@@ -7,4 +7,5 @@ export const quoteRouter = Router();
 quoteRouter.use(tenantContextMiddleware);
 
 quoteRouter.get("/quotes", requirePermission("sale.read"), quoteController.list);
+quoteRouter.get("/quotes/:id/pdf", requirePermission("sale.read"), quoteController.getPdf);
 quoteRouter.post("/quotes", requirePermission("quote.create"), quoteController.create);

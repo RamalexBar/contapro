@@ -21,3 +21,8 @@ collectionsRouter.post(
   requirePermission("collection.manage"),
   collectionsController.createCheckout
 );
+collectionsRouter.get(
+  "/receivable-payments/:id/pdf",
+  requirePermission("collection.read"),
+  collectionsController.getPaymentPdf
+);

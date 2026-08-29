@@ -33,5 +33,7 @@ export const commissionsController = new CommissionsController(
   new ListSellersUseCase(userDirectoryRepo),
   new CalculateCommissionsUseCase(saleRepo, schemeRepo, settlementRepo, auditService),
   new ListCommissionSettlementsUseCase(settlementRepo),
-  new PayCommissionSettlementUseCase(settlementRepo, userDirectoryRepo, postCommissionJournalEntryUseCase, auditService)
+  new PayCommissionSettlementUseCase(settlementRepo, userDirectoryRepo, postCommissionJournalEntryUseCase, auditService),
+  settlementRepo,
+  userDirectoryRepo
 );

@@ -67,5 +67,7 @@ export const suppliersController = new SuppliersController(
   new ListAccountsPayableUseCase(accountPayableRepo),
   new RegisterSupplierPaymentUseCase(accountPayableRepo, supplierRepo, postSupplierPaymentJournalEntryUseCase, auditService),
   new CancelPurchaseUseCase(purchaseRepo, accountPayableRepo, journalRepo, voidJournalEntryUseCase, auditService),
-  new ExtractPurchaseInvoiceUseCase(invoiceExtractionService, supplierRepo)
+  new ExtractPurchaseInvoiceUseCase(invoiceExtractionService, supplierRepo),
+  supplierRepo,
+  accountPayableRepo
 );

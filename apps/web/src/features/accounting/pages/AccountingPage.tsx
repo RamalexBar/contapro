@@ -808,17 +808,22 @@ function ReportsSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {(["balance", "income", "cashflow", "ledger"] as ReportTab[]).map((tab) => (
-          <Button key={tab} size="sm" variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
-            {tab === "balance" ? "Balance General" : tab === "income" ? "Estado de Resultados" : tab === "cashflow" ? "Flujo de caja" : "Libro mayor"}
-          </Button>
-        ))}
+      <div className="no-print flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          {(["balance", "income", "cashflow", "ledger"] as ReportTab[]).map((tab) => (
+            <Button key={tab} size="sm" variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
+              {tab === "balance" ? "Balance General" : tab === "income" ? "Estado de Resultados" : tab === "cashflow" ? "Flujo de caja" : "Libro mayor"}
+            </Button>
+          ))}
+        </div>
+        <Button size="sm" variant="secondary" onClick={() => window.print()}>
+          Imprimir
+        </Button>
       </div>
 
       {reportTab === "balance" && (
         <Card>
-          <div className="mb-4 flex flex-wrap items-end gap-4">
+          <div className="no-print mb-4 flex flex-wrap items-end gap-4">
             <Input type="date" label="Fecha de corte" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" checked={showCode} onChange={(e) => setShowCode(e.target.checked)} />
@@ -829,6 +834,7 @@ function ReportsSection() {
               Con terceros (Clientes/Proveedores por cliente/proveedor)
             </label>
           </div>
+          <p className="mb-2 hidden text-sm text-slate-500 print:block">Corte al {asOf}</p>
           {balanceQuery.data && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
               <div>
@@ -869,7 +875,7 @@ function ReportsSection() {
 
       {reportTab === "income" && (
         <Card>
-          <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="no-print mb-4 flex flex-wrap items-end gap-3">
             <Input type="date" label="Desde" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input type="date" label="Hasta" value={to} onChange={(e) => setTo(e.target.value)} />
             <Select label="Centro de costo" value={incomeCostCenterId} onChange={(e) => setIncomeCostCenterId(e.target.value)}>
@@ -881,6 +887,7 @@ function ReportsSection() {
               ))}
             </Select>
           </div>
+          <p className="mb-2 hidden text-sm text-slate-500 print:block">Del {from} al {to}</p>
           {incomeQuery.data && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
@@ -907,10 +914,11 @@ function ReportsSection() {
 
       {reportTab === "cashflow" && (
         <Card>
-          <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="no-print mb-4 flex flex-wrap items-end gap-3">
             <Input type="date" label="Desde" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input type="date" label="Hasta" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
+          <p className="mb-2 hidden text-sm text-slate-500 print:block">Del {from} al {to}</p>
           {cashFlowQuery.data && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
@@ -943,7 +951,7 @@ function ReportsSection() {
 
       {reportTab === "ledger" && (
         <Card>
-          <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="no-print mb-4 flex flex-wrap items-end gap-3">
             <div className="w-64">
               <span className="mb-1 block text-sm font-medium text-slate-700">Cuenta</span>
               <AccountCombobox accounts={accounts?.data ?? []} value={ledgerAccountId} onChange={setLedgerAccountId} />
@@ -959,6 +967,9 @@ function ReportsSection() {
               ))}
             </Select>
           </div>
+          <p className="mb-2 hidden text-sm text-slate-500 print:block">
+            {accounts?.data.find((a) => a.id === ledgerAccountId)?.name} — Del {from} al {to}
+          </p>
           {ledgerQuery.data && (
             <Table>
               <TableHead>

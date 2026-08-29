@@ -1,5 +1,5 @@
 import type { CreateQuoteInput } from "@erp/shared-types";
-import { apiFetch } from "../../../lib/api-client";
+import { apiFetch, openPdfInNewTab } from "../../../lib/api-client";
 
 export interface QuoteRecord {
   id: string;
@@ -16,6 +16,10 @@ export function listQuotes(): Promise<{ data: QuoteRecord[] }> {
 
 export function createQuote(input: CreateQuoteInput): Promise<QuoteRecord> {
   return apiFetch("/quotes", { method: "POST", body: input });
+}
+
+export function printQuotePdf(id: string): Promise<void> {
+  return openPdfInNewTab(`/quotes/${id}/pdf`);
 }
 
 export interface CreditNoteInput {

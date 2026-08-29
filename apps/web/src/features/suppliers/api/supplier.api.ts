@@ -1,4 +1,4 @@
-import { apiFetch } from "../../../lib/api-client";
+import { apiFetch, openPdfInNewTab } from "../../../lib/api-client";
 
 export interface SupplierRecord {
   id: string;
@@ -120,9 +120,22 @@ export function listAccountsPayable(status?: string): Promise<{ data: AccountPay
   return apiFetch(`/accounts-payable${status ? `?status=${encodeURIComponent(status)}` : ""}`);
 }
 
+export interface SupplierPaymentRecord {
+  id: string;
+  accountPayableId: string;
+  amount: number;
+  method: string;
+  status: "REGISTERED" | "REVERSED";
+  paidAt: string;
+}
+
 export function registerSupplierPayment(
   accountPayableId: string,
   input: { amount: number; method: string }
-): Promise<{ payment: unknown; accountPayable: AccountPayableRecord }> {
+): Promise<{ payment: SupplierPaymentRecord; accountPayable: AccountPayableRecord }> {
   return apiFetch(`/accounts-payable/${accountPayableId}/payments`, { method: "POST", body: input });
+}
+
+export function printSupplierPaymentPdf(paymentId: string): Promise<void> {
+  return openPdfInNewTab(`/supplier-payments/${paymentId}/pdf`);
 }

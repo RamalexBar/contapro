@@ -18,6 +18,7 @@ import {
   getPurchaseOrder,
   listGoodsReceipts,
   listPurchaseOrders,
+  printPurchaseOrderPdf,
   receiveGoods,
   sendPurchaseOrder,
   type PurchaseOrderItemInput,
@@ -134,6 +135,7 @@ function PurchaseOrdersSection({ suppliers, products }: { suppliers: SupplierRec
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
     },
   });
+  const printMutation = useMutation({ mutationFn: printPurchaseOrderPdf });
 
   function supplierName(id: string): string {
     return suppliers.find((s) => s.id === id)?.name ?? id;
@@ -196,6 +198,14 @@ function PurchaseOrdersSection({ suppliers, products }: { suppliers: SupplierRec
                       <Badge tone={po.status === "DRAFT" ? "neutral" : "success"}>{PURCHASE_ORDER_STATUS_LABEL[po.status] ?? po.status}</Badge>
                     </Td>
                     <Td className="space-x-2 text-right">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => printMutation.mutate(po.id)}
+                        loading={printMutation.isPending && printMutation.variables === po.id}
+                      >
+                        Imprimir
+                      </Button>
                       {po.status === "DRAFT" && (
                         <Button size="sm" onClick={() => sendMutation.mutate(po.id)} loading={sendMutation.isPending}>
                           Enviar

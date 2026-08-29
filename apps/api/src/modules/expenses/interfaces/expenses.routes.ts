@@ -16,5 +16,6 @@ expensesRouter.post(
 );
 
 expensesRouter.get("/expenses", requirePermission("expense.read"), expensesController.listExpenses);
+expensesRouter.get("/expenses/:id/pdf", requirePermission("expense.read"), expensesController.getExpensePdf);
 expensesRouter.post("/expenses", requirePermission("expense.manage"), expensesController.createExpense);
 expensesRouter.post("/expenses/:id/cancel", requirePermission("expense.manage"), expensesController.cancelExpense);

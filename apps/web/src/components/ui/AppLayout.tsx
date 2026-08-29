@@ -201,10 +201,12 @@ export function AppLayout({ children }: PropsWithChildren) {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      <SubscriptionBanner />
+      <div className="no-print">
+        <SubscriptionBanner />
+      </div>
       <div className="flex min-h-0 flex-1">
       {/* Sidebar de escritorio -- siempre visible en md+. */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+      <aside className="no-print hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
         <div className="border-b border-slate-200 px-4 py-4">
           <Logo />
         </div>
@@ -245,7 +247,7 @@ export function AppLayout({ children }: PropsWithChildren) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+        <header className="no-print flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}

@@ -64,3 +64,19 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   if (res.status === 204) return undefined as T;
   return res.json();
 }
+
+/** Abre un PDF generado por el backend en una pestana nueva, listo para imprimir con Ctrl+P --
+ * el endpoint exige el token en el header Authorization, asi que un <a href> directo no sirve.
+ * Usado por todos los botones "Imprimir" (comprobante contable, cotizacion, orden de compra,
+ * recibos de pago, gasto, liquidacion de comisiones). */
+export async function openPdfInNewTab(path: string): Promise<void> {
+  const { accessToken } = useAuthStore.getState();
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  if (!res.ok) throw new Error("No se pudo generar el PDF");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

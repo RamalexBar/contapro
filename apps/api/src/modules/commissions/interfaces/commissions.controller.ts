@@ -1,4 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
+import { basePrisma } from "@erp/database";
+import { formatCOP } from "@erp/shared-utils";
+import { getTenantContext } from "../../../shared/context/request-context";
+import { NotFoundError } from "../../../shared/errors/app-error";
+import { renderSimpleDocumentPdf } from "../../../shared/pdf/simple-document-renderer";
 import {
   calculateCommissionsSchema,
   createSalesCommissionSchemeSchema,
@@ -13,7 +18,13 @@ import type { ListSellersUseCase } from "../application/use-cases/list-sellers.u
 import type { CalculateCommissionsUseCase } from "../application/use-cases/calculate-commissions.use-case";
 import type { ListCommissionSettlementsUseCase } from "../application/use-cases/list-commission-settlements.use-case";
 import type { PayCommissionSettlementUseCase } from "../application/use-cases/pay-commission-settlement.use-case";
-import type { CommissionSettlementStatus } from "../domain/commission-settlement.repository";
+import type { CommissionSettlementStatus, ICommissionSettlementRepository } from "../domain/commission-settlement.repository";
+import type { IUserDirectoryRepository } from "../../rbac/domain/rbac.types";
+
+const MONTH_NAMES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
 
 export class CommissionsController {
   constructor(
@@ -24,7 +35,9 @@ export class CommissionsController {
     private readonly listSellersUseCase: ListSellersUseCase,
     private readonly calculateUseCase: CalculateCommissionsUseCase,
     private readonly listSettlementsUseCase: ListCommissionSettlementsUseCase,
-    private readonly payUseCase: PayCommissionSettlementUseCase
+    private readonly payUseCase: PayCommissionSettlementUseCase,
+    private readonly settlementRepo: ICommissionSettlementRepository,
+    private readonly userDirectoryRepo: IUserDirectoryRepository
   ) {}
 
   listSchemes = async (_req: Request, res: Response, next: NextFunction) => {
@@ -93,6 +106,36 @@ export class CommissionsController {
     try {
       const body = payCommissionSettlementSchema.parse(req.body);
       res.json(await this.payUseCase.execute({ id: req.params.id, ...body }));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getSettlementPdf = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const settlement = await this.settlementRepo.findByIdOrThrow(req.params.id);
+      const [company, sellers] = await Promise.all([
+        basePrisma.company.findFirst({ where: { id: getTenantContext().companyId } }),
+        this.userDirectoryRepo.list(),
+      ]);
+      if (!company) throw new NotFoundError("Company", getTenantContext().companyId);
+      const sellerName = sellers.find((s) => s.id === settlement.sellerUserId)?.fullName ?? "(vendedor no encontrado)";
+
+      const pdf = await renderSimpleDocumentPdf({
+        company: { name: company.name, nit: company.nit },
+        title: "Liquidacion de comisiones",
+        fields: [
+          { label: "Vendedor", value: sellerName },
+          { label: "Periodo", value: `${MONTH_NAMES[settlement.month - 1]} ${settlement.year}` },
+          { label: "Base de ventas", value: formatCOP(settlement.salesBase) },
+          { label: "Tarifa", value: `${settlement.ratePercent}%` },
+          { label: "Estado", value: settlement.status === "PAID" ? "Pagada" : "Calculada" },
+        ],
+        totalLabel: "Comision a pagar",
+        total: formatCOP(settlement.commissionAmount),
+        generatedAt: new Date(),
+      });
+      res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
     }

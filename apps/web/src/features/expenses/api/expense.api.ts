@@ -1,4 +1,4 @@
-import { apiFetch } from "../../../lib/api-client";
+import { apiFetch, openPdfInNewTab } from "../../../lib/api-client";
 
 export interface ExpenseCategoryRecord {
   id: string;
@@ -76,4 +76,8 @@ export function createExpense(input: CreateExpenseInput): Promise<ExpenseRecord>
 
 export function cancelExpense(id: string): Promise<ExpenseRecord> {
   return apiFetch(`/expenses/${id}/cancel`, { method: "POST" });
+}
+
+export function printExpensePdf(id: string): Promise<void> {
+  return openPdfInNewTab(`/expenses/${id}/pdf`);
 }

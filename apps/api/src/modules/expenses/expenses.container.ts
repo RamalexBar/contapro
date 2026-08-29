@@ -23,5 +23,7 @@ export const expensesController = new ExpensesController(
   new ListExpenseCategoriesUseCase(categoryRepo),
   new CreateExpenseUseCase(expenseRepo, categoryRepo, postExpenseJournalEntryUseCase, costCenterRepository, auditService),
   new CancelExpenseUseCase(expenseRepo, voidJournalEntryUseCase, auditService),
-  new ListExpensesUseCase(expenseRepo)
+  new ListExpensesUseCase(expenseRepo),
+  expenseRepo,
+  categoryRepo
 );

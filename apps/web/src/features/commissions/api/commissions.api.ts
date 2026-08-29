@@ -1,4 +1,4 @@
-import { apiFetch } from "../../../lib/api-client";
+import { apiFetch, openPdfInNewTab } from "../../../lib/api-client";
 
 export interface SalesCommissionSchemeRecord {
   id: string;
@@ -69,4 +69,8 @@ export function payCommissionSettlement(
   input: { branchId: string; paymentMethod: string }
 ): Promise<CommissionSettlementRecord> {
   return apiFetch(`/commissions/settlements/${id}/pay`, { method: "POST", body: input });
+}
+
+export function printCommissionSettlementPdf(id: string): Promise<void> {
+  return openPdfInNewTab(`/commissions/settlements/${id}/pdf`);
 }

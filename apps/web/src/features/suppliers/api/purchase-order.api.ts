@@ -1,4 +1,4 @@
-import { apiFetch } from "../../../lib/api-client";
+import { apiFetch, openPdfInNewTab } from "../../../lib/api-client";
 
 export interface PurchaseOrderItemInput {
   productId: string;
@@ -72,6 +72,10 @@ export function createPurchaseOrder(input: CreatePurchaseOrderInput): Promise<Pu
 
 export function sendPurchaseOrder(id: string): Promise<PurchaseOrderRecord> {
   return apiFetch(`/purchase-orders/${id}/send`, { method: "POST" });
+}
+
+export function printPurchaseOrderPdf(id: string): Promise<void> {
+  return openPdfInNewTab(`/purchase-orders/${id}/pdf`);
 }
 
 export function listGoodsReceipts(): Promise<{ data: GoodsReceiptRecord[] }> {
