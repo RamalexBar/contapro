@@ -34,6 +34,7 @@ accountingRouter.post(
 
 accountingRouter.get("/journal-entries", requirePermission("accounting.read"), accountingController.listEntries);
 accountingRouter.get("/journal-entries/:id", requirePermission("accounting.read"), accountingController.getEntry);
+accountingRouter.get("/journal-entries/:id/pdf", requirePermission("accounting.read"), accountingController.getEntryPdf);
 accountingRouter.post(
   "/journal-entries",
   requirePermission("accounting.manage"),

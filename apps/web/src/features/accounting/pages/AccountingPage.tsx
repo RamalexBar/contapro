@@ -34,6 +34,7 @@ import {
   listFinancialPeriods,
   listWithholdingConcepts,
   postEntry,
+  printJournalEntryPdf,
   reopenFinancialPeriod,
   updateAccount,
   updateCostCenter,
@@ -48,6 +49,12 @@ const ACCOUNT_TYPES: { value: AccountType; label: string }[] = [
   { value: "INCOME", label: "Ingreso" },
   { value: "EXPENSE", label: "Gasto" },
 ];
+
+const ENTRY_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  POSTED: "Confirmado",
+  VOID: "Anulado",
+};
 
 const WITHHOLDING_TYPES: { value: WithholdingType; label: string }[] = [
   { value: "RETEFUENTE", label: "Retencion en la fuente" },
@@ -623,6 +630,7 @@ function EntriesSection() {
     mutationFn: voidEntry,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounting", "entries"] }),
   });
+  const printMutation = useMutation({ mutationFn: printJournalEntryPdf });
 
   function updateLine(index: number, field: string, value: string) {
     setLines(lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)));
@@ -732,17 +740,25 @@ function EntriesSection() {
                   <Td>{entry.description}</Td>
                   <Td>{entry.type}</Td>
                   <Td>
-                    <Badge tone={entryStatusTone(entry.status)}>{entry.status}</Badge>
+                    <Badge tone={entryStatusTone(entry.status)}>{ENTRY_STATUS_LABEL[entry.status] ?? entry.status}</Badge>
                   </Td>
                   <Td className="space-x-2 text-right">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => printMutation.mutate(entry.id)}
+                      loading={printMutation.isPending && printMutation.variables === entry.id}
+                    >
+                      Imprimir
+                    </Button>
                     {entry.status === "DRAFT" && (
                       <Button size="sm" onClick={() => postMutation.mutate(entry.id)} loading={postMutation.isPending}>
-                        Postear
+                        Confirmar comprobante
                       </Button>
                     )}
                     {entry.status === "POSTED" && (
                       <Button size="sm" variant="danger" onClick={() => voidMutation.mutate(entry.id)} loading={voidMutation.isPending}>
-                        Anular
+                        Anular comprobante
                       </Button>
                     )}
                   </Td>

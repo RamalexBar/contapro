@@ -29,6 +29,9 @@ import type { ListCostCentersUseCase } from "../application/use-cases/list-cost-
 import type { IChartOfAccountsRepository } from "../domain/chart-of-accounts.repository";
 import type { IJournalEntryRepository } from "../domain/journal-entry.repository";
 import type { IFinancialPeriodRepository } from "../domain/financial-period.repository";
+import type { ICompanyReader } from "../domain/company-reader.repository";
+import { renderJournalEntryPdf } from "../infrastructure/pdfkit-journal-entry-renderer";
+import { getTenantContext } from "../../../shared/context/request-context";
 import { ValidationError } from "../../../shared/errors/app-error";
 import {
   createAccountSchema,
@@ -75,7 +78,8 @@ export class AccountingController {
     private readonly createCostCenterUseCase: CreateCostCenterUseCase,
     private readonly updateCostCenterUseCase: UpdateCostCenterUseCase,
     private readonly deactivateCostCenterUseCase: DeactivateCostCenterUseCase,
-    private readonly listCostCentersUseCase: ListCostCentersUseCase
+    private readonly listCostCentersUseCase: ListCostCentersUseCase,
+    private readonly companyReader: ICompanyReader
   ) {}
 
   listAccounts = async (_req: Request, res: Response, next: NextFunction) => {
@@ -157,6 +161,39 @@ export class AccountingController {
   voidEntry = async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(await this.voidEntryUseCase.execute(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getEntryPdf = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const entry = await this.journalRepo.findByIdOrThrow(req.params.id);
+      const [company, accounts] = await Promise.all([
+        this.companyReader.findByIdOrThrow(getTenantContext().companyId),
+        Promise.all(entry.lines.map((line) => this.accountRepo.findByIdOrThrow(line.accountId))),
+      ]);
+      const accountById = new Map(accounts.map((a) => [a.id, a]));
+      const pdf = await renderJournalEntryPdf({
+        company,
+        number: entry.number,
+        date: entry.date,
+        description: entry.description,
+        type: entry.type,
+        status: entry.status,
+        generatedAt: new Date(),
+        lines: entry.lines.map((line) => {
+          const account = accountById.get(line.accountId);
+          return {
+            accountCode: account?.code ?? "-",
+            accountName: account?.name ?? "(cuenta no encontrada)",
+            debit: line.debit,
+            credit: line.credit,
+            description: line.description,
+          };
+        }),
+      });
+      res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
     }

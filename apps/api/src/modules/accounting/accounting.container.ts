@@ -13,6 +13,7 @@ import { PrismaBankTransactionRepository } from "./infrastructure/prisma-bank-tr
 import { PrismaBankReconciliationRepository } from "./infrastructure/prisma-bank-reconciliation.repository";
 import { PrismaWithholdingConceptRepository } from "./infrastructure/prisma-withholding-concept.repository";
 import { PrismaCostCenterRepository } from "./infrastructure/prisma-cost-center.repository";
+import { PrismaCompanyReaderRepository } from "./infrastructure/prisma-company-reader.repository";
 import { AccountingReportsService } from "./application/accounting-reports.service";
 import { PrismaThirdPartyResolver } from "./infrastructure/prisma-third-party-resolver";
 import { CreateAccountUseCase } from "./application/use-cases/create-account.use-case";
@@ -62,6 +63,7 @@ const bankReconciliationRepo = new PrismaBankReconciliationRepository();
 const financialPeriodRepo = new PrismaFinancialPeriodRepository();
 const withholdingConceptRepo = new PrismaWithholdingConceptRepository();
 const costCenterRepo = new PrismaCostCenterRepository();
+const companyReader = new PrismaCompanyReaderRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 const thirdPartyResolver = new PrismaThirdPartyResolver();
 const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessionRepo, bankTransactionRepo, thirdPartyResolver);
@@ -106,7 +108,8 @@ export const accountingController = new AccountingController(
   new CreateCostCenterUseCase(costCenterRepo, auditService),
   new UpdateCostCenterUseCase(costCenterRepo, auditService),
   new DeactivateCostCenterUseCase(costCenterRepo, auditService),
-  new ListCostCentersUseCase(costCenterRepo)
+  new ListCostCentersUseCase(costCenterRepo),
+  companyReader
 );
 
 /** Usado por sale.container.ts y suppliers.container.ts para resolver los conceptos de retencion
