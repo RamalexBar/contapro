@@ -31,6 +31,11 @@ accountingRouter.post(
   requirePermission("accounting.manage"),
   accountingController.deactivateAccount
 );
+accountingRouter.post(
+  "/chart-of-accounts/:id/enable-entries",
+  requirePermission("accounting.manage"),
+  accountingController.enableAccountDirectEntries
+);
 
 accountingRouter.get("/journal-entries", requirePermission("accounting.read"), accountingController.listEntries);
 accountingRouter.get("/journal-entries/:id", requirePermission("accounting.read"), accountingController.getEntry);

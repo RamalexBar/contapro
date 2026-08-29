@@ -3,6 +3,7 @@ import type { AccountingReportsService } from "../application/accounting-reports
 import type { CreateAccountUseCase } from "../application/use-cases/create-account.use-case";
 import type { UpdateAccountUseCase } from "../application/use-cases/update-account.use-case";
 import type { SetAccountActiveUseCase } from "../application/use-cases/set-account-active.use-case";
+import type { EnableAccountDirectEntriesUseCase } from "../application/use-cases/enable-account-direct-entries.use-case";
 import type { CreateJournalEntryUseCase } from "../application/use-cases/create-journal-entry.use-case";
 import type { PostJournalEntryUseCase } from "../application/use-cases/post-journal-entry.use-case";
 import type { VoidJournalEntryUseCase } from "../application/use-cases/void-journal-entry.use-case";
@@ -56,6 +57,7 @@ export class AccountingController {
     private readonly createAccountUseCase: CreateAccountUseCase,
     private readonly updateAccountUseCase: UpdateAccountUseCase,
     private readonly setAccountActiveUseCase: SetAccountActiveUseCase,
+    private readonly enableAccountDirectEntriesUseCase: EnableAccountDirectEntriesUseCase,
     private readonly createEntryUseCase: CreateJournalEntryUseCase,
     private readonly postEntryUseCase: PostJournalEntryUseCase,
     private readonly voidEntryUseCase: VoidJournalEntryUseCase,
@@ -119,6 +121,14 @@ export class AccountingController {
   deactivateAccount = async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(await this.setAccountActiveUseCase.execute(req.params.id, false));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  enableAccountDirectEntries = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.enableAccountDirectEntriesUseCase.execute(req.params.id));
     } catch (err) {
       next(err);
     }

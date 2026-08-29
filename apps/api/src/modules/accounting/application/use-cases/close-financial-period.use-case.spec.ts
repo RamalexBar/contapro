@@ -147,6 +147,11 @@ class FakeChartOfAccountsRepository implements IChartOfAccountsRepository {
     account.acceptsEntries = false;
     return account;
   }
+  async enableDirectEntries(id: string): Promise<AccountRecord> {
+    const account = await this.findByIdOrThrow(id);
+    account.acceptsEntries = true;
+    return account;
+  }
   async update(id: string, data: { name: string }): Promise<AccountRecord> {
     const account = await this.findByIdOrThrow(id);
     account.name = data.name;

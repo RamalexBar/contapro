@@ -147,6 +147,12 @@ export function deactivateAccount(id: string): Promise<AccountRecord> {
   return apiFetch(`/chart-of-accounts/${id}/deactivate`, { method: "POST" });
 }
 
+/** Reverso manual de que una cuenta principal haya dejado de admitir movimientos directos al
+ * ganar una subcuenta -- rechaza si todavia le queda alguna subcuenta activa. */
+export function enableAccountDirectEntries(id: string): Promise<AccountRecord> {
+  return apiFetch(`/chart-of-accounts/${id}/enable-entries`, { method: "POST" });
+}
+
 export function listEntries(status?: string): Promise<{ data: JournalEntryRecord[] }> {
   return apiFetch(`/journal-entries${status ? `?status=${encodeURIComponent(status)}` : ""}`);
 }

@@ -24,6 +24,7 @@ import {
   deactivateAccount,
   deactivateCostCenter,
   deactivateWithholdingConcept,
+  enableAccountDirectEntries,
   getBalanceSheet,
   getCashFlow,
   getIncomeStatement,
@@ -112,6 +113,7 @@ function AccountsSection() {
 
   const activateMutation = useMutation({ mutationFn: activateAccount, onSuccess: invalidate });
   const deactivateMutation = useMutation({ mutationFn: deactivateAccount, onSuccess: invalidate });
+  const enableEntriesMutation = useMutation({ mutationFn: enableAccountDirectEntries, onSuccess: invalidate });
   const updateMutation = useMutation({
     mutationFn: (id: string) => updateAccount(id, { name: editName }),
     onSuccess: () => {
@@ -255,6 +257,16 @@ function AccountsSection() {
                                 Activar
                               </Button>
                             ))}
+                          {!a.acceptsEntries && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              loading={enableEntriesMutation.isPending && enableEntriesMutation.variables === a.id}
+                              onClick={() => enableEntriesMutation.mutate(a.id)}
+                            >
+                              Habilitar movimientos
+                            </Button>
+                          )}
                         </>
                       )}
                     </Td>
@@ -265,6 +277,11 @@ function AccountsSection() {
           </Table>
         )}
         {!isLoading && filtered.length === 0 && <p className="p-4 text-sm text-slate-400">Sin resultados.</p>}
+        {enableEntriesMutation.isError && (
+          <Alert tone="danger" className="m-4">
+            {(enableEntriesMutation.error as Error).message}
+          </Alert>
+        )}
       </Card>
     </div>
   );

@@ -84,6 +84,13 @@ export class PrismaChartOfAccountsRepository implements IChartOfAccountsReposito
     return this.toRecord(row);
   }
 
+  async enableDirectEntries(id: string): Promise<AccountRecord> {
+    const existing = await this.findByIdOrThrow(id);
+    if (existing.acceptsEntries) return existing;
+    const row = await prisma.chartOfAccounts.update({ where: { id }, data: { acceptsEntries: true } });
+    return this.toRecord(row);
+  }
+
   async update(id: string, data: UpdateAccountData): Promise<AccountRecord> {
     await this.findByIdOrThrow(id);
     const row = await prisma.chartOfAccounts.update({ where: { id }, data: { name: data.name } });

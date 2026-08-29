@@ -56,6 +56,11 @@ export interface IChartOfAccountsRepository {
    * de clasificacion, el movimiento real queda en el hijo (convencion PUC). No-op si ya era
    * false. */
   disableDirectEntries(id: string): Promise<AccountRecord>;
+  /** Reverso manual de disableDirectEntries -- para cuando el usuario borra/desactiva todas las
+   * subcuentas que le habian apagado el movimiento directo a una cuenta principal y quiere que
+   * vuelva a admitirlo (ver EnableAccountDirectEntriesUseCase para la validacion de que no le
+   * queden hijos activos). No-op si ya era true. */
+  enableDirectEntries(id: string): Promise<AccountRecord>;
   /** Renombra una cuenta -- solo subcuentas/auxiliares (nivel > MAX_PRINCIPAL_ACCOUNT_LEVEL), la
    * validacion vive en UpdateAccountUseCase, no aca. */
   update(id: string, data: UpdateAccountData): Promise<AccountRecord>;
