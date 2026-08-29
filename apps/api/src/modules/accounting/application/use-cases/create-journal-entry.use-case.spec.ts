@@ -74,6 +74,7 @@ class FakeChartOfAccountsRepository implements Partial<IChartOfAccountsRepositor
     { id: "acc-1", code: "1105", name: "Caja", type: "ASSET", parentId: null, level: 1, isActive: true, acceptsEntries: true },
     { id: "acc-2", code: "4135", name: "Ingresos", type: "INCOME", parentId: null, level: 1, isActive: true, acceptsEntries: true },
     { id: "acc-3", code: "1110", name: "Bancos", type: "ASSET", parentId: null, level: 1, isActive: false, acceptsEntries: true },
+    { id: "acc-4", code: "1105", name: "Caja general", type: "ASSET", parentId: null, level: 1, isActive: true, acceptsEntries: false },
   ];
   async create(data: CreateAccountData): Promise<AccountRecord> {
     const account: AccountRecord = { id: "acc-new", parentId: null, level: 1, isActive: true, acceptsEntries: true, ...data };
@@ -179,5 +180,42 @@ describe("CreateJournalEntryUseCase — cuenta inactiva del catalogo PUC", () =>
         })
       )
     ).rejects.toThrow(/inactiva/);
+  });
+});
+
+describe("CreateJournalEntryUseCase — solo cuentas auxiliares admiten movimiento, y solo para comprobantes MANUAL", () => {
+  it("rejects a MANUAL entry posted to an account that no longer accepts direct entries", async () => {
+    const { useCase } = makeUseCase();
+
+    await expect(
+      withTenantContext(() =>
+        useCase.execute({
+          ...BASE_INPUT,
+          type: "MANUAL",
+          lines: [
+            { accountId: "acc-4", debit: 1000, credit: 0 },
+            { accountId: "acc-2", debit: 0, credit: 1000 },
+          ],
+        })
+      )
+    ).rejects.toThrow(/no acepta movimientos directos/);
+  });
+
+  it("allows an automatic (non-MANUAL) entry posted to that same account -- Post*JournalEntryUseCase ya resolvio la subcuenta correcta via resolvePostingAccount, no debe volver a bloquearse aca", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+
+    const entry = await withTenantContext(() =>
+      useCase.execute({
+        ...BASE_INPUT,
+        type: "SALE",
+        lines: [
+          { accountId: "acc-4", debit: 1000, credit: 0 },
+          { accountId: "acc-2", debit: 0, credit: 1000 },
+        ],
+      })
+    );
+
+    expect(entry.id).toBeDefined();
+    expect(journalRepo.entries[0].lines[0].accountId).toBe("acc-4");
   });
 });

@@ -129,6 +129,14 @@ class FakeChartOfAccountsRepository implements IChartOfAccountsRepository {
   async upsertByCode(data: CreateAccountData): Promise<AccountRecord> {
     return (await this.findByCode(data.code)) ?? this.create(data);
   }
+  async resolvePostingAccount(data: CreateAccountData): Promise<AccountRecord> {
+    let current = await this.upsertByCode(data);
+    for (;;) {
+      const children = this.accounts.filter((a) => a.parentId === current.id);
+      if (children.length !== 1) return current;
+      current = children[0];
+    }
+  }
   async setActive(id: string, isActive: boolean): Promise<AccountRecord> {
     const account = await this.findByIdOrThrow(id);
     account.isActive = isActive;

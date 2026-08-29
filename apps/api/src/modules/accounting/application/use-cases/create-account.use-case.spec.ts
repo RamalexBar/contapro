@@ -38,6 +38,14 @@ class FakeChartOfAccountsRepository implements IChartOfAccountsRepository {
   async upsertByCode(data: CreateAccountData): Promise<AccountRecord> {
     return (await this.findByCode(data.code)) ?? this.create(data);
   }
+  async resolvePostingAccount(data: CreateAccountData): Promise<AccountRecord> {
+    let current = await this.upsertByCode(data);
+    for (;;) {
+      const children = this.accounts.filter((a) => a.parentId === current.id);
+      if (children.length !== 1) return current;
+      current = children[0];
+    }
+  }
   async setActive(id: string, isActive: boolean): Promise<AccountRecord> {
     const account = await this.findByIdOrThrow(id);
     account.isActive = isActive;
@@ -102,7 +110,7 @@ describe("CreateAccountUseCase — cuenta base deja de admitir movimientos al ga
     expect(auditRepo.entries.some((e) => e.action === "ACCOUNT_ENTRIES_DISABLED" && e.entityId === "acc-1524")).toBe(true);
   });
 
-  it("does NOT disable a subcuenta/auxiliar (level >= 4) parent when it gains a child", async () => {
+  it("also disables a subcuenta/auxiliar (level >= 4) parent when it gains a child -- la regla es pareja para todos los niveles", async () => {
     const { useCase, accountRepo, auditRepo } = makeUseCase();
 
     await withTenantContext(() =>
@@ -110,11 +118,11 @@ describe("CreateAccountUseCase — cuenta base deja de admitir movimientos al ga
     );
 
     const parent = accountRepo.accounts.find((a) => a.id === "acc-1110-sub");
-    expect(parent?.acceptsEntries).toBe(true);
-    expect(auditRepo.entries.some((e) => e.action === "ACCOUNT_ENTRIES_DISABLED")).toBe(false);
+    expect(parent?.acceptsEntries).toBe(false);
+    expect(auditRepo.entries.some((e) => e.action === "ACCOUNT_ENTRIES_DISABLED" && e.entityId === "acc-1110-sub")).toBe(true);
   });
 
-  it("does NOT disable a level-3 parent whose code is used by the automatic accounting engine", async () => {
+  it("also disables a level-3 parent whose code es usado por el motor contable automatico -- Post*JournalEntryUseCase resuelve la subcuenta real via resolvePostingAccount", async () => {
     const { useCase, accountRepo, auditRepo } = makeUseCase();
 
     await withTenantContext(() =>
@@ -122,8 +130,8 @@ describe("CreateAccountUseCase — cuenta base deja de admitir movimientos al ga
     );
 
     const parent = accountRepo.accounts.find((a) => a.id === "acc-1105");
-    expect(parent?.acceptsEntries).toBe(true);
-    expect(auditRepo.entries.some((e) => e.action === "ACCOUNT_ENTRIES_DISABLED")).toBe(false);
+    expect(parent?.acceptsEntries).toBe(false);
+    expect(auditRepo.entries.some((e) => e.action === "ACCOUNT_ENTRIES_DISABLED" && e.entityId === "acc-1105")).toBe(true);
   });
 
   it("is a no-op when the parent already does not accept direct entries", async () => {

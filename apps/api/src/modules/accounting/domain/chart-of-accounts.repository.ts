@@ -37,6 +37,16 @@ export interface IChartOfAccountsRepository {
   findByIdOrThrow(id: string): Promise<AccountRecord>;
   /** Crea la cuenta si el codigo no existe todavia; usado para las cuentas estandar de nomina. */
   upsertByCode(data: CreateAccountData): Promise<AccountRecord>;
+  /** Usado por todos los Post*JournalEntryUseCase en vez de upsertByCode directo: crea la cuenta
+   * estandar si no existe (igual que upsertByCode) y ademas desciende por su cadena de subcuentas
+   * hasta la mas profunda sin ambiguedad (exactamente un hijo en cada nivel) -- si el usuario
+   * subdividio esa cuenta (ej. Caja general en Caja 1/Caja 2), el motor debe postear en el
+   * auxiliar real, no en la cuenta de agrupacion que ya dejo de admitir movimientos (ver
+   * CreateAccountUseCase). Si hay mas de un hijo en algun nivel no hay forma de saber cual eligio
+   * el usuario para el motor -- se queda en ese nivel (CreateJournalEntryUseCase no exige
+   * acceptsEntries para comprobantes automaticos, solo para MANUAL, asi que esto no rompe la
+   * contabilizacion aunque esa cuenta puntual ya no acepte movimientos manuales). */
+  resolvePostingAccount(data: CreateAccountData): Promise<AccountRecord>;
   /** Activa/desactiva una cuenta del catalogo PUC (ver seedDefaultChartOfAccounts en
    * @erp/database) -- una cuenta inactiva no se puede usar en comprobantes nuevos, ver el
    * chequeo en CreateJournalEntryUseCase. */

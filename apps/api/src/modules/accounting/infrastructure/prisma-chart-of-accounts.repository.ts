@@ -62,6 +62,15 @@ export class PrismaChartOfAccountsRepository implements IChartOfAccountsReposito
     return this.create(data);
   }
 
+  async resolvePostingAccount(data: CreateAccountData): Promise<AccountRecord> {
+    let current = await this.upsertByCode(data);
+    for (;;) {
+      const children = await prisma.chartOfAccounts.findMany({ where: { parentId: current.id } });
+      if (children.length !== 1) return current;
+      current = this.toRecord(children[0]);
+    }
+  }
+
   async setActive(id: string, isActive: boolean): Promise<AccountRecord> {
     await this.findByIdOrThrow(id);
     const row = await prisma.chartOfAccounts.update({ where: { id }, data: { isActive } });

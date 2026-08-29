@@ -47,7 +47,7 @@ export class PostExpenseJournalEntryUseCase {
     if (input.total === 0) return null;
 
     const accounts = await this.ensureAccounts();
-    const expenseAccount = await this.accountRepo.upsertByCode({
+    const expenseAccount = await this.accountRepo.resolvePostingAccount({
       code: input.expenseAccountCode,
       name: input.expenseAccountName,
       type: "EXPENSE",
@@ -76,10 +76,10 @@ export class PostExpenseJournalEntryUseCase {
   private async ensureAccounts() {
     const entries = await Promise.all(
       Object.entries(STANDARD_ACCOUNTS).map(async ([key, def]) => {
-        const account = await this.accountRepo.upsertByCode(def);
+        const account = await this.accountRepo.resolvePostingAccount(def);
         return [key, account] as const;
       })
     );
-    return Object.fromEntries(entries) as Record<keyof typeof STANDARD_ACCOUNTS, Awaited<ReturnType<IChartOfAccountsRepository["upsertByCode"]>>>;
+    return Object.fromEntries(entries) as Record<keyof typeof STANDARD_ACCOUNTS, Awaited<ReturnType<IChartOfAccountsRepository["resolvePostingAccount"]>>>;
   }
 }

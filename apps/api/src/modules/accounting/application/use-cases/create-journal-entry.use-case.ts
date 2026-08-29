@@ -47,7 +47,13 @@ export class CreateJournalEntryUseCase {
 
     for (const line of input.lines) {
       const account = await this.accountRepo.findByIdOrThrow(line.accountId);
-      if (!account.acceptsEntries) {
+      // La regla "solo cuentas auxiliares admiten movimiento" protege al usuario de postear a
+      // mano en una cuenta de agrupacion (ver CreateAccountUseCase) -- no aplica a comprobantes
+      // automaticos (type !== MANUAL): esos ya resuelven la cuenta correcta ellos mismos via
+      // IChartOfAccountsRepository.resolvePostingAccount, incluido el caso ambiguo (mas de una
+      // subcuenta hija) donde ese metodo deliberadamente devuelve una cuenta que ya no acepta
+      // movimientos manuales pero que el motor si puede seguir usando.
+      if (input.type === "MANUAL" && !account.acceptsEntries) {
         throw new ValidationError(`La cuenta ${account.code} ${account.name} no acepta movimientos directos`);
       }
       if (!account.isActive) {
