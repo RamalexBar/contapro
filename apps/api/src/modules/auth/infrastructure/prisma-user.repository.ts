@@ -6,7 +6,7 @@ import type {
   IUserRepository,
   UserWithAccess,
 } from "../domain/user.repository";
-import { SYSTEM_ROLES } from "@erp/shared-types";
+import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS, SYSTEM_ROLES } from "@erp/shared-types";
 
 /**
  * Repositorio de autenticacion. A DIFERENCIA de los demas repositorios del sistema, este usa
@@ -128,6 +128,36 @@ export class PrismaUserRepository implements IUserRepository {
       let adminRole = await tx.role.findFirst({ where: { name: "ADMINISTRADOR", companyId: null } });
       if (!adminRole) {
         adminRole = await tx.role.create({ data: { name: SYSTEM_ROLES[0], isSystem: true, companyId: null } });
+      }
+
+      // Autosanacion: el rol ADMINISTRADOR global se crea (arriba) o se reusa, pero antes de este
+      // fix nunca quedaba garantizado que tuviera sus permisos por defecto -- si `db:seed:production`
+      // nunca se corrio contra esta base antes del primer registro, el rol quedaba creado vacio
+      // (isSystem:true pero SIN RolePermission), y CUALQUIER empresa que se registrara despues
+      // heredaba ese mismo rol roto (findFirst lo encuentra "existente" y nunca vuelve a intentar
+      // poblarlo). Se corrige aqui mismo, en cada registro, no solo cuando el rol es nuevo: si el
+      // rol ya existe pero le faltan permisos, este mismo bloque lo completa -- asi el proximo
+      // registro despues de este ya no arrastra el problema. Barato en el caso sano (una sola
+      // query de conteo) porque el desajuste solo pasa una vez en la vida de la base de datos.
+      const adminPermissionCodes = DEFAULT_ROLE_PERMISSIONS.ADMINISTRADOR;
+      const existingRolePermissionCount = await tx.rolePermission.count({ where: { roleId: adminRole.id } });
+      if (existingRolePermissionCount < adminPermissionCodes.length) {
+        for (const permission of PERMISSIONS) {
+          if (!(adminPermissionCodes as readonly string[]).includes(permission.code)) continue;
+          await tx.permission.upsert({
+            where: { code: permission.code },
+            create: permission,
+            update: {},
+          });
+        }
+        const permissions = await tx.permission.findMany({ where: { code: { in: adminPermissionCodes } } });
+        for (const permission of permissions) {
+          await tx.rolePermission.upsert({
+            where: { roleId_permissionId: { roleId: adminRole.id, permissionId: permission.id } },
+            create: { roleId: adminRole.id, permissionId: permission.id },
+            update: {},
+          });
+        }
       }
 
       const admin = await tx.user.create({
