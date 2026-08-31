@@ -20,8 +20,8 @@ export function LoginPage() {
   const location = useLocation();
   const registeredEmail = (location.state as { registeredEmail?: string } | null)?.registeredEmail;
   const setSession = useAuthStore((s) => s.setSession);
-  const [email, setEmail] = useState(registeredEmail ?? "admin@demo.com");
-  const [password, setPassword] = useState(registeredEmail ? "" : "Demo1234!");
+  const [email, setEmail] = useState(registeredEmail ?? "");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // El mismo email puede existir en mas de una empresa (unico solo POR empresa, ver
@@ -95,9 +95,23 @@ export function LoginPage() {
             </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <Input label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input
+                label="Correo"
+                type="email"
+                placeholder="tucorreo@empresa.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
               <div>
-                <Input label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <Input
+                  label="Contraseña"
+                  type="password"
+                  placeholder="Tu contraseña"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
                 <Link to="/forgot-password" className="mt-1 block text-right text-xs font-medium text-brand-700 hover:underline">
                   ¿Olvidaste tu contraseña?
                 </Link>
