@@ -32,8 +32,8 @@ const COMPETITORS = [
 const PLANS = [
   { code: "TRIAL", name: "Prueba gratuita", price: "$0", period: "14 días", branches: "1 sucursal", users: "3 usuarios", highlight: false },
   { code: "BASICO", name: "Plan Emprendedor", price: "$69.900", period: "/mes", branches: "1 sucursal", users: "3 usuarios", highlight: false },
-  { code: "PYME", name: "Plan Pyme", price: "$79.900", period: "/mes", branches: "3 sucursales", users: "10 usuarios", highlight: true },
-  { code: "PRO", name: "Plan Plus", price: "$149.900", period: "/mes", branches: "10 sucursales", users: "50 usuarios", highlight: false },
+  { code: "PYME", name: "Plan Pyme", price: "$149.900", period: "/mes", branches: "3 sucursales", users: "10 usuarios", highlight: true },
+  { code: "PRO", name: "Plan Plus", price: "$279.900", period: "/mes", branches: "10 sucursales", users: "50 usuarios", highlight: false },
 ];
 
 export function LandingPage() {
@@ -120,7 +120,7 @@ export function LandingPage() {
             ))}
             <div className="rounded-xl border-2 border-brand-600 bg-brand-50 p-5 text-left">
               <p className="text-sm font-semibold text-brand-700">Contapro</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">$69.900 – $149.900</p>
+              <p className="mt-1 text-xl font-bold text-slate-900">$69.900 – $279.900</p>
               <p className="mt-1 text-xs text-brand-700">todo incluido · COP/mes</p>
             </div>
           </div>
