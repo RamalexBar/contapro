@@ -60,8 +60,8 @@ export async function seedBase(prisma: Prisma.TransactionClient) {
   });
   await prisma.plan.upsert({
     where: { code: "BASICO" },
-    create: { code: "BASICO", name: "Plan Emprendedor", priceMonthly: 39900, priceYearly: 430900, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
-    update: { name: "Plan Emprendedor", priceMonthly: 39900, priceYearly: 430900, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+    create: { code: "BASICO", name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 754900, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+    update: { name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 754900, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
   });
   await prisma.plan.upsert({
     where: { code: "PYME" },
