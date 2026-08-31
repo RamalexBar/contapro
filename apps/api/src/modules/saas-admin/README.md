@@ -169,14 +169,24 @@ suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a red
      y un campo `signature`** (mismo algoritmo que `buildCheckoutUrl`, la propia documentacion de
      Wompi remite a esa formula) — sin ninguno de los dos, Wompi rechaza el request antes de
      intentar cobrar nada. Ambos ya se agregan en `chargePaymentSource`.
-  - **Lo unico que falta confirmar**: un cobro real en estado `APPROVED`. Con el
-    `WOMPI_INTEGRITY_SECRET` de sandbox que se probo, Wompi seguia respondiendo "firma invalida"
-    con los 4 ordenes de concatenacion razonables para el campo `signature` — la formula esta
-    verificada byte a byte para `buildCheckoutUrl`/Web Checkout (ver seccion de arriba) y la propia
-    documentacion dice que `POST /transactions` usa la misma, pero no se pudo demostrar con una
-    respuesta `APPROVED` real. Antes de confiar en el cobro automatico en produccion: confirmar que
-    `WOMPI_INTEGRITY_SECRET` en Render sea el correcto (dashboard de Wompi > Mi cuenta > Secretos)
-    y repetir esta prueba.
+  - **Lo unico que falta confirmar**: un cobro real en estado `APPROVED`. `POST /transactions` con
+    `payment_source_id` rechaza la `signature` como invalida SIEMPRE, pese a que:
+    - La formula esta verificada byte a byte contra el ejemplo oficial de Wompi (`buildCheckoutUrl`,
+      ver seccion de arriba) y tambien contra el schema publico de `TransactionRequest`
+      (`raw-githubusercontent.com/api-evangelist/wompi/openapi/wompi-transactions-api-openapi.yml`).
+    - **El mismo `WOMPI_INTEGRITY_SECRET`, la misma formula, el mismo `reference`/`amount`/
+      `currency`, calculados con el mismo script, SI fueron aceptados por el Web Checkout real**
+      (`checkout.wompi.co`) — el pago avanzo hasta el paso de clave dinamica (3DS/OTP) con la
+      tarjeta de prueba, en vez de rechazar la pagina por firma invalida. Eso descarta que el
+      secreto o la formula esten mal.
+    - Hipotesis mas fuerte, sin confirmar: la tarjeta de prueba de sandbox EXIGE 3DS/clave dinamica
+      (se vio en el Web Checkout), y un cobro `payment_source_id` server-to-server no tiene forma
+      de presentarle ese reto al cliente (es justamente el punto de tokenizar: cobrar sin que el
+      cliente este presente) — es posible que Wompi rechace el request con un mensaje generico de
+      "firma invalida" que en realidad esconde "esta tarjeta/comercio exige 3DS y este flujo no
+      puede resolverlo". **No confirmado** — pendiente de escalar a soporte de Wompi con el caso
+      reproducible exacto (mismo secret+formula: acepta Web Checkout, rechaza `/transactions` con
+      `payment_source_id`) antes de confiar en el cobro automatico en produccion.
   - 318 tests unitarios pasando (incluye tokenizacion/cobro mockeando `fetch`, con el body exacto
     confirmado arriba, ver `wompi-payment-gateway.spec.ts`), build/lint limpios.
 
@@ -233,9 +243,11 @@ suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a red
    tiempo) — la llave privada ya se usa para el cobro recurrente (iteracion 26) pero no para esto.
 6. Cobro automatico recurrente (iteracion 26): tokenizar y crear `payment_source` SI se
    confirmaron en vivo (ver seccion dedicada arriba); falta confirmar un `chargePaymentSource`
-   real en estado `APPROVED` — bloqueado por verificar que `WOMPI_INTEGRITY_SECRET` en Render sea
-   el correcto (la prueba en este entorno con un secreto de sandbox fue rechazada como "firma
-   invalida" pese a que la formula esta verificada byte a byte).
+   real en estado `APPROVED` — el secreto de integridad SI es correcto (confirmado: el mismo
+   secret+formula fue aceptado por Web Checkout real, avanzo hasta 3DS/clave dinamica), pero
+   `POST /transactions` con `payment_source_id` rechaza esa misma firma siempre. Hipotesis sin
+   confirmar: la tarjeta de prueba exige 3DS y un cobro server-to-server no puede resolverlo.
+   Pendiente escalar a soporte de Wompi con el caso reproducible (ver seccion dedicada arriba).
 7. Cobro automatico recurrente: si `chargePaymentSource` falla varias veces seguidas (tarjeta
    vencida) no hay una notificacion al cliente pidiendole actualizar el medio de pago — solo queda
    auditado (`SUBSCRIPTION_AUTO_CHARGE_FAILED`) y la suscripcion sigue su curso normal hacia
