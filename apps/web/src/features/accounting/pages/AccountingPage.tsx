@@ -10,6 +10,7 @@ import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../componen
 import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
+import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { AccountCombobox } from "../components/AccountCombobox";
 import {
   type AccountType,
@@ -84,7 +85,7 @@ function ActiveBadge({ active }: { active: boolean }) {
   return <Badge tone={active ? "success" : "neutral"}>{active ? "Activo" : "Inactivo"}</Badge>;
 }
 
-function AccountsSection() {
+function AccountsSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
   const [form, setForm] = useState({ code: "", name: "", type: "ASSET" as AccountType, parentId: "", acceptsEntries: true });
@@ -132,46 +133,48 @@ function AccountsSection() {
 
   return (
     <div className="space-y-6">
-      <Card title="Nueva cuenta">
-        <p className="mb-3 text-sm text-slate-500">
-          El plan de cuentas estandar ya viene precargado abajo -- usa esta seccion solo para agregar una subcuenta o
-          auxiliar que no este en el catalogo. Si eliges como padre una cuenta base (clase/grupo/cuenta) que hoy admite
-          movimientos, al crear su primera subcuenta esa cuenta base deja de admitirlos -- el movimiento pasa al
-          detalle nuevo.
-        </p>
-        <form
-          className="grid grid-cols-2 gap-3 sm:grid-cols-5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate();
-          }}
-        >
-          <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
-          <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AccountType })}>
-            {ACCOUNT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </Select>
-          <AccountCombobox
-            accounts={accounts}
-            value={form.parentId}
-            onChange={(id) => setForm({ ...form, parentId: id })}
-            filter={() => true}
-            placeholder="(sin cuenta padre)"
-          />
-          <Button type="submit" loading={createMutation.isPending}>
-            Crear
-          </Button>
-        </form>
-        {createMutation.isError && (
-          <Alert tone="danger" className="mt-3">
-            {(createMutation.error as Error).message}
-          </Alert>
-        )}
-      </Card>
+      {canManage && (
+        <Card title="Nueva cuenta">
+          <p className="mb-3 text-sm text-slate-500">
+            El plan de cuentas estandar ya viene precargado abajo -- usa esta seccion solo para agregar una subcuenta o
+            auxiliar que no este en el catalogo. Si eliges como padre una cuenta base (clase/grupo/cuenta) que hoy admite
+            movimientos, al crear su primera subcuenta esa cuenta base deja de admitirlos -- el movimiento pasa al
+            detalle nuevo.
+          </p>
+          <form
+            className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createMutation.mutate();
+            }}
+          >
+            <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+            <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AccountType })}>
+              {ACCOUNT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+            <AccountCombobox
+              accounts={accounts}
+              value={form.parentId}
+              onChange={(id) => setForm({ ...form, parentId: id })}
+              filter={() => true}
+              placeholder="(sin cuenta padre)"
+            />
+            <Button type="submit" loading={createMutation.isPending}>
+              Crear
+            </Button>
+          </form>
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-3">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
+        </Card>
+      )}
 
       <Card title="Plan unico de cuentas (PUC)">
         <p className="mb-3 text-sm text-slate-500">
@@ -219,7 +222,7 @@ function AccountsSection() {
                       <ActiveBadge active={a.isActive} />
                     </Td>
                     <Td className="space-x-2 text-right">
-                      {isEditing ? (
+                      {canManage && isEditing ? (
                         <>
                           <Button size="sm" loading={updateMutation.isPending} onClick={() => updateMutation.mutate(a.id)}>
                             Guardar
@@ -229,45 +232,47 @@ function AccountsSection() {
                           </Button>
                         </>
                       ) : (
-                        <>
-                          {isEditable && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                setEditingId(a.id);
-                                setEditName(a.name);
-                              }}
-                            >
-                              Editar
-                            </Button>
-                          )}
-                          {a.acceptsEntries &&
-                            (a.isActive ? (
+                        canManage && (
+                          <>
+                            {isEditable && (
                               <Button
                                 size="sm"
                                 variant="secondary"
-                                loading={deactivateMutation.isPending}
-                                onClick={() => deactivateMutation.mutate(a.id)}
+                                onClick={() => {
+                                  setEditingId(a.id);
+                                  setEditName(a.name);
+                                }}
                               >
-                                Desactivar
+                                Editar
                               </Button>
-                            ) : (
-                              <Button size="sm" loading={activateMutation.isPending} onClick={() => activateMutation.mutate(a.id)}>
-                                Activar
+                            )}
+                            {a.acceptsEntries &&
+                              (a.isActive ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  loading={deactivateMutation.isPending}
+                                  onClick={() => deactivateMutation.mutate(a.id)}
+                                >
+                                  Desactivar
+                                </Button>
+                              ) : (
+                                <Button size="sm" loading={activateMutation.isPending} onClick={() => activateMutation.mutate(a.id)}>
+                                  Activar
+                                </Button>
+                              ))}
+                            {!a.acceptsEntries && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                loading={enableEntriesMutation.isPending && enableEntriesMutation.variables === a.id}
+                                onClick={() => enableEntriesMutation.mutate(a.id)}
+                              >
+                                Habilitar movimientos
                               </Button>
-                            ))}
-                          {!a.acceptsEntries && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              loading={enableEntriesMutation.isPending && enableEntriesMutation.variables === a.id}
-                              onClick={() => enableEntriesMutation.mutate(a.id)}
-                            >
-                              Habilitar movimientos
-                            </Button>
-                          )}
-                        </>
+                            )}
+                          </>
+                        )
                       )}
                     </Td>
                   </TableRow>
@@ -287,7 +292,7 @@ function AccountsSection() {
   );
 }
 
-function WithholdingSection() {
+function WithholdingSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["withholding-concepts"], queryFn: listWithholdingConcepts });
   const [form, setForm] = useState({ code: "", name: "", type: "RETEFUENTE" as WithholdingType, ratePercent: "", dianConceptCode: "" });
@@ -333,50 +338,52 @@ function WithholdingSection() {
 
   return (
     <div className="space-y-6">
-      <Card title="Nuevo concepto de retencion">
-        <p className="mb-3 text-sm text-slate-500">
-          Cada venta o compra puede aplicar uno o mas de estos conceptos. Las tarifas de ReteFuente/ReteIVA de
-          fabrica son valores comunes de mercado; ajusta la de ICA a la tarifa real de tu municipio/actividad.
-        </p>
-        <form
-          className="grid grid-cols-2 gap-3 sm:grid-cols-5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate();
-          }}
-        >
-          <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
-          <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as WithholdingType })}>
-            {WITHHOLDING_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </Select>
-          <Input
-            type="number"
-            step="0.01"
-            placeholder="Tarifa %"
-            value={form.ratePercent}
-            onChange={(e) => setForm({ ...form, ratePercent: e.target.value })}
-            required
-          />
-          <Input
-            placeholder="Codigo DIAN retencion (opcional, ej. 1301)"
-            value={form.dianConceptCode}
-            onChange={(e) => setForm({ ...form, dianConceptCode: e.target.value })}
-          />
-          <Button type="submit" loading={createMutation.isPending}>
-            Crear
-          </Button>
-        </form>
-        {createMutation.isError && (
-          <Alert tone="danger" className="mt-3">
-            {(createMutation.error as Error).message}
-          </Alert>
-        )}
-      </Card>
+      {canManage && (
+        <Card title="Nuevo concepto de retencion">
+          <p className="mb-3 text-sm text-slate-500">
+            Cada venta o compra puede aplicar uno o mas de estos conceptos. Las tarifas de ReteFuente/ReteIVA de
+            fabrica son valores comunes de mercado; ajusta la de ICA a la tarifa real de tu municipio/actividad.
+          </p>
+          <form
+            className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createMutation.mutate();
+            }}
+          >
+            <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+            <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as WithholdingType })}>
+              {WITHHOLDING_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+            <Input
+              type="number"
+              step="0.01"
+              placeholder="Tarifa %"
+              value={form.ratePercent}
+              onChange={(e) => setForm({ ...form, ratePercent: e.target.value })}
+              required
+            />
+            <Input
+              placeholder="Codigo DIAN retencion (opcional, ej. 1301)"
+              value={form.dianConceptCode}
+              onChange={(e) => setForm({ ...form, dianConceptCode: e.target.value })}
+            />
+            <Button type="submit" loading={createMutation.isPending}>
+              Crear
+            </Button>
+          </form>
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-3">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
+        </Card>
+      )}
 
       <Card noPadding>
         {isLoading ? (
@@ -396,7 +403,7 @@ function WithholdingSection() {
             </TableHead>
             <TableBody>
               {data?.data.map((c) =>
-                editingId === c.id ? (
+                canManage && editingId === c.id ? (
                   <TableRow key={c.id}>
                     <Td className="font-medium text-slate-900">{c.code}</Td>
                     <Td>
@@ -445,20 +452,29 @@ function WithholdingSection() {
                       <ActiveBadge active={c.isActive} />
                     </Td>
                     <Td className="space-x-2 text-right">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setEditingId(c.id);
-                          setEditForm({ name: c.name, ratePercent: String(c.ratePercent), dianConceptCode: c.dianConceptCode ?? "" });
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      {c.isActive && (
-                        <Button size="sm" variant="danger" loading={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(c.id)}>
-                          Desactivar
-                        </Button>
+                      {canManage && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setEditingId(c.id);
+                              setEditForm({ name: c.name, ratePercent: String(c.ratePercent), dianConceptCode: c.dianConceptCode ?? "" });
+                            }}
+                          >
+                            Editar
+                          </Button>
+                          {c.isActive && (
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              loading={deactivateMutation.isPending}
+                              onClick={() => deactivateMutation.mutate(c.id)}
+                            >
+                              Desactivar
+                            </Button>
+                          )}
+                        </>
                       )}
                     </Td>
                   </TableRow>
@@ -472,7 +488,7 @@ function WithholdingSection() {
   );
 }
 
-function CostCentersSection() {
+function CostCentersSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["cost-centers"], queryFn: listCostCenters });
   const [form, setForm] = useState({ code: "", name: "" });
@@ -506,30 +522,32 @@ function CostCentersSection() {
 
   return (
     <div className="space-y-6">
-      <Card title="Nuevo centro de costo">
-        <p className="mb-3 text-sm text-slate-500">
-          Etiqueta comprobantes manuales y gastos operativos por area/proyecto (ej. sucursal, departamento) para
-          poder filtrar el Estado de Resultados y el Libro Mayor por ese mismo centro.
-        </p>
-        <form
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate();
-          }}
-        >
-          <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
-          <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Button type="submit" loading={createMutation.isPending}>
-            Crear
-          </Button>
-        </form>
-        {createMutation.isError && (
-          <Alert tone="danger" className="mt-3">
-            {(createMutation.error as Error).message}
-          </Alert>
-        )}
-      </Card>
+      {canManage && (
+        <Card title="Nuevo centro de costo">
+          <p className="mb-3 text-sm text-slate-500">
+            Etiqueta comprobantes manuales y gastos operativos por area/proyecto (ej. sucursal, departamento) para
+            poder filtrar el Estado de Resultados y el Libro Mayor por ese mismo centro.
+          </p>
+          <form
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createMutation.mutate();
+            }}
+          >
+            <Input placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+            <Input placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <Button type="submit" loading={createMutation.isPending}>
+              Crear
+            </Button>
+          </form>
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-3">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
+        </Card>
+      )}
 
       <Card noPadding>
         {isLoading ? (
@@ -546,7 +564,7 @@ function CostCentersSection() {
             </TableHead>
             <TableBody>
               {data?.data.map((c) =>
-                editingId === c.id ? (
+                canManage && editingId === c.id ? (
                   <TableRow key={c.id}>
                     <Td className="font-medium text-slate-900">{c.code}</Td>
                     <Td>
@@ -572,20 +590,29 @@ function CostCentersSection() {
                       <ActiveBadge active={c.isActive} />
                     </Td>
                     <Td className="space-x-2 text-right">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setEditingId(c.id);
-                          setEditName(c.name);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      {c.isActive && (
-                        <Button size="sm" variant="danger" loading={deactivateMutation.isPending} onClick={() => deactivateMutation.mutate(c.id)}>
-                          Desactivar
-                        </Button>
+                      {canManage && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setEditingId(c.id);
+                              setEditName(c.name);
+                            }}
+                          >
+                            Editar
+                          </Button>
+                          {c.isActive && (
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              loading={deactivateMutation.isPending}
+                              onClick={() => deactivateMutation.mutate(c.id)}
+                            >
+                              Desactivar
+                            </Button>
+                          )}
+                        </>
                       )}
                     </Td>
                   </TableRow>
@@ -599,7 +626,7 @@ function CostCentersSection() {
   );
 }
 
-function EntriesSection() {
+function EntriesSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data: entries, isLoading } = useQuery({ queryKey: ["accounting", "entries"], queryFn: () => listEntries() });
   const { data: accounts } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
@@ -661,78 +688,80 @@ function EntriesSection() {
 
   return (
     <div className="space-y-6">
-      <Card title="Nuevo comprobante manual">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate();
-          }}
-        >
-          <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            <Input placeholder="Descripcion" value={description} onChange={(e) => setDescription(e.target.value)} required />
-            <Select value={costCenterId} onChange={(e) => setCostCenterId(e.target.value)}>
-              <option value="">Sin centro de costo</option>
-              {costCenters?.data
-                .filter((c) => c.isActive)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} {c.name}
-                  </option>
+      {canManage && (
+        <Card title="Nuevo comprobante manual">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createMutation.mutate();
+            }}
+          >
+            <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+              <Input placeholder="Descripcion" value={description} onChange={(e) => setDescription(e.target.value)} required />
+              <Select value={costCenterId} onChange={(e) => setCostCenterId(e.target.value)}>
+                <option value="">Sin centro de costo</option>
+                {costCenters?.data
+                  .filter((c) => c.isActive)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} {c.name}
+                    </option>
+                  ))}
+              </Select>
+            </div>
+            <Table className="mb-3">
+              <TableHead>
+                <tr>
+                  <Th>Cuenta</Th>
+                  <Th>Debito</Th>
+                  <Th>Credito</Th>
+                  <Th>Descripcion</Th>
+                </tr>
+              </TableHead>
+              <TableBody>
+                {lines.map((line, i) => (
+                  <TableRow key={i} className="hover:bg-transparent">
+                    <Td className="pr-2">
+                      <AccountCombobox
+                        accounts={accounts?.data ?? []}
+                        value={line.accountId}
+                        onChange={(id) => updateLine(i, "accountId", id)}
+                      />
+                    </Td>
+                    <Td className="pr-2">
+                      <Input type="number" className="w-28" value={line.debit} onChange={(e) => updateLine(i, "debit", e.target.value)} />
+                    </Td>
+                    <Td className="pr-2">
+                      <Input type="number" className="w-28" value={line.credit} onChange={(e) => updateLine(i, "credit", e.target.value)} />
+                    </Td>
+                    <Td>
+                      <Input value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} />
+                    </Td>
+                  </TableRow>
                 ))}
-            </Select>
-          </div>
-          <Table className="mb-3">
-            <TableHead>
-              <tr>
-                <Th>Cuenta</Th>
-                <Th>Debito</Th>
-                <Th>Credito</Th>
-                <Th>Descripcion</Th>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {lines.map((line, i) => (
-                <TableRow key={i} className="hover:bg-transparent">
-                  <Td className="pr-2">
-                    <AccountCombobox
-                      accounts={accounts?.data ?? []}
-                      value={line.accountId}
-                      onChange={(id) => updateLine(i, "accountId", id)}
-                    />
-                  </Td>
-                  <Td className="pr-2">
-                    <Input type="number" className="w-28" value={line.debit} onChange={(e) => updateLine(i, "debit", e.target.value)} />
-                  </Td>
-                  <Td className="pr-2">
-                    <Input type="number" className="w-28" value={line.credit} onChange={(e) => updateLine(i, "credit", e.target.value)} />
-                  </Td>
-                  <Td>
-                    <Input value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} />
-                  </Td>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setLines([...lines, { accountId: "", debit: "", credit: "", description: "" }])}
-            >
-              + Linea
-            </Button>
-            <Button type="submit" loading={createMutation.isPending}>
-              Crear comprobante
-            </Button>
-          </div>
-        </form>
-        {createMutation.isError && (
-          <Alert tone="danger" className="mt-3">
-            {(createMutation.error as Error).message}
-          </Alert>
-        )}
-      </Card>
+              </TableBody>
+            </Table>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setLines([...lines, { accountId: "", debit: "", credit: "", description: "" }])}
+              >
+                + Linea
+              </Button>
+              <Button type="submit" loading={createMutation.isPending}>
+                Crear comprobante
+              </Button>
+            </div>
+          </form>
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-3">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
+        </Card>
+      )}
 
       <Card noPadding>
         {isLoading ? (
@@ -768,12 +797,12 @@ function EntriesSection() {
                     >
                       Imprimir
                     </Button>
-                    {entry.status === "DRAFT" && (
+                    {canManage && entry.status === "DRAFT" && (
                       <Button size="sm" onClick={() => postMutation.mutate(entry.id)} loading={postMutation.isPending}>
                         Confirmar comprobante
                       </Button>
                     )}
-                    {entry.status === "POSTED" && (
+                    {canManage && entry.status === "POSTED" && (
                       <Button size="sm" variant="danger" onClick={() => voidMutation.mutate(entry.id)} loading={voidMutation.isPending}>
                         Anular comprobante
                       </Button>
@@ -1024,7 +1053,7 @@ const MONTH_LABELS = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-function PeriodsSection() {
+function PeriodsSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["accounting", "financial-periods"], queryFn: () => listFinancialPeriods() });
 
@@ -1043,36 +1072,38 @@ function PeriodsSection() {
 
   return (
     <div className="space-y-6">
-      <Card title="Cerrar periodo contable">
-        <p className="mb-3 text-sm text-slate-500">
-          Al cerrar un periodo no se podran crear ni contabilizar comprobantes (manuales o automaticos) con fecha
-          dentro de ese mes. Requiere que todos los comprobantes del mes esten publicados o anulados.
-        </p>
-        <form
-          className="flex flex-wrap items-end gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            closeMutation.mutate();
-          }}
-        >
-          <Input label="Año" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} required />
-          <Select label="Mes" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-            {MONTH_LABELS.map((label, i) => (
-              <option key={label} value={i + 1}>
-                {label}
-              </option>
-            ))}
-          </Select>
-          <Button type="submit" loading={closeMutation.isPending}>
-            Cerrar periodo
-          </Button>
-        </form>
-        {closeMutation.isError && (
-          <Alert tone="danger" className="mt-3">
-            {(closeMutation.error as Error).message}
-          </Alert>
-        )}
-      </Card>
+      {canManage && (
+        <Card title="Cerrar periodo contable">
+          <p className="mb-3 text-sm text-slate-500">
+            Al cerrar un periodo no se podran crear ni contabilizar comprobantes (manuales o automaticos) con fecha
+            dentro de ese mes. Requiere que todos los comprobantes del mes esten publicados o anulados.
+          </p>
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              closeMutation.mutate();
+            }}
+          >
+            <Input label="Año" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} required />
+            <Select label="Mes" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+              {MONTH_LABELS.map((label, i) => (
+                <option key={label} value={i + 1}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+            <Button type="submit" loading={closeMutation.isPending}>
+              Cerrar periodo
+            </Button>
+          </form>
+          {closeMutation.isError && (
+            <Alert tone="danger" className="mt-3">
+              {(closeMutation.error as Error).message}
+            </Alert>
+          )}
+        </Card>
+      )}
 
       <Card title="Historial de periodos" noPadding>
         {isLoading ? (
@@ -1099,7 +1130,7 @@ function PeriodsSection() {
                     </Td>
                     <Td>{p.closedAt ? p.closedAt.slice(0, 10) : "-"}</Td>
                     <Td className="text-right">
-                      {p.status === "CLOSED" && (
+                      {canManage && p.status === "CLOSED" && (
                         <Button
                           size="sm"
                           variant="secondary"
@@ -1133,6 +1164,22 @@ const SECTIONS: { value: Section; label: string }[] = [
 
 export function AccountingPage() {
   const [section, setSection] = useState<Section>("accounts");
+  // Antes esta pagina completa (crear cuentas, comprobantes, cerrar periodos, retenciones, centros
+  // de costo) no revisaba ningun permiso en el frontend -- cualquier rol logueado veia todos los
+  // botones activos y solo se enteraba de que no tenia permiso al recibir un 403 del backend,
+  // mismo bug que se encontro y corrigio antes en POS/Caja (ver AppLayout NAV_SECTIONS, que ya
+  // ocultaba el link "Contabilidad" del menu pero no bloqueaba entrar por URL directa).
+  const canRead = useAuthStore((s) => s.hasPermission("accounting.read"));
+  const canManage = useAuthStore((s) => s.hasPermission("accounting.manage"));
+
+  if (!canRead) {
+    return (
+      <AppLayout>
+        <h1 className="mb-4 text-lg font-semibold text-slate-900">Contabilidad</h1>
+        <Alert tone="warning">Tu usuario no tiene permiso para ver esta seccion.</Alert>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -1145,12 +1192,12 @@ export function AccountingPage() {
         ))}
       </div>
 
-      {section === "accounts" && <AccountsSection />}
-      {section === "entries" && <EntriesSection />}
+      {section === "accounts" && <AccountsSection canManage={canManage} />}
+      {section === "entries" && <EntriesSection canManage={canManage} />}
       {section === "reports" && <ReportsSection />}
-      {section === "periods" && <PeriodsSection />}
-      {section === "withholding" && <WithholdingSection />}
-      {section === "cost-centers" && <CostCentersSection />}
+      {section === "periods" && <PeriodsSection canManage={canManage} />}
+      {section === "withholding" && <WithholdingSection canManage={canManage} />}
+      {section === "cost-centers" && <CostCentersSection canManage={canManage} />}
     </AppLayout>
   );
 }
