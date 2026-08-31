@@ -10,6 +10,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import {
   downloadExogenaFlatFile,
   getExogenaReport,
@@ -43,10 +44,16 @@ export function ExogenaPage() {
   const [format, setFormat] = useState<ExogenaFormatCode>("1001");
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  // Toda la pagina (los 5 formatos) solo exige accounting.read en el backend (ver
+  // exogena.routes.ts) -- no hay ninguna accion de escritura aqui, asi que un solo gate a nivel
+  // de pagina alcanza (mismo criterio que ReportsSection en AccountingPage.tsx, que tampoco muta
+  // nada). Antes esta pagina no revisaba ningun permiso en el frontend.
+  const canRead = useAuthStore((s) => s.hasPermission("accounting.read"));
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["exogena", format, year],
     queryFn: () => getExogenaReport(format, year),
+    enabled: canRead,
   });
 
   async function handleDownload() {
@@ -59,6 +66,15 @@ export function ExogenaPage() {
     } finally {
       setDownloading(false);
     }
+  }
+
+  if (!canRead) {
+    return (
+      <AppLayout>
+        <h1 className="mb-4 text-lg font-semibold text-slate-900">Información exógena DIAN</h1>
+        <Alert tone="warning">Tu usuario no tiene permiso para ver esta seccion.</Alert>
+      </AppLayout>
+    );
   }
 
   return (

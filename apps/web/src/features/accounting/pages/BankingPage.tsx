@@ -8,8 +8,10 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
 import { Badge } from "../../../components/ui/Badge";
+import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import {
   closeBankReconciliation,
   createBankAccount,
@@ -29,7 +31,7 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function BankAccountsSection() {
+function BankAccountsSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["banking", "accounts"], queryFn: listBankAccounts });
   const [form, setForm] = useState({ bankName: "", accountNumber: "", accountType: "AHORROS" });
@@ -44,30 +46,32 @@ function BankAccountsSection() {
 
   return (
     <div className="space-y-6">
-      <Card title="Nueva cuenta bancaria">
-        <form
-          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate();
-          }}
-        >
-          <Input placeholder="Banco" value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} required />
-          <Input
-            placeholder="Numero de cuenta"
-            value={form.accountNumber}
-            onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
-            required
-          />
-          <Select value={form.accountType} onChange={(e) => setForm({ ...form, accountType: e.target.value })}>
-            <option value="AHORROS">Ahorros</option>
-            <option value="CORRIENTE">Corriente</option>
-          </Select>
-          <Button type="submit" loading={createMutation.isPending}>
-            Crear
-          </Button>
-        </form>
-      </Card>
+      {canManage && (
+        <Card title="Nueva cuenta bancaria">
+          <form
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createMutation.mutate();
+            }}
+          >
+            <Input placeholder="Banco" value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} required />
+            <Input
+              placeholder="Numero de cuenta"
+              value={form.accountNumber}
+              onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
+              required
+            />
+            <Select value={form.accountType} onChange={(e) => setForm({ ...form, accountType: e.target.value })}>
+              <option value="AHORROS">Ahorros</option>
+              <option value="CORRIENTE">Corriente</option>
+            </Select>
+            <Button type="submit" loading={createMutation.isPending}>
+              Crear
+            </Button>
+          </form>
+        </Card>
+      )}
 
       <Card noPadding>
         {isLoading ? (
@@ -101,7 +105,7 @@ function BankAccountsSection() {
   );
 }
 
-function BankTransactionsSection() {
+function BankTransactionsSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data: accounts } = useQuery({ queryKey: ["banking", "accounts"], queryFn: listBankAccounts });
   const [bankAccountId, setBankAccountId] = useState("");
@@ -132,7 +136,7 @@ function BankTransactionsSection() {
           ))}
         </Select>
 
-        {bankAccountId && (
+        {bankAccountId && canManage && (
           <form
             className="grid grid-cols-2 gap-3 sm:grid-cols-5"
             onSubmit={(e) => {
@@ -207,10 +211,12 @@ function SuggestedMatchesList({
   reconciliationId,
   onConfirm,
   confirming,
+  canManage,
 }: {
   reconciliationId: string;
   onConfirm: (bankTransactionId: string, journalEntryLineId: string) => void;
   confirming: boolean;
+  canManage: boolean;
 }) {
   const { data, isLoading } = useQuery({
     queryKey: ["banking", "suggested-matches", reconciliationId],
@@ -240,9 +246,11 @@ function SuggestedMatchesList({
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone={s.confidence === "EXACT" ? "success" : "warning"}>{s.confidence === "EXACT" ? "Exacta" : "Probable"}</Badge>
-                <Button size="sm" onClick={() => onConfirm(s.bankTransactionId, s.journalEntryLineId)} loading={confirming}>
-                  Confirmar
-                </Button>
+                {canManage && (
+                  <Button size="sm" onClick={() => onConfirm(s.bankTransactionId, s.journalEntryLineId)} loading={confirming}>
+                    Confirmar
+                  </Button>
+                )}
               </div>
             </div>
           ))}
@@ -252,7 +260,7 @@ function SuggestedMatchesList({
   );
 }
 
-function ReconciliationsSection() {
+function ReconciliationsSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data: accounts } = useQuery({ queryKey: ["banking", "accounts"], queryFn: listBankAccounts });
   const { data: reconciliations, isLoading } = useQuery({
@@ -295,43 +303,45 @@ function ReconciliationsSection() {
 
   return (
     <div className="space-y-6">
-      <Card title="Iniciar conciliacion">
-        <form
-          className="grid grid-cols-2 gap-3 sm:grid-cols-5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            startMutation.mutate();
-          }}
-        >
-          <Select value={form.bankAccountId} onChange={(e) => setForm({ ...form, bankAccountId: e.target.value })} required>
-            <option value="">Cuenta bancaria...</option>
-            {accounts?.data.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.bankName} {a.accountNumber}
-              </option>
-            ))}
-          </Select>
-          <Input type="date" label="Inicio periodo" value={form.periodStart} onChange={(e) => setForm({ ...form, periodStart: e.target.value })} />
-          <Input type="date" label="Fin periodo" value={form.periodEnd} onChange={(e) => setForm({ ...form, periodEnd: e.target.value })} />
-          <Input
-            type="number"
-            placeholder="Saldo extracto"
-            value={form.statementBalance}
-            onChange={(e) => setForm({ ...form, statementBalance: e.target.value })}
-            required
-          />
-          <Input
-            type="number"
-            placeholder="Saldo libros"
-            value={form.bookBalance}
-            onChange={(e) => setForm({ ...form, bookBalance: e.target.value })}
-            required
-          />
-          <Button type="submit" loading={startMutation.isPending}>
-            Iniciar
-          </Button>
-        </form>
-      </Card>
+      {canManage && (
+        <Card title="Iniciar conciliacion">
+          <form
+            className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              startMutation.mutate();
+            }}
+          >
+            <Select value={form.bankAccountId} onChange={(e) => setForm({ ...form, bankAccountId: e.target.value })} required>
+              <option value="">Cuenta bancaria...</option>
+              {accounts?.data.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.bankName} {a.accountNumber}
+                </option>
+              ))}
+            </Select>
+            <Input type="date" label="Inicio periodo" value={form.periodStart} onChange={(e) => setForm({ ...form, periodStart: e.target.value })} />
+            <Input type="date" label="Fin periodo" value={form.periodEnd} onChange={(e) => setForm({ ...form, periodEnd: e.target.value })} />
+            <Input
+              type="number"
+              placeholder="Saldo extracto"
+              value={form.statementBalance}
+              onChange={(e) => setForm({ ...form, statementBalance: e.target.value })}
+              required
+            />
+            <Input
+              type="number"
+              placeholder="Saldo libros"
+              value={form.bookBalance}
+              onChange={(e) => setForm({ ...form, bookBalance: e.target.value })}
+              required
+            />
+            <Button type="submit" loading={startMutation.isPending}>
+              Iniciar
+            </Button>
+          </form>
+        </Card>
+      )}
 
       <Card noPadding>
         {isLoading ? (
@@ -386,37 +396,42 @@ function ReconciliationsSection() {
                                 matchMutation.mutate({ id: r.id, bankTransactionId, journalEntryLineId })
                               }
                               confirming={matchMutation.isPending}
+                              canManage={canManage}
                             />
 
-                            <p className="mb-1 mt-4 text-xs font-semibold text-slate-500">Emparejar a mano</p>
-                            <div className="flex flex-wrap items-end gap-2">
-                              <Input
-                                placeholder="bankTransactionId"
-                                value={matchForm.bankTransactionId}
-                                onChange={(e) => setMatchForm({ ...matchForm, bankTransactionId: e.target.value })}
-                              />
-                              <Input
-                                placeholder="journalEntryLineId"
-                                value={matchForm.journalEntryLineId}
-                                onChange={(e) => setMatchForm({ ...matchForm, journalEntryLineId: e.target.value })}
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() =>
-                                  matchMutation.mutate({
-                                    id: r.id,
-                                    bankTransactionId: matchForm.bankTransactionId || undefined,
-                                    journalEntryLineId: matchForm.journalEntryLineId || undefined,
-                                  })
-                                }
-                                loading={matchMutation.isPending}
-                              >
-                                Emparejar
-                              </Button>
-                              <Button size="sm" variant="danger" onClick={() => closeMutation.mutate(r.id)} loading={closeMutation.isPending}>
-                                Cerrar conciliacion
-                              </Button>
-                            </div>
+                            {canManage && (
+                              <>
+                                <p className="mb-1 mt-4 text-xs font-semibold text-slate-500">Emparejar a mano</p>
+                                <div className="flex flex-wrap items-end gap-2">
+                                  <Input
+                                    placeholder="bankTransactionId"
+                                    value={matchForm.bankTransactionId}
+                                    onChange={(e) => setMatchForm({ ...matchForm, bankTransactionId: e.target.value })}
+                                  />
+                                  <Input
+                                    placeholder="journalEntryLineId"
+                                    value={matchForm.journalEntryLineId}
+                                    onChange={(e) => setMatchForm({ ...matchForm, journalEntryLineId: e.target.value })}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      matchMutation.mutate({
+                                        id: r.id,
+                                        bankTransactionId: matchForm.bankTransactionId || undefined,
+                                        journalEntryLineId: matchForm.journalEntryLineId || undefined,
+                                      })
+                                    }
+                                    loading={matchMutation.isPending}
+                                  >
+                                    Emparejar
+                                  </Button>
+                                  <Button size="sm" variant="danger" onClick={() => closeMutation.mutate(r.id)} loading={closeMutation.isPending}>
+                                    Cerrar conciliacion
+                                  </Button>
+                                </div>
+                              </>
+                            )}
                           </>
                         )}
                       </td>
@@ -436,6 +451,17 @@ type BankSection = "accounts" | "transactions" | "reconciliations";
 
 export function BankingPage() {
   const [section, setSection] = useState<BankSection>("accounts");
+  const canRead = useAuthStore((s) => s.hasPermission("accounting.read"));
+  const canManage = useAuthStore((s) => s.hasPermission("accounting.manage"));
+
+  if (!canRead) {
+    return (
+      <AppLayout>
+        <h1 className="mb-4 text-lg font-semibold text-slate-900">Bancos</h1>
+        <Alert tone="warning">Tu usuario no tiene permiso para ver esta seccion.</Alert>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -452,9 +478,9 @@ export function BankingPage() {
         </Button>
       </div>
 
-      {section === "accounts" && <BankAccountsSection />}
-      {section === "transactions" && <BankTransactionsSection />}
-      {section === "reconciliations" && <ReconciliationsSection />}
+      {section === "accounts" && <BankAccountsSection canManage={canManage} />}
+      {section === "transactions" && <BankTransactionsSection canManage={canManage} />}
+      {section === "reconciliations" && <ReconciliationsSection canManage={canManage} />}
     </AppLayout>
   );
 }
