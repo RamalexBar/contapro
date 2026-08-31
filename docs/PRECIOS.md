@@ -1,56 +1,79 @@
 # Precios de Contapro vs. la competencia
 
-Snapshot de mercado tomado el **2026-08-03** para definir los planes de suscripción del panel
-SaaS (`packages/database/prisma/seed.ts`, tabla `Plan`). Los precios de la competencia cambian
-con el tiempo — esto es una fotografía puntual, no una verdad permanente. Revisar y actualizar
-periódicamente (al menos antes de cualquier campaña de publicidad real).
+Snapshot de mercado tomado el **2026-08-27** (actualizado desde el original del 2026-08-03) para
+definir los planes de suscripción del panel SaaS (`packages/database/prisma/seed-base.ts`, tabla
+`Plan`). Los precios de la competencia cambian con el tiempo — esto es una fotografía puntual, no
+una verdad permanente. Revisar y actualizar periódicamente (al menos antes de cualquier campaña de
+publicidad real).
 
-## Lo que cobra la competencia (COP/mes, plan "pyme típica")
+## Lo que cobra Alegra por su plan de **contabilidad completa** (COP/mes) — referencia directa
+
+Alegra separa el precio de solo-facturación del de contabilidad completa (que sí incluye POS/
+inventario). Como Contapro compite con el plan completo, este es el comparativo relevante:
+
+| Plan Alegra | Precio/mes | Incluye |
+|---|---|---|
+| Emprendedor | $69.900 | ingresos hasta $10.000.000/mes |
+| Pyme | $149.900 | ingresos hasta $40.000.000/mes, 1 usuario gratis para contador |
+| Pro | $219.900 | ingresos hasta $180.000.000/mes |
+| Plus | $279.900 | ingresos hasta $500.000.000/mes, 8 usuarios |
+
+**Importante**: esos precios de Alegra son SOLO por contabilidad — POS ($25.900–$199.900/mes) y
+nómina ($29.900–$259.000/mes) se cobran **aparte**, como productos separados. Ver "hallazgo clave"
+abajo.
+
+## Otros competidores (COP/mes, plan "pyme típica")
 
 | Proveedor | Solo factura (1 usuario) | Completo (factura+contab+inventario) | Nómina (add-on) | POS |
 |---|---|---|---|---|
-| Siigo | $9.992–$18.393 | ~$145.993–$191.327 | cotización aparte | ~$25.000+ |
-| Alegra | $17.900 | $163.900 (Pyme) | $29.900 (1-10 empl.) | $25.900–$79.900 |
+| Siigo | $9.992–$18.393 | ~$145.993–$207.869 | cotización aparte | ~$25.000+ |
 | World Office | — (solo anual) | $170.000 | incluida solo en plan tope ($182.750) | $56.667 |
 | Loggro | — | $133.990 (Estándar) | $72.990 | $54.990–$96.990 |
 | Helisa | sin precio público | cotización | cotización | — |
 
 Fuentes: siigo.com/facturacion-electronica, comparasoftware.co/siigo-facturacion,
 alegra.com/colombia/precios, alegra.com/colombia/facturacion-electronica/precios,
-alegra.com/colombia/nomina-electronica/planes, worldoffice.com.co/planesCloud.html,
-loggro.com/pymes/planes, blog.alegra.com/colombia/alegra-vs-siigo-colombia.
+alegra.com/colombia/nomina-electronica/planes, alegra.com/colombia/pos/precios,
+worldoffice.com.co/planesCloud.html, loggro.com/pymes/planes,
+blog.alegra.com/colombia/alegra-vs-siigo-colombia.
 
 ## El hallazgo clave: fragmentación de precios
 
-Siigo, Alegra (en su línea básica) y World Office venden **facturación, contabilidad, POS y
-nómina como productos/módulos separados** — el costo real de una implementación completa sube
-30-80% sobre el precio de entrada anunciado. Esa fragmentación es la queja más repetida en
-comparadores de terceros.
+Siigo, Alegra y World Office venden **facturación, contabilidad, POS y nómina como productos/
+módulos separados** — el costo real de una implementación completa sube 30-80% sobre el precio de
+entrada anunciado. Esa fragmentación es la queja más repetida en comparadores de terceros.
 
 Contapro ya tiene nómina electrónica DIAN, POS con costeo FIFO/kardex, conciliación bancaria y
-devoluciones implementados de fábrica. El mensaje comercial no es solo "más barato" — es **"un
-solo precio, todo incluido"**. Por eso los 4 planes de Contapro habilitan el mismo set de
-funcionalidad (`pos`/`inventory`/`cash`/`payroll`/`accounting` = `true` en los 4); lo único que
-escala con el precio es `maxBranches`/`maxUsers`, no qué módulos están prendidos.
+devoluciones implementados de fábrica. El mensaje comercial no es solo "más barato" — es **"el
+mismo precio de entrada de Alegra, con todo incluido"**: los 3 planes pagos de Contapro quedaron
+**igualados exactamente al precio de cada tier de Alegra** (Emprendedor/Pyme/Plus), pero en
+Contapro ese precio ya incluye POS y nómina, que en Alegra se cobran aparte. Por eso los 4 planes
+de Contapro habilitan el mismo set de funcionalidad (`pos`/`inventory`/`cash`/`payroll`/
+`accounting` = `true` en los 4); lo único que escala con el precio es `maxBranches`/`maxUsers`, no
+qué módulos están prendidos.
 
-## Planes de Contapro (definidos en `seed.ts`)
+## Planes de Contapro (definidos en `seed-base.ts`, actualizado 2026-08-27)
 
 | Plan | Código | Mensual | Anual (10% desc.) | Sucursales | Usuarios | Referencia de precio |
 |---|---|---|---|---|---|---|
 | Prueba gratuita | `TRIAL` | $0 | $0 | 1 | 3 | 14 días, todo habilitado (ver `register-company.use-case.ts`) |
-| Plan Emprendedor | `BASICO` | $39.900 | $430.900 | 1 | 3 | vs. $145.993 Siigo / $163.900 Alegra completo |
-| Plan Pyme | `PYME` | $79.900 | $862.900 | 3 | 10 | vs. $250.900 Alegra Pro |
-| Plan Plus | `PRO` | $149.900 | $1.618.900 | 10 | 50 | vs. $319.900 Alegra Plus / $182.750 World Office Enterprise |
+| Plan Emprendedor | `BASICO` | $69.900 | $754.900 | 1 | 3 | = Alegra Emprendedor ($69.900, solo contabilidad) |
+| Plan Pyme | `PYME` | $149.900 | $1.618.900 | 3 | 10 | = Alegra Pyme ($149.900, solo contabilidad) |
+| Plan Plus | `PRO` | $279.900 | $3.022.900 | 10 | 50 | = Alegra Plus ($279.900, solo contabilidad) |
 
 Los códigos internos (`BASICO`, `PRO`) se mantuvieron iguales a los del scaffold original aunque
 el nombre visible cambió (`Plan Emprendedor`, `Plan Plus`) — evita dejar filas de `Plan`
 huérfanas en bases de datos que ya tenían suscripciones apuntando a esos ids. `PYME` es un plan
-nuevo (no existía en el scaffold).
+nuevo (no existía en el scaffold). Precios subidos el 2026-08-27 desde $39.900/$79.900/$149.900 a
+los actuales — ver historial de git para el razonamiento completo.
 
-## Lo que falta para que esto sea un pricing real (no solo un número en el seed)
+## Cobro real: SÍ está integrado (Wompi/Bancolombia)
 
-Estos precios viven hoy únicamente en la tabla `Plan` del panel SaaS — no hay integración de
-cobro real (ver [ALCANCE.md](./ALCANCE.md), Panel administrador SaaS: "cobro real de
-suscripciones" está implementado a nivel de registro/estado, pero cobrar una tarjeta de verdad
-requiere una pasarela — Wompi/PayU/ePayco — que no está integrada). Cambiar estos números no
-implica que ya se le pueda cobrar a un cliente real.
+A diferencia de lo que decía una versión anterior de este documento, el cobro real **ya está
+funcionando en producción** (confirmado con llaves `pub_prod_`/`prv_prod_` reales, no sandbox):
+`POST /admin/subscriptions/:id/checkout` y su equivalente de autoservicio
+(`POST /subscription/checkout`, módulo `billing`) generan un link de pago Wompi real, con webhook
+que confirma el pago y renueva la suscripción automáticamente. Ver
+`apps/api/src/modules/saas-admin/README.md` para el detalle completo, incluido el cobro automático
+recurrente (tarjeta guardada) que quedó parcialmente pendiente de verificar (funciona el guardado
+de tarjeta, el cobro automático en sí tiene un problema sin resolver con Wompi, ver ese README).

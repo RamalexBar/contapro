@@ -402,6 +402,11 @@ cerrar.
   plan o pagar en línea.
 - Si tu suscripción vence, el sistema te avisa por correo antes del vencimiento (8, 5, 3, 1 y 0
   días antes) y da un período de gracia antes de suspender el acceso.
+- **Renovación automática**: en esa misma pantalla puedes guardar una tarjeta para que la
+  suscripción se renueve sola cada período, sin tener que volver a pagar manualmente cada vez. El
+  número de tarjeta nunca pasa por los servidores de Contapro (se tokeniza directo con Wompi desde
+  tu navegador). Puedes desactivar la renovación automática cuando quieras — la suscripción sigue
+  vigente hasta que venza, solo deja de cobrarse sola.
 
 ---
 

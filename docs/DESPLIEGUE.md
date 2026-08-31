@@ -27,10 +27,19 @@ el repo. En el dashboard de `contapro-api` → **Environment**, completar los qu
   **usar las llaves de PRODUCCIÓN** (`pub_prod_...`/`prv_prod_...`), no las de sandbox
   (`pub_test_...`) que se usaron para probar el flujo en desarrollo. Conseguirlas en
   comercios.wompi.co una vez el comercio esté activado para cobrar de verdad.
+- `VITE_WOMPI_PUBLIC_KEY` (en el servicio `contapro-web`, no `contapro-api`) — la misma llave
+  pública de arriba, necesaria para que la sección "Renovación automática" de `/billing` pueda
+  tokenizar tarjetas desde el navegador. Al ser un sitio estático (Vite), después de cargarla hay
+  que forzar un **rebuild** (no solo un redeploy) para que quede compilada en el bundle.
 - `RESEND_API_KEY` / DIAN_* / `ANTHROPIC_API_KEY` — opcionales, dejarlos vacíos si todavía no se
   van a usar (el sistema falla con un mensaje claro en vez de romperse, ver los README de cada
   módulo). `ANTHROPIC_API_KEY` habilita `POST /purchases/extract` (lectura automática de facturas
   de compra, ver `modules/suppliers/README.md`) — conseguirla en console.anthropic.com.
+  **`RESEND_API_KEY` sola no basta para que los correos le lleguen a un cliente real**: mientras no
+  se verifique un dominio propio en el dashboard de Resend (Domains), la cuenta queda en modo
+  sandbox y solo entrega a la dirección con la que te registraste ahí — hace falta comprar un
+  dominio, verificarlo en Resend, y actualizar `RESEND_FROM_EMAIL` (hoy en el remitente de pruebas
+  `onboarding@resend.dev`).
 
 Sin `WOMPI_PUBLIC_KEY`/`WOMPI_INTEGRITY_SECRET`, generar un link de cobro (`POST
 /admin/subscriptions/:id/checkout`) responde 422 con el mensaje "WOMPI_PUBLIC_KEY/... no estan
