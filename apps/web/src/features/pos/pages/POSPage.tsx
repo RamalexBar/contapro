@@ -37,6 +37,12 @@ function lineTotal(unitPrice: number, quantity: number, discountPercent: number,
 export function POSPage() {
   const user = useAuthStore((s) => s.user);
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  // A diferencia de QuoteSection/NoteSection/ReturnSection (QuotesAndNotesPage.tsx), que ocultan
+  // su formulario de creacion segun el permiso, este POS nunca revisaba `sale.create` -- un rol
+  // sin ese permiso (CONTADOR/EMPLEADO) podia armar todo el carrito y recien al dar "Cobrar"
+  // recibia un 403 del backend. Se agrega para que el comportamiento sea consistente con el resto
+  // de la app.
+  const canSell = hasPermission("sale.create");
   const { data: registers } = useQuery({ queryKey: ["cash-registers"], queryFn: listCashRegisters });
   const registerId = registers?.data[0]?.id;
   const { data: activeSession } = useQuery({
@@ -213,7 +219,12 @@ export function POSPage() {
   return (
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Punto de venta</h1>
-      {!activeSession && (
+      {!canSell && (
+        <Alert tone="warning" className="mb-4">
+          Tu usuario no tiene permiso para registrar ventas.
+        </Alert>
+      )}
+      {canSell && !activeSession && (
         <Alert tone="warning" className="mb-4">
           No hay una caja abierta. Abre una sesion de caja para registrar ventas con ingreso automatico de efectivo.
         </Alert>
@@ -462,6 +473,7 @@ export function POSPage() {
           <div className="mt-3 flex justify-end">
             <Button
               disabled={
+                !canSell ||
                 cart.length === 0 ||
                 saleMutation.isPending ||
                 (paymentMethod === "CREDIT" && !customerId) ||

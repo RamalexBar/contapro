@@ -6,10 +6,17 @@ import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Spinner } from "../../../components/ui/Spinner";
+import { Alert } from "../../../components/ui/Alert";
+import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { closeSession, getActiveSession, listCashRegisters, openSession } from "../api/cash.api";
 
 export function CashSessionPage() {
   const queryClient = useQueryClient();
+  // Mismo criterio agregado en POSPage.tsx: sin esto, un rol sin cash.session.open/close
+  // (CONTADOR/EMPLEADO) veia botones "Abrir caja"/"Cerrar caja" completamente funcionales y solo
+  // se enteraba de que no tenia permiso al recibir un 403 del backend al enviar el formulario.
+  const canOpen = useAuthStore((s) => s.hasPermission("cash.session.open"));
+  const canClose = useAuthStore((s) => s.hasPermission("cash.session.close"));
   const { data: registers } = useQuery({ queryKey: ["cash-registers"], queryFn: listCashRegisters });
   const registerId = registers?.data[0]?.id;
 
@@ -41,10 +48,16 @@ export function CashSessionPage() {
         {!isLoading && !activeSession && (
           <div className="space-y-3">
             <p className="text-sm text-slate-600">No hay una sesion de caja abierta.</p>
-            <Input label="Dinero inicial" type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} />
-            <Button onClick={() => openMutation.mutate()} disabled={!registerId} loading={openMutation.isPending}>
-              Abrir caja
-            </Button>
+            {canOpen ? (
+              <>
+                <Input label="Dinero inicial" type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} />
+                <Button onClick={() => openMutation.mutate()} disabled={!registerId} loading={openMutation.isPending}>
+                  Abrir caja
+                </Button>
+              </>
+            ) : (
+              <Alert tone="warning">Tu usuario no tiene permiso para abrir caja.</Alert>
+            )}
           </div>
         )}
 
@@ -53,15 +66,21 @@ export function CashSessionPage() {
             <p className="text-sm text-slate-600">
               Caja abierta con <strong className="text-slate-900">{formatCOP(activeSession.openingAmount)}</strong>
             </p>
-            <Input label="Dinero contado al cierre" type="number" value={closingAmount} onChange={(e) => setClosingAmount(e.target.value)} />
-            <Button variant="danger" onClick={() => closeMutation.mutate()} loading={closeMutation.isPending}>
-              Cerrar caja (arqueo)
-            </Button>
-            {closeMutation.data && (
-              <p className="text-sm text-slate-600">
-                Esperado: {formatCOP(closeMutation.data.closingAmountExpected ?? 0)} — Diferencia:{" "}
-                {formatCOP(closeMutation.data.difference ?? 0)}
-              </p>
+            {canClose ? (
+              <>
+                <Input label="Dinero contado al cierre" type="number" value={closingAmount} onChange={(e) => setClosingAmount(e.target.value)} />
+                <Button variant="danger" onClick={() => closeMutation.mutate()} loading={closeMutation.isPending}>
+                  Cerrar caja (arqueo)
+                </Button>
+                {closeMutation.data && (
+                  <p className="text-sm text-slate-600">
+                    Esperado: {formatCOP(closeMutation.data.closingAmountExpected ?? 0)} — Diferencia:{" "}
+                    {formatCOP(closeMutation.data.difference ?? 0)}
+                  </p>
+                )}
+              </>
+            ) : (
+              <Alert tone="warning">Tu usuario no tiene permiso para cerrar caja.</Alert>
             )}
           </div>
         )}
