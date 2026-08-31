@@ -123,6 +123,7 @@ export function RegisterPage() {
             label="Contraseña"
             type="password"
             minLength={8}
+            hint="Minimo 8 caracteres"
             value={form.adminPassword}
             onChange={(e) => update("adminPassword", e.target.value)}
             required
