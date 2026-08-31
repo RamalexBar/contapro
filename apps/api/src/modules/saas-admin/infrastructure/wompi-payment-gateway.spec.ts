@@ -154,6 +154,14 @@ describe("WompiPaymentGateway", () => {
       ).rejects.toThrow(/WOMPI_PRIVATE_KEY/);
     });
 
+    it("lanza si falta WOMPI_INTEGRITY_SECRET (chargePaymentSource)", async () => {
+      envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      const gateway = new WompiPaymentGateway();
+      await expect(
+        gateway.chargePaymentSource({ reference: "r", amountInCents: 100, customerEmail: "a@b.com", paymentSourceId: "ps-1" })
+      ).rejects.toThrow(/WOMPI_INTEGRITY_SECRET/);
+    });
+
     it("createPaymentSource llama a POST /payment_sources con Bearer + body correcto y mapea la respuesta", async () => {
       envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
       const fetchMock = stubFetch(201, { data: { id: 12345, public_data: { last_four: "4242", card_brand: "VISA" } } });
@@ -179,6 +187,16 @@ describe("WompiPaymentGateway", () => {
       expect(result).toEqual({ paymentSourceId: "12345", cardLastFour: "4242", cardBrand: "VISA" });
     });
 
+    it("createPaymentSource deriva la marca del `bin` cuando Wompi no manda card_brand (caso real: sandbox nunca lo manda)", async () => {
+      envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      stubFetch(201, { data: { id: 1, public_data: { last_four: "4242", bin: "424242" } } });
+
+      const gateway = new WompiPaymentGateway();
+      const result = await gateway.createPaymentSource({ cardToken: "t", customerEmail: "a@b.com", acceptanceToken: "acc" });
+
+      expect(result.cardBrand).toBe("VISA");
+    });
+
     it("createPaymentSource usa la URL de produccion si WOMPI_ENVIRONMENT es production", async () => {
       envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
       envMock.WOMPI_ENVIRONMENT = "production";
@@ -190,8 +208,9 @@ describe("WompiPaymentGateway", () => {
       expect(fetchMock.mock.calls[0][0]).toBe("https://production.wompi.co/v1/payment_sources");
     });
 
-    it("chargePaymentSource llama a POST /transactions con payment_source_id numerico y mapea el resultado", async () => {
+    it("chargePaymentSource llama a POST /transactions con payment_source_id numerico, installments y signature, y mapea el resultado", async () => {
       envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      envMock.WOMPI_INTEGRITY_SECRET = "integrity_secret_x";
       const fetchMock = stubFetch(201, { data: { id: 999, status: "PENDING" } });
 
       const gateway = new WompiPaymentGateway();
@@ -204,12 +223,21 @@ describe("WompiPaymentGateway", () => {
 
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe("https://sandbox.wompi.co/v1/transactions");
+      // Confirmado contra sandbox.wompi.co real: sin payment_method.installments ni signature,
+      // Wompi rechaza el request antes de intentar cobrar nada (ver comentario en
+      // wompi-payment-gateway.ts) -- este test existe para que nadie los vuelva a quitar.
+      const expectedSignature = crypto
+        .createHash("sha256")
+        .update(`sub-auto-17990000COP${envMock.WOMPI_INTEGRITY_SECRET}`)
+        .digest("hex");
       expect(JSON.parse(init.body)).toEqual({
         amount_in_cents: 7990000,
         currency: "COP",
         customer_email: "cliente@demo.com",
         reference: "sub-auto-1",
         payment_source_id: 12345,
+        payment_method: { type: "CARD", installments: 1 },
+        signature: expectedSignature,
       });
       expect(result).toEqual({ transactionId: "999", status: "PENDING" });
     });
@@ -226,6 +254,7 @@ describe("WompiPaymentGateway", () => {
 
     it("lanza un error legible si Wompi responde con un cuerpo no-JSON", async () => {
       envMock.WOMPI_PRIVATE_KEY = "prv_test_x";
+      envMock.WOMPI_INTEGRITY_SECRET = "integrity_secret_x";
       const fetchMock = vi.fn().mockResolvedValue({
         ok: false,
         status: 500,

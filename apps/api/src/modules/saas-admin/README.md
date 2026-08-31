@@ -156,12 +156,29 @@ suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a red
   `POST /subscription/payment-source` y `POST /subscription/disable-auto-renew`. La pagina
   `/billing` muestra "Renovacion automatica" (marca/ultimos 4 digitos si esta activa, formulario de
   tarjeta si no) — se oculta si `VITE_WOMPI_PUBLIC_KEY` no esta configurada.
-- **NO PROBADO end-to-end contra Wompi real** (mismo aviso que Web Checkout en su momento antes de
-  la verificacion en vivo): 316 tests unitarios pasando (incluye tokenizacion/cobro mockeando
-  `fetch`, ver `wompi-payment-gateway.spec.ts`), build/lint limpios, pero falta completar un
-  guardado de tarjeta real por navegador contra el sandbox de Wompi (requiere una tarjeta de prueba
-  de las que documenta Wompi) para confirmar el shape exacto de `payment_sources`/`transactions`
-  contra el servicio real.
+- **Verificado en vivo contra sandbox.wompi.co con llaves reales** (curl directo, sin pasar por
+  este backend ni por un navegador): `GET /merchants/:publicKey` → `acceptance_token`,
+  `POST /tokens/cards` con la tarjeta de prueba `4242 4242 4242 4242` (APPROVED segun
+  `datos-de-prueba-en-sandbox`) → token, `POST /payment_sources` con ese token → `payment_source`
+  creada (`status: AVAILABLE`). Los tres coinciden exactamente con lo que asumia el codigo, **salvo
+  dos hallazgos ya corregidos**:
+  1. `POST /payment_sources` **no devuelve `card_brand`** dentro de `public_data` (solo
+     `bin`/`last_four`/`card_holder`/`type`) — `cardBrand` quedaba `null` siempre. Se agrego
+     `detectCardBrandFromBin` (heuristica por rango de BIN) como fallback.
+  2. `POST /transactions` con `payment_source_id` **exige `payment_method: { type, installments }`
+     y un campo `signature`** (mismo algoritmo que `buildCheckoutUrl`, la propia documentacion de
+     Wompi remite a esa formula) — sin ninguno de los dos, Wompi rechaza el request antes de
+     intentar cobrar nada. Ambos ya se agregan en `chargePaymentSource`.
+  - **Lo unico que falta confirmar**: un cobro real en estado `APPROVED`. Con el
+    `WOMPI_INTEGRITY_SECRET` de sandbox que se probo, Wompi seguia respondiendo "firma invalida"
+    con los 4 ordenes de concatenacion razonables para el campo `signature` — la formula esta
+    verificada byte a byte para `buildCheckoutUrl`/Web Checkout (ver seccion de arriba) y la propia
+    documentacion dice que `POST /transactions` usa la misma, pero no se pudo demostrar con una
+    respuesta `APPROVED` real. Antes de confiar en el cobro automatico en produccion: confirmar que
+    `WOMPI_INTEGRITY_SECRET` en Render sea el correcto (dashboard de Wompi > Mi cuenta > Secretos)
+    y repetir esta prueba.
+  - 318 tests unitarios pasando (incluye tokenizacion/cobro mockeando `fetch`, con el body exacto
+    confirmado arriba, ver `wompi-payment-gateway.spec.ts`), build/lint limpios.
 
 ## Envio real de recordatorios (iteracion 17)
 
@@ -214,9 +231,11 @@ suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a red
    webhooks fallidos por su cuenta, pero no hay un job propio que consulte
    `GET /v1/transactions/:id` con `WOMPI_PRIVATE_KEY` para pagos que quedaron `PENDING` demasiado
    tiempo) — la llave privada ya se usa para el cobro recurrente (iteracion 26) pero no para esto.
-6. Cobro automatico recurrente (iteracion 26): falta guardar una tarjeta real por navegador contra
-   el sandbox de Wompi para confirmar el shape de `payment_sources`/`transactions` (ver seccion
-   dedicada arriba) — el mismo aviso que tuvo Web Checkout antes de su verificacion en vivo.
+6. Cobro automatico recurrente (iteracion 26): tokenizar y crear `payment_source` SI se
+   confirmaron en vivo (ver seccion dedicada arriba); falta confirmar un `chargePaymentSource`
+   real en estado `APPROVED` — bloqueado por verificar que `WOMPI_INTEGRITY_SECRET` en Render sea
+   el correcto (la prueba en este entorno con un secreto de sandbox fue rechazada como "firma
+   invalida" pese a que la formula esta verificada byte a byte).
 7. Cobro automatico recurrente: si `chargePaymentSource` falla varias veces seguidas (tarjeta
    vencida) no hay una notificacion al cliente pidiendole actualizar el medio de pago — solo queda
    auditado (`SUBSCRIPTION_AUTO_CHARGE_FAILED`) y la suscripcion sigue su curso normal hacia
