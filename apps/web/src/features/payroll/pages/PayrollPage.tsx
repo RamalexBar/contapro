@@ -14,10 +14,13 @@ import { listEmployees } from "../../employees/api/employee.api";
 import {
   approvePayroll,
   calculatePayroll,
+  cancelPayrollDeduction,
   createPayroll,
+  createPayrollDeduction,
   createPayrollParameter,
   downloadPayslipPdf,
   getPayroll,
+  listPayrollDeductions,
   listPayrollParameters,
   listPayrolls,
   listPayslipWhatsAppDeliveries,
@@ -30,6 +33,26 @@ const STATUS_LABEL: Record<string, string> = {
   CALCULATED: "Calculada",
   APPROVED: "Aprobada",
   PAID: "Pagada",
+};
+
+const DEDUCTION_TYPE_LABEL: Record<string, string> = {
+  LOAN_DEDUCTION: "Libranza",
+  GARNISHMENT: "Embargo",
+};
+
+const DEDUCTION_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Activa",
+  COMPLETED: "Completada",
+  CANCELLED: "Cancelada",
+};
+
+const EMPTY_DEDUCTION_FORM = {
+  employeeId: "",
+  type: "LOAN_DEDUCTION" as "LOAN_DEDUCTION" | "GARNISHMENT",
+  description: "",
+  amountPerPeriod: "",
+  totalAmount: "",
+  startDate: "",
 };
 
 const PARAMETER_DEFAULTS = {
@@ -76,6 +99,7 @@ export function PayrollPage() {
   const canCalculate = useAuthStore((s) => s.hasPermission("payroll.calculate"));
   const canApprove = useAuthStore((s) => s.hasPermission("payroll.approve"));
   const canPay = useAuthStore((s) => s.hasPermission("payroll.pay"));
+  const canManageDeductions = useAuthStore((s) => s.hasPermission("payroll.deduction.manage"));
 
   const { data: parameters } = useQuery({ queryKey: ["payroll-parameters"], queryFn: listPayrollParameters });
   const { data: payrolls, isLoading } = useQuery({ queryKey: ["payrolls"], queryFn: () => listPayrolls() });
@@ -160,6 +184,30 @@ export function PayrollPage() {
     queryKey: ["payroll", expandedId],
     queryFn: () => getPayroll(expandedId as string),
     enabled: Boolean(expandedId),
+  });
+
+  const { data: deductions } = useQuery({ queryKey: ["payroll-deductions"], queryFn: () => listPayrollDeductions() });
+  const [showDeductionForm, setShowDeductionForm] = useState(false);
+  const [deductionForm, setDeductionForm] = useState(EMPTY_DEDUCTION_FORM);
+  const createDeductionMutation = useMutation({
+    mutationFn: () =>
+      createPayrollDeduction({
+        employeeId: deductionForm.employeeId,
+        type: deductionForm.type,
+        description: deductionForm.description,
+        amountPerPeriod: Number(deductionForm.amountPerPeriod),
+        totalAmount: deductionForm.totalAmount ? Number(deductionForm.totalAmount) : undefined,
+        startDate: new Date(deductionForm.startDate),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payroll-deductions"] });
+      setDeductionForm(EMPTY_DEDUCTION_FORM);
+      setShowDeductionForm(false);
+    },
+  });
+  const cancelDeductionMutation = useMutation({
+    mutationFn: (id: string) => cancelPayrollDeduction(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payroll-deductions"] }),
   });
 
   return (
@@ -471,6 +519,140 @@ export function PayrollPage() {
             <Alert tone="danger" className="mt-2">
               {(createPayrollMutation.error as Error).message}
             </Alert>
+          )}
+        </Card>
+      )}
+
+      {(canManageDeductions || (deductions?.data.length ?? 0) > 0) && (
+        <Card className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">Deducciones recurrentes (libranzas/embargos)</h2>
+            {canManageDeductions && (
+              <Button size="sm" variant="secondary" onClick={() => setShowDeductionForm((v) => !v)}>
+                {showDeductionForm ? "Cancelar" : "Nueva deduccion"}
+              </Button>
+            )}
+          </div>
+
+          {showDeductionForm && canManageDeductions && (
+            <form
+              className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                createDeductionMutation.mutate();
+              }}
+            >
+              <div className="col-span-2 sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">Empleado</label>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  value={deductionForm.employeeId}
+                  onChange={(e) => setDeductionForm({ ...deductionForm, employeeId: e.target.value })}
+                  required
+                >
+                  <option value="">Seleccionar...</option>
+                  {employees?.data.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.firstName} {emp.lastName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  value={deductionForm.type}
+                  onChange={(e) => setDeductionForm({ ...deductionForm, type: e.target.value as "LOAN_DEDUCTION" | "GARNISHMENT" })}
+                >
+                  <option value="LOAN_DEDUCTION">Libranza</option>
+                  <option value="GARNISHMENT">Embargo</option>
+                </select>
+              </div>
+              <Input
+                label="Descripcion"
+                value={deductionForm.description}
+                onChange={(e) => setDeductionForm({ ...deductionForm, description: e.target.value })}
+                required
+              />
+              <Input
+                label="Cuota por periodo"
+                type="number"
+                value={deductionForm.amountPerPeriod}
+                onChange={(e) => setDeductionForm({ ...deductionForm, amountPerPeriod: e.target.value })}
+                required
+              />
+              <Input
+                label="Monto total (opcional)"
+                type="number"
+                hint="Vacio = indefinida hasta cancelar"
+                value={deductionForm.totalAmount}
+                onChange={(e) => setDeductionForm({ ...deductionForm, totalAmount: e.target.value })}
+              />
+              <Input
+                label="Fecha inicio"
+                type="date"
+                value={deductionForm.startDate}
+                onChange={(e) => setDeductionForm({ ...deductionForm, startDate: e.target.value })}
+                required
+              />
+              <div className="col-span-full">
+                <Button type="submit" loading={createDeductionMutation.isPending}>
+                  Guardar deduccion
+                </Button>
+              </div>
+              {createDeductionMutation.isError && (
+                <Alert tone="danger" className="col-span-full">
+                  {(createDeductionMutation.error as Error).message}
+                </Alert>
+              )}
+            </form>
+          )}
+
+          {(deductions?.data.length ?? 0) > 0 ? (
+            <Table>
+              <TableHead>
+                <tr>
+                  <Th>Empleado</Th>
+                  <Th>Tipo</Th>
+                  <Th>Descripcion</Th>
+                  <Th>Cuota/periodo</Th>
+                  <Th>Saldo</Th>
+                  <Th>Estado</Th>
+                  <Th></Th>
+                </tr>
+              </TableHead>
+              <TableBody>
+                {deductions?.data.map((d) => (
+                  <TableRow key={d.id}>
+                    <Td>{employeeNames.get(d.employeeId) ?? d.employeeId}</Td>
+                    <Td>{DEDUCTION_TYPE_LABEL[d.type] ?? d.type}</Td>
+                    <Td>{d.description}</Td>
+                    <Td>{formatCOP(d.amountPerPeriod)}</Td>
+                    <Td>{d.remainingBalance !== null ? formatCOP(d.remainingBalance) : "Indefinida"}</Td>
+                    <Td>
+                      <Badge tone={d.status === "ACTIVE" ? "success" : d.status === "COMPLETED" ? "info" : "neutral"}>
+                        {DEDUCTION_STATUS_LABEL[d.status] ?? d.status}
+                      </Badge>
+                    </Td>
+                    <Td className="text-right">
+                      {canManageDeductions && d.status === "ACTIVE" && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={cancelDeductionMutation.isPending && cancelDeductionMutation.variables === d.id}
+                          onClick={() => cancelDeductionMutation.mutate(d.id)}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
+                    </Td>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-slate-400">Sin deducciones recurrentes registradas.</p>
           )}
         </Card>
       )}

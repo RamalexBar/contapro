@@ -1,4 +1,4 @@
-import type { CreatePayrollInput, CreatePayrollParameterInput } from "@erp/shared-types";
+import type { CreatePayrollDeductionInput, CreatePayrollInput, CreatePayrollParameterInput } from "@erp/shared-types";
 import { apiFetch, BASE_URL } from "../../../lib/api-client";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 
@@ -132,4 +132,33 @@ export function listPayslipWhatsAppDeliveries(payslipId: string): Promise<{ data
 
 export function resendPayslipWhatsApp(payslipId: string): Promise<void> {
   return apiFetch(`/payslips/${payslipId}/whatsapp/resend`, { method: "POST" });
+}
+
+export interface PayrollDeductionRecord {
+  id: string;
+  employeeId: string;
+  type: "LOAN_DEDUCTION" | "GARNISHMENT";
+  description: string;
+  amountPerPeriod: number;
+  totalAmount: number | null;
+  remainingBalance: number | null;
+  status: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  startDate: string;
+  createdAt: string;
+}
+
+export function listPayrollDeductions(filter?: { employeeId?: string; status?: string }): Promise<{ data: PayrollDeductionRecord[] }> {
+  const params = new URLSearchParams();
+  if (filter?.employeeId) params.set("employeeId", filter.employeeId);
+  if (filter?.status) params.set("status", filter.status);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch(`/payroll-deductions${query}`);
+}
+
+export function createPayrollDeduction(input: CreatePayrollDeductionInput): Promise<PayrollDeductionRecord> {
+  return apiFetch("/payroll-deductions", { method: "POST", body: input });
+}
+
+export function cancelPayrollDeduction(id: string): Promise<PayrollDeductionRecord> {
+  return apiFetch(`/payroll-deductions/${id}/cancel`, { method: "POST" });
 }
