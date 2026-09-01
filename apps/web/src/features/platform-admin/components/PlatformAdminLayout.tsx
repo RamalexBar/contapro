@@ -32,7 +32,7 @@ export function PlatformAdminLayout({ children }: PropsWithChildren) {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <nav className="flex items-center gap-6">
             <span className="flex items-center gap-2 font-semibold text-white">
-              <Logo iconClassName="h-8" onDark />
+              <Logo heightClassName="h-8" onDark />
               <span className="font-normal text-slate-400">· Plataforma</span>
             </span>
             <div className="flex items-center gap-1">

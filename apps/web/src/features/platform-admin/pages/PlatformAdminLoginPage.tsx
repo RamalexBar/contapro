@@ -36,7 +36,7 @@ export function PlatformAdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center">
-          <Logo iconClassName="h-12" textSizeClass="text-2xl" onDark />
+          <Logo heightClassName="h-12" onDark />
         </div>
         <Card>
           <h1 className="mb-1 text-xl font-semibold text-slate-900">Panel Administrador SaaS</h1>

@@ -188,7 +188,7 @@ export function LandingPage() {
       </section>
 
       <footer className="border-t border-slate-100 py-8 text-center text-xs text-slate-400">
-        <Logo iconClassName="h-6" textSizeClass="text-sm" className="mb-2 justify-center" />
+        <Logo heightClassName="h-6" className="mb-2" />
         <p>Contapro — ERP para pequeños y medianos negocios en Colombia.</p>
       </footer>
     </div>

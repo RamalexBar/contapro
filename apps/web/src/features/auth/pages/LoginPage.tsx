@@ -55,7 +55,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-2">
-          <Logo iconClassName="h-14" textSizeClass="text-2xl" />
+          <Logo heightClassName="h-14" />
         </div>
         <Card>
           <h1 className="mb-1 text-lg font-semibold text-slate-900">Ingresa a tu empresa</h1>
