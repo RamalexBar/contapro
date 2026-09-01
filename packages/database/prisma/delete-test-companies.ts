@@ -9,15 +9,23 @@ const prisma = new PrismaClient();
  *
  * SEGURO EXPLICITO: solo borra companias cuyo NIT este en ALLOWED_TEST_NITS -- si algun id que se
  * pase no corresponde a un NIT de esa lista, se aborta ANTES de borrar nada (ninguna compania se
- * toca a medias). Confirmado con el usuario cuales son de prueba antes de escribir esto -- ver
- * conversacion en la sesion que genero este archivo.
+ * toca a medias).
  *
  * El schema NO tiene onDelete: Cascade en ningun lado (deliberado, ver seed-base.ts / el resto del
- * schema), asi que el orden de borrado abajo importa: primero las tablas "hoja" que referencian un
- * id de otra tabla via una relacion real de Prisma (@relation con fields/references -- Postgres SI
- * pone una FK real ahi), despues las que tienen companyId directo. Las referencias sueltas sin
- * @relation declarado (ej. Sale.customerId, JournalEntryLine.accountId) NO son FKs reales en la
- * base -- no bloquean el orden, se ignoran a proposito.
+ * schema), asi que el orden de borrado abajo importa. A diferencia de la version anterior de este
+ * archivo (que mantenia el orden a mano y se quedo desactualizada -- broto un P2003 real contra
+ * produccion en `payroll_deductions_employeeId_fkey` porque el modulo de nomina/tiempo se agrego
+ * despues de escribirla), esta version se genero recorriendo TODO `prisma/schema/*.prisma`
+ * programaticamente: se listaron las 114 tablas del esquema, se armo el grafo de dependencias real
+ * (cada `@relation(fields: ...)`) y se calculo un orden topologico (hijas antes que padres). Cada
+ * `deleteMany` de abajo usa un filtro de relacion anidado de Prisma (ej. `{ sale: { companyId } }`)
+ * en vez de coleccionar ids de padres a mano -- asi una tabla nueva que se agregue en el futuro
+ * mientras SI declare su `@relation` correctamente no puede romper este script en silencio.
+ *
+ * Excepcion: dos tablas (`AccountReceivableReminderLog.accountReceivableId` y
+ * `SyncConflictLog.outboxEventId`) guardan el id del padre como String suelto, SIN `@relation`
+ * declarado (no son FK reales en Postgres, a proposito) -- esas dos no se pueden filtrar por
+ * relacion anidada, se resuelven con un array de ids collectado antes de la transaccion.
  *
  * Uso: pnpm --filter @erp/database exec tsx prisma/delete-test-companies.ts <companyId> [companyId...]
  */
@@ -62,78 +70,129 @@ async function main() {
   for (const companyId of companyIds) {
     await prisma.$transaction(
       async (tx) => {
-        const saleIds = (await tx.sale.findMany({ where: { companyId }, select: { id: true } })).map((s) => s.id);
-        const quoteIds = (await tx.quote.findMany({ where: { companyId }, select: { id: true } })).map((q) => q.id);
-        const journalEntryIds = (await tx.journalEntry.findMany({ where: { companyId }, select: { id: true } })).map((j) => j.id);
-        const productIds = (await tx.product.findMany({ where: { companyId }, select: { id: true } })).map((p) => p.id);
-        const purchaseIds = (await tx.purchase.findMany({ where: { companyId }, select: { id: true } })).map((p) => p.id);
-        const customerIds = (await tx.customer.findMany({ where: { companyId }, select: { id: true } })).map((c) => c.id);
-        const userIds = (await tx.user.findMany({ where: { companyId }, select: { id: true } })).map((u) => u.id);
-        const accountReceivableIds = (await tx.accountReceivable.findMany({ where: { companyId }, select: { id: true } })).map((a) => a.id);
-        const accountPayableIds = (await tx.accountPayable.findMany({ where: { companyId }, select: { id: true } })).map((a) => a.id);
-        const subscriptionIds = (await tx.subscription.findMany({ where: { companyId }, select: { id: true } })).map((s) => s.id);
+        // Las unicas dos tablas sin @relation real -- necesitan el array de ids del padre
+        // recolectado ANTES de borrar nada (una vez que se borre AccountReceivable/SyncOutbox ya
+        // no se puede volver a consultar cuales eran sus ids).
+        const accountReceivableIds = (await tx.accountReceivable.findMany({ where: { companyId }, select: { id: true } })).map(
+          (a) => a.id
+        );
+        const syncOutboxIds = (await tx.syncOutbox.findMany({ where: { companyId }, select: { id: true } })).map((s) => s.id);
 
-        // ---- Fase 1: tablas hoja, referencian un id de otra tabla via @relation real (no tienen
-        // companyId propio, hay que resolverlas por el id del padre) ----
-        await tx.saleItem.deleteMany({ where: { saleId: { in: saleIds } } });
-        await tx.saleWithholding.deleteMany({ where: { saleId: { in: saleIds } } });
-        await tx.salePayment.deleteMany({ where: { saleId: { in: saleIds } } });
-        await tx.quoteItem.deleteMany({ where: { quoteId: { in: quoteIds } } });
-        await tx.journalEntryLine.deleteMany({ where: { journalEntryId: { in: journalEntryIds } } });
-        await tx.productImage.deleteMany({ where: { productId: { in: productIds } } });
-        await tx.productPresentation.deleteMany({ where: { productId: { in: productIds } } });
-        await tx.purchaseWithholding.deleteMany({ where: { purchaseId: { in: purchaseIds } } });
-        await tx.customerCreditMovement.deleteMany({ where: { customerId: { in: customerIds } } });
-        await tx.customerPayment.deleteMany({ where: { customerId: { in: customerIds } } });
-        await tx.userBranch.deleteMany({ where: { userId: { in: userIds } } });
-        await tx.userRole.deleteMany({ where: { userId: { in: userIds } } });
-        await tx.userPermission.deleteMany({ where: { userId: { in: userIds } } });
-        await tx.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
-        await tx.passwordResetToken.deleteMany({ where: { userId: { in: userIds } } });
-        await tx.accountReceivablePayment.deleteMany({ where: { accountReceivableId: { in: accountReceivableIds } } });
-        await tx.accountReceivableReminderLog.deleteMany({ where: { accountReceivableId: { in: accountReceivableIds } } });
-        await tx.supplierPayment.deleteMany({ where: { accountPayableId: { in: accountPayableIds } } });
-        await tx.subscriptionPayment.deleteMany({ where: { subscriptionId: { in: subscriptionIds } } });
-        await tx.subscriptionReminderLog.deleteMany({ where: { subscriptionId: { in: subscriptionIds } } });
-
-        // ---- Fase 2: tienen companyId propio, pero dependen de que la fase 1 ya haya limpiado
-        // sus hijos (o dependen de otra tabla de esta misma fase, ya anotado en cada linea) ----
-        await tx.accountReceivable.deleteMany({ where: { companyId } });
-        await tx.accountPayable.deleteMany({ where: { companyId } });
-        await tx.sale.deleteMany({ where: { companyId } });
-        await tx.quote.deleteMany({ where: { companyId } });
-        await tx.creditNote.deleteMany({ where: { companyId } });
-        await tx.debitNote.deleteMany({ where: { companyId } });
-        await tx.purchase.deleteMany({ where: { companyId } });
+        // ---- Orden topologico completo (hijas antes que padres), generado desde el esquema ----
+        await tx.saleWithholding.deleteMany({ where: { sale: { companyId } } });
+        await tx.purchaseWithholding.deleteMany({ where: { purchase: { companyId } } });
+        await tx.withholdingConcept.deleteMany({ where: { companyId } });
+        await tx.costCenter.deleteMany({ where: { companyId } });
+        await tx.chartOfAccounts.deleteMany({ where: { companyId } }); // auto-referenciada, un solo deleteMany cubre el arbol
+        await tx.journalEntryLine.deleteMany({ where: { journalEntry: { companyId } } });
         await tx.journalEntry.deleteMany({ where: { companyId } });
+        await tx.financialPeriod.deleteMany({ where: { companyId } });
+        await tx.bankTransaction.deleteMany({ where: { bankAccount: { companyId } } });
+        await tx.bankReconciliationItem.deleteMany({ where: { reconciliation: { bankAccount: { companyId } } } });
+        await tx.bankReconciliation.deleteMany({ where: { bankAccount: { companyId } } });
+        await tx.bankAccount.deleteMany({ where: { companyId } });
+        await tx.companyJournalEntryCounter.deleteMany({ where: { companyId } });
+        await tx.userBranch.deleteMany({ where: { user: { companyId } } });
+        await tx.userRole.deleteMany({ where: { user: { companyId } } });
+        await tx.userPermission.deleteMany({ where: { user: { companyId } } });
+        await tx.refreshToken.deleteMany({ where: { user: { companyId } } });
+        await tx.passwordResetToken.deleteMany({ where: { user: { companyId } } });
+        await tx.cashierDiscountLimit.deleteMany({ where: { companyId } });
+        await tx.electronicPayroll.deleteMany({ where: { companyId } });
+        await tx.payrollItem.deleteMany({ where: { payrollDetail: { payroll: { companyId } } } });
+        await tx.payslipDocument.deleteMany({ where: { payrollDetail: { payroll: { companyId } } } });
+        await tx.payrollDetail.deleteMany({ where: { payroll: { companyId } } });
+        await tx.payrollDeduction.deleteMany({ where: { companyId } });
+        await tx.timeEntry.deleteMany({ where: { employee: { companyId } } });
+        await tx.vacation.deleteMany({ where: { employee: { companyId } } });
+        await tx.leavePermission.deleteMany({ where: { employee: { companyId } } });
+        await tx.absence.deleteMany({ where: { employee: { companyId } } });
+        await tx.sickLeave.deleteMany({ where: { employee: { companyId } } });
+        await tx.employee.deleteMany({ where: { companyId } });
+        await tx.user.deleteMany({ where: { companyId } });
+        await tx.rolePermission.deleteMany({ where: { role: { companyId } } });
+        await tx.role.deleteMany({ where: { companyId } });
+        await tx.auditLog.deleteMany({ where: { companyId } });
+        await tx.discountAuthorization.deleteMany({ where: { companyId } });
+        await tx.cashMovement.deleteMany({ where: { cashSession: { companyId } } });
+        await tx.cashCount.deleteMany({ where: { cashSession: { companyId } } });
+        await tx.cashSession.deleteMany({ where: { companyId } });
+        await tx.cashRegister.deleteMany({ where: { companyId } });
+        await tx.accountReceivablePayment.deleteMany({ where: { accountReceivable: { companyId } } });
+        await tx.accountReceivableReminderLog.deleteMany({ where: { accountReceivableId: { in: accountReceivableIds } } });
+        await tx.accountReceivable.deleteMany({ where: { companyId } });
+        await tx.salesCommissionScheme.deleteMany({ where: { companyId } });
+        await tx.commissionSettlement.deleteMany({ where: { companyId } });
+        await tx.opportunityItem.deleteMany({ where: { opportunity: { companyId } } });
+        await tx.opportunity.deleteMany({ where: { companyId } });
+        await tx.customerCreditMovement.deleteMany({ where: { customer: { companyId } } });
+        await tx.customerPayment.deleteMany({ where: { customer: { companyId } } });
+        await tx.customer.deleteMany({ where: { companyId } });
+        await tx.electronicInvoice.deleteMany({ where: { companyId } });
+        await tx.electronicCreditNote.deleteMany({ where: { companyId } });
+        await tx.electronicDebitNote.deleteMany({ where: { companyId } });
+        await tx.electronicSupportDocument.deleteMany({ where: { companyId } });
+        await tx.invoiceNumberingResolution.deleteMany({ where: { companyId } });
+        await tx.expense.deleteMany({ where: { companyId } });
+        await tx.expenseCategory.deleteMany({ where: { companyId } });
+        await tx.depreciationEntry.deleteMany({ where: { fixedAsset: { companyId } } });
+        await tx.fixedAsset.deleteMany({ where: { companyId } });
+        await tx.productImage.deleteMany({ where: { product: { companyId } } });
         await tx.barcode.deleteMany({ where: { companyId } });
+        await tx.productPresentation.deleteMany({ where: { product: { companyId } } });
         await tx.productBranchStock.deleteMany({ where: { companyId } });
         await tx.batch.deleteMany({ where: { companyId } });
         await tx.stockMovement.deleteMany({ where: { companyId } });
+        await tx.product.deleteMany({ where: { companyId } });
+        await tx.category.deleteMany({ where: { companyId } });
+        await tx.brand.deleteMany({ where: { companyId } });
+        await tx.stockTransferItem.deleteMany({ where: { stockTransfer: { companyId } } });
+        await tx.stockTransfer.deleteMany({ where: { companyId } });
+        await tx.physicalInventoryItem.deleteMany({ where: { physicalInventory: { companyId } } });
+        await tx.physicalInventory.deleteMany({ where: { companyId } });
         await tx.kardex.deleteMany({ where: { companyId } });
-        await tx.product.deleteMany({ where: { companyId } }); // despues de barcode/stock/batch/kardex/images/presentations
-        await tx.category.deleteMany({ where: { companyId } }); // despues de product (Product.category es FK real)
-        await tx.brand.deleteMany({ where: { companyId } }); // despues de product (Product.brand es FK real)
-        await tx.customer.deleteMany({ where: { companyId } });
-        await tx.supplier.deleteMany({ where: { companyId } });
-        await tx.expense.deleteMany({ where: { companyId } });
-        await tx.expenseCategory.deleteMany({ where: { companyId } }); // despues de expense
-        await tx.withholdingConcept.deleteMany({ where: { companyId } });
-        await tx.cashierDiscountLimit.deleteMany({ where: { companyId } });
-        await tx.discountAuthorization.deleteMany({ where: { companyId } });
-        await tx.auditLog.deleteMany({ where: { companyId } });
-        await tx.cashRegister.deleteMany({ where: { companyId } });
-        await tx.chartOfAccounts.deleteMany({ where: { companyId } }); // auto-referenciada, un solo deleteMany cubre el arbol
+        await tx.payroll.deleteMany({ where: { companyId } });
+        await tx.saleItem.deleteMany({ where: { sale: { companyId } } });
+        await tx.salePayment.deleteMany({ where: { sale: { companyId } } });
+        await tx.sale.deleteMany({ where: { companyId } });
         await tx.branchSaleCounter.deleteMany({ where: { companyId } });
-        await tx.companyJournalEntryCounter.deleteMany({ where: { companyId } });
-        await tx.subscription.deleteMany({ where: { companyId } }); // despues de subscriptionPayment/reminderLog
-        await tx.rolePermission.deleteMany({ where: { role: { companyId } } });
-        await tx.role.deleteMany({ where: { companyId } });
-        await tx.employee.deleteMany({ where: { companyId } });
-        await tx.user.deleteMany({ where: { companyId } }); // despues de userBranch/userRole/userPermission/refreshToken/passwordResetToken/cashierDiscountLimit/employee
-        await tx.branch.deleteMany({ where: { companyId } }); // despues de userBranch
+        await tx.quoteItem.deleteMany({ where: { quote: { companyId } } });
+        await tx.quote.deleteMany({ where: { companyId } });
+        await tx.orderItem.deleteMany({ where: { order: { companyId } } });
+        await tx.order.deleteMany({ where: { companyId } });
+        await tx.returnItem.deleteMany({ where: { return: { companyId } } });
+        await tx.return.deleteMany({ where: { companyId } });
+        await tx.creditNote.deleteMany({ where: { companyId } });
+        await tx.debitNote.deleteMany({ where: { companyId } });
+        await tx.layawayItem.deleteMany({ where: { layaway: { companyId } } });
+        await tx.layawayPayment.deleteMany({ where: { layaway: { companyId } } });
+        await tx.layaway.deleteMany({ where: { companyId } });
+        await tx.productPriceListEntry.deleteMany({ where: { priceList: { companyId } } });
+        await tx.priceList.deleteMany({ where: { companyId } });
+        await tx.apiKey.deleteMany({ where: { companyId } });
+        await tx.webhookDelivery.deleteMany({ where: { webhookSubscription: { companyId } } });
+        await tx.webhookSubscription.deleteMany({ where: { companyId } });
+        await tx.recurringInvoiceItem.deleteMany({ where: { recurringInvoice: { companyId } } });
+        await tx.recurringInvoiceRun.deleteMany({ where: { recurringInvoice: { companyId } } });
+        await tx.recurringInvoice.deleteMany({ where: { companyId } });
+        await tx.supplier.deleteMany({ where: { companyId } });
+        await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrder: { companyId } } });
+        await tx.purchaseOrder.deleteMany({ where: { companyId } });
+        await tx.goodsReceiptItem.deleteMany({ where: { goodsReceipt: { companyId } } });
+        await tx.goodsReceipt.deleteMany({ where: { companyId } });
+        await tx.supplierPayment.deleteMany({ where: { accountPayable: { companyId } } });
+        await tx.accountPayable.deleteMany({ where: { companyId } });
+        await tx.purchase.deleteMany({ where: { companyId } });
+        await tx.syncDevice.deleteMany({ where: { companyId } });
+        await tx.syncConflictLog.deleteMany({ where: { outboxEventId: { in: syncOutboxIds } } });
+        await tx.syncOutbox.deleteMany({ where: { companyId } });
+        await tx.branch.deleteMany({ where: { companyId } });
+        await tx.subscriptionPayment.deleteMany({ where: { subscription: { companyId } } });
+        await tx.subscriptionReminderLog.deleteMany({ where: { subscription: { companyId } } });
+        await tx.subscription.deleteMany({ where: { companyId } });
+        await tx.whatsAppDeliveryLog.deleteMany({ where: { companyId } });
 
-        // ---- Fase 3: la compania misma, ya sin nada colgando ----
+        // ---- La compania misma, ya sin nada colgando ----
         await tx.company.delete({ where: { id: companyId } });
       },
       { timeout: 60_000 }
