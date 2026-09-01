@@ -28,6 +28,8 @@ const ALLOWED_TEST_NITS = new Set([
   "900999999-1", // Empresa de Prueba Despliegue
   "900123457-2", // Contapro Demo
   "900123456-7", // Contapro Demo
+  "9001788189425", // Smoke Test 1788189425 -- confirmado con el usuario 2026-09-01
+  "9001788266614", // Test DueDate 1788266614 -- confirmado con el usuario 2026-09-01
 ]);
 
 async function main() {
