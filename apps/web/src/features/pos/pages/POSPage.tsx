@@ -80,7 +80,11 @@ export function POSPage() {
   // cajero, no una segunda fuente de verdad del monto de la venta.
   const [amountReceived, setAmountReceived] = useState("");
   const [customerId, setCustomerId] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  // Plazo del credito en dias (15/30/60/lo que digite el cajero) -- el backend por defecto usa 30
+  // dias si no se manda dueDate (ver DEFAULT_DUE_DAYS en resolve-receivable-input.ts). Se guarda
+  // como dias en vez de fecha porque asi es como se negocia el plazo en la practica ("a 30 dias",
+  // "a 60 dias"), y se calcula la fecha exacta recien al enviar la venta.
+  const [creditDays, setCreditDays] = useState("");
   // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- solo etiqueta el total con una
   // moneda extranjera + TRM manual para mostrar un total de referencia; la venta se sigue
   // cobrando/contabilizando en COP igual que siempre.
@@ -133,6 +137,11 @@ export function POSPage() {
   const receivedAmount = Number(amountReceived);
   const hasReceivedAmount = amountReceived.trim() !== "" && !Number.isNaN(receivedAmount);
   const changeDue = hasReceivedAmount ? round2(receivedAmount - netTotal) : null;
+  const creditDaysNumber = Number(creditDays);
+  const creditDueDate =
+    creditDays.trim() !== "" && Number.isFinite(creditDaysNumber) && creditDaysNumber > 0
+      ? new Date(Date.now() + creditDaysNumber * 24 * 60 * 60 * 1000)
+      : null;
 
   const saleMutation = useMutation({
     mutationFn: () =>
@@ -143,7 +152,7 @@ export function POSPage() {
         items: cart.map((l) => ({ productId: l.productId, quantity: l.quantity, discountPercent: l.discountPercent })),
         payments: [{ method: paymentMethod, amount: netTotal }],
         withholdings,
-        dueDate: paymentMethod === "CREDIT" && dueDate ? new Date(dueDate) : undefined,
+        dueDate: paymentMethod === "CREDIT" && creditDueDate ? creditDueDate : undefined,
         currency,
         exchangeRate: currency === "COP" ? 1 : Number(exchangeRate),
         priceListId: selectedPriceListId || undefined,
@@ -159,7 +168,7 @@ export function POSPage() {
         setPaymentMethod("CASH");
         setAmountReceived("");
         setCustomerId("");
-        setDueDate("");
+        setCreditDays("");
         setCurrency("COP");
         setExchangeRate("");
         setSelectedPriceListId("");
@@ -421,8 +430,32 @@ export function POSPage() {
               </div>
               {paymentMethod === "CREDIT" && (
                 <div className="flex items-center gap-2 text-sm">
-                  <label className="w-20 shrink-0 text-slate-600">Vence:</label>
-                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} placeholder="30 dias por defecto" />
+                  <label className="w-20 shrink-0 text-slate-600">Plazo:</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    step="1"
+                    className="w-20"
+                    value={creditDays}
+                    onChange={(e) => setCreditDays(e.target.value)}
+                    placeholder="30"
+                  />
+                  <span className="text-slate-500">dias</span>
+                  <div className="flex gap-2">
+                    {[15, 30, 60].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className="text-xs font-medium text-brand-600 hover:underline"
+                        onClick={() => setCreditDays(String(d))}
+                      >
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                  {creditDueDate && (
+                    <span className="text-slate-500">Vence: {creditDueDate.toLocaleDateString("es-CO")}</span>
+                  )}
                 </div>
               )}
               <div className="flex items-center gap-2 text-sm">
