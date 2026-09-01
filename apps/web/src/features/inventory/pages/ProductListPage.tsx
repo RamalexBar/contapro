@@ -11,7 +11,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
-import { createProduct, deleteProduct, listProducts, updateProductPrice } from "../api/product.api";
+import { createProduct, deleteProduct, listProducts, updateProduct, updateProductBarcode, updateProductPrice } from "../api/product.api";
 import {
   createPriceList,
   deactivatePriceList,
@@ -21,16 +21,27 @@ import {
   setProductPrice,
   updatePriceList,
 } from "../api/price-list.api";
+import { listCategories } from "../api/category.api";
+import { listBrands } from "../api/brand.api";
+import { CategoriesSection } from "../components/CategoriesSection";
+import { BrandsSection } from "../components/BrandsSection";
+import { BranchStockSection } from "../components/BranchStockSection";
+import { StockMovementsSection } from "../components/StockMovementsSection";
+import { KardexSection } from "../components/KardexSection";
 
 function ProductsSection() {
   const queryClient = useQueryClient();
   const canManagePrice = useAuthStore((s) => s.hasPermission("product.price.update"));
   const canDelete = useAuthStore((s) => s.hasPermission("product.delete"));
   const canCreate = useAuthStore((s) => s.hasPermission("product.create"));
+  const canUpdate = useAuthStore((s) => s.hasPermission("product.update"));
+  const canUpdateBarcode = useAuthStore((s) => s.hasPermission("product.barcode.update"));
 
   const { data, isLoading } = useQuery({ queryKey: ["products"], queryFn: () => listProducts() });
+  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: listCategories });
+  const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: listBrands });
 
-  const [form, setForm] = useState({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "" });
+  const [form, setForm] = useState({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "", categoryId: "", brandId: "" });
   const createMutation = useMutation({
     mutationFn: () =>
       createProduct({
@@ -39,6 +50,8 @@ function ProductsSection() {
         currentPrice: Number(form.currentPrice),
         currentCost: Number(form.currentCost),
         barcode: form.barcode || undefined,
+        categoryId: form.categoryId || undefined,
+        brandId: form.brandId || undefined,
         unit: "UN",
         taxRate: 19,
         initialStock: 0,
@@ -47,7 +60,7 @@ function ProductsSection() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      setForm({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "" });
+      setForm({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "", categoryId: "", brandId: "" });
     },
   });
 
@@ -56,17 +69,39 @@ function ProductsSection() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });
 
+  const categoryBrandMutation = useMutation({
+    mutationFn: ({ id, categoryId, brandId }: { id: string; categoryId?: string | null; brandId?: string | null }) =>
+      updateProduct(id, { categoryId, brandId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+  });
+
+  const [barcodeDraft, setBarcodeDraft] = useState<Record<string, string>>({});
+  const barcodeMutation = useMutation({
+    mutationFn: ({ id, code }: { id: string; code: string }) => updateProductBarcode(id, code),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setBarcodeDraft((prev) => ({ ...prev, [id]: "" }));
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteProduct(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });
+
+  function categoryName(categoryId: string | null) {
+    return categories?.data.find((c) => c.id === categoryId)?.name ?? "-";
+  }
+  function brandName(brandId: string | null) {
+    return brands?.data.find((b) => b.id === brandId)?.name ?? "-";
+  }
 
   return (
     <div className="space-y-6">
       {canCreate && (
         <Card title="Nuevo producto">
           <form
-            className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
             onSubmit={(e) => {
               e.preventDefault();
               createMutation.mutate();
@@ -89,7 +124,23 @@ function ProductsSection() {
               required
             />
             <Input placeholder="Codigo de barras" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
-            <Button type="submit" loading={createMutation.isPending} className="col-span-2 sm:col-span-1">
+            <Select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
+              <option value="">Sin categoria</option>
+              {categories?.data.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+            <Select value={form.brandId} onChange={(e) => setForm({ ...form, brandId: e.target.value })}>
+              <option value="">Sin marca</option>
+              {brands?.data.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+            <Button type="submit" loading={createMutation.isPending}>
               Crear
             </Button>
           </form>
@@ -107,6 +158,8 @@ function ProductsSection() {
                 <Th>Nombre</Th>
                 <Th>Precio</Th>
                 <Th>Costo</Th>
+                <Th>Categoria</Th>
+                <Th>Marca</Th>
                 <Th>Codigo de barras</Th>
                 <Th></Th>
               </tr>
@@ -132,7 +185,68 @@ function ProductsSection() {
                     )}
                   </Td>
                   <Td>{formatCOP(p.currentCost)}</Td>
-                  <Td>{p.barcodes.join(", ")}</Td>
+                  <Td>
+                    {canUpdate ? (
+                      <Select
+                        className="w-32"
+                        defaultValue={p.categoryId ?? ""}
+                        key={p.categoryId}
+                        onChange={(e) => categoryBrandMutation.mutate({ id: p.id, categoryId: e.target.value || null })}
+                      >
+                        <option value="">Sin categoria</option>
+                        {categories?.data.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      categoryName(p.categoryId)
+                    )}
+                  </Td>
+                  <Td>
+                    {canUpdate ? (
+                      <Select
+                        className="w-32"
+                        defaultValue={p.brandId ?? ""}
+                        key={p.brandId}
+                        onChange={(e) => categoryBrandMutation.mutate({ id: p.id, brandId: e.target.value || null })}
+                      >
+                        <option value="">Sin marca</option>
+                        {brands?.data.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      brandName(p.brandId)
+                    )}
+                  </Td>
+                  <Td>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {p.barcodes.length > 0 && <span>{p.barcodes.join(", ")}</span>}
+                      {canUpdateBarcode && (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            placeholder="+ codigo"
+                            className="w-24"
+                            value={barcodeDraft[p.id] ?? ""}
+                            onChange={(e) => setBarcodeDraft((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                          />
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            loading={barcodeMutation.isPending}
+                            disabled={!barcodeDraft[p.id]}
+                            onClick={() => barcodeMutation.mutate({ id: p.id, code: barcodeDraft[p.id] ?? "" })}
+                          >
+                            Agregar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </Td>
                   <Td>
                     {canDelete && (
                       <Button size="sm" variant="danger" onClick={() => deleteMutation.mutate(p.id)}>
@@ -369,7 +483,17 @@ function PriceListsSection() {
   );
 }
 
-type Section = "products" | "price-lists";
+type Section = "products" | "price-lists" | "categories" | "brands" | "branches" | "movements" | "kardex";
+
+const SECTION_LABELS: Record<Section, string> = {
+  products: "Productos",
+  "price-lists": "Listas de precios",
+  categories: "Categorias",
+  brands: "Marcas",
+  branches: "Sucursales",
+  movements: "Movimientos de stock",
+  kardex: "Kardex",
+};
 
 export function ProductListPage() {
   const [section, setSection] = useState<Section>("products");
@@ -378,16 +502,20 @@ export function ProductListPage() {
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Inventario</h1>
       <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-        <Button size="sm" variant={section === "products" ? "primary" : "secondary"} onClick={() => setSection("products")}>
-          Productos
-        </Button>
-        <Button size="sm" variant={section === "price-lists" ? "primary" : "secondary"} onClick={() => setSection("price-lists")}>
-          Listas de precios
-        </Button>
+        {(Object.keys(SECTION_LABELS) as Section[]).map((s) => (
+          <Button key={s} size="sm" variant={section === s ? "primary" : "secondary"} onClick={() => setSection(s)}>
+            {SECTION_LABELS[s]}
+          </Button>
+        ))}
       </div>
 
       {section === "products" && <ProductsSection />}
       {section === "price-lists" && <PriceListsSection />}
+      {section === "categories" && <CategoriesSection />}
+      {section === "brands" && <BrandsSection />}
+      {section === "branches" && <BranchStockSection />}
+      {section === "movements" && <StockMovementsSection />}
+      {section === "kardex" && <KardexSection />}
     </AppLayout>
   );
 }

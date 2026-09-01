@@ -8,6 +8,7 @@ import { errorHandlerMiddleware } from "./shared/middlewares/error-handler.middl
 
 import { authRouter } from "./modules/auth/interfaces/auth.routes";
 import { rbacRouter } from "./modules/rbac/interfaces/rbac.routes";
+import { branchesRouter } from "./modules/branches/interfaces/branches.routes";
 import { categoryRouter } from "./modules/inventory/category/interfaces/category.routes";
 import { brandRouter } from "./modules/inventory/brand/interfaces/brand.routes";
 import { productRouter } from "./modules/inventory/product/interfaces/product.routes";
@@ -75,6 +76,7 @@ app.use("/api", collectionsWebhookRouter);
 // intercepte.
 app.use("/api", publicApiRouter);
 app.use("/api", rbacRouter);
+app.use("/api", branchesRouter);
 app.use("/api", categoryRouter);
 app.use("/api", brandRouter);
 app.use("/api", productRouter);
