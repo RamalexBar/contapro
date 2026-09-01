@@ -1,6 +1,7 @@
 export * from "./roles";
 export * from "./permissions";
 export * from "./auth";
+export * from "./branches";
 export * from "./inventory";
 export * from "./pos";
 export * from "./cash";

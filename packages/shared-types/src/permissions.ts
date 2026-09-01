@@ -20,6 +20,7 @@ export const PERMISSIONS = [
   { code: "stock.entry.create", module: "inventory", description: "Registrar entradas de inventario" },
   { code: "stock.adjust", module: "inventory", description: "Ajustar inventario" },
   { code: "stock.transfer", module: "inventory", description: "Transferir inventario entre sucursales" },
+  { code: "branch.manage", module: "inventory", description: "Crear y administrar sucursales" },
   { code: "price-list.manage", module: "inventory", description: "Crear listas de precios y fijar precios por producto" },
   { code: "price-list.read", module: "inventory", description: "Ver listas de precios y sus precios por producto" },
 
@@ -150,6 +151,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     "product.barcode.update",
     "category.manage",
     "brand.manage",
+    "branch.manage",
     "stock.entry.create",
     "stock.adjust",
     "stock.transfer",

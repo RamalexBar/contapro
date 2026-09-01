@@ -8,7 +8,7 @@ import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../componen
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
-import { listBranches } from "../api/branch.api";
+import { createBranch, listBranches } from "../api/branch.api";
 import { listProducts } from "../api/product.api";
 import { listBranchStock, transferStock } from "../api/stock.api";
 
@@ -20,10 +20,25 @@ import { listBranchStock, transferStock } from "../api/stock.api";
  */
 export function BranchStockSection() {
   const queryClient = useQueryClient();
+  const canManageBranches = useAuthStore((s) => s.hasPermission("branch.manage"));
   const canTransfer = useAuthStore((s) => s.hasPermission("stock.transfer"));
 
   const { data: branches } = useQuery({ queryKey: ["branches"], queryFn: listBranches });
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: () => listProducts() });
+
+  const [branchForm, setBranchForm] = useState({ name: "", address: "", phone: "" });
+  const createBranchMutation = useMutation({
+    mutationFn: () =>
+      createBranch({
+        name: branchForm.name,
+        address: branchForm.address || undefined,
+        phone: branchForm.phone || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["branches"] });
+      setBranchForm({ name: "", address: "", phone: "" });
+    },
+  });
 
   const [viewBranchId, setViewBranchId] = useState("");
   const { data: branchStock, isLoading: loadingStock } = useQuery({
@@ -53,6 +68,38 @@ export function BranchStockSection() {
 
   return (
     <div className="space-y-6">
+      {canManageBranches && (
+        <Card title="Nueva sucursal">
+          <form
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createBranchMutation.mutate();
+            }}
+          >
+            <Input placeholder="Nombre" value={branchForm.name} onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })} required />
+            <Input
+              placeholder="Direccion (opcional)"
+              value={branchForm.address}
+              onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })}
+            />
+            <Input
+              placeholder="Telefono (opcional)"
+              value={branchForm.phone}
+              onChange={(e) => setBranchForm({ ...branchForm, phone: e.target.value })}
+            />
+            <Button type="submit" loading={createBranchMutation.isPending}>
+              Crear sucursal
+            </Button>
+          </form>
+          {createBranchMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(createBranchMutation.error as Error).message}
+            </Alert>
+          )}
+        </Card>
+      )}
+
       <Card title="Stock por sucursal">
         <Select className="mb-3" value={viewBranchId} onChange={(e) => setViewBranchId(e.target.value)}>
           <option value="">Seleccionar sucursal...</option>
