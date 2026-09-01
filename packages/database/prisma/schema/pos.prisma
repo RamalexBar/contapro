@@ -51,6 +51,14 @@ model Sale {
   invoiceXmlUrl String?
   cancelReason  String?
   cancelledAt   DateTime?
+  // Vencimiento de credito pedido al crear la venta, usado SOLO cuando la venta queda
+  // PENDING_AUTHORIZATION (esperando autorizacion de descuento, ver AuthorizeDiscountUseCase) --
+  // Sale no tenia forma de recordar el dueDate elegido por el cajero mientras la venta esperaba,
+  // asi que la AccountReceivable creada al autorizarse el descuento siempre caia en el default de
+  // 30 dias (ver resolve-receivable-input.ts) sin importar lo que el cajero hubiera pedido. Queda
+  // null si la venta se completo de una vez (el AccountReceivable ya se creo con su propio dueDate,
+  // no hace falta duplicarlo aqui) o si el cajero no pidio un plazo especifico.
+  requestedReceivableDueDate DateTime?
   createdAt     DateTime      @default(now())
 
   items             SaleItem[]

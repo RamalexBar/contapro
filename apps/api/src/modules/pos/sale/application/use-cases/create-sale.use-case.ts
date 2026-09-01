@@ -140,9 +140,9 @@ export class CreateSaleUseCase {
 
     // Una venta con pago CREDIT genera una AccountReceivable (item 31, modulo `collections`) --
     // solo si la venta se completa de una vez; si necesita autorizacion de descuento, se crea
-    // despues en AuthorizeDiscountUseCase (Sale no tiene columna dueDate propia, asi que el
-    // request original no se puede "guardar" mientras la venta espera, ver
-    // resolve-receivable-input.ts).
+    // despues en AuthorizeDiscountUseCase. El dueDate pedido por el cajero (si lo hubo) se guarda
+    // en Sale.requestedReceivableDueDate para que AuthorizeDiscountUseCase lo recupere al
+    // completarse -- ver resolve-receivable-input.ts.
     const receivable = needsAuthorization ? null : resolveReceivableInput(input.payments, input.customerId, input.dueDate);
 
     const sale = await this.saleRepo.create({
@@ -161,6 +161,7 @@ export class CreateSaleUseCase {
       payments: input.payments,
       withholdings: computedWithholdings,
       receivable: receivable ?? undefined,
+      requestedReceivableDueDate: needsAuthorization ? input.dueDate : undefined,
       currency: input.currency,
       exchangeRate: input.exchangeRate,
       priceListId: effectivePriceListId,

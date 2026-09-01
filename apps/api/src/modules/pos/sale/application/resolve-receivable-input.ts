@@ -3,12 +3,11 @@ import { ValidationError } from "../../../../shared/errors/app-error";
 import type { ReceivableInput, SalePayment } from "../domain/sale.repository";
 
 /** 30 dias: mismo criterio de "valor asumido, documentado" que TRIAL_PERIOD_DAYS en
- * register-company.use-case.ts. Se usa cuando no se especifica un vencimiento explicito, y
- * SIEMPRE en el camino de AuthorizeDiscountUseCase (la venta necesito autorizacion de descuento
- * antes de completarse, y el dueDate original del request de creacion no se persiste mientras
- * espera -- Sale no tiene columna dueDate propia, vive solo en AccountReceivable -- asi que ese
- * caso borde siempre cae en el default, contado desde el momento de la autorizacion, no de la
- * venta original). */
+ * register-company.use-case.ts. Se usa solo cuando no se especifica un vencimiento explicito --
+ * incluido el camino de AuthorizeDiscountUseCase (la venta necesito autorizacion de descuento
+ * antes de completarse) si el cajero tampoco pidio un plazo especifico al vender; si lo pidio,
+ * queda guardado en Sale.requestedReceivableDueDate y se usa ese en vez de este default (ver
+ * AuthorizeDiscountUseCase). */
 const DEFAULT_DUE_DAYS = 30;
 
 /** Detecta si una venta trae un pago method="CREDIT" (mecanismo que ya existia y ya satisface la

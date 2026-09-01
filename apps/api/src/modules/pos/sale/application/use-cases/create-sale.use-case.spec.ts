@@ -128,6 +128,7 @@ class FakeSaleRepository implements Partial<ISaleRepository> {
       cude: null,
       invoiceXmlUrl: null,
       accountReceivableId: null,
+      requestedReceivableDueDate: data.requestedReceivableDueDate ?? null,
       currency: data.currency,
       exchangeRate: data.exchangeRate,
       foreignTotal: data.currency === "COP" ? null : data.total / data.exchangeRate,
@@ -332,6 +333,48 @@ describe("CreateSaleUseCase — venta a credito (item 31)", () => {
     );
 
     expect(saleRepo.created[0].receivable).toBeUndefined();
+  });
+
+  it("passes the requested dueDate through to saleRepo.create() even without a CREDIT payment (so it is not lost if the item ends up requiring discount authorization)", async () => {
+    const { useCase, saleRepo } = makeUseCase();
+    const dueDate = new Date("2026-10-15");
+
+    await withTenantContext(() =>
+      useCase.execute({
+        ...BASE_INPUT,
+        customerId: "customer-1",
+        payments: [{ method: "CREDIT", amount: 11_900 }],
+        withholdings: [],
+        dueDate,
+      })
+    );
+
+    // La venta se completa de una vez (no hay descuento) -- el receivable ya se crea con este
+    // dueDate, requestedReceivableDueDate queda undefined porque no hace falta duplicarlo.
+    expect(saleRepo.created[0].receivable).toMatchObject({ dueDate });
+    expect(saleRepo.created[0].requestedReceivableDueDate).toBeUndefined();
+  });
+
+  it("saves the requested dueDate on the sale itself when the sale needs discount authorization, instead of losing it (regression: antes siempre caia en el default de 30 dias al autorizarse)", async () => {
+    const { useCase, saleRepo } = makeUseCase();
+    const dueDate = new Date("2026-10-15");
+
+    const sale = await withTenantContext(() =>
+      useCase.execute({
+        ...BASE_INPUT,
+        items: [{ productId: "product-1", quantity: 2, discountPercent: 5 }],
+        customerId: "customer-1",
+        payments: [{ method: "CREDIT", amount: 9_405 }],
+        withholdings: [],
+        dueDate,
+      })
+    );
+
+    expect(sale.status).toBe("PENDING_AUTHORIZATION");
+    // Sin receivable todavia -- se crea recien al autorizarse (ver authorize-discount.use-case.ts).
+    expect(saleRepo.created[0].receivable).toBeUndefined();
+    // Pero el dueDate pedido no se pierde: queda guardado para usarse en ese momento.
+    expect(saleRepo.created[0].requestedReceivableDueDate).toEqual(dueDate);
   });
 });
 

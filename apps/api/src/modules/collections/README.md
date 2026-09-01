@@ -42,14 +42,15 @@ probado dos veces), en vez de heredar suposiciones de codigo nunca ejercitado.
 
 1. **Generacion automatica de la cuenta por cobrar**: `CreateSaleUseCase`/`AuthorizeDiscountUseCase`
    (modulo `pos/sale`) llaman a `resolveReceivableInput(payments, customerId, dueDate)` -- suma los
-   pagos `CREDIT`, exige `customerId` si el monto es mayor a cero, resuelve `dueDate` (input nuevo
+   pagos `CREDIT`, exige `customerId` si el monto es mayor a cero, resuelve `dueDate` (input
    opcional en `POST /sales`, default +30 dias). Se crea dentro de la MISMA transaccion que
    `PrismaSaleRepository.create()` (igual que `AccountPayable` dentro de
    `PrismaPurchaseRepository.create()`) cuando la venta se completa de una vez; si la venta
-   necesito autorizacion de descuento, se crea recien al completarse en
-   `AuthorizeDiscountUseCase` (con vencimiento por defecto contado desde ESE momento, no desde la
-   venta original -- `Sale` no tiene columna `dueDate` propia para poder "guardar" el request
-   mientras espera).
+   necesito autorizacion de descuento, se crea recien al completarse en `AuthorizeDiscountUseCase`.
+   El `dueDate` pedido al vender (si lo hubo) se guarda mientras tanto en
+   `Sale.requestedReceivableDueDate` (`Sale` no tiene una columna `dueDate` operativa propia, solo
+   este campo para la solicitud pendiente) y se reusa ahi -- solo si el cajero no pidio ningun
+   plazo especifico cae en el default de 30 dias, contado desde el momento de la autorizacion.
 2. **Cancelacion de una venta a credito** (`CancelSaleUseCase`): si la `AccountReceivable` no
    tiene ningun pago registrado, se cancela junto con la venta; si ya tiene un pago (en persona o
    confirmado en linea), la cancelacion se **rechaza** (422) -- mismo criterio de guarda que

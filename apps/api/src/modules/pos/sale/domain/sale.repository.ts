@@ -52,6 +52,10 @@ export interface CreateSaleData {
   payments: SalePayment[];
   withholdings: ComputedSaleWithholding[];
   receivable?: ReceivableInput;
+  // Presente solo cuando la venta queda PENDING_AUTHORIZATION y el cajero pidio un plazo de
+  // credito especifico -- se persiste para que AuthorizeDiscountUseCase lo recupere al completar
+  // la venta, en vez de caer siempre en el default de 30 dias (ver resolve-receivable-input.ts).
+  requestedReceivableDueDate?: Date;
   // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- ver pos.prisma.
   currency: string;
   exchangeRate: number;
@@ -79,6 +83,7 @@ export interface SaleRecord {
   invoiceXmlUrl: string | null;
   createdAt: Date;
   accountReceivableId: string | null;
+  requestedReceivableDueDate: Date | null;
   // Multi-moneda informativa (item 33) -- foreignTotal es derivado (null si currency === "COP"),
   // nunca una segunda fuente de verdad. Ver prisma-sale.repository.ts.
   currency: string;

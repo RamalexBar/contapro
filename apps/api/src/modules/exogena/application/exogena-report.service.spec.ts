@@ -128,6 +128,7 @@ function makeSale(overrides: Partial<SaleRecord>): SaleRecord {
     invoiceXmlUrl: null,
     createdAt: new Date(2026, 5, 1),
     accountReceivableId: null,
+    requestedReceivableDueDate: null,
     currency: "COP",
     exchangeRate: 1,
     foreignTotal: null,

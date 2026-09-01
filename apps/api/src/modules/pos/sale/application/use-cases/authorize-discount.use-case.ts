@@ -94,10 +94,15 @@ export class AuthorizeDiscountUseCase {
 
       // AccountReceivable (item 31): esta venta no la creo al momento de CreateSaleUseCase
       // porque necesitaba autorizacion de descuento -- se crea recien ahora que se completa.
-      // Vencimiento por defecto (30 dias desde AHORA, no desde la venta original -- ver
-      // resolve-receivable-input.ts), el request original de creacion no se persiste mientras
-      // la venta espera autorizacion.
-      const receivable = resolveReceivableInput(updatedSale.payments, updatedSale.customerId ?? undefined, undefined);
+      // Si el cajero pidio un plazo especifico al vender, CreateSaleUseCase lo guardo en
+      // Sale.requestedReceivableDueDate (Sale no tiene su propia columna dueDate operativa, solo
+      // este campo de "solicitud pendiente") -- se usa aqui en vez de perderlo. Si no pidio nada,
+      // sigue cayendo en el default de 30 dias desde AHORA (ver resolve-receivable-input.ts).
+      const receivable = resolveReceivableInput(
+        updatedSale.payments,
+        updatedSale.customerId ?? undefined,
+        updatedSale.requestedReceivableDueDate ?? undefined
+      );
       if (receivable) {
         await this.accountReceivableRepo.create({ customerId: receivable.customerId, saleId: updatedSale.id, amount: receivable.amount, dueDate: receivable.dueDate });
       }

@@ -26,6 +26,7 @@ function toRecord(row: any, costTotal = 0): SaleRecord {
     invoiceXmlUrl: row.invoiceXmlUrl,
     createdAt: row.createdAt,
     accountReceivableId: row.accountReceivable?.id ?? null,
+    requestedReceivableDueDate: row.requestedReceivableDueDate ?? null,
     currency: row.currency,
     exchangeRate: Number(row.exchangeRate),
     foreignTotal: row.currency === "COP" ? null : round2(Number(row.total) / Number(row.exchangeRate)),
@@ -134,6 +135,7 @@ export class PrismaSaleRepository implements ISaleRepository {
           currency: data.currency,
           exchangeRate: data.exchangeRate,
           priceListId: data.priceListId,
+          requestedReceivableDueDate: data.requestedReceivableDueDate,
           items: {
             create: data.items.map((item) => ({
               productId: item.productId,

@@ -43,6 +43,7 @@ function makeSaleRecord(id: string): SaleRecord {
     cude: null,
     invoiceXmlUrl: null,
     accountReceivableId: null,
+    requestedReceivableDueDate: null,
     currency: "COP",
     exchangeRate: 1,
     foreignTotal: null,

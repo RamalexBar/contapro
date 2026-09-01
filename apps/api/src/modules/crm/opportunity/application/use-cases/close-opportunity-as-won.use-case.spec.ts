@@ -82,6 +82,7 @@ const FAKE_SALE: SaleRecord = {
   cude: null,
   invoiceXmlUrl: null,
   accountReceivableId: "ar-1",
+  requestedReceivableDueDate: null,
   currency: "COP",
   exchangeRate: 1,
   foreignTotal: null,
