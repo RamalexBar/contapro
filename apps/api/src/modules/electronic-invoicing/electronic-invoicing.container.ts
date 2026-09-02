@@ -14,6 +14,7 @@ import { NodeForgeCertificateLoader } from "./infrastructure/node-forge-certific
 import { XadesXmlSigner } from "./infrastructure/xades-xml-signer";
 import { DianSoapClient } from "./infrastructure/dian-soap-client";
 import { DianNominaSoapClient } from "./infrastructure/dian-nomina-soap-client";
+import { MatiasInvoicingClient } from "./infrastructure/matias-invoicing-client";
 import { GenerateElectronicInvoiceUseCase } from "./application/use-cases/generate-electronic-invoice.use-case";
 import { GenerateElectronicCreditNoteUseCase } from "./application/use-cases/generate-electronic-credit-note.use-case";
 import { GenerateElectronicDebitNoteUseCase } from "./application/use-cases/generate-electronic-debit-note.use-case";
@@ -32,6 +33,8 @@ import { ResubmitElectronicDebitNoteUseCase } from "./application/use-cases/resu
 import { ResubmitElectronicSupportDocumentUseCase } from "./application/use-cases/resubmit-electronic-support-document.use-case";
 import { ResubmitElectronicPayrollUseCase } from "./application/use-cases/resubmit-electronic-payroll.use-case";
 import { PollDianSubmissionsUseCase } from "./application/use-cases/poll-dian-submissions.use-case";
+import { SetElectronicInvoicingProviderUseCase } from "./application/use-cases/set-electronic-invoicing-provider.use-case";
+import { GetElectronicInvoicingProviderSettingsUseCase } from "./application/use-cases/get-electronic-invoicing-provider-settings.use-case";
 import { SendInvoiceWhatsAppUseCase } from "./application/use-cases/send-invoice-whatsapp.use-case";
 import { PrismaSaleRepository } from "../pos/sale/infrastructure/prisma-sale.repository";
 import { whatsAppSender, whatsAppDeliveryLogRepo } from "../whatsapp/whatsapp.container";
@@ -57,11 +60,24 @@ const dianClient = new DianSoapClient();
 // dian-nomina-soap-client.ts. employeeRepo si se importa directo de employees.container.ts
 // (sin riesgo de ciclo: ese container no importa nada de aqui, a diferencia de suppliers).
 const dianNominaClient = new DianNominaSoapClient();
+// Proveedor tecnologico DIAN alternativo (ver README, seccion "Proveedor tecnologico (MATIAS
+// API)") -- solo se usa cuando Company.electronicInvoicingProvider === "MATIAS", ver
+// GenerateElectronicInvoiceUseCase/ResubmitElectronicInvoiceUseCase.
+const thirdPartyInvoicingClient = new MatiasInvoicingClient();
+const setProviderUseCase = new SetElectronicInvoicingProviderUseCase(companyReader, auditService);
+const getProviderSettingsUseCase = new GetElectronicInvoicingProviderSettingsUseCase(companyReader);
 
 const createResolutionUseCase = new CreateNumberingResolutionUseCase(numberingResolutionRepo, auditService);
 const listResolutionsUseCase = new ListNumberingResolutionsUseCase(numberingResolutionRepo);
 const getInvoiceUseCase = new GetElectronicInvoiceUseCase(electronicInvoiceRepo);
-const resubmitUseCase = new ResubmitElectronicInvoiceUseCase(electronicInvoiceRepo, certificateLoader, xmlSigner, auditService);
+const resubmitUseCase = new ResubmitElectronicInvoiceUseCase(
+  electronicInvoiceRepo,
+  certificateLoader,
+  xmlSigner,
+  auditService,
+  companyReader,
+  thirdPartyInvoicingClient
+);
 const getCreditNoteUseCase = new GetElectronicCreditNoteUseCase(electronicCreditNoteRepo);
 const resubmitCreditNoteUseCase = new ResubmitElectronicCreditNoteUseCase(
   electronicCreditNoteRepo,
@@ -120,7 +136,9 @@ export const electronicInvoicingController = new ElectronicInvoicingController(
   resubmitPayrollUseCase,
   sendInvoiceWhatsAppUseCase,
   saleRepoForWhatsApp,
-  whatsAppDeliveryLogRepo
+  whatsAppDeliveryLogRepo,
+  setProviderUseCase,
+  getProviderSettingsUseCase
 );
 
 /** Usado por sale.container.ts para generar el CUFE/XML local (y firmar si hay certificado
@@ -131,7 +149,8 @@ export const generateElectronicInvoiceUseCase = new GenerateElectronicInvoiceUse
   customerRepo,
   auditService,
   certificateLoader,
-  xmlSigner
+  xmlSigner,
+  thirdPartyInvoicingClient
 );
 
 /** Usado por credit-note.container.ts para generar el CUDE/XML local (y firmar si hay

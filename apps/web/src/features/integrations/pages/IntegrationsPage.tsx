@@ -1,10 +1,11 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
+import { Select } from "../../../components/ui/Select";
 import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
@@ -15,10 +16,12 @@ import {
   createWebhookSubscription,
   deactivateApiKey,
   deactivateWebhookSubscription,
+  getDianProviderSettings,
   listApiKeys,
   listWebhookDeliveries,
   listWebhookSubscriptions,
   resendWebhookDelivery,
+  setDianProviderSettings,
   type CreateApiKeyResult,
   type CreateWebhookSubscriptionResult,
 } from "../api/integrations.api";
@@ -350,7 +353,113 @@ function WebhooksSection() {
   );
 }
 
-type Section = "api-keys" | "webhooks";
+function DianProviderSection() {
+  const queryClient = useQueryClient();
+  const canManage = useAuthStore((s) => s.hasPermission("electronic-invoicing.manage"));
+  const { data, isLoading } = useQuery({ queryKey: ["dian-provider-settings"], queryFn: getDianProviderSettings });
+
+  const [provider, setProvider] = useState<"DIRECT" | "MATIAS">("DIRECT");
+  const [apiToken, setApiToken] = useState("");
+  const [replaceToken, setReplaceToken] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Sincroniza el select con lo que devuelve el servidor la primera vez que carga.
+  useEffect(() => {
+    if (data?.provider) setProvider(data.provider);
+  }, [data?.provider]);
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      setDianProviderSettings({
+        provider,
+        apiToken: provider === "MATIAS" && (replaceToken || !data?.hasMatiasToken) ? apiToken : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dian-provider-settings"] });
+      setApiToken("");
+      setReplaceToken(false);
+      setSaved(true);
+    },
+  });
+
+  if (isLoading) return <Spinner />;
+
+  const needsToken = provider === "MATIAS" && (replaceToken || !data?.hasMatiasToken);
+
+  return (
+    <Card title="Proveedor tecnologico DIAN (facturas de venta)">
+      <p className="mb-4 text-sm text-slate-500">
+        Por defecto (<strong>Directo</strong>) Contapro genera el CUFE/XML localmente y los envia a
+        la DIAN — camino sin verificar contra su servicio real todavia. Con <strong>MATIAS</strong>{" "}
+        un proveedor tecnologico se encarga de generar, firmar y transmitir la factura — camino
+        verificado contra su entorno de pruebas.
+      </p>
+
+      {!canManage ? (
+        <p className="text-sm text-slate-500">
+          Proveedor actual: <Badge tone={data?.provider === "MATIAS" ? "success" : "neutral"}>{data?.provider}</Badge>
+        </p>
+      ) : (
+        <form
+          className="max-w-md space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveMutation.mutate();
+          }}
+        >
+          <Select label="Proveedor" value={provider} onChange={(e) => setProvider(e.target.value as "DIRECT" | "MATIAS")}>
+            <option value="DIRECT">Directo (envio a la DIAN, default)</option>
+            <option value="MATIAS">MATIAS API</option>
+          </Select>
+
+          {provider === "MATIAS" && (
+            <>
+              {data?.hasMatiasToken && !replaceToken ? (
+                <Alert tone="info">
+                  Ya hay un token de MATIAS cargado.{" "}
+                  <button type="button" className="underline" onClick={() => setReplaceToken(true)}>
+                    Reemplazarlo
+                  </button>
+                </Alert>
+              ) : (
+                <Input
+                  type="password"
+                  placeholder="Token de MATIAS (Bearer)"
+                  value={apiToken}
+                  onChange={(e) => setApiToken(e.target.value)}
+                  required={needsToken}
+                />
+              )}
+              {!data?.hasMatiasToken && (
+                <p className="text-xs text-slate-500">
+                  Se pide el token a MATIAS al crear la cuenta de la empresa en su plataforma
+                  (sandbox: sandbox-auth.matias-api.com). Se guarda cifrado, no se vuelve a mostrar.
+                </p>
+              )}
+            </>
+          )}
+
+          <Button type="submit" loading={saveMutation.isPending} disabled={needsToken && !apiToken}>
+            Guardar
+          </Button>
+
+          {saved && !saveMutation.isPending && (
+            <Alert tone="info" className="mt-2">
+              Guardado.
+            </Alert>
+          )}
+          {saveMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(saveMutation.error as Error).message}
+            </Alert>
+          )}
+        </form>
+      )}
+    </Card>
+  );
+}
+
+type Section = "api-keys" | "webhooks" | "dian-provider";
 
 export function IntegrationsPage() {
   const [section, setSection] = useState<Section>("api-keys");
@@ -371,10 +480,14 @@ export function IntegrationsPage() {
         <Button size="sm" variant={section === "webhooks" ? "primary" : "secondary"} onClick={() => setSection("webhooks")}>
           Webhooks
         </Button>
+        <Button size="sm" variant={section === "dian-provider" ? "primary" : "secondary"} onClick={() => setSection("dian-provider")}>
+          Facturacion electronica (DIAN)
+        </Button>
       </div>
 
       {section === "api-keys" && <ApiKeysSection />}
       {section === "webhooks" && <WebhooksSection />}
+      {section === "dian-provider" && <DianProviderSection />}
     </AppLayout>
   );
 }

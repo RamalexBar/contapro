@@ -2,6 +2,7 @@ import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { ConflictError } from "../../../shared/errors/app-error";
 import type {
+  ApplyThirdPartyInvoiceResultInput,
   ElectronicInvoiceRecord,
   ElectronicInvoiceWithXml,
   GenerateElectronicInvoiceData,
@@ -24,7 +25,7 @@ function toRecord(row: {
   issueDate: Date;
   status: string;
   createdAt: Date;
-}): ElectronicInvoiceRecord {
+}, resolutionNumber: string): ElectronicInvoiceRecord {
   return {
     id: row.id,
     saleId: row.saleId,
@@ -32,6 +33,7 @@ function toRecord(row: {
     prefix: row.prefix,
     number: row.number,
     fullNumber: row.fullNumber,
+    resolutionNumber,
     cufe: row.cufe,
     issueDate: row.issueDate,
     status: row.status,
@@ -99,17 +101,17 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
         data: { cufe, invoiceXmlUrl: `/api/electronic-invoicing/sales/${data.saleId}/xml` },
       });
 
-      return invoice;
+      return { invoice, resolutionNumber: resolution.resolutionNumber };
     });
 
-    return toRecord(row);
+    return toRecord(row.invoice, row.resolutionNumber);
   }
 
   async findBySaleId(saleId: string): Promise<ElectronicInvoiceWithXml | null> {
-    const row = await prisma.electronicInvoice.findFirst({ where: { saleId } });
+    const row = await prisma.electronicInvoice.findFirst({ where: { saleId }, include: { numberingResolution: true } });
     if (!row) return null;
     return {
-      ...toRecord(row),
+      ...toRecord(row, row.numberingResolution.resolutionNumber),
       xmlContent: row.xmlContent,
       signedXmlContent: row.signedXmlContent,
       dianTrackingId: row.dianTrackingId,
@@ -150,6 +152,43 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
     await prisma.electronicInvoice.updateMany({
       where: { id, companyId },
       data: { status: "REJECTED", dianResponseXml: responseXml, rejectionReason: reason, respondedAt: new Date() },
+    });
+  }
+
+  async applyThirdPartySubmissionResult(id: string, result: ApplyThirdPartyInvoiceResultInput): Promise<void> {
+    const companyId = getTenantContext().companyId;
+    const now = new Date();
+    if (result.status === "ACCEPTED") {
+      await prisma.electronicInvoice.updateMany({
+        where: { id, companyId },
+        data: {
+          status: "ACCEPTED",
+          cufe: result.cufe,
+          xmlContent: result.signedXmlContent,
+          signedXmlContent: result.signedXmlContent,
+          dianResponseXml: result.rawResponse,
+          submittedAt: now,
+          respondedAt: now,
+        },
+      });
+      // El CUFE local generado en claimNumberAndGenerate era provisional -- Sale.cufe debe
+      // reflejar el CUFE real que autorizo la DIAN via el proveedor (ver aviso en el use-case).
+      const invoice = await prisma.electronicInvoice.findFirst({ where: { id, companyId }, select: { saleId: true } });
+      if (invoice) {
+        await prisma.sale.updateMany({ where: { id: invoice.saleId, companyId }, data: { cufe: result.cufe } });
+      }
+      return;
+    }
+
+    await prisma.electronicInvoice.updateMany({
+      where: { id, companyId },
+      data: {
+        status: "REJECTED",
+        dianResponseXml: result.rawResponse,
+        rejectionReason: result.rejectionReason ?? "Rechazado por el proveedor (sin motivo especificado)",
+        submittedAt: now,
+        respondedAt: now,
+      },
     });
   }
 

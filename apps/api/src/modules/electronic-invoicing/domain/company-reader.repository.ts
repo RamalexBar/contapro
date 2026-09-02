@@ -3,6 +3,10 @@ export interface CompanyRecord {
   nit: string;
   legalName: string;
   name: string;
+  /** Ver modules/electronic-invoicing/README.md, seccion "Proveedor tecnologico (MATIAS API)". */
+  electronicInvoicingProvider: "DIRECT" | "MATIAS";
+  /** Cifrado (credential-cipher.ts) -- descifrar solo justo antes de llamar al proveedor. */
+  matiasApiTokenEncrypted: string | null;
 }
 
 /**
@@ -12,4 +16,8 @@ export interface CompanyRecord {
  */
 export interface ICompanyReader {
   findByIdOrThrow(id: string): Promise<CompanyRecord>;
+  /** Ver README, seccion "Proveedor tecnologico (MATIAS API)" -- endpoint
+   * PUT /electronic-invoicing/provider-settings. encryptedToken ya viene cifrado (ver
+   * shared/crypto/credential-cipher.ts), este metodo no cifra nada por su cuenta. */
+  updateElectronicInvoicingProvider(companyId: string, provider: "DIRECT" | "MATIAS", encryptedToken: string | null): Promise<void>;
 }

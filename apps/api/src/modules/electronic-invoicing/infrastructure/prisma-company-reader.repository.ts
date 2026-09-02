@@ -11,6 +11,20 @@ export class PrismaCompanyReaderRepository implements ICompanyReader {
   async findByIdOrThrow(id: string): Promise<CompanyRecord> {
     const row = await basePrisma.company.findFirst({ where: { id } });
     if (!row) throw new NotFoundError("Company", id);
-    return { id: row.id, nit: row.nit, legalName: row.legalName, name: row.name };
+    return {
+      id: row.id,
+      nit: row.nit,
+      legalName: row.legalName,
+      name: row.name,
+      electronicInvoicingProvider: row.electronicInvoicingProvider,
+      matiasApiTokenEncrypted: row.matiasApiTokenEncrypted,
+    };
+  }
+
+  async updateElectronicInvoicingProvider(companyId: string, provider: "DIRECT" | "MATIAS", encryptedToken: string | null): Promise<void> {
+    await basePrisma.company.update({
+      where: { id: companyId },
+      data: { electronicInvoicingProvider: provider, matiasApiTokenEncrypted: encryptedToken },
+    });
   }
 }

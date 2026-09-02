@@ -13,7 +13,10 @@ credenciales de habilitacion reales, ver "Limitaciones e items sin verificar"). 
 electronica es, con diferencia, la parte MENOS verificada de todo el modulo** — esquema XML propio
 (no UBL) sin contrastar contra el Anexo Tecnico, servicio SOAP distinto al de facturacion sin
 confirmar ni en nombre, ver punto 12 y las limitaciones al final. El documento soporte (compras)
-es la segunda parte menos verificada, ver mas abajo.
+es la segunda parte menos verificada, ver mas abajo. **Facturas de venta** tienen ademas un
+segundo camino, alternativo al envio directo de arriba: via el proveedor tecnologico MATIAS API
+(`Company.electronicInvoicingProvider = "MATIAS"`), **si verificado** contra su sandbox real
+(punto 14) — el unico camino de envio de este modulo que no lleva el aviso "sin verificar".
 
 ## Modelos (`packages/database/prisma/schema/electronic-invoicing.prisma`)
 
@@ -170,6 +173,34 @@ es la segunda parte menos verificada, ver mas abajo.
     "HABILITACION - NO VALIDO COMO DOCUMENTO FISCAL". **Ver limitaciones**: el formato del QR y el
     layout en si no estan validados contra el Anexo Tecnico DIAN vigente, y el documento soporte
     no tiene desglose de lineas (hereda el hueco de su XML, ver punto 8).
+14. **Proveedor tecnologico (MATIAS API)** — alternativa al envio directo a la DIAN (puntos 4-5
+    de arriba), solo para **facturas de venta** por ahora. `Company.electronicInvoicingProvider`
+    (`DIRECT` default | `MATIAS`) decide el camino en `GenerateElectronicInvoiceUseCase` /
+    `ResubmitElectronicInvoiceUseCase`. A diferencia del envio directo, MATIAS recibe datos
+    estructurados en JSON (no XML ya firmado) y el mismo genera CUFE/XML/firma XAdES y transmite
+    a la DIAN, todo en una llamada sincrona (sin poller) — puerto
+    `domain/third-party-invoicing-client.ts`, implementacion real y **verificada contra su
+    sandbox** (no especulativa, a diferencia del resto del modulo) en
+    `infrastructure/matias-invoicing-client.ts`. El CUFE/XML generados localmente en
+    `claimNumberAndGenerate` son solo un placeholder rapido (evita mantener una transaccion de
+    Postgres abierta durante la llamada de red) — `IElectronicInvoiceRepository.
+    applyThirdPartySubmissionResult` los sobrescribe con los reales de MATIAS. Cada empresa carga
+    su propio token via `PUT /electronic-invoicing/provider-settings` (permiso
+    `electronic-invoicing.manage`), cifrado en reposo (`shared/crypto/credential-cipher.ts`,
+    AES-256-GCM, clave maestra `CREDENTIALS_ENCRYPTION_KEY`) — nunca un token global en `env`,
+    porque cada empresa cliente de Contapro necesita su propia cuenta MATIAS bajo su propio NIT.
+    `Customer` gano 7 campos opcionales (`dianIdentityDocumentId`/`dianTypeOrganizationId`/
+    `dianTaxRegimeId`/`dianTaxLevelId`/`dianCountryId`/`dianCityId`/`dianPostalCode`) con los
+    catalogos que MATIAS exige y Contapro no capturaba — deliberadamente sin mapeo automatico
+    desde `documentType` (solo se confirmo el catalogo real para "CC"), el contador de cada
+    empresa los completa con el valor real de MATIAS. Sin ellos, la factura queda `REJECTED` con
+    el motivo real de MATIAS (mismo patron no bloqueante del resto del modulo). Notas
+    credito/debito, documento soporte y nomina electronica **no** usan MATIAS todavia — solo se
+    probo `POST /invoice`, el resto de sus endpoints (`/notes/credit`, `/ds/document`,
+    `/ep/payroll`, etc.) queda documentado por MATIAS pero sin verificar en este codebase.
+    Plemsi (otro proveedor evaluado) queda fuera hasta tener su formato real de factura
+    confirmado — solo se conoce su URL de sandbox (`https://pruebas.plemsi.com`) y su esquema de
+    autenticacion Bearer.
 
 ## Como probar localmente sin credenciales DIAN
 

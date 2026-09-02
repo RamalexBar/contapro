@@ -10,11 +10,19 @@ function toRecord(row: {
   name: string;
   email: string | null;
   phone: string | null;
+  address: string | null;
   creditLimit: unknown;
   currentBalance: unknown;
   isActive: boolean;
   priceListId: string | null;
   municipalityCode: string | null;
+  dianIdentityDocumentId: string | null;
+  dianTypeOrganizationId: string | null;
+  dianTaxRegimeId: string | null;
+  dianTaxLevelId: string | null;
+  dianCountryId: string | null;
+  dianCityId: string | null;
+  dianPostalCode: string | null;
 }): CustomerRecord {
   return {
     id: row.id,
@@ -23,11 +31,19 @@ function toRecord(row: {
     name: row.name,
     email: row.email,
     phone: row.phone,
+    address: row.address,
     creditLimit: Number(row.creditLimit),
     currentBalance: Number(row.currentBalance),
     isActive: row.isActive,
     priceListId: row.priceListId,
     municipalityCode: row.municipalityCode,
+    dianIdentityDocumentId: row.dianIdentityDocumentId,
+    dianTypeOrganizationId: row.dianTypeOrganizationId,
+    dianTaxRegimeId: row.dianTaxRegimeId,
+    dianTaxLevelId: row.dianTaxLevelId,
+    dianCountryId: row.dianCountryId,
+    dianCityId: row.dianCityId,
+    dianPostalCode: row.dianPostalCode,
   };
 }
 
@@ -45,6 +61,13 @@ export class PrismaCustomerRepository implements ICustomerRepository {
         creditLimit: data.creditLimit ?? 0,
         priceListId: data.priceListId,
         municipalityCode: data.municipalityCode,
+        dianIdentityDocumentId: data.dianIdentityDocumentId,
+        dianTypeOrganizationId: data.dianTypeOrganizationId,
+        dianTaxRegimeId: data.dianTaxRegimeId,
+        dianTaxLevelId: data.dianTaxLevelId,
+        dianCountryId: data.dianCountryId,
+        dianCityId: data.dianCityId,
+        dianPostalCode: data.dianPostalCode,
       },
     });
     return toRecord(row);

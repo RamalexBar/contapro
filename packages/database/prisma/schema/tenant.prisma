@@ -1,5 +1,16 @@
 // Multiempresa / Multisucursal / Suscripciones SaaS
 
+/// Ver modules/electronic-invoicing/README.md, seccion "Proveedor tecnologico (MATIAS API)".
+/// DIRECT = envio directo a la DIAN existente (dian-soap-client.ts, default, sin cambios de
+/// conducta). MATIAS = via proveedor tecnologico (matias-invoicing-client.ts), solo facturas de
+/// venta por ahora (ver README). Un solo proveedor real implementado; no se modela como tabla
+/// generica "por si acaso" se suma Plemsi despues -- se decide si vale la pena esa
+/// generalizacion cuando exista una segunda implementacion real que comparar.
+enum DianProviderType {
+  DIRECT
+  MATIAS
+}
+
 model Company {
   id        String   @id @default(uuid())
   name      String
@@ -18,6 +29,13 @@ model Company {
   municipalityCode          String? // codigo DANE del lugar de trabajo por defecto
   payrollElectronicSequence Int     @default(0)
   payrollElectronicPrefix   String?
+  // ---- Proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md) ----
+  // matiasApiTokenEncrypted: el PAT de MATIAS de ESTA empresa, cifrado (credential-cipher.ts) --
+  // nunca en texto plano en la base ni en env, porque cada empresa cliente de Contapro tiene su
+  // propia cuenta/NIT en MATIAS. Cargado una sola vez via PUT
+  // /electronic-invoicing/provider-settings; no se puede volver a leer en texto plano despues.
+  electronicInvoicingProvider DianProviderType @default(DIRECT)
+  matiasApiTokenEncrypted     String?
 
   branches      Branch[]
   users         User[]

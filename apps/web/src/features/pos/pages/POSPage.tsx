@@ -7,6 +7,7 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Alert } from "../../../components/ui/Alert";
+import { ApiError } from "../../../lib/api-client";
 import { listProducts } from "../../inventory/api/product.api";
 import { getActiveSession, listCashRegisters } from "../../cash/api/cash.api";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
@@ -519,6 +520,14 @@ export function POSPage() {
               {paymentMethod === "CREDIT" ? "Vender a credito" : "Cobrar"}
             </Button>
           </div>
+
+          {saleMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(saleMutation.error as ApiError).details
+                ? JSON.stringify((saleMutation.error as ApiError).details)
+                : (saleMutation.error as Error).message}
+            </Alert>
+          )}
 
           {sale?.status === "COMPLETED" && (
             <div className="mt-3">

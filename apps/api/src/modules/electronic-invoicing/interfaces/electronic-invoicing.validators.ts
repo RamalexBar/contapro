@@ -10,3 +10,9 @@ export const createNumberingResolutionSchema = z.object({
   validFrom: z.coerce.date(),
   validUntil: z.coerce.date(),
 });
+
+// Ver README, seccion "Proveedor tecnologico (MATIAS API)".
+export const setElectronicInvoicingProviderSchema = z.object({
+  provider: z.enum(["DIRECT", "MATIAS"]),
+  apiToken: z.string().min(1).optional(),
+});

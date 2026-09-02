@@ -11,6 +11,8 @@ import type { GetElectronicSupportDocumentUseCase } from "../application/use-cas
 import type { ResubmitElectronicSupportDocumentUseCase } from "../application/use-cases/resubmit-electronic-support-document.use-case";
 import type { GetElectronicPayrollUseCase } from "../application/use-cases/get-electronic-payroll.use-case";
 import type { ResubmitElectronicPayrollUseCase } from "../application/use-cases/resubmit-electronic-payroll.use-case";
+import type { SetElectronicInvoicingProviderUseCase } from "../application/use-cases/set-electronic-invoicing-provider.use-case";
+import type { GetElectronicInvoicingProviderSettingsUseCase } from "../application/use-cases/get-electronic-invoicing-provider-settings.use-case";
 import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSupportDocumentToRideData } from "../application/ride-data-mapper";
 import { renderRidePdf, renderThermalReceiptPdf } from "../infrastructure/pdfkit-ride-renderer";
 import type { RideDocumentData } from "../application/ride-data-mapper";
@@ -18,7 +20,7 @@ import type { SendInvoiceWhatsAppUseCase } from "../application/use-cases/send-i
 import type { ISaleRepository } from "../../pos/sale/domain/sale.repository";
 import type { IWhatsAppDeliveryLogRepository } from "../../whatsapp/domain/whatsapp-delivery-log.repository";
 import { getTenantContext } from "../../../shared/context/request-context";
-import { createNumberingResolutionSchema } from "./electronic-invoicing.validators";
+import { createNumberingResolutionSchema, setElectronicInvoicingProviderSchema } from "./electronic-invoicing.validators";
 
 export class ElectronicInvoicingController {
   constructor(
@@ -36,8 +38,28 @@ export class ElectronicInvoicingController {
     private readonly resubmitPayrollUseCase: ResubmitElectronicPayrollUseCase,
     private readonly sendInvoiceWhatsAppUseCase: SendInvoiceWhatsAppUseCase,
     private readonly saleRepo: ISaleRepository,
-    private readonly whatsAppDeliveryLogRepo: IWhatsAppDeliveryLogRepository
+    private readonly whatsAppDeliveryLogRepo: IWhatsAppDeliveryLogRepository,
+    private readonly setProviderUseCase: SetElectronicInvoicingProviderUseCase,
+    private readonly getProviderSettingsUseCase: GetElectronicInvoicingProviderSettingsUseCase
   ) {}
+
+  getProviderSettings = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.getProviderSettingsUseCase.execute());
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setProviderSettings = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = setElectronicInvoicingProviderSchema.parse(req.body);
+      await this.setProviderUseCase.execute(body);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
 
   createResolution = async (req: Request, res: Response, next: NextFunction) => {
     try {

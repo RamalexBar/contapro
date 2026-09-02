@@ -73,6 +73,21 @@ const envSchema = z.object({
   // de la imagen/PDF que el propio usuario sube -- el registro de la compra sigue siendo manual
   // (POST /purchases), esto solo prellena el formulario.
   ANTHROPIC_API_KEY: z.string().default(""),
+
+  // ---- Proveedor tecnologico DIAN alternativo al envio directo (ver README del modulo,
+  // seccion "Proveedor tecnologico (MATIAS API)") ----
+  // El token de cada empresa emisora NO va aqui -- es un dato por Company (Company.electronicInvoicingProvider
+  // / matiasApiTokenEncrypted, cifrado con CREDENTIALS_ENCRYPTION_KEY), porque Contapro es
+  // multiempresa y cada empresa cliente necesita su propia cuenta/token de MATIAS (o Plemsi mas
+  // adelante), nunca uno global compartido entre empresas distintas.
+  MATIAS_BASE_URL: z.string().default("https://sandbox-api.matias-api.com/api/ubl2.1"),
+  // Clave maestra (32 bytes, hex o base64) para cifrar/descifrar los tokens de proveedor por
+  // empresa -- ej.: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))".
+  // Vacio por defecto = cargar/usar un token de proveedor falla con mensaje claro (mismo criterio
+  // que el resto de integraciones opcionales de arriba); a diferencia de JWT_ACCESS_SECRET esto
+  // NO es requerido al arrancar porque romperia el boot de cualquier entorno existente que todavia
+  // no usa proveedores externos.
+  CREDENTIALS_ENCRYPTION_KEY: z.string().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -12,6 +12,14 @@ export const createCustomerSchema = z.object({
   priceListId: z.string().uuid().optional(),
   // Item 37 de docs/ALCANCE.md (informacion exogena DIAN): codigo DANE de municipio.
   municipalityCode: z.string().optional(),
+  // Catalogos del proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md).
+  dianIdentityDocumentId: z.string().optional(),
+  dianTypeOrganizationId: z.string().optional(),
+  dianTaxRegimeId: z.string().optional(),
+  dianTaxLevelId: z.string().optional(),
+  dianCountryId: z.string().optional(),
+  dianCityId: z.string().optional(),
+  dianPostalCode: z.string().optional(),
 });
 
 export const updateCustomerPriceListSchema = z.object({

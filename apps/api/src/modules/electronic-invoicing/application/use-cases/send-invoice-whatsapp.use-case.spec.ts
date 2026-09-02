@@ -36,6 +36,14 @@ const CUSTOMER_WITH_PHONE: CustomerRecord = {
   isActive: true,
   priceListId: null,
   municipalityCode: null,
+  address: null,
+  dianIdentityDocumentId: null,
+  dianTypeOrganizationId: null,
+  dianTaxRegimeId: null,
+  dianTaxLevelId: null,
+  dianCountryId: null,
+  dianCityId: null,
+  dianPostalCode: null,
 };
 const CUSTOMER_NO_PHONE: CustomerRecord = { ...CUSTOMER_WITH_PHONE, id: "customer-2", phone: null };
 

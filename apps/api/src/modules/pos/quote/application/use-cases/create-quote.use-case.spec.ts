@@ -17,6 +17,14 @@ const CUSTOMER_NO_LIST: CustomerRecord = {
   isActive: true,
   priceListId: null,
   municipalityCode: null,
+  address: null,
+  dianIdentityDocumentId: null,
+  dianTypeOrganizationId: null,
+  dianTaxRegimeId: null,
+  dianTaxLevelId: null,
+  dianCountryId: null,
+  dianCityId: null,
+  dianPostalCode: null,
 };
 
 const CUSTOMER_WITH_LIST: CustomerRecord = { ...CUSTOMER_NO_LIST, id: "customer-2", priceListId: "pl-wholesale" };

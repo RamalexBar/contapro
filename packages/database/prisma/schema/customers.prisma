@@ -20,6 +20,22 @@ model Customer {
   // Item 37 de docs/ALCANCE.md (informacion exogena DIAN): codigo DANE de municipio del tercero,
   // mismo campo/criterio que Company.municipalityCode y Supplier.municipalityCode. Nullable.
   municipalityCode String?
+  // ---- Catalogos del proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md,
+  // seccion "Proveedor tecnologico (MATIAS API)") -- NO son codigos DIAN oficiales, son los ids
+  // internos del catalogo de MATIAS (persona natural/juridica, regimen IVA, nivel de tributacion,
+  // pais/ciudad, tipo de documento de identidad). Deliberadamente sin mapear/adivinar desde
+  // documentType: el catalogo real de MATIAS solo se confirmo para "CC" (identityDocumentId "1"),
+  // el resto se deja para que el contador de cada empresa lo complete con el valor real de
+  // MATIAS -- inventar un mapeo aqui arriesgaria enviar datos tributarios incorrectos a la DIAN.
+  // Todos opcionales: sin ellos, facturar via proveedor devuelve REJECTED con el motivo real que
+  // de MATIAS (mismo criterio no bloqueante que el resto del modulo), la venta se completa igual.
+  dianIdentityDocumentId String?
+  dianTypeOrganizationId String?
+  dianTaxRegimeId        String?
+  dianTaxLevelId         String?
+  dianCountryId          String?
+  dianCityId             String?
+  dianPostalCode         String?
   createdAt      DateTime @default(now())
 
   creditMovements CustomerCreditMovement[]

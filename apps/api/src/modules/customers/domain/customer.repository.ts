@@ -11,6 +11,16 @@ export interface CreateCustomerData {
   priceListId?: string;
   // Item 37 de docs/ALCANCE.md (informacion exogena DIAN): codigo DANE de municipio del tercero.
   municipalityCode?: string;
+  // Catalogos del proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md,
+  // seccion "Proveedor tecnologico (MATIAS API)") -- opcionales, solo necesarios para facturar
+  // este cliente via proveedor externo.
+  dianIdentityDocumentId?: string;
+  dianTypeOrganizationId?: string;
+  dianTaxRegimeId?: string;
+  dianTaxLevelId?: string;
+  dianCountryId?: string;
+  dianCityId?: string;
+  dianPostalCode?: string;
 }
 
 export interface CustomerRecord {
@@ -25,11 +35,19 @@ export interface CustomerRecord {
   // Item 41 de docs/ALCANCE.md (envio de documentos por WhatsApp): se guarda desde el alta pero
   // hasta este item ningun caso de uso lo leia -- mismo patron que email arriba.
   phone: string | null;
+  address: string | null;
   creditLimit: number;
   currentBalance: number;
   isActive: boolean;
   priceListId: string | null;
   municipalityCode: string | null;
+  dianIdentityDocumentId: string | null;
+  dianTypeOrganizationId: string | null;
+  dianTaxRegimeId: string | null;
+  dianTaxLevelId: string | null;
+  dianCountryId: string | null;
+  dianCityId: string | null;
+  dianPostalCode: string | null;
 }
 
 export interface ICustomerRepository {

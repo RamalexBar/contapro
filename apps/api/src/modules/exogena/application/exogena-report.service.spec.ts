@@ -44,6 +44,14 @@ const CUSTOMER: CustomerRecord = {
   isActive: true,
   priceListId: null,
   municipalityCode: "05001",
+  address: null,
+  dianIdentityDocumentId: null,
+  dianTypeOrganizationId: null,
+  dianTaxRegimeId: null,
+  dianTaxLevelId: null,
+  dianCountryId: null,
+  dianCityId: null,
+  dianPostalCode: null,
 };
 
 class FakeCustomerRepository implements Partial<ICustomerRepository> {

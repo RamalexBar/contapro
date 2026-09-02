@@ -32,6 +32,7 @@ describe("mapInvoiceToRideData", () => {
     prefix: "SETP",
     number: 1,
     fullNumber: "SETP990000001",
+    resolutionNumber: "18760000001",
     cufe: "a".repeat(96),
     issueDate,
     status: "PENDING_SUBMISSION",

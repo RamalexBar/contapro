@@ -1,10 +1,12 @@
 import { env } from "../../../../config/env";
 import { getTenantContext } from "../../../../shared/context/request-context";
+import { decryptCredential } from "../../../../shared/crypto/credential-cipher";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { ICustomerRepository } from "../../../customers/domain/customer.repository";
 import type { ICertificateLoader } from "../../domain/certificate-loader";
 import type { ICompanyReader } from "../../domain/company-reader.repository";
 import type { ElectronicInvoiceRecord, IElectronicInvoiceRepository } from "../../domain/electronic-invoice.repository";
+import type { IThirdPartyInvoicingClient } from "../../domain/third-party-invoicing-client";
 import type { IXmlSigner } from "../../domain/xml-signer";
 import { DIAN_GENERIC_FINAL_CONSUMER } from "../constants";
 import { generateCufe } from "../cufe-generator";
@@ -48,7 +50,8 @@ export class GenerateElectronicInvoiceUseCase {
     private readonly customerRepo: ICustomerRepository,
     private readonly audit: AuditService,
     private readonly certificateLoader: ICertificateLoader,
-    private readonly xmlSigner: IXmlSigner
+    private readonly xmlSigner: IXmlSigner,
+    private readonly thirdPartyClient: IThirdPartyInvoicingClient
   ) {}
 
   async execute(input: GenerateElectronicInvoiceInput): Promise<ElectronicInvoiceRecord> {
@@ -130,7 +133,13 @@ export class GenerateElectronicInvoiceUseCase {
       metadata: { fullNumber: invoice.fullNumber, cufe: invoice.cufe },
     });
 
-    if (env.DIAN_CERTIFICATE_PATH) {
+    if (company.electronicInvoicingProvider === "MATIAS") {
+      // Deliberadamente FUERA de la transaccion de claimNumberAndGenerate (ver aviso en
+      // domain/third-party-invoicing-client.ts): una llamada de red ahi dejaria la transaccion de
+      // Postgres abierta durante todo el round-trip. El CUFE/xmlContent locales de arriba son
+      // provisionales -- applyThirdPartySubmissionResult los sobrescribe con los reales de MATIAS.
+      await this.submitViaThirdPartyProvider(invoice, input, buyer, customer, company.matiasApiTokenEncrypted);
+    } else if (env.DIAN_CERTIFICATE_PATH) {
       // No bloquea: si falla, la factura queda GENERATED (sin firmar), recuperable via el
       // endpoint de reenvio manual una vez se corrija el problema (ej. contraseña incorrecta).
       await signAndQueueElectronicDocument({
@@ -151,5 +160,86 @@ export class GenerateElectronicInvoiceUseCase {
     }
 
     return invoice;
+  }
+
+  /**
+   * Ver README del modulo, seccion "Proveedor tecnologico (MATIAS API)". No bloquea la venta si
+   * falla: la factura queda GENERATED con el CUFE local provisional, se audita, y el reenvio
+   * manual (ResubmitElectronicInvoiceUseCase) reintenta -- mismo criterio que el resto del modulo.
+   */
+  private async submitViaThirdPartyProvider(
+    invoice: ElectronicInvoiceRecord,
+    input: GenerateElectronicInvoiceInput,
+    buyer: { documentType: string; documentNumber: string; name: string },
+    customer: Awaited<ReturnType<ICustomerRepository["findByIdOrThrow"]>> | null,
+    encryptedToken: string | null
+  ): Promise<void> {
+    if (!encryptedToken) {
+      await this.audit.record({
+        action: "ELECTRONIC_INVOICE_GENERATION_FAILED",
+        entityType: "Sale",
+        entityId: input.saleId,
+        description: `Empresa configurada con proveedor MATIAS pero sin token cargado (${invoice.fullNumber})`,
+      });
+      return;
+    }
+
+    try {
+      const token = decryptCredential(encryptedToken, env.CREDENTIALS_ENCRYPTION_KEY);
+      const result = await this.thirdPartyClient.submitInvoice(token, {
+        resolutionNumber: invoice.resolutionNumber,
+        prefix: invoice.prefix,
+        documentNumber: invoice.number,
+        issueDate: input.issueDate,
+        subtotal: input.subtotal,
+        taxTotal: input.taxTotal,
+        total: input.total,
+        customer: {
+          documentType: buyer.documentType,
+          documentNumber: buyer.documentNumber,
+          name: buyer.name,
+          email: customer?.email ?? null,
+          phone: customer?.phone ?? null,
+          address: customer?.address ?? null,
+          postalCode: customer?.dianPostalCode ?? null,
+          countryId: customer?.dianCountryId ?? null,
+          cityId: customer?.dianCityId ?? null,
+          identityDocumentId: customer?.dianIdentityDocumentId ?? null,
+          typeOrganizationId: customer?.dianTypeOrganizationId ?? null,
+          taxRegimeId: customer?.dianTaxRegimeId ?? null,
+          taxLevelId: customer?.dianTaxLevelId ?? null,
+        },
+        lines: input.items.map((item, i) => ({
+          description: item.description,
+          // Contapro no propaga un codigo de producto hasta este use-case todavia -- ver
+          // README del modulo. Placeholder estable por posicion dentro de la factura.
+          code: `ITEM-${i + 1}`,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxPercent: item.taxPercent,
+          taxAmount: item.taxAmount,
+          lineTotal: item.total,
+        })),
+      });
+
+      await this.invoiceRepo.applyThirdPartySubmissionResult(invoice.id, result);
+      await this.audit.record({
+        action: result.status === "ACCEPTED" ? "ELECTRONIC_DOCUMENT_ACCEPTED" : "ELECTRONIC_DOCUMENT_REJECTED",
+        entityType: "Sale",
+        entityId: input.saleId,
+        description:
+          result.status === "ACCEPTED"
+            ? `Factura electronica autorizada via MATIAS: ${invoice.fullNumber} (CUFE ${result.cufe.slice(0, 12)}...)`
+            : `Factura electronica rechazada por MATIAS: ${invoice.fullNumber} (${result.rejectionReason})`,
+        metadata: { fullNumber: invoice.fullNumber, cufe: result.cufe || undefined, rejectionReason: result.rejectionReason },
+      });
+    } catch (err) {
+      await this.audit.record({
+        action: "ELECTRONIC_INVOICE_GENERATION_FAILED",
+        entityType: "Sale",
+        entityId: input.saleId,
+        description: `Fallo la llamada a MATIAS para ${invoice.fullNumber}: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
   }
 }

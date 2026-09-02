@@ -20,6 +20,10 @@ export interface ElectronicInvoiceRecord {
   prefix: string;
   number: number;
   fullNumber: string;
+  /** Numero de resolucion DIAN administrativo (InvoiceNumberingResolution.resolutionNumber) --
+   * necesario para GenerateElectronicInvoiceUseCase cuando factura via proveedor tecnologico
+   * (ver domain/third-party-invoicing-client.ts), MATIAS lo exige como campo separado del prefijo. */
+  resolutionNumber: string;
   cufe: string;
   issueDate: Date;
   status: string;
@@ -31,6 +35,16 @@ export interface ElectronicInvoiceWithXml extends ElectronicInvoiceRecord {
   signedXmlContent: string | null;
   dianTrackingId: string | null;
   rejectionReason: string | null;
+}
+
+export interface ApplyThirdPartyInvoiceResultInput {
+  status: "ACCEPTED" | "REJECTED";
+  /** CUFE real del proveedor -- sobrescribe el generado localmente en claimNumberAndGenerate. */
+  cufe: string;
+  /** XML firmado del proveedor; vacio si REJECTED (se deja el xmlContent local sin tocar). */
+  signedXmlContent: string;
+  rejectionReason?: string;
+  rawResponse: string;
 }
 
 export interface IElectronicInvoiceRepository extends IElectronicDocumentSubmissionRepository {
@@ -49,4 +63,14 @@ export interface IElectronicInvoiceRepository extends IElectronicDocumentSubmiss
   ): Promise<ElectronicInvoiceRecord>;
 
   findBySaleId(saleId: string): Promise<ElectronicInvoiceWithXml | null>;
+
+  /**
+   * Aplica el resultado de un proveedor tecnologico (IThirdPartyInvoicingClient), ver README del
+   * modulo. A diferencia de markAccepted/markRejected (heredados de
+   * IElectronicDocumentSubmissionRepository, que asumen que el CUFE/XML ya guardado en GENERATED
+   * es el definitivo), esto SOBRESCRIBE cufe/xmlContent con el valor real que devolvio el
+   * proveedor -- el CUFE generado localmente por Contapro nunca es el CUFE oficial de una
+   * factura emitida via proveedor (ver aviso en generate-electronic-invoice.use-case.ts).
+   */
+  applyThirdPartySubmissionResult(id: string, result: ApplyThirdPartyInvoiceResultInput): Promise<void>;
 }

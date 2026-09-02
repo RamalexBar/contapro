@@ -12,6 +12,17 @@ electronicInvoicingRouter.post(
   electronicInvoicingController.createResolution
 );
 electronicInvoicingRouter.get(
+  "/electronic-invoicing/provider-settings",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getProviderSettings
+);
+electronicInvoicingRouter.put(
+  "/electronic-invoicing/provider-settings",
+  requirePermission("electronic-invoicing.manage"),
+  electronicInvoicingController.setProviderSettings
+);
+
+electronicInvoicingRouter.get(
   "/electronic-invoicing/numbering-resolutions",
   requirePermission("electronic-invoicing.read"),
   electronicInvoicingController.listResolutions
