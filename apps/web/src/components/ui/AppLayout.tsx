@@ -62,7 +62,7 @@ const NAV_SECTIONS: NavSection[] = [
         permissions: ["quote.create", "creditnote.create", "debitnote.create", "return.create", "sale.read"],
       },
       { to: "/cash", label: "Caja", icon: Wallet },
-      { to: "/manual-invoices", label: "Factura manual", icon: FileText, permissions: ["sale.create"] },
+      { to: "/manual-invoices", label: "Factura electrónica", icon: FileText, permissions: ["sale.create"] },
     ],
   },
   { label: "Inventario", items: [{ to: "/products", label: "Inventario", icon: Package }] },

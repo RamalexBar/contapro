@@ -81,10 +81,10 @@ export function ManualInvoicePage() {
   if (!profile?.complete) {
     return (
       <AppLayout>
-        <h1 className="mb-4 text-lg font-semibold text-slate-900">Factura manual</h1>
+        <h1 className="mb-4 text-lg font-semibold text-slate-900">Factura electrónica</h1>
         <Alert tone="warning">
           Completa los <Link to="/company/profile" className="underline">datos fiscales de la empresa</Link> antes de
-          crear tu primera factura manual.
+          crear tu primera factura electrónica.
         </Alert>
       </AppLayout>
     );
@@ -92,7 +92,7 @@ export function ManualInvoicePage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold text-slate-900">Factura manual</h1>
+      <h1 className="mb-4 text-lg font-semibold text-slate-900">Factura electrónica</h1>
       <p className="mb-4 max-w-2xl text-sm text-slate-500">
         Crea una factura electrónica DIAN con líneas de descripción libre, sin pasar por el punto de
         venta ni el catálogo de inventario.

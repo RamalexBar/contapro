@@ -99,7 +99,7 @@ export function CompanyProfilePage() {
         Datos fiscales DIAN de tu empresa (tipo de documento, dígito de verificación, responsabilidad
         tributaria, ubicación). Se piden antes de poder crear tu primera{" "}
         <a href="/manual-invoices" className="text-brand-600 underline">
-          factura manual
+          factura electrónica
         </a>{" "}
         (sin punto de venta). No se envían a MATIAS si esa integración está activa — su identidad de
         emisor se configura directamente en su cuenta.
