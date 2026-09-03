@@ -118,42 +118,55 @@ export function ManualInvoicePage() {
           </Select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {lines.map((line, i) => (
-            <div key={i} className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-2 sm:grid-cols-[1fr_90px_120px_90px_110px_auto]">
+            <div key={i} className="grid grid-cols-2 gap-2 rounded-md border border-slate-200 p-3 sm:grid-cols-[1fr_90px_120px_90px_110px_auto] sm:items-end">
+              <div className="col-span-2 sm:col-span-1">
+                <Input
+                  label="Descripción"
+                  placeholder="ej. Asesoría contable"
+                  value={line.description}
+                  onChange={(e) => updateLine(i, { description: e.target.value })}
+                />
+              </div>
               <Input
-                placeholder="Descripción"
-                value={line.description}
-                onChange={(e) => updateLine(i, { description: e.target.value })}
-              />
-              <Input
+                label="Cantidad"
                 type="number"
                 min={0.01}
                 step="any"
-                placeholder="Cant."
                 value={line.quantity}
                 onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
               />
               <Input
+                label="Valor unitario"
                 type="number"
                 min={0}
                 step="any"
-                placeholder="Valor unitario"
                 value={line.unitPrice}
                 onChange={(e) => updateLine(i, { unitPrice: Number(e.target.value) })}
               />
               <Input
+                label="IVA %"
                 type="number"
                 min={0}
                 max={100}
                 step="any"
-                placeholder="IVA %"
                 value={line.taxPercent}
                 onChange={(e) => updateLine(i, { taxPercent: Number(e.target.value) })}
               />
-              <span className="flex items-center text-sm text-slate-600">{formatCOP(lineTotal(line))}</span>
-              <Button type="button" size="sm" variant="danger" onClick={() => removeLine(i)} disabled={lines.length === 1}>
-                Quitar
+              <div>
+                <span className="mb-1 block text-sm font-medium text-slate-700">Total línea</span>
+                <span className="flex h-[38px] items-center text-sm text-slate-600">{formatCOP(lineTotal(line))}</span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="danger"
+                className="col-span-2 sm:col-span-1"
+                onClick={() => removeLine(i)}
+                disabled={lines.length === 1}
+              >
+                Quitar línea
               </Button>
             </div>
           ))}
