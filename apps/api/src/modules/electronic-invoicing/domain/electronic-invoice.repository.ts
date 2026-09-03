@@ -1,7 +1,12 @@
 import type { IElectronicDocumentSubmissionRepository } from "./electronic-document-submission.repository";
 
+/** Entidad fuente de una ElectronicInvoice -- EXACTAMENTE una de las dos (ver invariante XOR en
+ * electronic-invoicing.prisma). "sale" = venta del POS (camino original). "manual" = factura sin
+ * POS/producto via modules/manual-invoicing (ver su README). */
+export type ElectronicInvoiceSource = { type: "sale"; saleId: string } | { type: "manual"; manualInvoiceId: string };
+
 export interface GenerateElectronicInvoiceData {
-  saleId: string;
+  source: ElectronicInvoiceSource;
   branchId: string;
   issueDate: Date;
   customerDocumentType: string;
@@ -15,7 +20,8 @@ export interface GenerateElectronicInvoiceData {
 
 export interface ElectronicInvoiceRecord {
   id: string;
-  saleId: string;
+  saleId: string | null;
+  manualInvoiceId: string | null;
   branchId: string;
   prefix: string;
   number: number;
@@ -63,6 +69,9 @@ export interface IElectronicInvoiceRepository extends IElectronicDocumentSubmiss
   ): Promise<ElectronicInvoiceRecord>;
 
   findBySaleId(saleId: string): Promise<ElectronicInvoiceWithXml | null>;
+
+  /** Analogo a findBySaleId para facturas manuales (modules/manual-invoicing). */
+  findByManualInvoiceId(manualInvoiceId: string): Promise<ElectronicInvoiceWithXml | null>;
 
   /**
    * Aplica el resultado de un proveedor tecnologico (IThirdPartyInvoicingClient), ver README del

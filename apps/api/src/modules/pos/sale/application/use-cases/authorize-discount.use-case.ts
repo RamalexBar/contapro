@@ -123,7 +123,7 @@ export class AuthorizeDiscountUseCase {
         );
 
         await this.generateElectronicInvoice.execute({
-          saleId: updatedSale.id,
+          source: { type: "sale", saleId: updatedSale.id },
           branchId: updatedSale.branchId,
           customerId: updatedSale.customerId,
           issueDate: updatedSale.createdAt,

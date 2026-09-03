@@ -74,6 +74,38 @@ export async function seedBase(prisma: Prisma.TransactionClient) {
     update: { name: "Plan Plus", priceMonthly: 279900, priceYearly: 3022900, maxBranches: 10, maxUsers: 50, features: FULL_FEATURES },
   });
 
+  // ---- Planes "Solo Facturacion" (2026-09-03) ----
+  // Linea de precio nueva y aparte de los 4 planes de arriba (que NO se tocaron) -- calcada tal
+  // cual de la escalera real de Alegra "Solo Facturacion" (alegra.com/colombia/facturacion-electronica/precios,
+  // verificado en vivo con el navegador el 2026-09-03: mismos 4 nombres de tier, mismo precio
+  // mensual, mismo 25% de descuento anual -- ver docs/PRECIOS.md). features sigue siendo
+  // FULL_FEATURES, no un set reducido: la empresa que solo necesita facturar no queda bloqueada de
+  // usar POS/inventario si alguna vez lo necesita, y la factura manual sin venta
+  // (modules/manual-invoicing) ya esta disponible para CUALQUIER plan, no solo para estos --
+  // decision explicita del usuario. Lo unico que diferencia esta linea de la de arriba es el
+  // precio y maxUsers (maxBranches queda en 1 en los 4 tiers, igual que Alegra no menciona
+  // sucursales en esta linea -- pensada para una sola sede).
+  await prisma.plan.upsert({
+    where: { code: "FACT_EMPRENDEDOR" },
+    create: { code: "FACT_EMPRENDEDOR", name: "Solo Facturacion Emprendedor", priceMonthly: 17900, priceYearly: 161100, maxBranches: 1, maxUsers: 1, features: FULL_FEATURES },
+    update: { name: "Solo Facturacion Emprendedor", priceMonthly: 17900, priceYearly: 161100, maxBranches: 1, maxUsers: 1, features: FULL_FEATURES },
+  });
+  await prisma.plan.upsert({
+    where: { code: "FACT_PYME" },
+    create: { code: "FACT_PYME", name: "Solo Facturacion Pyme", priceMonthly: 49900, priceYearly: 449100, maxBranches: 1, maxUsers: 2, features: FULL_FEATURES },
+    update: { name: "Solo Facturacion Pyme", priceMonthly: 49900, priceYearly: 449100, maxBranches: 1, maxUsers: 2, features: FULL_FEATURES },
+  });
+  await prisma.plan.upsert({
+    where: { code: "FACT_PRO" },
+    create: { code: "FACT_PRO", name: "Solo Facturacion Pro", priceMonthly: 99900, priceYearly: 899100, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+    update: { name: "Solo Facturacion Pro", priceMonthly: 99900, priceYearly: 899100, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+  });
+  await prisma.plan.upsert({
+    where: { code: "FACT_PLUS" },
+    create: { code: "FACT_PLUS", name: "Solo Facturacion Plus", priceMonthly: 179900, priceYearly: 1619100, maxBranches: 1, maxUsers: 5, features: FULL_FEATURES },
+    update: { name: "Solo Facturacion Plus", priceMonthly: 179900, priceYearly: 1619100, maxBranches: 1, maxUsers: 5, features: FULL_FEATURES },
+  });
+
   // ---- Backfill de conceptos de retencion / categorias de gasto / plan de cuentas para empresas
   // que ya existian antes de estos items (empresas nuevas los reciben directo en
   // RegisterCompanyUseCase, sin esperar a un re-seed) ----

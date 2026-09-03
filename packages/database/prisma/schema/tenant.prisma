@@ -37,6 +37,21 @@ model Company {
   electronicInvoicingProvider DianProviderType @default(DIRECT)
   matiasApiTokenEncrypted     String?
 
+  // ---- Datos fiscales DIAN de la empresa (ver modules/company/README.md) ----
+  // Strings planos opcionales SIN catalogo/enum, mismo criterio ya usado en Customer.dian* --
+  // este codebase deliberadamente no inventa catalogos DIAN sin verificar contra la fuente real.
+  // NO se envian a MATIAS: su payload por factura no tiene objeto seller/emisor, la identidad del
+  // emisor vive en la cuenta/token de MATIAS (ver matias-invoicing-client.ts). Sirven para (1) el
+  // gate de completitud antes de la primera factura manual (modules/manual-invoicing), (2) futuro
+  // enriquecimiento del XML UBL del camino DIRECT, (3) datos de cumplimiento/visualizacion.
+  documentType           String? // "NIT" | "CC", igual que Customer.documentType
+  dv                     String? // digito de verificacion
+  taxRegime              String? // regimen tributario
+  fiscalResponsibilities String? // responsabilidad tributaria
+  address                String?
+  municipality            String? // nombre, complementa municipalityCode (codigo DANE) de arriba
+  department              String?
+
   branches      Branch[]
   users         User[]
   roles         Role[]

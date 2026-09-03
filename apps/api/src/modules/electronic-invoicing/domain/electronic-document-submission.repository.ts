@@ -2,6 +2,12 @@ export interface ElectronicDocumentSubmissionRecord {
   id: string;
   /** Id de la entidad de negocio que origino el documento (Sale.id / CreditNote.id / DebitNote.id). */
   sourceEntityId: string;
+  /** Solo lo puebla el repo de ElectronicInvoice (Sale | ManualInvoice, ver
+   * electronic-invoice.repository.ts) -- es el unico tipo de documento cuya cola mezcla mas de
+   * una entidad fuente. El resto de repos (nota credito/debito, documento soporte, nomina) lo
+   * dejan undefined; PollDianSubmissionsUseCase usa su propio `entityType` del constructor en
+   * ese caso. */
+  sourceEntityType?: string;
   fullNumber: string;
   status: string;
 }

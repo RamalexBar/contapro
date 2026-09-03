@@ -72,6 +72,9 @@ const TENANT_MODELS = new Set([
   "ElectronicDebitNote",
   "ElectronicSupportDocument",
   "ElectronicPayroll",
+  // "ManualInvoiceItem" NO va aqui: fila hija sin companyId propia, protegida via su
+  // ManualInvoice padre (mismo criterio que SaleItem/ProductPriceListEntry).
+  "ManualInvoice",
   // "RecurringInvoiceItem"/"RecurringInvoiceRun" NO van aqui: filas hijas sin companyId propia,
   // protegidas via su RecurringInvoice padre (mismo criterio que SaleItem/ProductPriceListEntry).
   "RecurringInvoice",

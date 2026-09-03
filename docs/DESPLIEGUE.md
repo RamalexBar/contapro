@@ -31,6 +31,11 @@ el repo. En el dashboard de `contapro-api` → **Environment**, completar los qu
   pública de arriba, necesaria para que la sección "Renovación automática" de `/billing` pueda
   tokenizar tarjetas desde el navegador. Al ser un sitio estático (Vite), después de cargarla hay
   que forzar un **rebuild** (no solo un redeploy) para que quede compilada en el bundle.
+- `CREDENTIALS_ENCRYPTION_KEY` — necesaria para que una empresa pueda activar el proveedor
+  tecnológico MATIAS (facturación electrónica, ver `modules/electronic-invoicing/README.md` punto
+  14). Generar con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` y
+  pegar el resultado tal cual (32 bytes en hex, 64 caracteres). Sin esto, activar MATIAS desde una
+  empresa falla con un mensaje claro — el resto de la plataforma sigue funcionando igual.
 - `RESEND_API_KEY` / DIAN_* / `ANTHROPIC_API_KEY` — opcionales, dejarlos vacíos si todavía no se
   van a usar (el sistema falla con un mensaje claro en vez de romperse, ver los README de cada
   módulo). `ANTHROPIC_API_KEY` habilita `POST /purchases/extract` (lectura automática de facturas
@@ -94,6 +99,23 @@ También podés probar directo desde la web (iteración 27): entrar a
 `https://contapro-web.onrender.com/register` para crear la empresa de prueba sin `curl`, y una vez
 logueado, `/billing` ("Mi suscripción") para generar el link de pago Wompi vos mismo, sin que el
 operador de la plataforma lo genere a mano (`modules/billing`, permiso `billing.manage`).
+
+## Actualizar despues del primer deploy
+
+Un `git push` a `master` dispara un redeploy automático de `contapro-api`/`contapro-web` (Render
+está conectado al repo), y `preDeployCommand` corre `prisma migrate deploy` solo — las migraciones
+nuevas quedan aplicadas sin acción manual. Lo que **no** es automático:
+
+- **Planes nuevos/cambiados en `seed-base.ts`** (ej. los 4 planes "Solo Facturación" agregados el
+  2026-09-03): un `upsert` en `seed-base.ts` no se ejecuta solo en cada deploy. Hace falta volver
+  a correr `pnpm --filter @erp/database run db:seed:production` desde la pestaña **Shell** de
+  `contapro-api` en el dashboard de Render (mismo comando del Paso 4) — es seguro re-correrlo,
+  hace `upsert` por `code`, no duplica ni borra nada existente.
+- **Secretos nuevos** (ej. `CREDENTIALS_ENCRYPTION_KEY` de arriba): agregarlos a mano en el
+  dashboard de Render, `contapro-api` → Environment. `render.yaml` con `sync: false` solo crea el
+  placeholder vacío la primera vez que se aplica el Blueprint — actualizaciones posteriores de
+  `render.yaml` que agregan una key nueva SI la crean vacía en el dashboard, pero el valor real
+  sigue habiendo que completarlo a mano ahí.
 
 ## Costos aproximados (Render, plan `starter`)
 

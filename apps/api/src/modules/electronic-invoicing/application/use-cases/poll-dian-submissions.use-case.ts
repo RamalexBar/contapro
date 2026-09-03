@@ -37,7 +37,7 @@ export class PollDianSubmissionsUseCase {
         await this.submissionRepo.markSubmitted(doc.id, trackingId);
         await this.audit.record({
           action: "ELECTRONIC_DOCUMENT_SUBMITTED",
-          entityType: this.entityType,
+          entityType: doc.sourceEntityType ?? this.entityType,
           entityId: doc.sourceEntityId,
           description: `${this.documentLabel} ${doc.fullNumber} enviada a la DIAN (tracking ${trackingId})`,
           metadata: { fullNumber: doc.fullNumber, trackingId },
@@ -58,7 +58,7 @@ export class PollDianSubmissionsUseCase {
           await this.submissionRepo.markAccepted(doc.id, result.responseXml ?? "");
           await this.audit.record({
             action: "ELECTRONIC_DOCUMENT_ACCEPTED",
-            entityType: this.entityType,
+            entityType: doc.sourceEntityType ?? this.entityType,
             entityId: doc.sourceEntityId,
             description: `${this.documentLabel} ${doc.fullNumber} aceptada por la DIAN`,
             metadata: { fullNumber: doc.fullNumber },
@@ -67,7 +67,7 @@ export class PollDianSubmissionsUseCase {
           await this.submissionRepo.markRejected(doc.id, result.responseXml ?? "", result.rejectionReason ?? "Rechazado");
           await this.audit.record({
             action: "ELECTRONIC_DOCUMENT_REJECTED",
-            entityType: this.entityType,
+            entityType: doc.sourceEntityType ?? this.entityType,
             entityId: doc.sourceEntityId,
             description: `${this.documentLabel} ${doc.fullNumber} rechazada por la DIAN: ${result.rejectionReason ?? "sin motivo"}`,
             metadata: { fullNumber: doc.fullNumber, rejectionReason: result.rejectionReason },

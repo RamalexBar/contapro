@@ -197,7 +197,7 @@ export class CreateSaleUseCase {
 
       try {
         await this.generateElectronicInvoice.execute({
-          saleId: sale.id,
+          source: { type: "sale", saleId: sale.id },
           branchId: sale.branchId,
           customerId: input.customerId ?? null,
           issueDate: sale.createdAt,

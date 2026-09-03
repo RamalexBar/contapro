@@ -31,6 +31,8 @@ import { accountingRouter } from "./modules/accounting/interfaces/accounting.rou
 import { suppliersRouter } from "./modules/suppliers/interfaces/suppliers.routes";
 import { expensesRouter } from "./modules/expenses/interfaces/expenses.routes";
 import { electronicInvoicingRouter } from "./modules/electronic-invoicing/interfaces/electronic-invoicing.routes";
+import { companyRouter } from "./modules/company/interfaces/company.routes";
+import { manualInvoicingRouter } from "./modules/manual-invoicing/interfaces/manual-invoicing.routes";
 import { syncRouter } from "./modules/sync/interfaces/sync.routes";
 import { billingRouter } from "./modules/billing/interfaces/billing.routes";
 import { collectionsRouter } from "./modules/collections/interfaces/collections.routes";
@@ -98,6 +100,8 @@ app.use("/api", accountingRouter);
 app.use("/api", suppliersRouter);
 app.use("/api", expensesRouter);
 app.use("/api", electronicInvoicingRouter);
+app.use("/api", companyRouter);
+app.use("/api", manualInvoicingRouter);
 app.use("/api", syncRouter);
 app.use("/api", billingRouter);
 app.use("/api", collectionsRouter);

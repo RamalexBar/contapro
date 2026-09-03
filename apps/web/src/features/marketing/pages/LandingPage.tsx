@@ -36,6 +36,17 @@ const PLANS = [
   { code: "PRO", name: "Plan Plus", price: "$279.900", period: "/mes", branches: "10 sucursales", users: "50 usuarios", highlight: false },
 ];
 
+// Linea de precio aparte para quien SOLO necesita facturar (sin POS/inventario/contabilidad) --
+// calcada del contenido real de la linea "Solo Facturacion" de Alegra
+// (alegra.com/colombia/facturacion-electronica/precios, verificado 2026-09-03): mismos 4 nombres
+// de tier, mismos precios, mismos limites de usuarios. Los 4 planes de PLANS arriba NO cambiaron.
+const FACTURACION_PLANS = [
+  { code: "FACT_EMPRENDEDOR", name: "Emprendedor", price: "$17.900", period: "/mes", users: "1 usuario", highlight: false },
+  { code: "FACT_PYME", name: "Pyme", price: "$49.900", period: "/mes", users: "2 usuarios", highlight: false },
+  { code: "FACT_PRO", name: "Pro", price: "$99.900", period: "/mes", users: "3 usuarios", highlight: true },
+  { code: "FACT_PLUS", name: "Plus", price: "$179.900", period: "/mes", users: "5 usuarios", highlight: false },
+];
+
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
@@ -46,6 +57,9 @@ export function LandingPage() {
           <nav className="flex items-center gap-3">
             <a href="#precios" className="hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:block">
               Precios
+            </a>
+            <a href="#solo-facturacion" className="hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:block">
+              Solo facturación
             </a>
             <Link to="/login">
               <Button variant="ghost" size="sm">
@@ -162,6 +176,54 @@ export function LandingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check size={15} className="text-success-600" /> Todos los módulos
+                  </li>
+                </ul>
+                <Link to="/register" className="mt-6 block">
+                  <Button variant={p.highlight ? "primary" : "secondary"} className="w-full">
+                    Empezar
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Solo Facturación */}
+      <section id="solo-facturacion" className="border-t border-slate-100 bg-slate-50 py-16">
+        <div className="mx-auto max-w-6xl px-4">
+          <h2 className="text-center text-2xl font-bold text-slate-900">¿Solo necesitas facturar electrónicamente?</h2>
+          <p className="mx-auto mt-2 max-w-xl text-center text-slate-600">
+            Factura sin pasar por el punto de venta ni el catálogo de inventario — solo tus datos
+            fiscales y una línea de descripción libre. Facturas ilimitadas en los 4 planes.
+          </p>
+          <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {FACTURACION_PLANS.map((p) => (
+              <div
+                key={p.code}
+                className={`rounded-xl border bg-white p-6 ${
+                  p.highlight ? "border-2 border-brand-600 shadow-md" : "border-slate-200"
+                }`}
+              >
+                {p.highlight && (
+                  <span className="mb-2 inline-block rounded-full bg-brand-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+                    Recomendado
+                  </span>
+                )}
+                <h3 className="font-semibold text-slate-900">{p.name}</h3>
+                <p className="mt-2">
+                  <span className="text-2xl font-bold text-slate-900">{p.price}</span>{" "}
+                  <span className="text-sm text-slate-500">{p.period}</span>
+                </p>
+                <ul className="mt-4 space-y-2 text-sm text-slate-600">
+                  <li className="flex items-center gap-2">
+                    <Check size={15} className="text-success-600" /> Facturas ilimitadas
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check size={15} className="text-success-600" /> {p.users}
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check size={15} className="text-success-600" /> 1 usuario gratis para tu contador
                   </li>
                 </ul>
                 <Link to="/register" className="mt-6 block">

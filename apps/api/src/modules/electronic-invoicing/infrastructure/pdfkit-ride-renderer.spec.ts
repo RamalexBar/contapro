@@ -23,6 +23,7 @@ function makeInvoice(overrides: Partial<Parameters<typeof buildUblInvoiceXml>[0]
   return {
     id: "inv-1",
     saleId: "sale-1",
+    manualInvoiceId: null,
     branchId: "branch-1",
     prefix: "SETP",
     number: 1,

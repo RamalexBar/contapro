@@ -5,7 +5,7 @@ import type { AuditService } from "../../../audit/application/audit.service";
 import type { ICustomerRepository } from "../../../customers/domain/customer.repository";
 import type { ICertificateLoader } from "../../domain/certificate-loader";
 import type { ICompanyReader } from "../../domain/company-reader.repository";
-import type { ElectronicInvoiceRecord, IElectronicInvoiceRepository } from "../../domain/electronic-invoice.repository";
+import type { ElectronicInvoiceRecord, ElectronicInvoiceSource, IElectronicInvoiceRepository } from "../../domain/electronic-invoice.repository";
 import type { IThirdPartyInvoicingClient } from "../../domain/third-party-invoicing-client";
 import type { IXmlSigner } from "../../domain/xml-signer";
 import { DIAN_GENERIC_FINAL_CONSUMER } from "../constants";
@@ -30,7 +30,7 @@ export interface GenerateElectronicInvoiceWithholdingInput {
 }
 
 export interface GenerateElectronicInvoiceInput {
-  saleId: string;
+  source: ElectronicInvoiceSource;
   branchId: string;
   customerId: string | null;
   issueDate: Date;
@@ -59,6 +59,11 @@ export class GenerateElectronicInvoiceUseCase {
     const company = await this.companyReader.findByIdOrThrow(ctx.companyId);
     const customer = input.customerId ? await this.customerRepo.findByIdOrThrow(input.customerId) : null;
 
+    // Discriminador de la entidad fuente -- reusado en cada auditoria/llamada de firma de abajo
+    // en vez de hardcodear "Sale" (ver ElectronicInvoiceSource en domain/electronic-invoice.repository.ts).
+    const entityType = input.source.type === "sale" ? "Sale" : "ManualInvoice";
+    const entityId = input.source.type === "sale" ? input.source.saleId : input.source.manualInvoiceId;
+
     const buyer = customer
       ? { documentType: customer.documentType, documentNumber: customer.documentNumber, name: customer.name }
       : DIAN_GENERIC_FINAL_CONSUMER;
@@ -67,7 +72,7 @@ export class GenerateElectronicInvoiceUseCase {
 
     const invoice = await this.invoiceRepo.claimNumberAndGenerate(
       {
-        saleId: input.saleId,
+        source: input.source,
         branchId: input.branchId,
         issueDate: input.issueDate,
         customerDocumentType: buyer.documentType,
@@ -127,8 +132,8 @@ export class GenerateElectronicInvoiceUseCase {
 
     await this.audit.record({
       action: "ELECTRONIC_INVOICE_GENERATED",
-      entityType: "Sale",
-      entityId: input.saleId,
+      entityType,
+      entityId,
       description: `Factura electronica generada localmente: ${invoice.fullNumber} (CUFE ${invoice.cufe.slice(0, 12)}...)`,
       metadata: { fullNumber: invoice.fullNumber, cufe: invoice.cufe },
     });
@@ -138,7 +143,7 @@ export class GenerateElectronicInvoiceUseCase {
       // domain/third-party-invoicing-client.ts): una llamada de red ahi dejaria la transaccion de
       // Postgres abierta durante todo el round-trip. El CUFE/xmlContent locales de arriba son
       // provisionales -- applyThirdPartySubmissionResult los sobrescribe con los reales de MATIAS.
-      await this.submitViaThirdPartyProvider(invoice, input, buyer, customer, company.matiasApiTokenEncrypted);
+      await this.submitViaThirdPartyProvider(invoice, input, buyer, customer, company.matiasApiTokenEncrypted, entityType, entityId);
     } else if (env.DIAN_CERTIFICATE_PATH) {
       // No bloquea: si falla, la factura queda GENERATED (sin firmar), recuperable via el
       // endpoint de reenvio manual una vez se corrija el problema (ej. contraseña incorrecta).
@@ -150,8 +155,8 @@ export class GenerateElectronicInvoiceUseCase {
         certificatePath: env.DIAN_CERTIFICATE_PATH,
         certificatePassword: env.DIAN_CERTIFICATE_PASSWORD,
         documentId: invoice.id,
-        entityType: "Sale",
-        sourceEntityId: input.saleId,
+        entityType,
+        sourceEntityId: entityId,
         fullNumber: invoice.fullNumber,
         unsignedXml: generatedXmlContent,
         signingFailedAction: "ELECTRONIC_INVOICE_SIGNING_FAILED",
@@ -172,13 +177,15 @@ export class GenerateElectronicInvoiceUseCase {
     input: GenerateElectronicInvoiceInput,
     buyer: { documentType: string; documentNumber: string; name: string },
     customer: Awaited<ReturnType<ICustomerRepository["findByIdOrThrow"]>> | null,
-    encryptedToken: string | null
+    encryptedToken: string | null,
+    entityType: string,
+    entityId: string
   ): Promise<void> {
     if (!encryptedToken) {
       await this.audit.record({
         action: "ELECTRONIC_INVOICE_GENERATION_FAILED",
-        entityType: "Sale",
-        entityId: input.saleId,
+        entityType,
+        entityId,
         description: `Empresa configurada con proveedor MATIAS pero sin token cargado (${invoice.fullNumber})`,
       });
       return;
@@ -225,8 +232,8 @@ export class GenerateElectronicInvoiceUseCase {
       await this.invoiceRepo.applyThirdPartySubmissionResult(invoice.id, result);
       await this.audit.record({
         action: result.status === "ACCEPTED" ? "ELECTRONIC_DOCUMENT_ACCEPTED" : "ELECTRONIC_DOCUMENT_REJECTED",
-        entityType: "Sale",
-        entityId: input.saleId,
+        entityType,
+        entityId,
         description:
           result.status === "ACCEPTED"
             ? `Factura electronica autorizada via MATIAS: ${invoice.fullNumber} (CUFE ${result.cufe.slice(0, 12)}...)`
@@ -236,8 +243,8 @@ export class GenerateElectronicInvoiceUseCase {
     } catch (err) {
       await this.audit.record({
         action: "ELECTRONIC_INVOICE_GENERATION_FAILED",
-        entityType: "Sale",
-        entityId: input.saleId,
+        entityType,
+        entityId,
         description: `Fallo la llamada a MATIAS para ${invoice.fullNumber}: ${err instanceof Error ? err.message : String(err)}`,
       });
     }

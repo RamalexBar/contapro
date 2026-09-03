@@ -48,14 +48,20 @@ model InvoiceNumberingResolution {
   @@map("invoice_numbering_resolutions")
 }
 
-/// Un registro por venta facturada electronicamente. El XML completo se guarda en xmlContent
-/// (sin storage de objetos configurado aun, ver README del modulo).
+/// Un registro por venta O factura manual (modules/manual-invoicing, sin POS/producto) facturada
+/// electronicamente. El XML completo se guarda en xmlContent (sin storage de objetos configurado
+/// aun, ver README del modulo). saleId/manualInvoiceId son la entidad fuente -- EXACTAMENTE UNO
+/// de los dos debe estar presente (invariante XOR aplicado via CHECK constraint en la migracion,
+/// Prisma no lo expresa nativamente). Notas credito/debito y documento soporte siguen siendo
+/// exclusivamente de venta/compra -- este XOR es solo para ElectronicInvoice.
 model ElectronicInvoice {
   id                     String                  @id @default(uuid())
   companyId              String
   branchId               String
-  saleId                 String                  @unique
-  sale                   Sale                    @relation(fields: [saleId], references: [id])
+  saleId                 String?                 @unique
+  sale                   Sale?                   @relation(fields: [saleId], references: [id])
+  manualInvoiceId        String?                 @unique
+  manualInvoice          ManualInvoice?          @relation(fields: [manualInvoiceId], references: [id])
   numberingResolutionId  String
   numberingResolution    InvoiceNumberingResolution @relation(fields: [numberingResolutionId], references: [id])
   prefix                 String

@@ -77,6 +77,14 @@ services:
         sync: false
       - key: DIAN_NOMINA_SOAP_ENDPOINT
         sync: false
+      # Proveedor tecnologico DIAN alternativo (MATIAS API, ver modules/electronic-invoicing/README.md
+      # punto 14) -- clave maestra para cifrar/descifrar el token de MATIAS de cada empresa
+      # (Company.matiasApiTokenEncrypted). Sin esto, activar el proveedor MATIAS desde una empresa
+      # falla con mensaje claro ("CREDENTIALS_ENCRYPTION_KEY no esta configurado"), el resto de la
+      # plataforma sigue funcionando igual. Generar con:
+      # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      - key: CREDENTIALS_ENCRYPTION_KEY
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       # onboarding@resend.dev: remitente de pruebas de Resend, funciona sin verificar un dominio

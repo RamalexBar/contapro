@@ -29,9 +29,13 @@ export class ResubmitElectronicInvoiceUseCase {
     private readonly thirdPartyClient: IThirdPartyInvoicingClient
   ) {}
 
-  async execute(saleId: string): Promise<void> {
-    const invoice = await this.invoiceRepo.findBySaleId(saleId);
-    if (!invoice) throw new NotFoundError("ElectronicInvoice", saleId);
+  async execute(query: { type: "sale"; id: string } | { type: "manual"; id: string }): Promise<void> {
+    const invoice =
+      query.type === "sale" ? await this.invoiceRepo.findBySaleId(query.id) : await this.invoiceRepo.findByManualInvoiceId(query.id);
+    if (!invoice) throw new NotFoundError("ElectronicInvoice", query.id);
+
+    const entityType = invoice.saleId ? "Sale" : "ManualInvoice";
+    const entityId = (invoice.saleId ?? invoice.manualInvoiceId) as string;
 
     if (invoice.status === "ACCEPTED" || invoice.status === "PENDING_SUBMISSION") {
       throw new ConflictError(`La factura ${invoice.fullNumber} ya esta ${invoice.status.toLowerCase()}, nada que reenviar`);
@@ -100,8 +104,8 @@ export class ResubmitElectronicInvoiceUseCase {
       certificatePath: env.DIAN_CERTIFICATE_PATH,
       certificatePassword: env.DIAN_CERTIFICATE_PASSWORD,
       documentId: invoice.id,
-      entityType: "Sale",
-      sourceEntityId: invoice.saleId,
+      entityType,
+      sourceEntityId: entityId,
       fullNumber: invoice.fullNumber,
       unsignedXml: invoice.xmlContent,
       signingFailedAction: "ELECTRONIC_INVOICE_SIGNING_FAILED",

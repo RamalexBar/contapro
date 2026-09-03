@@ -62,6 +62,7 @@ const NAV_SECTIONS: NavSection[] = [
         permissions: ["quote.create", "creditnote.create", "debitnote.create", "return.create", "sale.read"],
       },
       { to: "/cash", label: "Caja", icon: Wallet },
+      { to: "/manual-invoices", label: "Factura manual", icon: FileText, permissions: ["sale.create"] },
     ],
   },
   { label: "Inventario", items: [{ to: "/products", label: "Inventario", icon: Package }] },
@@ -110,6 +111,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Configuración",
     items: [
+      { to: "/company/profile", label: "Datos de la empresa", icon: Building2, permissions: ["electronic-invoicing.read"] },
       { to: "/rbac", label: "Roles y permisos", icon: ShieldCheck, permissions: ["rbac.manage"] },
       { to: "/audit", label: "Auditoría", icon: History, permissions: ["audit.read"] },
       { to: "/billing", label: "Mi suscripción", icon: CreditCard, permissions: ["billing.manage"] },

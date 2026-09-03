@@ -80,7 +80,7 @@ export class ElectronicInvoicingController {
 
   getBySale = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const invoice = await this.getInvoiceUseCase.execute(req.params.saleId);
+      const invoice = await this.getInvoiceUseCase.execute({ type: "sale", id: req.params.saleId });
       const { xmlContent: _xmlContent, signedXmlContent: _signedXmlContent, ...metadata } = invoice;
       res.json(metadata);
     } catch (err) {
@@ -90,7 +90,7 @@ export class ElectronicInvoicingController {
 
   getXmlBySale = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const invoice = await this.getInvoiceUseCase.execute(req.params.saleId);
+      const invoice = await this.getInvoiceUseCase.execute({ type: "sale", id: req.params.saleId });
       res.type("application/xml").send(invoice.signedXmlContent ?? invoice.xmlContent);
     } catch (err) {
       next(err);
@@ -99,7 +99,38 @@ export class ElectronicInvoicingController {
 
   resubmit = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.resubmitUseCase.execute(req.params.saleId);
+      await this.resubmitUseCase.execute({ type: "sale", id: req.params.saleId });
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ---- Factura manual (modules/manual-invoicing, sin POS/producto) -- mismos handlers que
+  // arriba, misma entidad ElectronicInvoice, discriminador "manual" en vez de "sale". ----
+
+  getByManualInvoice = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const invoice = await this.getInvoiceUseCase.execute({ type: "manual", id: req.params.manualInvoiceId });
+      const { xmlContent: _xmlContent, signedXmlContent: _signedXmlContent, ...metadata } = invoice;
+      res.json(metadata);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getXmlByManualInvoice = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const invoice = await this.getInvoiceUseCase.execute({ type: "manual", id: req.params.manualInvoiceId });
+      res.type("application/xml").send(invoice.signedXmlContent ?? invoice.xmlContent);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resubmitManualInvoice = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.resubmitUseCase.execute({ type: "manual", id: req.params.manualInvoiceId });
       res.status(204).send();
     } catch (err) {
       next(err);
@@ -229,7 +260,17 @@ export class ElectronicInvoicingController {
 
   getPdfBySale = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const invoice = await this.getInvoiceUseCase.execute(req.params.saleId);
+      const invoice = await this.getInvoiceUseCase.execute({ type: "sale", id: req.params.saleId });
+      const pdf = await this.renderPdf(mapInvoiceToRideData(invoice), req);
+      res.type("application/pdf").send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPdfByManualInvoice = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const invoice = await this.getInvoiceUseCase.execute({ type: "manual", id: req.params.manualInvoiceId });
       const pdf = await this.renderPdf(mapInvoiceToRideData(invoice), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {

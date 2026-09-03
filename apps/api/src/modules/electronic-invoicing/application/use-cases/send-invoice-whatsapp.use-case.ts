@@ -40,7 +40,7 @@ export class SendInvoiceWhatsAppUseCase {
     const recipientPhone = normalizeToE164(customer.phone);
 
     try {
-      const invoice = await this.getInvoiceUseCase.execute(input.saleId);
+      const invoice = await this.getInvoiceUseCase.execute({ type: "sale", id: input.saleId });
       const pdf = await renderRidePdf(mapInvoiceToRideData(invoice));
       await this.whatsAppSender.sendDocument(recipientPhone, {
         buffer: pdf,

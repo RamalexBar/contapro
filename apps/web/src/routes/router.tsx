@@ -29,6 +29,8 @@ import { RecurringInvoicesPage } from "../features/recurring-invoices/pages/Recu
 import { CommissionsPage } from "../features/commissions/pages/CommissionsPage";
 import { FixedAssetsPage } from "../features/fixed-assets/pages/FixedAssetsPage";
 import { IntegrationsPage } from "../features/integrations/pages/IntegrationsPage";
+import { CompanyProfilePage } from "../features/company/pages/CompanyProfilePage";
+import { ManualInvoicePage } from "../features/manual-invoicing/pages/ManualInvoicePage";
 import { PlatformAdminLoginPage } from "../features/platform-admin/pages/PlatformAdminLoginPage";
 import { PlatformDashboardPage } from "../features/platform-admin/pages/PlatformDashboardPage";
 import { PlansPage } from "../features/platform-admin/pages/PlansPage";
@@ -240,6 +242,22 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <IntegrationsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/company/profile",
+    element: (
+      <ProtectedRoute>
+        <CompanyProfilePage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/manual-invoices",
+    element: (
+      <ProtectedRoute>
+        <ManualInvoicePage />
       </ProtectedRoute>
     ),
   },

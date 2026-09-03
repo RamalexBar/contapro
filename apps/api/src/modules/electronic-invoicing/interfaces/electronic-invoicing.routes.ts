@@ -49,6 +49,28 @@ electronicInvoicingRouter.post(
   electronicInvoicingController.resubmit
 );
 
+// ---- Factura manual (modules/manual-invoicing, sin POS/producto) ----
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/manual-invoices/:manualInvoiceId",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getByManualInvoice
+);
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/manual-invoices/:manualInvoiceId/xml",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getXmlByManualInvoice
+);
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/manual-invoices/:manualInvoiceId/pdf",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getPdfByManualInvoice
+);
+electronicInvoicingRouter.post(
+  "/electronic-invoicing/manual-invoices/:manualInvoiceId/resubmit",
+  requirePermission("electronic-invoicing.manage"),
+  electronicInvoicingController.resubmitManualInvoice
+);
+
 electronicInvoicingRouter.get(
   "/electronic-invoicing/credit-notes/:creditNoteId",
   requirePermission("electronic-invoicing.read"),

@@ -16,7 +16,8 @@ import { claimNextDocumentNumber } from "../application/numbering-claim";
 
 function toRecord(row: {
   id: string;
-  saleId: string;
+  saleId: string | null;
+  manualInvoiceId: string | null;
   branchId: string;
   prefix: string;
   number: number;
@@ -29,6 +30,7 @@ function toRecord(row: {
   return {
     id: row.id,
     saleId: row.saleId,
+    manualInvoiceId: row.manualInvoiceId,
     branchId: row.branchId,
     prefix: row.prefix,
     number: row.number,
@@ -76,7 +78,7 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
         data: {
           companyId,
           branchId: data.branchId,
-          saleId: data.saleId,
+          ...(data.source.type === "sale" ? { saleId: data.source.saleId } : { manualInvoiceId: data.source.manualInvoiceId }),
           numberingResolutionId: resolution.id,
           prefix: resolution.prefix,
           number,
@@ -94,12 +96,20 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
         },
       });
 
-      // updateMany (no update): Sale.update({where:{id}}) por si solo no queda scoped al tenant
-      // (ver tenant.extension.ts) -- companyId ya esta disponible arriba, se agrega al where.
-      await tx.sale.updateMany({
-        where: { id: data.saleId, companyId },
-        data: { cufe, invoiceXmlUrl: `/api/electronic-invoicing/sales/${data.saleId}/xml` },
-      });
+      // updateMany (no update): Sale/ManualInvoice.update({where:{id}}) por si solo no queda
+      // scoped al tenant (ver tenant.extension.ts) -- companyId ya esta disponible arriba, se
+      // agrega al where.
+      if (data.source.type === "sale") {
+        await tx.sale.updateMany({
+          where: { id: data.source.saleId, companyId },
+          data: { cufe, invoiceXmlUrl: `/api/electronic-invoicing/sales/${data.source.saleId}/xml` },
+        });
+      } else {
+        await tx.manualInvoice.updateMany({
+          where: { id: data.source.manualInvoiceId, companyId },
+          data: { cufe, invoiceXmlUrl: `/api/electronic-invoicing/manual-invoices/${data.source.manualInvoiceId}/xml` },
+        });
+      }
 
       return { invoice, resolutionNumber: resolution.resolutionNumber };
     });
@@ -109,6 +119,18 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
 
   async findBySaleId(saleId: string): Promise<ElectronicInvoiceWithXml | null> {
     const row = await prisma.electronicInvoice.findFirst({ where: { saleId }, include: { numberingResolution: true } });
+    if (!row) return null;
+    return {
+      ...toRecord(row, row.numberingResolution.resolutionNumber),
+      xmlContent: row.xmlContent,
+      signedXmlContent: row.signedXmlContent,
+      dianTrackingId: row.dianTrackingId,
+      rejectionReason: row.rejectionReason,
+    };
+  }
+
+  async findByManualInvoiceId(manualInvoiceId: string): Promise<ElectronicInvoiceWithXml | null> {
+    const row = await prisma.electronicInvoice.findFirst({ where: { manualInvoiceId }, include: { numberingResolution: true } });
     if (!row) return null;
     return {
       ...toRecord(row, row.numberingResolution.resolutionNumber),
@@ -171,11 +193,17 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
           respondedAt: now,
         },
       });
-      // El CUFE local generado en claimNumberAndGenerate era provisional -- Sale.cufe debe
-      // reflejar el CUFE real que autorizo la DIAN via el proveedor (ver aviso en el use-case).
-      const invoice = await prisma.electronicInvoice.findFirst({ where: { id, companyId }, select: { saleId: true } });
-      if (invoice) {
+      // El CUFE local generado en claimNumberAndGenerate era provisional -- Sale.cufe/
+      // ManualInvoice.cufe debe reflejar el CUFE real que autorizo la DIAN via el proveedor (ver
+      // aviso en el use-case).
+      const invoice = await prisma.electronicInvoice.findFirst({
+        where: { id, companyId },
+        select: { saleId: true, manualInvoiceId: true },
+      });
+      if (invoice?.saleId) {
         await prisma.sale.updateMany({ where: { id: invoice.saleId, companyId }, data: { cufe: result.cufe } });
+      } else if (invoice?.manualInvoiceId) {
+        await prisma.manualInvoice.updateMany({ where: { id: invoice.manualInvoiceId, companyId }, data: { cufe: result.cufe } });
       }
       return;
     }
@@ -200,7 +228,8 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
     });
     return rows.map((row) => ({
       id: row.id,
-      sourceEntityId: row.saleId,
+      sourceEntityId: (row.saleId ?? row.manualInvoiceId) as string,
+      sourceEntityType: row.saleId ? "Sale" : "ManualInvoice",
       fullNumber: row.fullNumber,
       status: row.status,
       signedXmlContent: row.signedXmlContent,
@@ -215,7 +244,8 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
     });
     return rows.map((row) => ({
       id: row.id,
-      sourceEntityId: row.saleId,
+      sourceEntityId: (row.saleId ?? row.manualInvoiceId) as string,
+      sourceEntityType: row.saleId ? "Sale" : "ManualInvoice",
       fullNumber: row.fullNumber,
       status: row.status,
       dianTrackingId: row.dianTrackingId as string,

@@ -1,0 +1,44 @@
+// Factura manual (modules/manual-invoicing) — factura electronica DIAN sin pasar por POS/producto,
+// para una empresa que solo quiere facturar (ver modules/manual-invoicing/README.md). Lineas de
+// descripcion libre, sin productId -- deliberadamente no reusa Sale/SaleItem para no arrastrar
+// movimientos de inventario reales de un "producto generico" inventado (Product no tiene ningun
+// flag de "no rastrea inventario" en este codebase). Actua como una sexta entidad fuente para
+// ElectronicInvoice (ver electronic-invoicing.prisma), mismo patron que Sale/CreditNote/DebitNote/
+// Purchase ya usan cada uno con su propio tipo de documento electronico.
+
+model ManualInvoice {
+  id              String   @id @default(uuid())
+  companyId       String
+  branchId        String
+  customerId      String?
+  createdByUserId String
+  issueDate       DateTime @default(now())
+  subtotal        Decimal  @db.Decimal(14, 2)
+  taxTotal        Decimal  @db.Decimal(14, 2)
+  total           Decimal  @db.Decimal(14, 2)
+  // Mirror de Sale.cufe/Sale.invoiceXmlUrl, mismo criterio: stampeados por
+  // claimNumberAndGenerate/applyThirdPartySubmissionResult cuando la factura se genera/confirma.
+  cufe            String?
+  invoiceXmlUrl   String?
+  createdAt       DateTime @default(now())
+
+  items             ManualInvoiceItem[]
+  electronicInvoice ElectronicInvoice?
+
+  @@index([companyId, branchId, createdAt])
+  @@map("manual_invoices")
+}
+
+model ManualInvoiceItem {
+  id              String        @id @default(uuid())
+  manualInvoiceId String
+  manualInvoice   ManualInvoice @relation(fields: [manualInvoiceId], references: [id])
+  description     String
+  quantity        Decimal       @db.Decimal(14, 4)
+  unitPrice       Decimal       @db.Decimal(14, 4)
+  taxPercent      Decimal       @db.Decimal(5, 2)
+  taxAmount       Decimal       @db.Decimal(14, 2)
+  total           Decimal       @db.Decimal(14, 2)
+
+  @@map("manual_invoice_items")
+}
