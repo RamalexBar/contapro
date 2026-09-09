@@ -181,6 +181,12 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
     currency: "COP",
     exchangeRate: "",
   });
+  // Helper de solo-UI: calcula form.taxTotal a partir de un % en vez de que el usuario tenga que
+  // sacar la cuenta a mano (mismo bug que se corrigio en ExpensesPage.tsx: un campo "IVA" que
+  // esperaba el valor en pesos, no el %, sumaba literalmente 1.500.000 + 19). Se deja taxTotal
+  // editable de forma independiente porque la extraccion por IA (extractMutation) llena un valor
+  // ya calculado desde la foto/PDF de la factura, no un %.
+  const [taxPercentHelper, setTaxPercentHelper] = useState("");
   const [withholdings, setWithholdings] = useState<PurchaseWithholdingInput[]>([]);
   const [extractResult, setExtractResult] = useState<ExtractPurchaseInvoiceResult | null>(null);
   const [fileTypeError, setFileTypeError] = useState(false);
@@ -193,6 +199,7 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
     },
     onSuccess: (result) => {
       setExtractResult(result);
+      setTaxPercentHelper("");
       const { extracted, matchedSupplier, suggestedDueDate } = result;
       setForm((prev) => ({
         ...prev,
@@ -245,6 +252,7 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
       queryClient.invalidateQueries({ queryKey: ["accounts-payable"] });
       setForm({ supplierId: "", invoiceNumber: "", subtotal: "", taxTotal: "", dueDate: todayStr(), currency: "COP", exchangeRate: "" });
+      setTaxPercentHelper("");
       setWithholdings([]);
       setExtractResult(null);
     },
@@ -332,7 +340,28 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
             onChange={(e) => setForm({ ...form, subtotal: e.target.value })}
             required
           />
-          <Input type="number" placeholder="IVA" value={form.taxTotal} onChange={(e) => setForm({ ...form, taxTotal: e.target.value })} />
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            step="any"
+            placeholder="IVA % (opcional, calcula el valor)"
+            value={taxPercentHelper}
+            onChange={(e) => {
+              const pct = e.target.value;
+              setTaxPercentHelper(pct);
+              setForm((prev) => ({ ...prev, taxTotal: pct === "" ? prev.taxTotal : String(round2(calculateTax(Number(prev.subtotal) || 0, Number(pct) || 0))) }));
+            }}
+          />
+          <Input
+            type="number"
+            placeholder="IVA (valor $ — de la factura o calculado con el % de arriba)"
+            value={form.taxTotal}
+            onChange={(e) => {
+              setTaxPercentHelper("");
+              setForm({ ...form, taxTotal: e.target.value });
+            }}
+          />
           <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} required />
           <Select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
             <option value="COP">COP</option>
@@ -350,6 +379,10 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
               required
             />
           )}
+          <p className="col-span-2 text-sm text-slate-500 sm:col-span-4">
+            Subtotal: {formatCOP(Number(form.subtotal) || 0)} · IVA: {formatCOP(Number(form.taxTotal) || 0)} ·{" "}
+            <span className="font-semibold text-slate-700">Total: {formatCOP(total)}</span>
+          </p>
           <Button
             type="submit"
             disabled={form.currency !== "COP" && !(Number(form.exchangeRate) > 0)}
