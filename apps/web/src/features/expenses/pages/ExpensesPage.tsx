@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatCOP } from "@erp/shared-utils";
+import { calculateTax, formatCOP, round2 } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
@@ -176,11 +176,13 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
     description: "",
     date: todayStr(),
     subtotal: "",
-    taxTotal: "",
+    taxPercent: "",
     paymentMethod: "CASH" as "CASH" | "CARD" | "TRANSFER",
     costCenterId: "",
   });
-  const total = (Number(form.subtotal) || 0) + (Number(form.taxTotal) || 0);
+  const subtotal = Number(form.subtotal) || 0;
+  const taxTotal = round2(calculateTax(subtotal, Number(form.taxPercent) || 0));
+  const total = round2(subtotal + taxTotal);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -190,8 +192,8 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
         payeeName: form.payeeName,
         description: form.description || undefined,
         date: form.date,
-        subtotal: Number(form.subtotal),
-        taxTotal: Number(form.taxTotal) || 0,
+        subtotal,
+        taxTotal,
         total,
         paymentMethod: form.paymentMethod,
         costCenterId: form.costCenterId || undefined,
@@ -204,7 +206,7 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
         description: "",
         date: todayStr(),
         subtotal: "",
-        taxTotal: "",
+        taxPercent: "",
         paymentMethod: "CASH",
         costCenterId: "",
       });
@@ -256,12 +258,20 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
           <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input
             type="number"
-            placeholder="Subtotal"
+            placeholder="Subtotal (sin IVA)"
             value={form.subtotal}
             onChange={(e) => setForm({ ...form, subtotal: e.target.value })}
             required
           />
-          <Input type="number" placeholder="IVA" value={form.taxTotal} onChange={(e) => setForm({ ...form, taxTotal: e.target.value })} />
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            step="any"
+            placeholder="IVA % (ej. 19)"
+            value={form.taxPercent}
+            onChange={(e) => setForm({ ...form, taxPercent: e.target.value })}
+          />
           <Select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value as "CASH" | "CARD" | "TRANSFER" })}>
             <option value="CASH">Efectivo</option>
             <option value="CARD">Tarjeta</option>
@@ -277,6 +287,9 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
                 </option>
               ))}
           </Select>
+          <p className="col-span-2 text-sm text-slate-500 sm:col-span-4">
+            Subtotal: {formatCOP(subtotal)} · IVA: {formatCOP(taxTotal)} · <span className="font-semibold text-slate-700">Total: {formatCOP(total)}</span>
+          </p>
           <Button type="submit" loading={createMutation.isPending}>
             Registrar: {formatCOP(total)}
           </Button>
