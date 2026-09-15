@@ -18,6 +18,7 @@ import { OpportunitiesPage } from "../features/crm/pages/OpportunitiesPage";
 import { AuditLogPage } from "../features/audit/pages/AuditLogPage";
 import { QuotesAndNotesPage } from "../features/pos/pages/QuotesAndNotesPage";
 import { AccountingPage } from "../features/accounting/pages/AccountingPage";
+import { JournalBookPage } from "../features/accounting/pages/JournalBookPage";
 import { BankingPage } from "../features/accounting/pages/BankingPage";
 import { ExogenaPage } from "../features/accounting/pages/ExogenaPage";
 import { SuppliersPage } from "../features/suppliers/pages/SuppliersPage";
@@ -154,6 +155,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <AccountingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/accounting/journal",
+    element: (
+      <ProtectedRoute>
+        <JournalBookPage />
       </ProtectedRoute>
     ),
   },

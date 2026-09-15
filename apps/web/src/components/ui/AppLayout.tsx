@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
+  BookOpen,
   Building2,
   CalendarDays,
   Clock,
@@ -70,6 +71,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Contabilidad",
     items: [
       { to: "/accounting", label: "Contabilidad", icon: FileSpreadsheet, permissions: ["accounting.read"] },
+      { to: "/accounting/journal", label: "Libro Diario", icon: BookOpen, permissions: ["accounting.read"] },
       { to: "/accounting/banks", label: "Bancos", icon: Landmark, permissions: ["accounting.read"] },
       { to: "/accounting/exogena", label: "Exógena DIAN", icon: ScrollText, permissions: ["accounting.read"] },
     ],
