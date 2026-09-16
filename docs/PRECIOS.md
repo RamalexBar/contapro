@@ -52,20 +52,24 @@ de Contapro habilitan el mismo set de funcionalidad (`pos`/`inventory`/`cash`/`p
 `accounting` = `true` en los 4); lo único que escala con el precio es `maxBranches`/`maxUsers`, no
 qué módulos están prendidos.
 
-## Planes de Contapro (definidos en `seed-base.ts`, actualizado 2026-08-27)
+## Planes de Contapro (definidos en `seed-base.ts`, actualizado 2026-09-16)
 
-| Plan | Código | Mensual | Anual (10% desc.) | Sucursales | Usuarios | Referencia de precio |
+| Plan | Código | Mensual | Anual | Sucursales | Usuarios | Referencia de precio |
 |---|---|---|---|---|---|---|
 | Prueba gratuita | `TRIAL` | $0 | $0 | 1 | 3 | 14 días, todo habilitado (ver `register-company.use-case.ts`) |
-| Plan Emprendedor | `BASICO` | $69.900 | $754.900 | 1 | 3 | = Alegra Emprendedor ($69.900, solo contabilidad) |
-| Plan Pyme | `PYME` | $149.900 | $1.618.900 | 3 | 10 | = Alegra Pyme ($149.900, solo contabilidad) |
-| Plan Plus | `PRO` | $279.900 | $3.022.900 | 10 | 50 | = Alegra Plus ($279.900, solo contabilidad) |
+| Plan Emprendedor | `BASICO` | $69.900 | $720.000 (~14,2% desc.) | 1 | 3 | = Alegra Emprendedor ($69.900, solo contabilidad) |
+| Plan Pyme | `PYME` | $149.900 | $1.528.900 (15% desc.) | 3 | 10 | = Alegra Pyme ($149.900, solo contabilidad) |
+| Plan Plus | `PRO` | $279.900 | $2.854.900 (15% desc.) | 10 | 50 | = Alegra Plus ($279.900, solo contabilidad) |
 
 Los códigos internos (`BASICO`, `PRO`) se mantuvieron iguales a los del scaffold original aunque
 el nombre visible cambió (`Plan Emprendedor`, `Plan Plus`) — evita dejar filas de `Plan`
 huérfanas en bases de datos que ya tenían suscripciones apuntando a esos ids. `PYME` es un plan
-nuevo (no existía en el scaffold). Precios subidos el 2026-08-27 desde $39.900/$79.900/$149.900 a
-los actuales — ver historial de git para el razonamiento completo.
+nuevo (no existía en el scaffold). Precios mensuales subidos el 2026-08-27 desde
+$39.900/$79.900/$149.900 a los actuales — ver historial de git para el razonamiento completo.
+**Anual repriced el 2026-09-16** (antes 10% de descuento parejo: $754.900/$1.618.900/$3.022.900) a
+pedido explícito del usuario, sin ligarlo a un descuento de la competencia (no hay dato propio de
+cuánto descuenta Alegra en su plan anual) — el de `BASICO` es un valor fijo elegido a mano
+($720.000, no una fórmula de %), los otros dos sí siguen una regla pareja de 15% sobre 12 meses.
 
 ## Cobro real: SÍ está integrado (Wompi/Bancolombia)
 
@@ -75,5 +79,7 @@ funcionando en producción** (confirmado con llaves `pub_prod_`/`prv_prod_` real
 (`POST /subscription/checkout`, módulo `billing`) generan un link de pago Wompi real, con webhook
 que confirma el pago y renueva la suscripción automáticamente. Ver
 `apps/api/src/modules/saas-admin/README.md` para el detalle completo, incluido el cobro automático
-recurrente (tarjeta guardada) que quedó parcialmente pendiente de verificar (funciona el guardado
-de tarjeta, el cobro automático en sí tiene un problema sin resolver con Wompi, ver ese README).
+recurrente (tarjeta guardada) — **confirmado en vivo de punta a punta el 2026-09-16 contra sandbox
+con llaves reales**, funciona para Visa y Mastercard sin necesitar 3DS/3RI. Falta repetir la misma
+prueba con llaves de producción antes de ofrecerlo a un cliente real (sandbox y producción son
+ambientes separados en Wompi).

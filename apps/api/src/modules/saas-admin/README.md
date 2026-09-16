@@ -156,39 +156,39 @@ suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a red
   `POST /subscription/payment-source` y `POST /subscription/disable-auto-renew`. La pagina
   `/billing` muestra "Renovacion automatica" (marca/ultimos 4 digitos si esta activa, formulario de
   tarjeta si no) — se oculta si `VITE_WOMPI_PUBLIC_KEY` no esta configurada.
-- **Verificado en vivo contra sandbox.wompi.co con llaves reales** (curl directo, sin pasar por
-  este backend ni por un navegador): `GET /merchants/:publicKey` → `acceptance_token`,
-  `POST /tokens/cards` con la tarjeta de prueba `4242 4242 4242 4242` (APPROVED segun
-  `datos-de-prueba-en-sandbox`) → token, `POST /payment_sources` con ese token → `payment_source`
-  creada (`status: AVAILABLE`). Los tres coinciden exactamente con lo que asumia el codigo, **salvo
-  dos hallazgos ya corregidos**:
-  1. `POST /payment_sources` **no devuelve `card_brand`** dentro de `public_data` (solo
-     `bin`/`last_four`/`card_holder`/`type`) — `cardBrand` quedaba `null` siempre. Se agrego
-     `detectCardBrandFromBin` (heuristica por rango de BIN) como fallback.
-  2. `POST /transactions` con `payment_source_id` **exige `payment_method: { type, installments }`
-     y un campo `signature`** (mismo algoritmo que `buildCheckoutUrl`, la propia documentacion de
-     Wompi remite a esa formula) — sin ninguno de los dos, Wompi rechaza el request antes de
-     intentar cobrar nada. Ambos ya se agregan en `chargePaymentSource`.
-  - **Lo unico que falta confirmar**: un cobro real en estado `APPROVED`. `POST /transactions` con
-    `payment_source_id` rechaza la `signature` como invalida SIEMPRE, pese a que:
-    - La formula esta verificada byte a byte contra el ejemplo oficial de Wompi (`buildCheckoutUrl`,
-      ver seccion de arriba) y tambien contra el schema publico de `TransactionRequest`
-      (`raw-githubusercontent.com/api-evangelist/wompi/openapi/wompi-transactions-api-openapi.yml`).
-    - **El mismo `WOMPI_INTEGRITY_SECRET`, la misma formula, el mismo `reference`/`amount`/
-      `currency`, calculados con el mismo script, SI fueron aceptados por el Web Checkout real**
-      (`checkout.wompi.co`) — el pago avanzo hasta el paso de clave dinamica (3DS/OTP) con la
-      tarjeta de prueba, en vez de rechazar la pagina por firma invalida. Eso descarta que el
-      secreto o la formula esten mal.
-    - Hipotesis mas fuerte, sin confirmar: la tarjeta de prueba de sandbox EXIGE 3DS/clave dinamica
-      (se vio en el Web Checkout), y un cobro `payment_source_id` server-to-server no tiene forma
-      de presentarle ese reto al cliente (es justamente el punto de tokenizar: cobrar sin que el
-      cliente este presente) — es posible que Wompi rechace el request con un mensaje generico de
-      "firma invalida" que en realidad esconde "esta tarjeta/comercio exige 3DS y este flujo no
-      puede resolverlo". **No confirmado** — pendiente de escalar a soporte de Wompi con el caso
-      reproducible exacto (mismo secret+formula: acepta Web Checkout, rechaza `/transactions` con
-      `payment_source_id`) antes de confiar en el cobro automatico en produccion.
-  - 318 tests unitarios pasando (incluye tokenizacion/cobro mockeando `fetch`, con el body exacto
-    confirmado arriba, ver `wompi-payment-gateway.spec.ts`), build/lint limpios.
+- **Confirmado en vivo de punta a punta el 2026-09-16** (sesion anterior habia quedado bloqueada
+  aqui, ver historial de git de este archivo) **contra sandbox.wompi.co con llaves reales**, con
+  DOS pruebas independientes:
+  1. Curl directo (sin pasar por este backend): tokenizar + `POST /payment_sources` +
+     `POST /transactions` con `payment_source_id` → `APPROVED`, probado tanto con una tarjeta
+     Mastercard asegurada con el flujo 3DS/3RI (`fuentes-de-pago-3ds` de la doc de Wompi) como con
+     una tarjeta Visa **normal, sin ningun paso de 3DS**. Los dos casos aprobaron igual — 3DS/3RI
+     es una funcionalidad opcional de Wompi (autenticacion reforzada), no un requisito para que
+     `chargePaymentSource` funcione.
+  2. **De punta a punta contra la app real** (no curl aislado): tarjeta Visa guardada desde
+     `/billing` en el navegador (`SaveOwnPaymentSourceUseCase` → `SavePaymentSourceUseCase` →
+     `WompiPaymentGateway.createPaymentSource`) → `RunSubscriptionAutoChargesUseCase.execute()`
+     corrido a mano (sin esperar el poller de 1 hora) → `chargePaymentSource` cobro `APPROVED`
+     contra Wompi → webhook `transaction.updated` simulado a mano contra
+     `POST /admin/subscriptions/webhooks/wompi` con una firma calculada con el mismo algoritmo de
+     `verifyWebhookSignature` (mismo `WOMPI_EVENTS_SECRET`) → `ConfirmWompiPaymentUseCase` acepto
+     la firma, marco el `SubscriptionPayment` `CONFIRMED` y avanzo `currentPeriodEnd` en 1 mes
+     correctamente. Todo el flujo de cobro recurrente esta confirmado con datos reales, no
+     mockeados.
+  - **Conclusion sobre la limitacion anterior**: el bloqueo documentado antes ("firma invalida
+    SIEMPRE") **no era un limite real de Wompi ni de la red de la tarjeta** — el propio comentario
+    de esa sesion ya lo advertia ("el `WOMPI_INTEGRITY_SECRET` usado en la prueba fue rechazado...
+    revisar que la llave configurada sea la correcta"). Con un `WOMPI_INTEGRITY_SECRET` correcto,
+    el cobro automatico funciona para cualquier red de tarjeta (Visa incluida), sin necesitar el
+    flujo de 3DS/3RI para nada.
+  - **Matiz honesto sobre el webhook**: el payload del paso 2 se armo a mano replicando el formato
+    documentado de Wompi (mismo algoritmo que ya implementa `verifyWebhookSignature`, que ademas
+    lee el orden de `properties` del propio evento en vez de asumirlo fijo) — confirma que el
+    mecanismo de firma/aplicacion de pago funciona correctamente, pero no reemplaza un webhook
+    100% enviado por los servidores de Wompi contra una URL publica real (sigue pendiente, ver
+    item 3 de "Que falta implementar").
+  - 318 tests unitarios pasando (incluye tokenizacion/cobro mockeando `fetch`, ver
+    `wompi-payment-gateway.spec.ts`), build/lint limpios.
 
 ## Envio real de recordatorios (iteracion 17)
 
@@ -230,9 +230,10 @@ suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a red
    codigo).
 2. Actualizaciones automaticas de `apps/web`/`apps/mobile` ("Nueva version disponible") — fuera
    del alcance de este backend, responsabilidad de Service Worker / Expo OTA updates.
-3. Wompi: confirmar `verifyWebhookSignature` contra un webhook 100% real (ver limitacion en la
-   seccion dedicada arriba) — falta completar un pago de prueba end-to-end por navegador con una
-   URL publica registrada en el dashboard de Wompi.
+3. Wompi: confirmar `verifyWebhookSignature` contra un webhook 100% real enviado por los
+   servidores de Wompi (el 2026-09-16 se confirmo el algoritmo con un payload armado a mano que
+   replica el formato documentado, ver seccion dedicada arriba, pero no es lo mismo que recibirlo
+   de verdad) — falta una URL publica registrada en el dashboard de Wompi para completarlo.
 4. Wompi: sin UI web todavia para generar el link de cobro desde el panel
    (`apps/web/src/features/platform-admin`) — hoy solo existe el endpoint
    (`POST /admin/subscriptions/:id/checkout`), un admin de plataforma lo llamaria a mano o via un
@@ -241,13 +242,9 @@ suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a red
    webhooks fallidos por su cuenta, pero no hay un job propio que consulte
    `GET /v1/transactions/:id` con `WOMPI_PRIVATE_KEY` para pagos que quedaron `PENDING` demasiado
    tiempo) — la llave privada ya se usa para el cobro recurrente (iteracion 26) pero no para esto.
-6. Cobro automatico recurrente (iteracion 26): tokenizar y crear `payment_source` SI se
-   confirmaron en vivo (ver seccion dedicada arriba); falta confirmar un `chargePaymentSource`
-   real en estado `APPROVED` — el secreto de integridad SI es correcto (confirmado: el mismo
-   secret+formula fue aceptado por Web Checkout real, avanzo hasta 3DS/clave dinamica), pero
-   `POST /transactions` con `payment_source_id` rechaza esa misma firma siempre. Hipotesis sin
-   confirmar: la tarjeta de prueba exige 3DS y un cobro server-to-server no puede resolverlo.
-   Pendiente escalar a soporte de Wompi con el caso reproducible (ver seccion dedicada arriba).
+6. ~~Cobro automatico recurrente (iteracion 26): confirmar `chargePaymentSource` en `APPROVED`~~ —
+   **resuelto y confirmado en vivo el 2026-09-16** (ver seccion dedicada arriba), para Visa y
+   Mastercard, sin necesitar 3DS/3RI.
 7. Cobro automatico recurrente: si `chargePaymentSource` falla varias veces seguidas (tarjeta
    vencida) no hay una notificacion al cliente pidiendole actualizar el medio de pago — solo queda
    auditado (`SUBSCRIPTION_AUTO_CHARGE_FAILED`) y la suscripcion sigue su curso normal hacia

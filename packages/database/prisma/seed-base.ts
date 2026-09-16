@@ -60,18 +60,18 @@ export async function seedBase(prisma: Prisma.TransactionClient) {
   });
   await prisma.plan.upsert({
     where: { code: "BASICO" },
-    create: { code: "BASICO", name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 754900, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
-    update: { name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 754900, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+    create: { code: "BASICO", name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 720000, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+    update: { name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 720000, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
   });
   await prisma.plan.upsert({
     where: { code: "PYME" },
-    create: { code: "PYME", name: "Plan Pyme", priceMonthly: 149900, priceYearly: 1618900, maxBranches: 3, maxUsers: 10, features: FULL_FEATURES },
-    update: { name: "Plan Pyme", priceMonthly: 149900, priceYearly: 1618900, maxBranches: 3, maxUsers: 10, features: FULL_FEATURES },
+    create: { code: "PYME", name: "Plan Pyme", priceMonthly: 149900, priceYearly: 1528900, maxBranches: 3, maxUsers: 10, features: FULL_FEATURES },
+    update: { name: "Plan Pyme", priceMonthly: 149900, priceYearly: 1528900, maxBranches: 3, maxUsers: 10, features: FULL_FEATURES },
   });
   await prisma.plan.upsert({
     where: { code: "PRO" },
-    create: { code: "PRO", name: "Plan Plus", priceMonthly: 279900, priceYearly: 3022900, maxBranches: 10, maxUsers: 50, features: FULL_FEATURES },
-    update: { name: "Plan Plus", priceMonthly: 279900, priceYearly: 3022900, maxBranches: 10, maxUsers: 50, features: FULL_FEATURES },
+    create: { code: "PRO", name: "Plan Plus", priceMonthly: 279900, priceYearly: 2854900, maxBranches: 10, maxUsers: 50, features: FULL_FEATURES },
+    update: { name: "Plan Plus", priceMonthly: 279900, priceYearly: 2854900, maxBranches: 10, maxUsers: 50, features: FULL_FEATURES },
   });
 
   // ---- Planes "Solo Facturacion" (2026-09-03) ----
