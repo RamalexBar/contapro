@@ -6,8 +6,8 @@ import type { ISubscriptionRepository, SubscriptionRecord } from "../../../saas-
 export interface OwnSubscriptionResult {
   subscription: SubscriptionRecord;
   plan: PlanRecord;
-  /** Planes pagos disponibles (excluye TRIAL) para el selector "cambiar de plan" -- solo tiene
-   * sentido mostrarlo mientras la suscripcion siga en TRIALING (ver README del modulo). */
+  /** Planes pagos disponibles (excluye TRIAL) para el selector "cambiar de plan" -- el frontend
+   * (BillingPage.tsx) lo muestra mientras la suscripcion este en TRIALING o SUSPENDED. */
   availablePlans: PlanRecord[];
 }
 

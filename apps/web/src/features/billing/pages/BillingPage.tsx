@@ -260,9 +260,15 @@ export function BillingPage() {
               `data.plan.code === "TRIAL"`, que dejaba de ser cierto apenas alguien elegia un plan
               pago (createOwnCheckout cambia Subscription.planId ANTES de cobrar, para que el
               monto del checkout sea el correcto), asi que si esa persona no llegaba a pagar
-              quedaba con un solo boton "Pagar ahora" y sin forma de volver a la lista. */}
-          {data.subscription.status === "TRIALING" && data.availablePlans.length > 0 && (
-            <Card title="Elegi un plan para empezar a pagar">
+              quedaba con un solo boton "Pagar ahora" y sin forma de volver a la lista. Tambien se
+              habilita en SUSPENDED: el backend (CreateOwnSubscriptionCheckoutUseCase) ya permitia
+              cambiar de plan en cualquier estado, esto solo destrababa la UI -- antes una empresa
+              suspendida que queria bajar/subir de plan para reactivar quedaba forzada a pagar el
+              mismo plan primero y recien despues ir a pedirle el cambio al operador de plataforma. */}
+          {(data.subscription.status === "TRIALING" || data.subscription.status === "SUSPENDED") && data.availablePlans.length > 0 && (
+            <Card
+              title={data.subscription.status === "SUSPENDED" ? "Elegi un plan para reactivar tu suscripcion" : "Elegi un plan para empezar a pagar"}
+            >
               <div className="grid gap-4 sm:grid-cols-3">
                 {data.availablePlans.map((plan: PlanRecord) => {
                   const isSelected = plan.id === data.plan.id;
