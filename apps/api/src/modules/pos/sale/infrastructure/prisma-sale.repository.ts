@@ -306,6 +306,15 @@ export class PrismaSaleRepository implements ISaleRepository {
     const companyId = getTenantContext().companyId;
     let costTotal = 0;
 
+    // Branch esta en TENANT_MODELS (auto-scoped por findFirst) -- se confirma ANTES de usar
+    // branchId en cualquier where/create de abajo. Sin esto, un branchId de otra empresa no
+    // llegaria a leer/tocar datos ajenos (ProductBranchStock tambien esta tenant-scoped, un
+    // branchId ajeno simplemente no matchea ninguna fila), pero si dejaria StockMovement/Kardex
+    // con una referencia colgada dentro de los propios registros del atacante -- mismo criterio
+    // de "no depender de que el caller ya valido esto" que authorizeItemDiscount de mas abajo.
+    const branch = await tx.branch.findFirst({ where: { id: branchId } });
+    if (!branch) throw new NotFoundError("Branch", branchId);
+
     for (const item of items) {
       const quantity = Number(item.quantity);
 
@@ -313,6 +322,7 @@ export class PrismaSaleRepository implements ISaleRepository {
         where: { id: item.productId },
         select: { costMethod: true, tracksBatches: true, currentCost: true },
       });
+      if (!product) throw new NotFoundError("Product", item.productId);
       const useFifo = product?.costMethod === "FIFO" && product?.tracksBatches;
       const averageCost = Number(product?.currentCost ?? 0);
 
