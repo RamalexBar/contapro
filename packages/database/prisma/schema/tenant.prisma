@@ -1,14 +1,19 @@
 // Multiempresa / Multisucursal / Suscripciones SaaS
 
-/// Ver modules/electronic-invoicing/README.md, seccion "Proveedor tecnologico (MATIAS API)".
-/// DIRECT = envio directo a la DIAN existente (dian-soap-client.ts, default, sin cambios de
-/// conducta). MATIAS = via proveedor tecnologico (matias-invoicing-client.ts), solo facturas de
-/// venta por ahora (ver README). Un solo proveedor real implementado; no se modela como tabla
-/// generica "por si acaso" se suma Plemsi despues -- se decide si vale la pena esa
-/// generalizacion cuando exista una segunda implementacion real que comparar.
+/// Ver modules/electronic-invoicing/README.md, seccion "Proveedor tecnologico (MATIAS API /
+/// Factus API)". DIRECT = envio directo a la DIAN existente (dian-soap-client.ts, default, sin
+/// cambios de conducta). MATIAS/FACTUS = via el proveedor tecnologico correspondiente
+/// (matias-invoicing-client.ts / factus-invoicing-client.ts), solo facturas de venta por ahora
+/// (ver README). Dos proveedores reales implementados; se sigue sin modelar como tabla generica
+/// "por si acaso" se suma un tercero -- la comparacion real entre MATIAS y Factus (2026-09-18)
+/// confirmo que sus modelos de auth/numeracion son lo bastante distintos (token fijo por empresa
+/// vs OAuth2 password grant + numbering_range_id propio de Factus) como para que una tabla
+/// generica de "credenciales de proveedor" hoy forzaria una forma comun artificial en vez de
+/// simplificar algo.
 enum DianProviderType {
   DIRECT
   MATIAS
+  FACTUS
 }
 
 model Company {
@@ -36,6 +41,13 @@ model Company {
   // /electronic-invoicing/provider-settings; no se puede volver a leer en texto plano despues.
   electronicInvoicingProvider DianProviderType @default(DIRECT)
   matiasApiTokenEncrypted     String?
+  // factusCredentialsEncrypted: un solo blob cifrado (credential-cipher.ts) con el JSON
+  // {clientId, clientSecret, email, password, numberingRangeId} -- Factus exige las 4 credenciales
+  // de OAuth2 password grant (no un token fijo como MATIAS) MAS el id interno del rango de
+  // numeracion de Factus para "Factura de Venta" (asignado por Factus al crear el rango en su
+  // plataforma, no el prefijo/resolucion DIAN que ya guarda InvoiceNumberingResolution) -- por eso
+  // es un campo propio y no matiasApiTokenEncrypted reusado. Ver factus-invoicing-client.ts.
+  factusCredentialsEncrypted  String?
 
   // ---- Datos fiscales DIAN de la empresa (ver modules/company/README.md) ----
   // Strings planos opcionales SIN catalogo/enum, mismo criterio ya usado en Customer.dian* --

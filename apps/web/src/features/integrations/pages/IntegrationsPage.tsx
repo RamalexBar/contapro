@@ -24,6 +24,7 @@ import {
   setDianProviderSettings,
   type CreateApiKeyResult,
   type CreateWebhookSubscriptionResult,
+  type FactusCredentialsInput,
 } from "../api/integrations.api";
 
 const API_SCOPE_OPTIONS = [
@@ -358,9 +359,17 @@ function DianProviderSection() {
   const canManage = useAuthStore((s) => s.hasPermission("electronic-invoicing.manage"));
   const { data, isLoading } = useQuery({ queryKey: ["dian-provider-settings"], queryFn: getDianProviderSettings });
 
-  const [provider, setProvider] = useState<"DIRECT" | "MATIAS">("DIRECT");
+  const [provider, setProvider] = useState<"DIRECT" | "MATIAS" | "FACTUS">("DIRECT");
   const [apiToken, setApiToken] = useState("");
   const [replaceToken, setReplaceToken] = useState(false);
+  const [factusForm, setFactusForm] = useState<FactusCredentialsInput>({
+    clientId: "",
+    clientSecret: "",
+    email: "",
+    password: "",
+    numberingRangeId: 0,
+  });
+  const [replaceFactusCredentials, setReplaceFactusCredentials] = useState(false);
   const [saved, setSaved] = useState(false);
 
   // Sincroniza el select con lo que devuelve el servidor la primera vez que carga.
@@ -368,36 +377,43 @@ function DianProviderSection() {
     if (data?.provider) setProvider(data.provider);
   }, [data?.provider]);
 
+  const needsToken = provider === "MATIAS" && (replaceToken || !data?.hasMatiasToken);
+  const needsFactusCredentials = provider === "FACTUS" && (replaceFactusCredentials || !data?.hasFactusCredentials);
+
   const saveMutation = useMutation({
     mutationFn: () =>
       setDianProviderSettings({
         provider,
-        apiToken: provider === "MATIAS" && (replaceToken || !data?.hasMatiasToken) ? apiToken : undefined,
+        apiToken: needsToken ? apiToken : undefined,
+        factusCredentials: needsFactusCredentials ? factusForm : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dian-provider-settings"] });
       setApiToken("");
       setReplaceToken(false);
+      setFactusForm({ clientId: "", clientSecret: "", email: "", password: "", numberingRangeId: 0 });
+      setReplaceFactusCredentials(false);
       setSaved(true);
     },
   });
 
   if (isLoading) return <Spinner />;
 
-  const needsToken = provider === "MATIAS" && (replaceToken || !data?.hasMatiasToken);
+  const factusFormValid =
+    factusForm.clientId && factusForm.clientSecret && factusForm.email && factusForm.password && factusForm.numberingRangeId > 0;
 
   return (
     <Card title="Proveedor tecnologico DIAN (facturas de venta)">
       <p className="mb-4 text-sm text-slate-500">
         Por defecto (<strong>Directo</strong>) Contapro genera el CUFE/XML localmente y los envia a
         la DIAN — camino sin verificar contra su servicio real todavia. Con <strong>MATIAS</strong>{" "}
-        un proveedor tecnologico se encarga de generar, firmar y transmitir la factura — camino
-        verificado contra su entorno de pruebas.
+        o <strong>Factus</strong> un proveedor tecnologico se encarga de generar, firmar y
+        transmitir la factura — ambos caminos verificados contra su entorno de pruebas.
       </p>
 
       {!canManage ? (
         <p className="text-sm text-slate-500">
-          Proveedor actual: <Badge tone={data?.provider === "MATIAS" ? "success" : "neutral"}>{data?.provider}</Badge>
+          Proveedor actual: <Badge tone={data?.provider === "DIRECT" ? "neutral" : "success"}>{data?.provider}</Badge>
         </p>
       ) : (
         <form
@@ -407,9 +423,10 @@ function DianProviderSection() {
             saveMutation.mutate();
           }}
         >
-          <Select label="Proveedor" value={provider} onChange={(e) => setProvider(e.target.value as "DIRECT" | "MATIAS")}>
+          <Select label="Proveedor" value={provider} onChange={(e) => setProvider(e.target.value as "DIRECT" | "MATIAS" | "FACTUS")}>
             <option value="DIRECT">Directo (envio a la DIAN, default)</option>
             <option value="MATIAS">MATIAS API</option>
+            <option value="FACTUS">Factus API</option>
           </Select>
 
           {provider === "MATIAS" && (
@@ -439,7 +456,70 @@ function DianProviderSection() {
             </>
           )}
 
-          <Button type="submit" loading={saveMutation.isPending} disabled={needsToken && !apiToken}>
+          {provider === "FACTUS" && (
+            <>
+              {data?.hasFactusCredentials && !replaceFactusCredentials ? (
+                <Alert tone="info">
+                  Ya hay credenciales de Factus cargadas.{" "}
+                  <button type="button" className="underline" onClick={() => setReplaceFactusCredentials(true)}>
+                    Reemplazarlas
+                  </button>
+                </Alert>
+              ) : (
+                <>
+                  <Input
+                    placeholder="Client ID"
+                    value={factusForm.clientId}
+                    onChange={(e) => setFactusForm({ ...factusForm, clientId: e.target.value })}
+                    required={needsFactusCredentials}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Client Secret"
+                    value={factusForm.clientSecret}
+                    onChange={(e) => setFactusForm({ ...factusForm, clientSecret: e.target.value })}
+                    required={needsFactusCredentials}
+                  />
+                  <Input
+                    type="email"
+                    placeholder="Correo/Usuario de Factus"
+                    value={factusForm.email}
+                    onChange={(e) => setFactusForm({ ...factusForm, email: e.target.value })}
+                    required={needsFactusCredentials}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Contraseña de Factus"
+                    value={factusForm.password}
+                    onChange={(e) => setFactusForm({ ...factusForm, password: e.target.value })}
+                    required={needsFactusCredentials}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="ID del rango de numeracion (Factura de Venta)"
+                    value={factusForm.numberingRangeId || ""}
+                    onChange={(e) => setFactusForm({ ...factusForm, numberingRangeId: Number(e.target.value) })}
+                    required={needsFactusCredentials}
+                  />
+                </>
+              )}
+              {!data?.hasFactusCredentials && (
+                <p className="text-xs text-slate-500">
+                  Las credenciales las asigna el administrador de la cuenta de Factus (no hay
+                  autoregistro). El ID del rango de numeracion es el que Factus asigno al crear el
+                  rango de "Factura de Venta" en su plataforma (ver GET /v2/numbering-ranges) — no
+                  es el prefijo/resolucion DIAN que ya tiene Contapro. Se guarda todo cifrado, no
+                  se vuelve a mostrar.
+                </p>
+              )}
+            </>
+          )}
+
+          <Button
+            type="submit"
+            loading={saveMutation.isPending}
+            disabled={(needsToken && !apiToken) || (needsFactusCredentials && !factusFormValid)}
+          >
             Guardar
           </Button>
 

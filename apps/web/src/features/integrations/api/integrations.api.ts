@@ -73,14 +73,27 @@ export function resendWebhookDelivery(id: string): Promise<void> {
 // ---- Proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md, punto 14) ----
 
 export interface DianProviderSettings {
-  provider: "DIRECT" | "MATIAS";
+  provider: "DIRECT" | "MATIAS" | "FACTUS";
   hasMatiasToken: boolean;
+  hasFactusCredentials: boolean;
+}
+
+export interface FactusCredentialsInput {
+  clientId: string;
+  clientSecret: string;
+  email: string;
+  password: string;
+  numberingRangeId: number;
 }
 
 export function getDianProviderSettings(): Promise<DianProviderSettings> {
   return apiFetch("/electronic-invoicing/provider-settings");
 }
 
-export function setDianProviderSettings(input: { provider: "DIRECT" | "MATIAS"; apiToken?: string }): Promise<void> {
+export function setDianProviderSettings(input: {
+  provider: "DIRECT" | "MATIAS" | "FACTUS";
+  apiToken?: string;
+  factusCredentials?: FactusCredentialsInput;
+}): Promise<void> {
   return apiFetch("/electronic-invoicing/provider-settings", { method: "PUT", body: input });
 }

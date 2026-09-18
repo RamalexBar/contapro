@@ -81,6 +81,12 @@ const envSchema = z.object({
   // multiempresa y cada empresa cliente necesita su propia cuenta/token de MATIAS (o Plemsi mas
   // adelante), nunca uno global compartido entre empresas distintas.
   MATIAS_BASE_URL: z.string().default("https://sandbox-api.matias-api.com/api/ubl2.1"),
+  // Segundo proveedor tecnologico DIAN (ver README, seccion "Proveedor tecnologico (Factus
+  // API)") -- verificado en vivo contra este sandbox el 2026-09-18 (autenticacion OAuth2 +
+  // creacion real de una factura con CUFE valido). Igual que MATIAS_BASE_URL, es la unica pieza
+  // de Factus que es global: las 4 credenciales OAuth2 + el numbering_range_id son por Company
+  // (Company.factusCredentialsEncrypted).
+  FACTUS_BASE_URL: z.string().default("https://api-sandbox.factus.com.co"),
   // Clave maestra (32 bytes, hex o base64) para cifrar/descifrar los tokens de proveedor por
   // empresa -- ej.: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))".
   // Vacio por defecto = cargar/usar un token de proveedor falla con mensaje claro (mismo criterio

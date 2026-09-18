@@ -8,13 +8,14 @@ import type { ICompanyReader } from "../../domain/company-reader.repository";
 import type { IElectronicInvoiceRepository } from "../../domain/electronic-invoice.repository";
 import type { IThirdPartyInvoicingClient } from "../../domain/third-party-invoicing-client";
 import type { IXmlSigner } from "../../domain/xml-signer";
+import { resolveThirdPartyProvider } from "../resolve-third-party-provider";
 import { signAndQueueElectronicDocument } from "../sign-and-queue-electronic-document";
 import { extractUblDocument } from "../xml-document-extractor";
 
 /**
  * Recuperacion manual para una factura que quedo GENERADA-sin-firmar (fallo la firma o la
  * llamada al proveedor) o REJECTED. En modo DIRECT re-arma la firma y la deja en
- * PENDING_SUBMISSION para que el poller la retome. En modo MATIAS (ver README del modulo,
+ * PENDING_SUBMISSION para que el poller la retome. En modo MATIAS/FACTUS (ver README del modulo,
  * seccion "Proveedor tecnologico") reintenta el envio al proveedor directamente aqui -- ese
  * camino es sincrono (sin poller), asi que no hay "quien habla con la DIAN" que reusar como en
  * el flujo DIRECT.
@@ -26,7 +27,8 @@ export class ResubmitElectronicInvoiceUseCase {
     private readonly xmlSigner: IXmlSigner,
     private readonly audit: AuditService,
     private readonly companyReader: ICompanyReader,
-    private readonly thirdPartyClient: IThirdPartyInvoicingClient
+    private readonly matiasClient: IThirdPartyInvoicingClient,
+    private readonly factusClient: IThirdPartyInvoicingClient
   ) {}
 
   async execute(query: { type: "sale"; id: string } | { type: "manual"; id: string }): Promise<void> {
@@ -42,10 +44,11 @@ export class ResubmitElectronicInvoiceUseCase {
     }
 
     const company = await this.companyReader.findByIdOrThrow(getTenantContext().companyId);
+    const thirdParty = resolveThirdPartyProvider(company, this.matiasClient, this.factusClient);
 
-    if (company.electronicInvoicingProvider === "MATIAS") {
-      if (!company.matiasApiTokenEncrypted) {
-        throw new ValidationError("Esta empresa usa el proveedor MATIAS pero no tiene un token cargado");
+    if (thirdParty) {
+      if (!thirdParty.encryptedCredential) {
+        throw new ValidationError(`Esta empresa usa el proveedor ${thirdParty.providerName} pero no tiene credenciales cargadas`);
       }
       // ElectronicInvoice no guarda customerId ni las lineas por separado (ver README, punto 13:
       // "el XML es la unica fuente disponible") -- se reconstruyen del xmlContent local ya
@@ -54,8 +57,8 @@ export class ResubmitElectronicInvoiceUseCase {
       // quedan en el XML local -- si el rechazo original fue por falta de esos datos, corregir el
       // Customer y reintentar aqui NO alcanza, hay que generar la factura de nuevo desde la venta.
       const extracted = extractUblDocument(invoice.xmlContent);
-      const token = decryptCredential(company.matiasApiTokenEncrypted, env.CREDENTIALS_ENCRYPTION_KEY);
-      const result = await this.thirdPartyClient.submitInvoice(token, {
+      const token = decryptCredential(thirdParty.encryptedCredential, env.CREDENTIALS_ENCRYPTION_KEY);
+      const result = await thirdParty.client.submitInvoice(token, {
         resolutionNumber: invoice.resolutionNumber,
         prefix: invoice.prefix,
         documentNumber: invoice.number,

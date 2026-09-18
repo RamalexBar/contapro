@@ -11,8 +11,17 @@ export const createNumberingResolutionSchema = z.object({
   validUntil: z.coerce.date(),
 });
 
-// Ver README, seccion "Proveedor tecnologico (MATIAS API)".
+// Ver README, seccion "Proveedor tecnologico (MATIAS API / Factus API)".
 export const setElectronicInvoicingProviderSchema = z.object({
-  provider: z.enum(["DIRECT", "MATIAS"]),
+  provider: z.enum(["DIRECT", "MATIAS", "FACTUS"]),
   apiToken: z.string().min(1).optional(),
+  factusCredentials: z
+    .object({
+      clientId: z.string().min(1),
+      clientSecret: z.string().min(1),
+      email: z.string().email(),
+      password: z.string().min(1),
+      numberingRangeId: z.number().int().positive(),
+    })
+    .optional(),
 });

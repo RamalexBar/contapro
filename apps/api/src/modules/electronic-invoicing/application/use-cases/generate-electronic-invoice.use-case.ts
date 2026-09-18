@@ -10,6 +10,7 @@ import type { IThirdPartyInvoicingClient } from "../../domain/third-party-invoic
 import type { IXmlSigner } from "../../domain/xml-signer";
 import { DIAN_GENERIC_FINAL_CONSUMER } from "../constants";
 import { generateCufe } from "../cufe-generator";
+import { resolveThirdPartyProvider, type ResolvedThirdPartyProvider } from "../resolve-third-party-provider";
 import { signAndQueueElectronicDocument } from "../sign-and-queue-electronic-document";
 import { buildUblInvoiceXml } from "../ubl-invoice-xml-builder";
 
@@ -51,7 +52,8 @@ export class GenerateElectronicInvoiceUseCase {
     private readonly audit: AuditService,
     private readonly certificateLoader: ICertificateLoader,
     private readonly xmlSigner: IXmlSigner,
-    private readonly thirdPartyClient: IThirdPartyInvoicingClient
+    private readonly matiasClient: IThirdPartyInvoicingClient,
+    private readonly factusClient: IThirdPartyInvoicingClient
   ) {}
 
   async execute(input: GenerateElectronicInvoiceInput): Promise<ElectronicInvoiceRecord> {
@@ -138,12 +140,13 @@ export class GenerateElectronicInvoiceUseCase {
       metadata: { fullNumber: invoice.fullNumber, cufe: invoice.cufe },
     });
 
-    if (company.electronicInvoicingProvider === "MATIAS") {
+    const thirdParty = resolveThirdPartyProvider(company, this.matiasClient, this.factusClient);
+    if (thirdParty) {
       // Deliberadamente FUERA de la transaccion de claimNumberAndGenerate (ver aviso en
       // domain/third-party-invoicing-client.ts): una llamada de red ahi dejaria la transaccion de
       // Postgres abierta durante todo el round-trip. El CUFE/xmlContent locales de arriba son
-      // provisionales -- applyThirdPartySubmissionResult los sobrescribe con los reales de MATIAS.
-      await this.submitViaThirdPartyProvider(invoice, input, buyer, customer, company.matiasApiTokenEncrypted, entityType, entityId);
+      // provisionales -- applyThirdPartySubmissionResult los sobrescribe con los reales del proveedor.
+      await this.submitViaThirdPartyProvider(invoice, input, buyer, customer, thirdParty, entityType, entityId);
     } else if (env.DIAN_CERTIFICATE_PATH) {
       // No bloquea: si falla, la factura queda GENERATED (sin firmar), recuperable via el
       // endpoint de reenvio manual una vez se corrija el problema (ej. contraseña incorrecta).
@@ -168,32 +171,33 @@ export class GenerateElectronicInvoiceUseCase {
   }
 
   /**
-   * Ver README del modulo, seccion "Proveedor tecnologico (MATIAS API)". No bloquea la venta si
-   * falla: la factura queda GENERATED con el CUFE local provisional, se audita, y el reenvio
-   * manual (ResubmitElectronicInvoiceUseCase) reintenta -- mismo criterio que el resto del modulo.
+   * Ver README del modulo, seccion "Proveedor tecnologico (MATIAS API / Factus API)". No bloquea
+   * la venta si falla: la factura queda GENERATED con el CUFE local provisional, se audita, y el
+   * reenvio manual (ResubmitElectronicInvoiceUseCase) reintenta -- mismo criterio que el resto
+   * del modulo.
    */
   private async submitViaThirdPartyProvider(
     invoice: ElectronicInvoiceRecord,
     input: GenerateElectronicInvoiceInput,
     buyer: { documentType: string; documentNumber: string; name: string },
     customer: Awaited<ReturnType<ICustomerRepository["findByIdOrThrow"]>> | null,
-    encryptedToken: string | null,
+    thirdParty: ResolvedThirdPartyProvider,
     entityType: string,
     entityId: string
   ): Promise<void> {
-    if (!encryptedToken) {
+    if (!thirdParty.encryptedCredential) {
       await this.audit.record({
         action: "ELECTRONIC_INVOICE_GENERATION_FAILED",
         entityType,
         entityId,
-        description: `Empresa configurada con proveedor MATIAS pero sin token cargado (${invoice.fullNumber})`,
+        description: `Empresa configurada con proveedor ${thirdParty.providerName} pero sin credenciales cargadas (${invoice.fullNumber})`,
       });
       return;
     }
 
     try {
-      const token = decryptCredential(encryptedToken, env.CREDENTIALS_ENCRYPTION_KEY);
-      const result = await this.thirdPartyClient.submitInvoice(token, {
+      const token = decryptCredential(thirdParty.encryptedCredential, env.CREDENTIALS_ENCRYPTION_KEY);
+      const result = await thirdParty.client.submitInvoice(token, {
         resolutionNumber: invoice.resolutionNumber,
         prefix: invoice.prefix,
         documentNumber: invoice.number,
@@ -236,8 +240,8 @@ export class GenerateElectronicInvoiceUseCase {
         entityId,
         description:
           result.status === "ACCEPTED"
-            ? `Factura electronica autorizada via MATIAS: ${invoice.fullNumber} (CUFE ${result.cufe.slice(0, 12)}...)`
-            : `Factura electronica rechazada por MATIAS: ${invoice.fullNumber} (${result.rejectionReason})`,
+            ? `Factura electronica autorizada via ${thirdParty.providerName}: ${invoice.fullNumber} (CUFE ${result.cufe.slice(0, 12)}...)`
+            : `Factura electronica rechazada por ${thirdParty.providerName}: ${invoice.fullNumber} (${result.rejectionReason})`,
         metadata: { fullNumber: invoice.fullNumber, cufe: result.cufe || undefined, rejectionReason: result.rejectionReason },
       });
     } catch (err) {
@@ -245,7 +249,7 @@ export class GenerateElectronicInvoiceUseCase {
         action: "ELECTRONIC_INVOICE_GENERATION_FAILED",
         entityType,
         entityId,
-        description: `Fallo la llamada a MATIAS para ${invoice.fullNumber}: ${err instanceof Error ? err.message : String(err)}`,
+        description: `Fallo la llamada a ${thirdParty.providerName} para ${invoice.fullNumber}: ${err instanceof Error ? err.message : String(err)}`,
       });
     }
   }

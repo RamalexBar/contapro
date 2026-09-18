@@ -18,13 +18,18 @@ export class PrismaCompanyReaderRepository implements ICompanyReader {
       name: row.name,
       electronicInvoicingProvider: row.electronicInvoicingProvider,
       matiasApiTokenEncrypted: row.matiasApiTokenEncrypted,
+      factusCredentialsEncrypted: row.factusCredentialsEncrypted,
     };
   }
 
-  async updateElectronicInvoicingProvider(companyId: string, provider: "DIRECT" | "MATIAS", encryptedToken: string | null): Promise<void> {
+  async updateElectronicInvoicingProvider(
+    companyId: string,
+    provider: "DIRECT" | "MATIAS" | "FACTUS",
+    credentials: { matiasApiTokenEncrypted?: string | null; factusCredentialsEncrypted?: string | null }
+  ): Promise<void> {
     await basePrisma.company.update({
       where: { id: companyId },
-      data: { electronicInvoicingProvider: provider, matiasApiTokenEncrypted: encryptedToken },
+      data: { electronicInvoicingProvider: provider, ...credentials },
     });
   }
 }

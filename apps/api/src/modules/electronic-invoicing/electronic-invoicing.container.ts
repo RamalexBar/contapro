@@ -15,6 +15,7 @@ import { XadesXmlSigner } from "./infrastructure/xades-xml-signer";
 import { DianSoapClient } from "./infrastructure/dian-soap-client";
 import { DianNominaSoapClient } from "./infrastructure/dian-nomina-soap-client";
 import { MatiasInvoicingClient } from "./infrastructure/matias-invoicing-client";
+import { FactusInvoicingClient } from "./infrastructure/factus-invoicing-client";
 import { GenerateElectronicInvoiceUseCase } from "./application/use-cases/generate-electronic-invoice.use-case";
 import { GenerateElectronicCreditNoteUseCase } from "./application/use-cases/generate-electronic-credit-note.use-case";
 import { GenerateElectronicDebitNoteUseCase } from "./application/use-cases/generate-electronic-debit-note.use-case";
@@ -60,10 +61,12 @@ const dianClient = new DianSoapClient();
 // dian-nomina-soap-client.ts. employeeRepo si se importa directo de employees.container.ts
 // (sin riesgo de ciclo: ese container no importa nada de aqui, a diferencia de suppliers).
 const dianNominaClient = new DianNominaSoapClient();
-// Proveedor tecnologico DIAN alternativo (ver README, seccion "Proveedor tecnologico (MATIAS
-// API)") -- solo se usa cuando Company.electronicInvoicingProvider === "MATIAS", ver
-// GenerateElectronicInvoiceUseCase/ResubmitElectronicInvoiceUseCase.
-const thirdPartyInvoicingClient = new MatiasInvoicingClient();
+// Proveedores tecnologicos DIAN alternativos (ver README, seccion "Proveedor tecnologico (MATIAS
+// API / Factus API)") -- cual de los dos se usa depende de Company.electronicInvoicingProvider,
+// resuelto por resolveThirdPartyProvider en GenerateElectronicInvoiceUseCase/
+// ResubmitElectronicInvoiceUseCase.
+const matiasInvoicingClient = new MatiasInvoicingClient();
+const factusInvoicingClient = new FactusInvoicingClient();
 const setProviderUseCase = new SetElectronicInvoicingProviderUseCase(companyReader, auditService);
 const getProviderSettingsUseCase = new GetElectronicInvoicingProviderSettingsUseCase(companyReader);
 
@@ -76,7 +79,8 @@ const resubmitUseCase = new ResubmitElectronicInvoiceUseCase(
   xmlSigner,
   auditService,
   companyReader,
-  thirdPartyInvoicingClient
+  matiasInvoicingClient,
+  factusInvoicingClient
 );
 const getCreditNoteUseCase = new GetElectronicCreditNoteUseCase(electronicCreditNoteRepo);
 const resubmitCreditNoteUseCase = new ResubmitElectronicCreditNoteUseCase(
@@ -150,7 +154,8 @@ export const generateElectronicInvoiceUseCase = new GenerateElectronicInvoiceUse
   auditService,
   certificateLoader,
   xmlSigner,
-  thirdPartyInvoicingClient
+  matiasInvoicingClient,
+  factusInvoicingClient
 );
 
 /** Usado por credit-note.container.ts para generar el CUDE/XML local (y firmar si hay

@@ -33,6 +33,7 @@ const COMPANY: CompanyRecord = {
   name: "Minimarket La Esquina",
   electronicInvoicingProvider: "DIRECT",
   matiasApiTokenEncrypted: null,
+  factusCredentialsEncrypted: null,
 };
 
 class FakeCompanyReader implements Partial<ICompanyReader> {
@@ -137,6 +138,7 @@ describe("GenerateElectronicInvoiceUseCase source discriminator", () => {
       new AuditService(auditRepo),
       noopCertificateLoader,
       noopXmlSigner,
+      noopThirdPartyClient,
       noopThirdPartyClient
     );
 
@@ -162,6 +164,7 @@ describe("GenerateElectronicInvoiceUseCase source discriminator", () => {
       new AuditService(auditRepo),
       noopCertificateLoader,
       noopXmlSigner,
+      noopThirdPartyClient,
       noopThirdPartyClient
     );
 
