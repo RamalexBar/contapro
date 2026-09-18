@@ -89,6 +89,11 @@ accountingRouter.get(
   requirePermission("accounting.read"),
   accountingController.listBankTransactions
 );
+accountingRouter.post(
+  "/bank-accounts/extract-statement",
+  requirePermission("accounting.manage"),
+  accountingController.extractBankStatement
+);
 
 accountingRouter.post(
   "/bank-reconciliations",

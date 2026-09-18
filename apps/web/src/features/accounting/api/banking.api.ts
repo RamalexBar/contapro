@@ -74,6 +74,22 @@ export function registerBankTransaction(bankAccountId: string, input: RegisterBa
   return apiFetch(`/bank-accounts/${bankAccountId}/transactions`, { method: "POST", body: input });
 }
 
+export interface ExtractedBankTransaction {
+  date: string;
+  description: string;
+  amount: number;
+  type: "DEBIT" | "CREDIT";
+}
+
+export interface ExtractedBankStatement {
+  transactions: ExtractedBankTransaction[];
+  warnings: string[];
+}
+
+export function extractBankStatement(fileBase64: string, mediaType: string): Promise<ExtractedBankStatement> {
+  return apiFetch("/bank-accounts/extract-statement", { method: "POST", body: { fileBase64, mediaType } });
+}
+
 export function listBankReconciliations(): Promise<{ data: BankReconciliationRecord[] }> {
   return apiFetch("/bank-reconciliations");
 }

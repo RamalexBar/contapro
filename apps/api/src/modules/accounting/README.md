@@ -84,6 +84,19 @@ compras y centros de costo, todo implementado.**
    - `POST /bank-accounts`, `GET /bank-accounts` — alta/listado de cuentas bancarias.
    - `POST /bank-accounts/:id/transactions`, `GET /bank-accounts/:id/transactions` — alta manual
      de una linea de extracto (no hay integracion real con ningun banco) y su listado.
+   - `POST /bank-accounts/extract-statement` (`ExtractBankStatementUseCase`,
+     `ClaudeStatementExtractionService`) — lectura automatica de extractos via Claude (vision +
+     salida estructurada con Zod), mismo patron que `POST /purchases/extract` del modulo
+     suppliers: sube una foto/PDF del extracto, el modelo devuelve la lista de movimientos
+     (fecha/descripcion/monto/DEBIT-CREDIT) y filas ilegibles quedan en `warnings` en vez de
+     inventarse. **Nunca crea ningun `BankTransaction` solo** — el usuario revisa, desmarca lo que
+     no corresponda y confirma; cada fila seleccionada se registra con el
+     `POST /bank-accounts/:id/transactions` de arriba (sin endpoint de alta masiva propio).
+     Conectado a la UI (`BankingPage.tsx` → pestaña Movimientos, con una cuenta seleccionada →
+     boton "Leer extracto (foto/PDF)"). **NO PROBADO contra un extracto real** — verificado solo
+     que el endpoint completo (ruta/permiso/validacion/caso de uso/llamada a Claude) esta bien
+     conectado; la extraccion real quedo bloqueada por saldo insuficiente en la cuenta de
+     `ANTHROPIC_API_KEY` (mismo aviso que aplica hoy a la lectura de facturas de compra).
    - `POST /bank-reconciliations` — inicia una conciliacion (`IN_PROGRESS`) para una cuenta y
      periodo; recibe `statementBalance` (saldo del extracto) y `bookBalance` (saldo segun libros)
      **como datos de entrada, no derivados del libro mayor** — no hay ningun enlace en el schema

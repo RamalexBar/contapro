@@ -17,6 +17,7 @@ import type { CloseBankReconciliationUseCase } from "../application/use-cases/cl
 import type { GetBankReconciliationUseCase } from "../application/use-cases/get-bank-reconciliation.use-case";
 import type { ListBankReconciliationsUseCase } from "../application/use-cases/list-bank-reconciliations.use-case";
 import type { SuggestBankReconciliationMatchesUseCase } from "../application/use-cases/suggest-bank-reconciliation-matches.use-case";
+import type { ExtractBankStatementUseCase } from "../application/use-cases/extract-bank-statement.use-case";
 import type { CloseFinancialPeriodUseCase } from "../application/use-cases/close-financial-period.use-case";
 import type { ReopenFinancialPeriodUseCase } from "../application/use-cases/reopen-financial-period.use-case";
 import type { CreateWithholdingConceptUseCase } from "../application/use-cases/create-withholding-concept.use-case";
@@ -42,6 +43,7 @@ import {
   matchBankReconciliationItemSchema,
   registerBankTransactionSchema,
   startBankReconciliationSchema,
+  extractBankStatementSchema,
   createWithholdingConceptSchema,
   updateWithholdingConceptSchema,
   createCostCenterSchema,
@@ -65,6 +67,7 @@ export class AccountingController {
     private readonly listBankAccountsUseCase: ListBankAccountsUseCase,
     private readonly registerBankTransactionUseCase: RegisterBankTransactionUseCase,
     private readonly listBankTransactionsUseCase: ListBankTransactionsUseCase,
+    private readonly extractBankStatementUseCase: ExtractBankStatementUseCase,
     private readonly startBankReconciliationUseCase: StartBankReconciliationUseCase,
     private readonly matchBankReconciliationItemUseCase: MatchBankReconciliationItemUseCase,
     private readonly closeBankReconciliationUseCase: CloseBankReconciliationUseCase,
@@ -272,6 +275,15 @@ export class AccountingController {
     try {
       const body = registerBankTransactionSchema.parse(req.body);
       res.status(201).json(await this.registerBankTransactionUseCase.execute({ ...body, bankAccountId: req.params.id }));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  extractBankStatement = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = extractBankStatementSchema.parse(req.body);
+      res.json(await this.extractBankStatementUseCase.execute({ base64: body.fileBase64, mediaType: body.mediaType }));
     } catch (err) {
       next(err);
     }

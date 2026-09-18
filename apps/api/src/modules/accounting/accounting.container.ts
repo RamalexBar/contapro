@@ -43,6 +43,8 @@ import { CloseBankReconciliationUseCase } from "./application/use-cases/close-ba
 import { GetBankReconciliationUseCase } from "./application/use-cases/get-bank-reconciliation.use-case";
 import { ListBankReconciliationsUseCase } from "./application/use-cases/list-bank-reconciliations.use-case";
 import { SuggestBankReconciliationMatchesUseCase } from "./application/use-cases/suggest-bank-reconciliation-matches.use-case";
+import { ExtractBankStatementUseCase } from "./application/use-cases/extract-bank-statement.use-case";
+import { ClaudeStatementExtractionService } from "./infrastructure/claude-statement-extraction.service";
 import { CloseFinancialPeriodUseCase } from "./application/use-cases/close-financial-period.use-case";
 import { ReopenFinancialPeriodUseCase } from "./application/use-cases/reopen-financial-period.use-case";
 import { CreateWithholdingConceptUseCase } from "./application/use-cases/create-withholding-concept.use-case";
@@ -67,6 +69,7 @@ const costCenterRepo = new PrismaCostCenterRepository();
 const companyReader = new PrismaCompanyReaderRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 const thirdPartyResolver = new PrismaThirdPartyResolver();
+const statementExtractionService = new ClaudeStatementExtractionService();
 const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessionRepo, bankTransactionRepo, thirdPartyResolver);
 
 const createAccountUseCase = new CreateAccountUseCase(accountRepo, auditService);
@@ -96,6 +99,7 @@ export const accountingController = new AccountingController(
   new ListBankAccountsUseCase(bankAccountRepo),
   new RegisterBankTransactionUseCase(bankTransactionRepo, bankAccountRepo, auditService),
   new ListBankTransactionsUseCase(bankTransactionRepo, bankAccountRepo),
+  new ExtractBankStatementUseCase(statementExtractionService),
   new StartBankReconciliationUseCase(bankReconciliationRepo, bankAccountRepo, auditService),
   new MatchBankReconciliationItemUseCase(bankReconciliationRepo, auditService),
   new CloseBankReconciliationUseCase(bankReconciliationRepo, auditService),

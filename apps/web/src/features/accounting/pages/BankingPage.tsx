@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCOP } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
@@ -15,6 +15,7 @@ import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import {
   closeBankReconciliation,
   createBankAccount,
+  extractBankStatement,
   getSuggestedBankReconciliationMatches,
   listBankAccounts,
   listBankReconciliations,
@@ -22,13 +23,28 @@ import {
   matchBankReconciliationItem,
   registerBankTransaction,
   startBankReconciliation,
+  type ExtractedBankStatement,
 } from "../api/banking.api";
 
 const RECONCILIATION_STATUS_LABEL: Record<string, string> = { IN_PROGRESS: "En progreso", COMPLETED: "Cerrada" };
+const ACCEPTED_STATEMENT_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
 function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // FileReader.readAsDataURL da "data:<mime>;base64,<datos>" -- la API solo quiere <datos>.
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
 }
 
 function BankAccountsSection({ canManage }: { canManage: boolean }) {
@@ -124,6 +140,62 @@ function BankTransactionsSection({ canManage }: { canManage: boolean }) {
     },
   });
 
+  const [extractResult, setExtractResult] = useState<ExtractedBankStatement | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [fileTypeError, setFileTypeError] = useState(false);
+  const statementFileInputRef = useRef<HTMLInputElement>(null);
+
+  const extractMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fileBase64 = await fileToBase64(file);
+      return extractBankStatement(fileBase64, file.type);
+    },
+    onSuccess: (result) => {
+      setExtractResult(result);
+      setSelectedRows(new Set(result.transactions.map((_, i) => i)));
+    },
+  });
+
+  function handleStatementFileSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo si se corrige algo y se reintenta
+    if (!file) return;
+    if (!ACCEPTED_STATEMENT_TYPES.includes(file.type)) {
+      setFileTypeError(true);
+      return;
+    }
+    setFileTypeError(false);
+    setExtractResult(null);
+    extractMutation.mutate(file);
+  }
+
+  function toggleRow(i: number) {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  }
+
+  // Registra cada movimiento seleccionado con el mismo endpoint del formulario manual de abajo
+  // (POST /bank-accounts/:id/transactions) -- no hay (ni hace falta) un endpoint de creacion
+  // masiva propio, es la misma operacion repetida N veces con el usuario ya habiendo revisado
+  // cada fila antes de confirmar.
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      const rows = extractResult?.transactions.filter((_, i) => selectedRows.has(i)) ?? [];
+      for (const row of rows) {
+        await registerBankTransaction(bankAccountId, row);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["banking", "transactions", bankAccountId] });
+      setExtractResult(null);
+      setSelectedRows(new Set());
+    },
+  });
+
   return (
     <div className="space-y-6">
       <Card title="Movimientos bancarios">
@@ -168,6 +240,91 @@ function BankTransactionsSection({ canManage }: { canManage: boolean }) {
           </form>
         )}
       </Card>
+
+      {bankAccountId && canManage && (
+        <Card title="Leer extracto bancario automaticamente">
+          <p className="mb-3 text-sm text-slate-500">
+            Sube una foto o el PDF del extracto de la cuenta seleccionada y se listan abajo los movimientos encontrados. Revisa, desmarca
+            los que no correspondan y confirma para registrarlos.
+          </p>
+          <input
+            ref={statementFileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            className="hidden"
+            onChange={handleStatementFileSelected}
+          />
+          <Button type="button" loading={extractMutation.isPending} onClick={() => statementFileInputRef.current?.click()}>
+            Leer extracto (foto/PDF)
+          </Button>
+
+          {fileTypeError && (
+            <Alert tone="danger" className="mt-3">
+              Ese tipo de archivo no se puede leer. Sube una foto (JPG/PNG/WEBP) o un PDF.
+            </Alert>
+          )}
+          {extractMutation.isError && (
+            <Alert tone="danger" className="mt-3">
+              {(extractMutation.error as Error).message}
+            </Alert>
+          )}
+
+          {extractResult && (
+            <div className="mt-3 space-y-2">
+              {extractResult.warnings.map((w, i) => (
+                <Alert key={i} tone="warning">
+                  {w}
+                </Alert>
+              ))}
+
+              {extractResult.transactions.length === 0 ? (
+                <Alert tone="warning">No se identifico ningun movimiento en el archivo.</Alert>
+              ) : (
+                <>
+                  <Table>
+                    <TableHead>
+                      <tr>
+                        <Th></Th>
+                        <Th>Fecha</Th>
+                        <Th>Descripcion</Th>
+                        <Th>Tipo</Th>
+                        <Th>Monto</Th>
+                      </tr>
+                    </TableHead>
+                    <TableBody>
+                      {extractResult.transactions.map((t, i) => (
+                        <TableRow key={i}>
+                          <Td>
+                            <input type="checkbox" checked={selectedRows.has(i)} onChange={() => toggleRow(i)} />
+                          </Td>
+                          <Td>{t.date}</Td>
+                          <Td>{t.description}</Td>
+                          <Td>{t.type}</Td>
+                          <Td>{formatCOP(t.amount)}</Td>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <Button
+                    type="button"
+                    className="mt-3"
+                    loading={importMutation.isPending}
+                    disabled={selectedRows.size === 0}
+                    onClick={() => importMutation.mutate()}
+                  >
+                    Importar seleccionados ({selectedRows.size})
+                  </Button>
+                  {importMutation.isError && (
+                    <Alert tone="danger" className="mt-2">
+                      {(importMutation.error as Error).message}
+                    </Alert>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {bankAccountId && (
         <Card noPadding>
