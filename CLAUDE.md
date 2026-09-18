@@ -93,11 +93,11 @@ buffer. Para el móvil, sin emulador/dispositivo en este entorno: se verifica co
 únicamente y se dice explícitamente que no se probó en runtime — nunca reportar como "probado"
 algo que solo compiló.
 
-## Estado actual (actualizado 2026-08-27) — LEER ESTO PRIMERO EN UNA SESIÓN NUEVA
+## Estado actual (actualizado 2026-09-18) — LEER ESTO PRIMERO EN UNA SESIÓN NUEVA
 
 Historial completo iteración por iteración: `docs/ALCANCE.md`. Esto es solo el resumen de **por
 dónde íbamos** en la conversación más reciente, para retomarla en otra máquina sin perder
-contexto (el código y los commits ya están en GitHub, esto es solo la narrativa).
+contexto (el código de esta sesión NO está commiteado todavía — ver "Pendiente" abajo).
 
 ### Contexto de negocio
 
@@ -107,42 +107,62 @@ precio) — Contapro gana en precio (todo incluido, sin fragmentar módulos) y e
 reales) y en amplitud de IA (Alegra tiene 38 funciones, Contapro apenas 1). Ver `docs/PRECIOS.md`
 para el snapshot de precios de la competencia (2026-08-03).
 
-**Esta semana** se está conectando la facturación electrónica DIAN con un **proveedor
-tecnológico** externo (reemplaza la integración directa SOAP+XAdES propia, nunca verificada
-contra el servicio real de la DIAN) — es la pieza de mayor riesgo que queda abierta. Sin novedades
-de esto todavía en esta conversación, quedó como plan, no como trabajo iniciado aquí.
+**El proveedor tecnológico de facturación electrónica DIAN — la pieza de mayor riesgo que quedaba
+abierta — avanzó fuerte en esta sesión** (2026-09-18): reunión con Factus a las 4:30pm, el usuario
+consiguió credenciales de su sandbox, y se construyó una segunda integración completa (ver punto 1
+abajo). MATIAS sigue siendo la otra opción ya integrada desde antes; la decisión de cuál usar en
+producción (o si valen ambas para clientes distintos) sigue abierta — ver memoria
+`dian-tech-provider.md` para el comparativo completo MATIAS vs Factus vs Plemsi y el precio de
+Factus (todavía sin confirmar, tema para retomar con ellos).
 
-### Lo que se implementó en esta sesión (commit `68044a3`, ya subido a `origin/master`)
+### Lo que se implementó en esta sesión (sin commitear todavía)
 
-1. **Conciliación bancaria — desempate por texto** (`SuggestBankReconciliationMatchesUseCase`,
-   `apps/api/src/modules/accounting/application/description-similarity.ts`): cuando varios
-   comprobantes candidatos quedan a fechas parecidas de una transacción, ya no gana "el primero de
-   la lista" sino el que comparte más palabras con la descripción del banco (índice de Jaccard).
-   Conectado a la UI (`BankingPage.tsx`, pestaña Conciliaciones → expandir una en progreso):
-   sugerencias con botón "Confirmar", ya no hay que pegar IDs a mano (el formulario manual sigue
-   ahí como respaldo). Sigue siendo 1 a 1, no soporta pagos partidos (documentado como pendiente
-   en el README del módulo).
-2. **Lectura automática de facturas de compra con IA** (`POST /purchases/extract`,
-   `ExtractPurchaseInvoiceUseCase`, `ClaudeInvoiceExtractionService`): sube una foto/PDF de
-   factura, Claude (`claude-opus-5`, visión + salida estructurada con Zod) extrae proveedor/NIT/
-   número/fecha/subtotal/IVA/total, intenta emparejar con un proveedor ya existente por NIT o
-   nombre inequívoco, y sugiere fecha de vencimiento a 30 días. **Nunca crea la compra sola** — el
-   usuario revisa y confirma con el `POST /purchases` de siempre. Conectado a la UI
-   (`SuppliersPage.tsx` → Registrar compra → botón "Leer factura (foto/PDF)").
+1. **Segundo proveedor tecnológico DIAN: Factus API** (`Company.electronicInvoicingProvider` ahora
+   acepta `DIRECT | MATIAS | FACTUS`, `infrastructure/factus-invoicing-client.ts`,
+   `application/resolve-third-party-provider.ts` para no duplicar el if/else de "qué cliente y qué
+   credencial usar" entre `GenerateElectronicInvoiceUseCase` y `ResubmitElectronicInvoiceUseCase`).
+   **Verificado de punta a punta contra el sandbox real de Factus**, incluyendo una venta completa
+   generada a través del flujo real de Contapro (`POST /sales` → factura `ACCEPTED` con CUFE y XML
+   firmado reales) — más verificación de la que se pudo hacer para MATIAS en su momento. Detalle
+   completo (arquitectura OAuth2 password-grant, `numbering_range_id` propio de Factus, etc.) en
+   `apps/api/src/modules/electronic-invoicing/README.md`, punto 15. UI en
+   `IntegrationsPage.tsx` → Facturación electrónica (DIAN), ya permite elegir Factus y cargar sus
+   5 credenciales. Migración `20260918170000_add_factus_provider` ya aplicada en la base local.
+2. **Lector de extractos bancarios con IA** (`POST /bank-accounts/extract-statement`,
+   `ExtractBankStatementUseCase`, `ClaudeStatementExtractionService`): mismo patrón que la lectura
+   de facturas de compra — sube foto/PDF del extracto, Claude devuelve la lista de movimientos
+   (fecha/descripción/monto/débito-crédito), el usuario desmarca lo que no corresponda y confirma;
+   cada fila se registra con el `POST /bank-accounts/:id/transactions` ya existente, sin endpoint
+   de alta masiva propio. Conectado a `BankingPage.tsx` → Movimientos. **NO probado contra un
+   extracto real todavía** — quedó bloqueado por saldo insuficiente en `ANTHROPIC_API_KEY` (ver
+   "Pendiente"), solo se verificó que el endpoint completo está bien conectado.
+3. **Limpieza de planes de facturación**: se eliminaron 4 planes fantasma
+   (`FACT_EMPRENDEDOR/PYME/PRO/PLUS`, una línea "Solo Facturación" copiada de Alegra el
+   2026-09-03) de `seed-base.ts`, de la base local y de `LandingPage.tsx` — contradecían la
+   estrategia de precios de Contapro ("todo incluido, sin fragmentar"). Quedan solo
+   `TRIAL`/`BASICO`/`PYME`/`PRO`. **Falta borrar esas mismas 4 filas en la base de producción de
+   Render a mano** — el cambio en `seed-base.ts` no las borra ahí solo.
+4. Se armó y publicó como Artifact una ficha de preparación para la reunión con Factus (stack
+   técnico, qué comprarles, preguntas para ellos, Q&A anticipado) — buscarla como "Reunión con
+   Factus" en `/artifacts` si hace falta el link de nuevo.
 
 ### Pendiente — lo primero que hay que retomar
 
-- **`ANTHROPIC_API_KEY` sin configurar todavía** (ni local ni en Render) — sin esto,
-  `POST /purchases/extract` responde 422 con mensaje claro, no se puede probar. El usuario iba a
-  crear la llave en console.anthropic.com y no había terminado ese paso cuando cambió de equipo.
-- **La lectura de facturas nunca se probó contra una factura real.** Había dos candidatas
-  encontradas en `C:\Users\alexa\Downloads` de la máquina anterior (`factura chec manizales.pdf`,
-  el usuario eligió esa) — en la máquina nueva hay que ubicar el archivo de nuevo (Downloads no se
-  clona con git) o pedirle otra factura al usuario.
-- **Fase "conciliación bancaria con IA" del plan original todavía no se hizo** (usar IA para los
-  casos que el desempate por texto no resuelve) — se decidió dejarla para después de facturas.
-- El proveedor tecnológico de facturación electrónica DIAN (ver "Contexto de negocio" arriba)
-  sigue siendo un plan del usuario, no algo que se haya trabajado en esta conversación.
+- **Nada de esta sesión está commiteado.** `git status` tiene ~20 archivos modificados + 6 nuevos
+  (Factus + lector de extractos + limpieza de planes) sin commit. Revisar y commitear antes de
+  seguir para no perder el trabajo.
+- **`ANTHROPIC_API_KEY` se quedó sin saldo** ("Your credit balance is too low") — bloquea tanto el
+  lector de extractos bancarios nuevo como la lectura de facturas de compra ya existente. Hay que
+  recargar en console.anthropic.com antes de poder probar cualquiera de las dos con un archivo
+  real.
+- **Precio real de Factus todavía sin confirmar** — la reunión de las 4:30pm era el momento de
+  preguntarlo directamente (ver ficha de preparación). Sin esto, no se puede decidir MATIAS vs
+  Factus vs ambos para producción.
+- **Borrar los 4 planes "Solo Facturación" en la base de datos de producción (Render)** — ver
+  punto 3 arriba, sigue pendiente ahí aunque ya se limpiaron en local.
+- **Fase "conciliación bancaria con IA para desempate" del plan original** (usar IA para los casos
+  que el desempate por texto de `description-similarity.ts` no resuelve) sigue sin hacer — se hizo
+  en cambio el lector de extractos (una feature distinta, ver punto 2 arriba).
 
 ### Artifacts publicados (viven en la cuenta de Claude, no en este repo — se ven desde cualquier PC logueado)
 
