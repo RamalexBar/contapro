@@ -97,7 +97,8 @@ algo que solo compiló.
 
 Historial completo iteración por iteración: `docs/ALCANCE.md`. Esto es solo el resumen de **por
 dónde íbamos** en la conversación más reciente, para retomarla en otra máquina sin perder
-contexto (el código de esta sesión NO está commiteado todavía — ver "Pendiente" abajo).
+contexto (todo el código de esta sesión ya está commiteado y pusheado a `origin/master`, y
+desplegado en Render — ver commits `b78e5d3`..`cb9f20e`).
 
 ### Contexto de negocio
 
@@ -115,7 +116,7 @@ producción (o si valen ambas para clientes distintos) sigue abierta — ver mem
 `dian-tech-provider.md` para el comparativo completo MATIAS vs Factus vs Plemsi y el precio de
 Factus (todavía sin confirmar, tema para retomar con ellos).
 
-### Lo que se implementó en esta sesión (sin commitear todavía)
+### Lo que se implementó en esta sesión (commiteado y desplegado)
 
 1. **Segundo proveedor tecnológico DIAN: Factus API** (`Company.electronicInvoicingProvider` ahora
    acepta `DIRECT | MATIAS | FACTUS`, `infrastructure/factus-invoicing-client.ts`,
@@ -138,19 +139,25 @@ Factus (todavía sin confirmar, tema para retomar con ellos).
    "Pendiente"), solo se verificó que el endpoint completo está bien conectado.
 3. **Limpieza de planes de facturación**: se eliminaron 4 planes fantasma
    (`FACT_EMPRENDEDOR/PYME/PRO/PLUS`, una línea "Solo Facturación" copiada de Alegra el
-   2026-09-03) de `seed-base.ts`, de la base local y de `LandingPage.tsx` — contradecían la
-   estrategia de precios de Contapro ("todo incluido, sin fragmentar"). Quedan solo
-   `TRIAL`/`BASICO`/`PYME`/`PRO`. **Falta borrar esas mismas 4 filas en la base de producción de
-   Render a mano** — el cambio en `seed-base.ts` no las borra ahí solo.
+   2026-09-03) de `seed-base.ts`, de la base local, de la base de **producción de Render** (borrado
+   a mano vía Shell, confirmado 2026-09-21) y de `LandingPage.tsx` — contradecían la estrategia de
+   precios de Contapro ("todo incluido, sin fragmentar"). Quedan solo `TRIAL`/`BASICO`/`PYME`/`PRO`
+   en ambas bases.
 4. Se armó y publicó como Artifact una ficha de preparación para la reunión con Factus (stack
    técnico, qué comprarles, preguntas para ellos, Q&A anticipado) — buscarla como "Reunión con
    Factus" en `/artifacts` si hace falta el link de nuevo.
+5. **Landing pública (`LandingPage.tsx`) rediseñada con selector PUC/NIIF + certificado digital +
+   integraciones** (2026-09-21): antes de ver el detalle completo de los 3 planes reales, el
+   visitante debe elegir PUC o NIIF (gatea la tabla de planes, atenuada hasta elegir); toggle
+   mensual/anual con precios y ahorro reales del seed; bloque separado de certificado digital de
+   firma electrónica ($130.000 COP/año, cargo aparte, exigido por la DIAN); sección de
+   integraciones vía API con CTA de documentación (placeholder). **PUC/NIIF y el certificado son
+   solo UI por ahora** — no hay plantilla de plan de cuentas NIIF ni flujo de checkout del
+   certificado en el backend; "Elegir plan" pasa la elección como query params a `/register`,
+   listo para conectarse el día que exista esa lógica real.
 
 ### Pendiente — lo primero que hay que retomar
 
-- **Nada de esta sesión está commiteado.** `git status` tiene ~20 archivos modificados + 6 nuevos
-  (Factus + lector de extractos + limpieza de planes) sin commit. Revisar y commitear antes de
-  seguir para no perder el trabajo.
 - **`ANTHROPIC_API_KEY` se quedó sin saldo** ("Your credit balance is too low") — bloquea tanto el
   lector de extractos bancarios nuevo como la lectura de facturas de compra ya existente. Hay que
   recargar en console.anthropic.com antes de poder probar cualquiera de las dos con un archivo
@@ -158,8 +165,9 @@ Factus (todavía sin confirmar, tema para retomar con ellos).
 - **Precio real de Factus todavía sin confirmar** — la reunión de las 4:30pm era el momento de
   preguntarlo directamente (ver ficha de preparación). Sin esto, no se puede decidir MATIAS vs
   Factus vs ambos para producción.
-- **Borrar los 4 planes "Solo Facturación" en la base de datos de producción (Render)** — ver
-  punto 3 arriba, sigue pendiente ahí aunque ya se limpiaron en local.
+- **PUC/NIIF y certificado digital son solo UI todavía** (ver punto 5 arriba) — falta la plantilla
+  de plan de cuentas NIIF real y el flujo de checkout/compra del certificado digital si se decide
+  llevar esto a producción de verdad.
 - **Fase "conciliación bancaria con IA para desempate" del plan original** (usar IA para los casos
   que el desempate por texto de `description-similarity.ts` no resuelve) sigue sin hacer — se hizo
   en cambio el lector de extractos (una feature distinta, ver punto 2 arriba).
