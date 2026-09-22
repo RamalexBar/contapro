@@ -31,7 +31,6 @@ const FEATURES = [
 
 const COMPETITORS = [
   { name: "Siigo", price: "$145.993 – $191.327", note: "módulos separados" },
-  { name: "Alegra", price: "$69.900 – $279.900", note: "nómina y POS aparte" },
   { name: "World Office", price: "$170.000 – $182.750", note: "nómina solo en el plan tope" },
 ];
 
@@ -230,7 +229,7 @@ export function LandingPage() {
         <div className="mx-auto max-w-4xl px-4 text-center">
           <h2 className="text-2xl font-bold text-slate-900">La competencia cobra por partes. Nosotros no.</h2>
           <p className="mx-auto mt-3 max-w-2xl text-slate-600">
-            Siigo, Alegra y World Office venden facturación, contabilidad, POS y nómina como
+            Siigo y World Office venden facturación, contabilidad, POS y nómina como
             productos separados — el costo real termina 30-80% arriba del precio anunciado.
           </p>
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
