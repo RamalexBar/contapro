@@ -7,9 +7,14 @@ function startOfCurrentMonth(): Date {
 }
 
 export class PrismaElectronicDocumentUsageRepository implements IElectronicDocumentUsageRepository {
+  /** Solo ACCEPTED: confirmado con Factus (2026-09-22, ver memoria "Preguntas para Factus" /
+   * dian-tech-provider) que un documento RECHAZADO por la DIAN no descuenta de la bolsa
+   * comprada -- solo lo que "haya sido validado correctamente". Contar REJECTED aca sobreestimaria
+   * el consumo real y mostraria al cliente una barra de progreso mas llena de lo que Factus
+   * realmente les cobra. */
   async countThisMonth(): Promise<number> {
     const where = {
-      status: { in: ["ACCEPTED", "REJECTED"] as ("ACCEPTED" | "REJECTED")[] },
+      status: "ACCEPTED" as const,
       createdAt: { gte: startOfCurrentMonth() },
     };
 
