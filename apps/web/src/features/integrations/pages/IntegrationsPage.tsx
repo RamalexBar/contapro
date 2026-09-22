@@ -17,6 +17,7 @@ import {
   deactivateApiKey,
   deactivateWebhookSubscription,
   getDianProviderSettings,
+  getElectronicDocumentUsage,
   listApiKeys,
   listWebhookDeliveries,
   listWebhookSubscriptions,
@@ -354,20 +355,56 @@ function WebhooksSection() {
   );
 }
 
+function DocumentUsageCard() {
+  const { data, isLoading } = useQuery({ queryKey: ["electronic-document-usage"], queryFn: getElectronicDocumentUsage });
+
+  if (isLoading || !data) return null;
+  if (!data.monthlyLimit) {
+    // Sin suscripcion activa, o el plan no tiene tope (TRIAL) -- nada que mostrar.
+    return null;
+  }
+
+  const percent = Math.min(100, Math.round((data.documentsThisMonth / data.monthlyLimit) * 100));
+  const tone = percent >= 100 ? "danger" : percent >= 80 ? "warning" : "success";
+
+  return (
+    <Card className="mb-4" title="Documentos DIAN este mes">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">
+          <span className="font-semibold text-slate-900">
+            {data.documentsThisMonth} / {data.monthlyLimit}
+          </span>{" "}
+          documentos usados este mes ({data.planName})
+        </p>
+        <Badge tone={tone}>{percent}%</Badge>
+      </div>
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${tone === "danger" ? "bg-danger-600" : tone === "warning" ? "bg-warning-500" : "bg-success-600"}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      {percent >= 80 && (
+        <p className="mt-2 text-xs text-slate-500">
+          Te estás acercando al tope de tu plan. El excedente no bloquea la facturación, pero
+          conviene revisar si conviene subir de plan.
+        </p>
+      )}
+    </Card>
+  );
+}
+
 function DianProviderSection() {
   const queryClient = useQueryClient();
   const canManage = useAuthStore((s) => s.hasPermission("electronic-invoicing.manage"));
   const { data, isLoading } = useQuery({ queryKey: ["dian-provider-settings"], queryFn: getDianProviderSettings });
 
-  const [provider, setProvider] = useState<"DIRECT" | "MATIAS" | "FACTUS">("DIRECT");
-  const [apiToken, setApiToken] = useState("");
-  const [replaceToken, setReplaceToken] = useState(false);
+  const [provider, setProvider] = useState<"DIRECT" | "FACTUS">("DIRECT");
   const [factusForm, setFactusForm] = useState<FactusCredentialsInput>({
     clientId: "",
     clientSecret: "",
     email: "",
     password: "",
-    numberingRangeId: 0,
   });
   const [replaceFactusCredentials, setReplaceFactusCredentials] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -377,21 +414,17 @@ function DianProviderSection() {
     if (data?.provider) setProvider(data.provider);
   }, [data?.provider]);
 
-  const needsToken = provider === "MATIAS" && (replaceToken || !data?.hasMatiasToken);
   const needsFactusCredentials = provider === "FACTUS" && (replaceFactusCredentials || !data?.hasFactusCredentials);
 
   const saveMutation = useMutation({
     mutationFn: () =>
       setDianProviderSettings({
         provider,
-        apiToken: needsToken ? apiToken : undefined,
         factusCredentials: needsFactusCredentials ? factusForm : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dian-provider-settings"] });
-      setApiToken("");
-      setReplaceToken(false);
-      setFactusForm({ clientId: "", clientSecret: "", email: "", password: "", numberingRangeId: 0 });
+      setFactusForm({ clientId: "", clientSecret: "", email: "", password: "" });
       setReplaceFactusCredentials(false);
       setSaved(true);
     },
@@ -399,16 +432,18 @@ function DianProviderSection() {
 
   if (isLoading) return <Spinner />;
 
-  const factusFormValid =
-    factusForm.clientId && factusForm.clientSecret && factusForm.email && factusForm.password && factusForm.numberingRangeId > 0;
+  const factusFormValid = factusForm.clientId && factusForm.clientSecret && factusForm.email && factusForm.password;
 
   return (
-    <Card title="Proveedor tecnologico DIAN (facturas de venta)">
+    <>
+      <DocumentUsageCard />
+      <Card title="Proveedor tecnologico DIAN (facturas de venta)">
       <p className="mb-4 text-sm text-slate-500">
         Por defecto (<strong>Directo</strong>) Contapro genera el CUFE/XML localmente y los envia a
-        la DIAN — camino sin verificar contra su servicio real todavia. Con <strong>MATIAS</strong>{" "}
-        o <strong>Factus</strong> un proveedor tecnologico se encarga de generar, firmar y
-        transmitir la factura — ambos caminos verificados contra su entorno de pruebas.
+        la DIAN — camino sin verificar contra su servicio real todavia. Con <strong>Factus</strong>{" "}
+        un proveedor tecnologico se encarga de generar, firmar y transmitir la factura — al cargar
+        las credenciales, Contapro crea automaticamente el rango de numeracion en Factus a partir
+        de tu resolucion DIAN ya registrada (no hace falta crearlo a mano).
       </p>
 
       {!canManage ? (
@@ -423,38 +458,10 @@ function DianProviderSection() {
             saveMutation.mutate();
           }}
         >
-          <Select label="Proveedor" value={provider} onChange={(e) => setProvider(e.target.value as "DIRECT" | "MATIAS" | "FACTUS")}>
+          <Select label="Proveedor" value={provider} onChange={(e) => setProvider(e.target.value as "DIRECT" | "FACTUS")}>
             <option value="DIRECT">Directo (envio a la DIAN, default)</option>
-            <option value="MATIAS">MATIAS API</option>
             <option value="FACTUS">Factus API</option>
           </Select>
-
-          {provider === "MATIAS" && (
-            <>
-              {data?.hasMatiasToken && !replaceToken ? (
-                <Alert tone="info">
-                  Ya hay un token de MATIAS cargado.{" "}
-                  <button type="button" className="underline" onClick={() => setReplaceToken(true)}>
-                    Reemplazarlo
-                  </button>
-                </Alert>
-              ) : (
-                <Input
-                  type="password"
-                  placeholder="Token de MATIAS (Bearer)"
-                  value={apiToken}
-                  onChange={(e) => setApiToken(e.target.value)}
-                  required={needsToken}
-                />
-              )}
-              {!data?.hasMatiasToken && (
-                <p className="text-xs text-slate-500">
-                  Se pide el token a MATIAS al crear la cuenta de la empresa en su plataforma
-                  (sandbox: sandbox-auth.matias-api.com). Se guarda cifrado, no se vuelve a mostrar.
-                </p>
-              )}
-            </>
-          )}
 
           {provider === "FACTUS" && (
             <>
@@ -494,32 +501,21 @@ function DianProviderSection() {
                     onChange={(e) => setFactusForm({ ...factusForm, password: e.target.value })}
                     required={needsFactusCredentials}
                   />
-                  <Input
-                    type="number"
-                    placeholder="ID del rango de numeracion (Factura de Venta)"
-                    value={factusForm.numberingRangeId || ""}
-                    onChange={(e) => setFactusForm({ ...factusForm, numberingRangeId: Number(e.target.value) })}
-                    required={needsFactusCredentials}
-                  />
                 </>
               )}
               {!data?.hasFactusCredentials && (
                 <p className="text-xs text-slate-500">
                   Las credenciales las asigna el administrador de la cuenta de Factus (no hay
-                  autoregistro). El ID del rango de numeracion es el que Factus asigno al crear el
-                  rango de "Factura de Venta" en su plataforma (ver GET /v2/numbering-ranges) — no
-                  es el prefijo/resolucion DIAN que ya tiene Contapro. Se guarda todo cifrado, no
-                  se vuelve a mostrar.
+                  autoregistro). Al guardar, Contapro crea solo el rango de numeracion en Factus
+                  usando tu resolucion DIAN de factura de venta ya activa (y sube tu logo si ya
+                  tenes uno cargado) — necesita que esa resolucion ya exista en Numeracion. Se
+                  guarda todo cifrado, no se vuelve a mostrar.
                 </p>
               )}
             </>
           )}
 
-          <Button
-            type="submit"
-            loading={saveMutation.isPending}
-            disabled={(needsToken && !apiToken) || (needsFactusCredentials && !factusFormValid)}
-          >
+          <Button type="submit" loading={saveMutation.isPending} disabled={needsFactusCredentials && !factusFormValid}>
             Guardar
           </Button>
 
@@ -535,7 +531,8 @@ function DianProviderSection() {
           )}
         </form>
       )}
-    </Card>
+      </Card>
+    </>
   );
 }
 

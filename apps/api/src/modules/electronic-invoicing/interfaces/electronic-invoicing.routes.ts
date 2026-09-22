@@ -21,6 +21,11 @@ electronicInvoicingRouter.put(
   requirePermission("electronic-invoicing.manage"),
   electronicInvoicingController.setProviderSettings
 );
+electronicInvoicingRouter.get(
+  "/electronic-invoicing/document-usage",
+  requirePermission("electronic-invoicing.read"),
+  electronicInvoicingController.getDocumentUsage
+);
 
 electronicInvoicingRouter.get(
   "/electronic-invoicing/numbering-resolutions",

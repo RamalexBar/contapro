@@ -16,6 +16,7 @@ const PLAN: PlanRecord = {
   maxBranches: 2,
   maxUsers: 10,
   features: {},
+  maxElectronicDocumentsPerMonth: null,
   isActive: true,
   createdAt: new Date("2026-01-01"),
 };

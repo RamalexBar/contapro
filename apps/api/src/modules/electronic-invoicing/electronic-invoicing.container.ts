@@ -14,8 +14,10 @@ import { NodeForgeCertificateLoader } from "./infrastructure/node-forge-certific
 import { XadesXmlSigner } from "./infrastructure/xades-xml-signer";
 import { DianSoapClient } from "./infrastructure/dian-soap-client";
 import { DianNominaSoapClient } from "./infrastructure/dian-nomina-soap-client";
-import { MatiasInvoicingClient } from "./infrastructure/matias-invoicing-client";
 import { FactusInvoicingClient } from "./infrastructure/factus-invoicing-client";
+import { FactusAccountProvisioningService } from "./infrastructure/factus-account-provisioning.service";
+import { PrismaElectronicDocumentUsageRepository } from "./infrastructure/prisma-electronic-document-usage.repository";
+import { planRepo, subscriptionRepo } from "../saas-admin/saas-admin.container";
 import { GenerateElectronicInvoiceUseCase } from "./application/use-cases/generate-electronic-invoice.use-case";
 import { GenerateElectronicCreditNoteUseCase } from "./application/use-cases/generate-electronic-credit-note.use-case";
 import { GenerateElectronicDebitNoteUseCase } from "./application/use-cases/generate-electronic-debit-note.use-case";
@@ -36,6 +38,7 @@ import { ResubmitElectronicPayrollUseCase } from "./application/use-cases/resubm
 import { PollDianSubmissionsUseCase } from "./application/use-cases/poll-dian-submissions.use-case";
 import { SetElectronicInvoicingProviderUseCase } from "./application/use-cases/set-electronic-invoicing-provider.use-case";
 import { GetElectronicInvoicingProviderSettingsUseCase } from "./application/use-cases/get-electronic-invoicing-provider-settings.use-case";
+import { GetElectronicDocumentUsageUseCase } from "./application/use-cases/get-electronic-document-usage.use-case";
 import { SendInvoiceWhatsAppUseCase } from "./application/use-cases/send-invoice-whatsapp.use-case";
 import { PrismaSaleRepository } from "../pos/sale/infrastructure/prisma-sale.repository";
 import { whatsAppSender, whatsAppDeliveryLogRepo } from "../whatsapp/whatsapp.container";
@@ -61,14 +64,22 @@ const dianClient = new DianSoapClient();
 // dian-nomina-soap-client.ts. employeeRepo si se importa directo de employees.container.ts
 // (sin riesgo de ciclo: ese container no importa nada de aqui, a diferencia de suppliers).
 const dianNominaClient = new DianNominaSoapClient();
-// Proveedores tecnologicos DIAN alternativos (ver README, seccion "Proveedor tecnologico (MATIAS
-// API / Factus API)") -- cual de los dos se usa depende de Company.electronicInvoicingProvider,
-// resuelto por resolveThirdPartyProvider en GenerateElectronicInvoiceUseCase/
-// ResubmitElectronicInvoiceUseCase.
-const matiasInvoicingClient = new MatiasInvoicingClient();
+// Proveedor tecnologico DIAN alternativo (ver README, seccion "Proveedor tecnologico (Factus
+// API)") -- solo se usa cuando Company.electronicInvoicingProvider === "FACTUS", ver
+// GenerateElectronicInvoiceUseCase/ResubmitElectronicInvoiceUseCase.
 const factusInvoicingClient = new FactusInvoicingClient();
-const setProviderUseCase = new SetElectronicInvoicingProviderUseCase(companyReader, auditService);
+const factusProvisioner = new FactusAccountProvisioningService();
+const documentUsageRepo = new PrismaElectronicDocumentUsageRepository();
+const setProviderUseCase = new SetElectronicInvoicingProviderUseCase(
+  companyReader,
+  auditService,
+  numberingResolutionRepo,
+  factusProvisioner,
+  subscriptionRepo,
+  planRepo
+);
 const getProviderSettingsUseCase = new GetElectronicInvoicingProviderSettingsUseCase(companyReader);
+const getDocumentUsageUseCase = new GetElectronicDocumentUsageUseCase(documentUsageRepo, subscriptionRepo, planRepo);
 
 const createResolutionUseCase = new CreateNumberingResolutionUseCase(numberingResolutionRepo, auditService);
 const listResolutionsUseCase = new ListNumberingResolutionsUseCase(numberingResolutionRepo);
@@ -79,7 +90,6 @@ const resubmitUseCase = new ResubmitElectronicInvoiceUseCase(
   xmlSigner,
   auditService,
   companyReader,
-  matiasInvoicingClient,
   factusInvoicingClient
 );
 const getCreditNoteUseCase = new GetElectronicCreditNoteUseCase(electronicCreditNoteRepo);
@@ -142,7 +152,8 @@ export const electronicInvoicingController = new ElectronicInvoicingController(
   saleRepoForWhatsApp,
   whatsAppDeliveryLogRepo,
   setProviderUseCase,
-  getProviderSettingsUseCase
+  getProviderSettingsUseCase,
+  getDocumentUsageUseCase
 );
 
 /** Usado por sale.container.ts para generar el CUFE/XML local (y firmar si hay certificado
@@ -154,7 +165,6 @@ export const generateElectronicInvoiceUseCase = new GenerateElectronicInvoiceUse
   auditService,
   certificateLoader,
   xmlSigner,
-  matiasInvoicingClient,
   factusInvoicingClient
 );
 

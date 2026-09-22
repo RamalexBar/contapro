@@ -70,11 +70,11 @@ export function resendWebhookDelivery(id: string): Promise<void> {
   return apiFetch(`/webhook-deliveries/${id}/resend`, { method: "POST" });
 }
 
-// ---- Proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md, punto 14) ----
+// ---- Proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md, seccion
+// "Proveedor tecnologico (Factus API)") ----
 
 export interface DianProviderSettings {
-  provider: "DIRECT" | "MATIAS" | "FACTUS";
-  hasMatiasToken: boolean;
+  provider: "DIRECT" | "FACTUS";
   hasFactusCredentials: boolean;
 }
 
@@ -83,7 +83,6 @@ export interface FactusCredentialsInput {
   clientSecret: string;
   email: string;
   password: string;
-  numberingRangeId: number;
 }
 
 export function getDianProviderSettings(): Promise<DianProviderSettings> {
@@ -91,9 +90,22 @@ export function getDianProviderSettings(): Promise<DianProviderSettings> {
 }
 
 export function setDianProviderSettings(input: {
-  provider: "DIRECT" | "MATIAS" | "FACTUS";
-  apiToken?: string;
+  provider: "DIRECT" | "FACTUS";
   factusCredentials?: FactusCredentialsInput;
 }): Promise<void> {
   return apiFetch("/electronic-invoicing/provider-settings", { method: "PUT", body: input });
+}
+
+// ---- Consumo de documentos DIAN del mes vs. tope del plan (decision 2026-09-21, ver memoria
+// factus-pricing-and-caps) ----
+
+export interface ElectronicDocumentUsage {
+  documentsThisMonth: number;
+  planCode: string | null;
+  planName: string | null;
+  monthlyLimit: number | null;
+}
+
+export function getElectronicDocumentUsage(): Promise<ElectronicDocumentUsage> {
+  return apiFetch("/electronic-invoicing/document-usage");
 }

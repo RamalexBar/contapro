@@ -11,6 +11,7 @@ function toRecord(row: {
   maxBranches: number;
   maxUsers: number;
   features: unknown;
+  maxElectronicDocumentsPerMonth: number | null;
   isActive: boolean;
   createdAt: Date;
 }): PlanRecord {
@@ -23,6 +24,7 @@ function toRecord(row: {
     maxBranches: row.maxBranches,
     maxUsers: row.maxUsers,
     features: row.features as Record<string, unknown>,
+    maxElectronicDocumentsPerMonth: row.maxElectronicDocumentsPerMonth,
     isActive: row.isActive,
     createdAt: row.createdAt,
   };

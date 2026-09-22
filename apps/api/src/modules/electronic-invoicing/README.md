@@ -13,12 +13,15 @@ credenciales de habilitacion reales, ver "Limitaciones e items sin verificar"). 
 electronica es, con diferencia, la parte MENOS verificada de todo el modulo** — esquema XML propio
 (no UBL) sin contrastar contra el Anexo Tecnico, servicio SOAP distinto al de facturacion sin
 confirmar ni en nombre, ver punto 12 y las limitaciones al final. El documento soporte (compras)
-es la segunda parte menos verificada, ver mas abajo. **Facturas de venta** tienen ademas dos
-caminos alternativos al envio directo de arriba, via proveedor tecnologico
-(`Company.electronicInvoicingProvider = "MATIAS" | "FACTUS"`), **ambos verificados** contra su
-sandbox real (puntos 14 y 15) — los unicos caminos de envio de este modulo que no llevan el aviso
-"sin verificar" (Factus, ademas, se verifico de punta a punta a traves de una venta real completada
-en Contapro, no solo el cliente aislado).
+es la segunda parte menos verificada, ver mas abajo. **Facturas de venta** tienen ademas un
+camino alternativo al envio directo de arriba, via proveedor tecnologico
+(`Company.electronicInvoicingProvider = "FACTUS"`), **verificado** contra su sandbox real (punto
+14) — el unico camino de envio de este modulo que no lleva el aviso "sin verificar" (se verifico
+ademas de punta a punta a traves de una venta real completada en Contapro, no solo el cliente
+aislado). MATIAS fue el primer proveedor tecnologico integrado y tambien llego a verificarse
+contra su sandbox, pero se elimino del codebase el 2026-09-21 (decision del usuario: su soporte no
+atendio el caso de uso de "casa de software" pese a que su propia web lo ofrece) — Factus quedo
+como unico proveedor tecnologico.
 
 ## Modelos (`packages/database/prisma/schema/electronic-invoicing.prisma`)
 
@@ -175,75 +178,99 @@ en Contapro, no solo el cliente aislado).
     "HABILITACION - NO VALIDO COMO DOCUMENTO FISCAL". **Ver limitaciones**: el formato del QR y el
     layout en si no estan validados contra el Anexo Tecnico DIAN vigente, y el documento soporte
     no tiene desglose de lineas (hereda el hueco de su XML, ver punto 8).
-14. **Proveedor tecnologico (MATIAS API)** — alternativa al envio directo a la DIAN (puntos 4-5
+14. **Proveedor tecnologico (Factus API)** — alternativa al envio directo a la DIAN (puntos 4-5
     de arriba), solo para **facturas de venta** por ahora. `Company.electronicInvoicingProvider`
-    (`DIRECT` default | `MATIAS`) decide el camino en `GenerateElectronicInvoiceUseCase` /
-    `ResubmitElectronicInvoiceUseCase`. A diferencia del envio directo, MATIAS recibe datos
-    estructurados en JSON (no XML ya firmado) y el mismo genera CUFE/XML/firma XAdES y transmite
-    a la DIAN, todo en una llamada sincrona (sin poller) — puerto
-    `domain/third-party-invoicing-client.ts`, implementacion real y **verificada contra su
-    sandbox** (no especulativa, a diferencia del resto del modulo) en
-    `infrastructure/matias-invoicing-client.ts`. El CUFE/XML generados localmente en
-    `claimNumberAndGenerate` son solo un placeholder rapido (evita mantener una transaccion de
-    Postgres abierta durante la llamada de red) — `IElectronicInvoiceRepository.
-    applyThirdPartySubmissionResult` los sobrescribe con los reales de MATIAS. Cada empresa carga
-    su propio token via `PUT /electronic-invoicing/provider-settings` (permiso
-    `electronic-invoicing.manage`), cifrado en reposo (`shared/crypto/credential-cipher.ts`,
-    AES-256-GCM, clave maestra `CREDENTIALS_ENCRYPTION_KEY`) — nunca un token global en `env`,
-    porque cada empresa cliente de Contapro necesita su propia cuenta MATIAS bajo su propio NIT.
-    `Customer` gano 7 campos opcionales (`dianIdentityDocumentId`/`dianTypeOrganizationId`/
-    `dianTaxRegimeId`/`dianTaxLevelId`/`dianCountryId`/`dianCityId`/`dianPostalCode`) con los
-    catalogos que MATIAS exige y Contapro no capturaba — deliberadamente sin mapeo automatico
-    desde `documentType` (solo se confirmo el catalogo real para "CC"), el contador de cada
-    empresa los completa con el valor real de MATIAS. Sin ellos, la factura queda `REJECTED` con
-    el motivo real de MATIAS (mismo patron no bloqueante del resto del modulo). Notas
-    credito/debito, documento soporte y nomina electronica **no** usan MATIAS todavia — solo se
-    probo `POST /invoice`, el resto de sus endpoints (`/notes/credit`, `/ds/document`,
-    `/ep/payroll`, etc.) queda documentado por MATIAS pero sin verificar en este codebase.
-    Plemsi (otro proveedor evaluado) queda fuera hasta tener su formato real de factura
-    confirmado — solo se conoce su URL de sandbox (`https://pruebas.plemsi.com`) y su esquema de
-    autenticacion Bearer.
-15. **Proveedor tecnologico (Factus API)** — segundo proveedor tecnologico, agregado 2026-09-18
-    junto a MATIAS (`Company.electronicInvoicingProvider` ahora acepta `DIRECT | MATIAS | FACTUS`),
-    resuelto por `application/resolve-third-party-provider.ts` (usado por
-    `GenerateElectronicInvoiceUseCase`/`ResubmitElectronicInvoiceUseCase` para no duplicar el
-    if/else de "que cliente y que credencial usar" en los dos lugares). **Verificado en vivo
-    contra su sandbox** (`https://api-sandbox.factus.com.co`) el mismo dia: autenticacion OAuth2 +
-    una factura de prueba real creada con `is_validated: true`, CUFE real, y **ademas verificado
-    de punta a punta a traves del flujo real de Contapro** (venta completada -> `POST /sales` ->
+    (`DIRECT` default | `FACTUS`) decide el camino en `GenerateElectronicInvoiceUseCase` /
+    `ResubmitElectronicInvoiceUseCase`. A diferencia del envio directo, Factus recibe datos
+    estructurados en JSON (no XML ya firmado) y el mismo genera CUFE/XML/firma y transmite a la
+    DIAN, todo en una llamada sincrona (sin poller) — puerto
+    `domain/third-party-invoicing-client.ts`, implementacion real en
+    `infrastructure/factus-invoicing-client.ts`. **Verificado en vivo contra su sandbox**
+    (`https://api-sandbox.factus.com.co`, 2026-09-18): autenticacion OAuth2 + una factura de
+    prueba real creada con `is_validated: true`, CUFE real, y **ademas verificado de punta a
+    punta a traves del flujo real de Contapro** (venta completada -> `POST /sales` ->
     `GenerateElectronicInvoiceUseCase` -> Factus -> `ElectronicInvoice.status = "ACCEPTED"` con
-    CUFE y XML firmado reales) — un nivel de verificacion mayor que el que se pudo hacer para
-    MATIAS en su momento (ahi solo se probo el cliente aislado, no el flujo completo de venta).
-    Arquitectura deliberadamente distinta a MATIAS, no una variante del mismo cliente (ver cabecera
-    de `infrastructure/factus-invoicing-client.ts`):
+    CUFE y XML firmado reales).
+
+    Notas de arquitectura (ver cabecera de `infrastructure/factus-invoicing-client.ts`):
     - **Autenticacion OAuth2 "password grant"** (`client_id` + `client_secret` + `email` +
-      `password` -> `access_token` de 1h), no un token fijo por empresa como MATIAS. El cliente
-      se re-autentica en cada llamada en vez de cachear/refrescar el token — mas simple, sin bugs
+      `password` -> `access_token` de 1h), no un token fijo por empresa. El cliente se
+      re-autentica en cada llamada en vez de cachear/refrescar el token — mas simple, sin bugs
       de token vencido, a costa de una llamada HTTP extra por factura.
     - Factus **no acepta el prefijo/resolucion/consecutivo de Contapro** — exige un
       `numbering_range_id` (id interno que Factus asigna al crear el rango de numeracion EN SU
-      plataforma, `GET /v2/numbering-ranges`) y es **Factus quien decide el numero final del
-      documento** (`data.number`, ej. `"SETP990019699"`). El `fullNumber` que Contapro ya reservo
-      localmente viaja solo como `reference_code` de correlacion, no como el numero real —mismo
-      tipo de aviso que ya existe para el CUFE local provisional vs el real del proveedor.
+      plataforma) y es **Factus quien decide el numero final del documento** (`data.number`, ej.
+      `"SETP990019699"`). El `fullNumber` que Contapro ya reservo localmente viaja solo como
+      `reference_code` de correlacion, no como el numero real —mismo tipo de aviso que ya existe
+      para el CUFE local provisional vs el real del proveedor.
     - El XML firmado **no viene en la respuesta de creacion** — se pide aparte con
       `GET /v2/bills/{number}/download-xml`. Si esa segunda llamada falla, la factura queda
       `ACCEPTED` igual (ya se emitio en Factus, irreversible) pero con `signedXmlContent` vacio —
       limite conocido, no auto-reintentado (Factus rechazaria un reintento de creacion por
       `reference_code` duplicado).
     - Las 5 credenciales (4 de OAuth2 + `numberingRangeId`) viajan empaquetadas en un solo JSON
-      dentro de `Company.factusCredentialsEncrypted` (cifrado, mismo mecanismo que
-      `matiasApiTokenEncrypted`) — un solo campo en vez de 5 columnas, y evita ampliar la firma de
-      `IThirdPartyInvoicingClient.submitInvoice` (sigue recibiendo un solo `apiToken: string`)
-      solo para este proveedor.
-    - Catalogos DIAN fijados a mano (mismo hueco ya documentado para MATIAS: Customer no tiene hoy
-      un regimen/responsabilidad DIAN real por venta): `document: "01"`, `operation_type: "10"`,
-      `payment_form: "1"` + `payment_method_code: "42"` (tomado del ejemplo oficial de Factus, sin
-      verificar contra otros codigos), `tribute_code: "ZZ"`, `responsibilities: ["R-99-PN"]`.
-    - Notas credito/debito, documento soporte, nomina electronica, rangos via API y eventos RADIAN
-      **no** usan Factus todavia — solo se implemento y probo `POST /v2/bills/validate` +
-      descarga de XML, el resto de su API (mucho mas amplia que la de MATIAS) queda documentada
-      por Factus pero sin verificar en este codebase.
+      dentro de `Company.factusCredentialsEncrypted` (cifrado, `shared/crypto/credential-cipher.ts`,
+      AES-256-GCM, clave maestra `CREDENTIALS_ENCRYPTION_KEY`) — un solo campo en vez de 5
+      columnas, y evita ampliar la firma de `IThirdPartyInvoicingClient.submitInvoice` (sigue
+      recibiendo un solo `apiToken: string`) solo para este proveedor. Nunca un token/credencial
+      global en `env`, porque cada empresa cliente de Contapro necesita su propia cuenta Factus
+      bajo su propio NIT.
+    - Catalogos DIAN fijados a mano (Customer no tiene hoy un regimen/responsabilidad DIAN real
+      por venta): `document: "01"`, `operation_type: "10"`, `payment_form: "1"` +
+      `payment_method_code: "42"` (tomado del ejemplo oficial de Factus, sin verificar contra
+      otros codigos), `tribute_code: "ZZ"`, `responsibilities: ["R-99-PN"]`.
+    - Notas credito/debito, documento soporte, nomina electronica y eventos RADIAN **no** usan
+      Factus todavia — solo se implemento y probo `POST /v2/bills/validate` + descarga de XML, el
+      resto de su API (mucho mas amplia que la del proveedor anterior evaluado, MATIAS) queda
+      documentada por Factus pero sin verificar en este codebase.
+
+    **Activacion 100% automatica** (`SetElectronicInvoicingProviderUseCase`,
+    `domain/factus-account-provisioner.ts`, `infrastructure/factus-account-provisioning.service.ts`,
+    agregado 2026-09-21): el usuario carga solo las 4 credenciales OAuth2 (nunca el
+    `numbering_range_id` a mano) — el caso de uso toma la `InvoiceNumberingResolution` de factura
+    de venta activa que Contapro ya tiene registrada y llama `POST /v2/numbering-ranges` de Factus
+    para crear ese mismo rango alla, quedandose con el `numbering_range_id` que Factus devuelve;
+    tambien sube el logo de la empresa (`Company.logoUrl`) a Factus via `POST /v2/companies/logo`
+    si ya hay uno cargado (best-effort, no bloquea la activacion si falla). **Sin verificar contra
+    un servicio real**: ambos endpoints devuelven `500 Internal Server Error` en el sandbox
+    compartido de Factus (`sandboxv2@factus.com.co`) sin importar el contenido del request —
+    probado 2026-09-21 con el payload documentado exacto (confirmado contra
+    developers.factus.com.co/rangos-de-numeracion/facturación/crear-rango/, el link de esa pagina
+    en la coleccion de Postman de Factus esta roto) y con una imagen minima valida para el logo.
+    Apunta a que esas dos operaciones estan bloqueadas para cuentas de sandbox compartidas, no a
+    un error de formato del lado de Contapro — falta una cuenta de Factus dedicada (no compartida)
+    para confirmarlo en vivo.
+
+    **MATIAS** fue el primer proveedor tecnologico integrado (2026-09-18) y llego a verificarse
+    contra su propio sandbox (factura de prueba real autorizada), pero se elimino del codebase por
+    completo el 2026-09-21 (decision del usuario: su soporte respondio que "no es para
+    desarrolladores", lo cual no coincide con su propia web) — no quedo ningun archivo, campo de
+    base de datos (`matiasApiTokenEncrypted` se borro de `Company` via migracion) ni opcion de UI
+    relacionada con MATIAS. `Customer` conserva 6 columnas opcionales que se habian agregado para
+    su catalogo interno (`dianIdentityDocumentId`/`dianTypeOrganizationId`/`dianTaxRegimeId`/
+    `dianTaxLevelId`/`dianCountryId`/`dianPostalCode`) — quedaron sin ningun consumidor (solo
+    `dianCityId` lo usa Factus hoy, para `municipality_code`), no se borraron del schema para no
+    ampliar el alcance de este cambio, ver `customers.prisma`.
+15. **Tope de documentos DIAN por plan** (decision de negocio 2026-09-21, ver memoria
+    `factus-pricing-and-caps` — comprada la Bolsa Anual Multifacturador de Factus de 10.000
+    documentos/año, $630.000 COP, $63/documento): `Plan.maxElectronicDocumentsPerMonth` (`150`
+    Emprendedor / `350` Pyme / `650` Plus / `null` TRIAL = sin tope) protege el margen de Contapro
+    contra un cliente de alto volumen. `GetElectronicDocumentUsageUseCase`
+    (`GET /electronic-invoicing/document-usage`) expone el consumo del mes en curso vs. el tope
+    del plan activo — **es de solo lectura, no bloquea nada todavia**: el excedente sobre el tope
+    se decidio cobrar aparte, pero el mecanismo de cobro no esta definido, asi que por ahora esto
+    es solo para seguimiento manual (UI en `IntegrationsPage.tsx`, barra de progreso arriba de la
+    seccion de proveedor DIAN). El conteo es una aproximacion: suma documentos en estado
+    `ACCEPTED`/`REJECTED` de los 5 tipos que comparten la misma bolsa (factura, notas
+    credito/debito, documento soporte, nomina) del mes calendario en curso, sin distinguir si ese
+    documento en particular salio por FACTUS o por DIRECT (no importa en la practica, una empresa
+    solo tiene un proveedor activo a la vez) — ver
+    `domain/electronic-document-usage.repository.ts`.
+
+    **Regla dura que si se aplica**: una empresa en el plan `TRIAL` no puede activar FACTUS
+    (`SetElectronicInvoicingProviderUseCase.assertNotOnTrialPlan`, tambien falla si la empresa no
+    tiene ninguna suscripcion activa) — el trial es gratis y no deberia poder gastar la bolsa de
+    documentos que Contapro ya pago. TRIAL sigue pudiendo facturar por DIRECT sin restriccion.
 
 ## Como probar localmente sin credenciales DIAN
 

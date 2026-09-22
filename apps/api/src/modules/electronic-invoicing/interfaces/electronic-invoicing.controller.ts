@@ -13,6 +13,7 @@ import type { GetElectronicPayrollUseCase } from "../application/use-cases/get-e
 import type { ResubmitElectronicPayrollUseCase } from "../application/use-cases/resubmit-electronic-payroll.use-case";
 import type { SetElectronicInvoicingProviderUseCase } from "../application/use-cases/set-electronic-invoicing-provider.use-case";
 import type { GetElectronicInvoicingProviderSettingsUseCase } from "../application/use-cases/get-electronic-invoicing-provider-settings.use-case";
+import type { GetElectronicDocumentUsageUseCase } from "../application/use-cases/get-electronic-document-usage.use-case";
 import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSupportDocumentToRideData } from "../application/ride-data-mapper";
 import { renderRidePdf, renderThermalReceiptPdf } from "../infrastructure/pdfkit-ride-renderer";
 import type { RideDocumentData } from "../application/ride-data-mapper";
@@ -40,12 +41,21 @@ export class ElectronicInvoicingController {
     private readonly saleRepo: ISaleRepository,
     private readonly whatsAppDeliveryLogRepo: IWhatsAppDeliveryLogRepository,
     private readonly setProviderUseCase: SetElectronicInvoicingProviderUseCase,
-    private readonly getProviderSettingsUseCase: GetElectronicInvoicingProviderSettingsUseCase
+    private readonly getProviderSettingsUseCase: GetElectronicInvoicingProviderSettingsUseCase,
+    private readonly getDocumentUsageUseCase: GetElectronicDocumentUsageUseCase
   ) {}
 
   getProviderSettings = async (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(await this.getProviderSettingsUseCase.execute());
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getDocumentUsage = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.getDocumentUsageUseCase.execute());
     } catch (err) {
       next(err);
     }

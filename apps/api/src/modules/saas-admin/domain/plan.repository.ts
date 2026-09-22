@@ -27,6 +27,10 @@ export interface PlanRecord {
   maxBranches: number;
   maxUsers: number;
   features: Record<string, unknown>;
+  /** Tope de documentos DIAN por mes via Factus, ver modules/electronic-invoicing. null = sin
+   * tope. No editable hoy desde CreatePlanData/UpdatePlanData (solo por seed) -- ver
+   * GetElectronicDocumentUsageUseCase. */
+  maxElectronicDocumentsPerMonth: number | null;
   isActive: boolean;
   createdAt: Date;
 }

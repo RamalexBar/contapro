@@ -51,27 +51,99 @@ export async function seedBase(prisma: Prisma.TransactionClient) {
   }
 
   // ---- Planes (panel administrador SaaS) ----
+  // maxElectronicDocumentsPerMonth: tope de documentos DIAN via Factus por mes calendario,
+  // decidido 2026-09-21 con la bolsa Multifacturador de 10.000 docs/año ($630.000 COP, $63/doc)
+  // como referencia de costo -- ver memoria factus-pricing-and-caps para el calculo completo
+  // (target: Factus no supera ~15% del ingreso anual del plan en el peor caso de costo/doc).
   await prisma.plan.upsert({
     where: { code: "TRIAL" },
-    create: { code: "TRIAL", name: "Prueba gratuita", priceMonthly: 0, priceYearly: 0, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+    create: {
+      code: "TRIAL",
+      name: "Prueba gratuita",
+      priceMonthly: 0,
+      priceYearly: 0,
+      maxBranches: 1,
+      maxUsers: 3,
+      features: FULL_FEATURES,
+      maxElectronicDocumentsPerMonth: null,
+    },
     // update completo (no {}): un re-seed debe poder corregir datos de planes ya creados, no solo
     // poblarlos la primera vez -- estos valores SI cambian con el tiempo (ajustes de precio).
-    update: { name: "Prueba gratuita", priceMonthly: 0, priceYearly: 0, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+    update: {
+      name: "Prueba gratuita",
+      priceMonthly: 0,
+      priceYearly: 0,
+      maxBranches: 1,
+      maxUsers: 3,
+      features: FULL_FEATURES,
+      maxElectronicDocumentsPerMonth: null,
+    },
   });
   await prisma.plan.upsert({
     where: { code: "BASICO" },
-    create: { code: "BASICO", name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 720000, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
-    update: { name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 720000, maxBranches: 1, maxUsers: 3, features: FULL_FEATURES },
+    create: {
+      code: "BASICO",
+      name: "Plan Emprendedor",
+      priceMonthly: 69900,
+      priceYearly: 720000,
+      maxBranches: 1,
+      maxUsers: 3,
+      features: FULL_FEATURES,
+      maxElectronicDocumentsPerMonth: 150,
+    },
+    update: {
+      name: "Plan Emprendedor",
+      priceMonthly: 69900,
+      priceYearly: 720000,
+      maxBranches: 1,
+      maxUsers: 3,
+      features: FULL_FEATURES,
+      maxElectronicDocumentsPerMonth: 150,
+    },
   });
   await prisma.plan.upsert({
     where: { code: "PYME" },
-    create: { code: "PYME", name: "Plan Pyme", priceMonthly: 149900, priceYearly: 1528900, maxBranches: 3, maxUsers: 10, features: FULL_FEATURES },
-    update: { name: "Plan Pyme", priceMonthly: 149900, priceYearly: 1528900, maxBranches: 3, maxUsers: 10, features: FULL_FEATURES },
+    create: {
+      code: "PYME",
+      name: "Plan Pyme",
+      priceMonthly: 149900,
+      priceYearly: 1528900,
+      maxBranches: 3,
+      maxUsers: 10,
+      features: FULL_FEATURES,
+      maxElectronicDocumentsPerMonth: 350,
+    },
+    update: {
+      name: "Plan Pyme",
+      priceMonthly: 149900,
+      priceYearly: 1528900,
+      maxBranches: 3,
+      maxUsers: 10,
+      features: FULL_FEATURES,
+      maxElectronicDocumentsPerMonth: 350,
+    },
   });
   await prisma.plan.upsert({
     where: { code: "PRO" },
-    create: { code: "PRO", name: "Plan Plus", priceMonthly: 279900, priceYearly: 2854900, maxBranches: 10, maxUsers: 50, features: FULL_FEATURES },
-    update: { name: "Plan Plus", priceMonthly: 279900, priceYearly: 2854900, maxBranches: 10, maxUsers: 50, features: FULL_FEATURES },
+    create: {
+      code: "PRO",
+      name: "Plan Plus",
+      priceMonthly: 279900,
+      priceYearly: 2854900,
+      maxBranches: 10,
+      maxUsers: 50,
+      features: FULL_FEATURES,
+      maxElectronicDocumentsPerMonth: 650,
+    },
+    update: {
+      name: "Plan Plus",
+      priceMonthly: 279900,
+      priceYearly: 2854900,
+      maxBranches: 10,
+      maxUsers: 50,
+      features: FULL_FEATURES,
+      maxElectronicDocumentsPerMonth: 650,
+    },
   });
 
   // ---- Backfill de conceptos de retencion / categorias de gasto / plan de cuentas para empresas

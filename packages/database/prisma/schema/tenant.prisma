@@ -1,18 +1,14 @@
 // Multiempresa / Multisucursal / Suscripciones SaaS
 
-/// Ver modules/electronic-invoicing/README.md, seccion "Proveedor tecnologico (MATIAS API /
-/// Factus API)". DIRECT = envio directo a la DIAN existente (dian-soap-client.ts, default, sin
-/// cambios de conducta). MATIAS/FACTUS = via el proveedor tecnologico correspondiente
-/// (matias-invoicing-client.ts / factus-invoicing-client.ts), solo facturas de venta por ahora
-/// (ver README). Dos proveedores reales implementados; se sigue sin modelar como tabla generica
-/// "por si acaso" se suma un tercero -- la comparacion real entre MATIAS y Factus (2026-09-18)
-/// confirmo que sus modelos de auth/numeracion son lo bastante distintos (token fijo por empresa
-/// vs OAuth2 password grant + numbering_range_id propio de Factus) como para que una tabla
-/// generica de "credenciales de proveedor" hoy forzaria una forma comun artificial en vez de
-/// simplificar algo.
+/// Ver modules/electronic-invoicing/README.md, seccion "Proveedor tecnologico (Factus API)".
+/// DIRECT = envio directo a la DIAN existente (dian-soap-client.ts, default, sin cambios de
+/// conducta). FACTUS = via el proveedor tecnologico (factus-invoicing-client.ts), solo facturas
+/// de venta por ahora (ver README). MATIAS se evaluo e integro primero (2026-09-18) pero se
+/// descarto el mismo dia por decision del usuario (su soporte no atendio el caso de uso de
+/// "casa de software" pese a que su propia web lo ofrece) -- el codigo y el campo
+/// matiasApiTokenEncrypted se eliminaron por completo, no se dejaron "por si acaso".
 enum DianProviderType {
   DIRECT
-  MATIAS
   FACTUS
 }
 
@@ -35,18 +31,14 @@ model Company {
   payrollElectronicSequence Int     @default(0)
   payrollElectronicPrefix   String?
   // ---- Proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md) ----
-  // matiasApiTokenEncrypted: el PAT de MATIAS de ESTA empresa, cifrado (credential-cipher.ts) --
-  // nunca en texto plano en la base ni en env, porque cada empresa cliente de Contapro tiene su
-  // propia cuenta/NIT en MATIAS. Cargado una sola vez via PUT
-  // /electronic-invoicing/provider-settings; no se puede volver a leer en texto plano despues.
-  electronicInvoicingProvider DianProviderType @default(DIRECT)
-  matiasApiTokenEncrypted     String?
   // factusCredentialsEncrypted: un solo blob cifrado (credential-cipher.ts) con el JSON
   // {clientId, clientSecret, email, password, numberingRangeId} -- Factus exige las 4 credenciales
-  // de OAuth2 password grant (no un token fijo como MATIAS) MAS el id interno del rango de
-  // numeracion de Factus para "Factura de Venta" (asignado por Factus al crear el rango en su
-  // plataforma, no el prefijo/resolucion DIAN que ya guarda InvoiceNumberingResolution) -- por eso
-  // es un campo propio y no matiasApiTokenEncrypted reusado. Ver factus-invoicing-client.ts.
+  // de OAuth2 password grant MAS el id interno del rango de numeracion de Factus para "Factura de
+  // Venta". Este ultimo YA NO lo pide el usuario a mano: SetElectronicInvoicingProviderUseCase lo
+  // obtiene solo, creando el rango en Factus a partir de la InvoiceNumberingResolution que
+  // Contapro ya tiene (ver factus-account-provisioning.service.ts). Cargado una sola vez via PUT
+  // /electronic-invoicing/provider-settings; no se puede volver a leer en texto plano despues.
+  electronicInvoicingProvider DianProviderType @default(DIRECT)
   factusCredentialsEncrypted  String?
 
   // ---- Datos fiscales DIAN de la empresa (ver modules/company/README.md) ----
@@ -101,6 +93,15 @@ model Plan {
   maxBranches  Int
   maxUsers     Int
   features     Json
+  // Tope de documentos DIAN (factura+notas+documento soporte+nomina, todo lo que sale de la
+  // misma bolsa comprada a Factus) que este plan puede emitir por mes calendario -- decision de
+  // negocio del 2026-09-21 (ver memoria factus-pricing-and-caps): protege el margen de un cliente
+  // de alto volumen contra el costo real de la bolsa de Factus. null = sin tope (TRIAL, que de
+  // todas formas no puede activar FACTUS, ver SetElectronicInvoicingProviderUseCase). El
+  // excedente sobre el tope NO bloquea la facturacion todavia -- se decidio cobrarlo aparte, pero
+  // el mecanismo de cobro no esta definido; por ahora GetElectronicDocumentUsageUseCase solo lo
+  // expone para seguimiento manual.
+  maxElectronicDocumentsPerMonth Int?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
