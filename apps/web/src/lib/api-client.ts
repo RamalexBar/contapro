@@ -67,8 +67,16 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
 /** Abre un PDF generado por el backend en una pestana nueva, listo para imprimir con Ctrl+P --
  * el endpoint exige el token en el header Authorization, asi que un <a href> directo no sirve.
- * Usado por todos los botones "Imprimir" (comprobante contable, cotizacion, orden de compra,
- * recibos de pago, gasto, liquidacion de comisiones). */
+ * Usado por todos los botones "Imprimir"/"Ver PDF" (comprobante contable, cotizacion, orden de
+ * compra, recibos de pago, gasto, liquidacion de comisiones, factura electronica, tirilla POS).
+ *
+ * `window.open` despues de un `await fetch(...)` puede volver `null` si el navegador decide que
+ * ya paso demasiado tiempo desde el clic original para seguir considerandolo un gesto directo del
+ * usuario (bloqueo silencioso de ventana emergente -- no todos los navegadores/extensiones
+ * muestran el icono nativo de "bloqueado" en la barra de direcciones). Sin este chequeo, un
+ * bloqueo o un fetch fallido no mostraban ningun error: el boton simplemente no hacia nada visible
+ * (bug real reportado en ManualInvoicePage.tsx, 2026-09-21). Se propaga como excepcion para que el
+ * caller (via useMutation) pueda mostrarlo en un Alert. */
 export async function openPdfInNewTab(path: string): Promise<void> {
   const { accessToken } = useAuthStore.getState();
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -77,6 +85,10 @@ export async function openPdfInNewTab(path: string): Promise<void> {
   if (!res.ok) throw new Error("No se pudo generar el PDF");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
+  const opened = window.open(url, "_blank");
+  if (!opened) {
+    URL.revokeObjectURL(url);
+    throw new Error("El navegador bloqueó la ventana emergente del PDF. Habilitá las ventanas emergentes para este sitio e intentá de nuevo.");
+  }
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

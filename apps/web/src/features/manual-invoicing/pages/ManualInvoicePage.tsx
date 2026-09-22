@@ -58,6 +58,8 @@ export function ManualInvoicePage() {
     },
   });
 
+  const pdfMutation = useMutation({ mutationFn: openManualInvoicePdf });
+
   function updateLine(index: number, patch: Partial<LineItem>) {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   }
@@ -200,9 +202,19 @@ export function ManualInvoicePage() {
         {invoice && (
           <div className="mt-4">
             <Alert tone="success">Factura creada por {formatCOP(invoice.total)}.</Alert>
-            <Button variant="secondary" className="mt-2" onClick={() => openManualInvoicePdf(invoice.id)}>
+            <Button
+              variant="secondary"
+              className="mt-2"
+              loading={pdfMutation.isPending}
+              onClick={() => pdfMutation.mutate(invoice.id)}
+            >
               Ver PDF
             </Button>
+            {pdfMutation.isError && (
+              <Alert tone="danger" className="mt-2">
+                {(pdfMutation.error as Error).message}
+              </Alert>
+            )}
           </div>
         )}
       </Card>

@@ -1,6 +1,5 @@
 import type { AuthorizeDiscountInput, CreateSaleInput } from "@erp/shared-types";
-import { apiFetch, ApiError, BASE_URL } from "../../../lib/api-client";
-import { useAuthStore } from "../../auth/hooks/useAuthStore";
+import { apiFetch, ApiError, openPdfInNewTab } from "../../../lib/api-client";
 
 export interface SaleResponse {
   id: string;
@@ -76,20 +75,8 @@ export function resendSaleWhatsApp(saleId: string): Promise<void> {
 /**
  * Abre en una pestana nueva la tirilla termica (80mm) de la venta, lista para imprimir desde el
  * navegador (Ctrl+P / icono de impresora del lector de PDF) en cualquier impresora, incluida una
- * termica de mostrador instalada como impresora del sistema operativo. La URL del endpoint exige
- * el token en el header Authorization, asi que no sirve un <a href> directo -- se trae el PDF
- * como blob (mismo patron que downloadPayslipPdf) y se abre ese blob, en vez de descargarlo.
+ * termica de mostrador instalada como impresora del sistema operativo.
  */
-export async function printThermalReceipt(saleId: string): Promise<void> {
-  const { accessToken } = useAuthStore.getState();
-  const res = await fetch(`${BASE_URL}/electronic-invoicing/sales/${saleId}/pdf?format=thermal`, {
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-  });
-  if (!res.ok) throw new Error("No se pudo generar la tirilla para imprimir");
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
-  // No se revoca de inmediato: la pestana nueva todavia tiene que cargar el blob de forma
-  // asincrona. Se libera igual, solo que despues, en vez de dejarlo colgado indefinidamente.
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+export function printThermalReceipt(saleId: string): Promise<void> {
+  return openPdfInNewTab(`/electronic-invoicing/sales/${saleId}/pdf?format=thermal`);
 }
