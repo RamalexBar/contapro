@@ -4,9 +4,11 @@ import type { ICustomerRepository } from "../../../customers/domain/customer.rep
 import { normalizeToE164 } from "../../../whatsapp/application/normalize-phone";
 import type { IWhatsAppSender } from "../../../whatsapp/domain/whatsapp-sender.port";
 import type { IWhatsAppDeliveryLogRepository } from "../../../whatsapp/domain/whatsapp-delivery-log.repository";
-import { mapInvoiceToRideData } from "../ride-data-mapper";
+import { findResolutionForFullNumber, mapInvoiceToRideData } from "../ride-data-mapper";
 import { renderRidePdf } from "../../infrastructure/pdfkit-ride-renderer";
 import type { GetElectronicInvoiceUseCase } from "./get-electronic-invoice.use-case";
+import type { ICompanyReader } from "../../domain/company-reader.repository";
+import type { IInvoiceNumberingResolutionRepository } from "../../domain/invoice-numbering-resolution.repository";
 
 export interface SendInvoiceWhatsAppInput {
   saleId: string;
@@ -27,7 +29,9 @@ export class SendInvoiceWhatsAppUseCase {
     private readonly getInvoiceUseCase: GetElectronicInvoiceUseCase,
     private readonly whatsAppSender: IWhatsAppSender,
     private readonly deliveryLogRepo: IWhatsAppDeliveryLogRepository,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly companyReader: ICompanyReader,
+    private readonly numberingResolutionRepo: IInvoiceNumberingResolutionRepository
   ) {}
 
   async execute(input: SendInvoiceWhatsAppInput): Promise<void> {
@@ -41,7 +45,9 @@ export class SendInvoiceWhatsAppUseCase {
 
     try {
       const invoice = await this.getInvoiceUseCase.execute({ type: "sale", id: input.saleId });
-      const pdf = await renderRidePdf(mapInvoiceToRideData(invoice));
+      const [company, resolutions] = await Promise.all([this.companyReader.findByIdOrThrow(companyId), this.numberingResolutionRepo.list()]);
+      const resolution = findResolutionForFullNumber(resolutions, "FACTURA_VENTA", invoice.fullNumber);
+      const pdf = await renderRidePdf(mapInvoiceToRideData(invoice, company, resolution));
       await this.whatsAppSender.sendDocument(recipientPhone, {
         buffer: pdf,
         filename: `factura-${invoice.fullNumber}.pdf`,

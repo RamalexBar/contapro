@@ -47,6 +47,12 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
 
   doc.fontSize(16).font("Helvetica-Bold").text(data.issuer.legalName || "(razon social no disponible)");
   doc.fontSize(10).font("Helvetica").text(`NIT: ${data.issuer.nit || "-"}`);
+  const addressLine = [data.issuer.address, data.issuer.municipality, data.issuer.department].filter(Boolean).join(", ");
+  if (addressLine) doc.fontSize(9).font("Helvetica").text(addressLine, { width: pageWidth * 0.65 });
+  const regimeLine = [data.issuer.taxRegime, data.issuer.fiscalResponsibilities].filter(Boolean).join(" -- ");
+  if (regimeLine) doc.fontSize(9).font("Helvetica").text(regimeLine, { width: pageWidth * 0.65 });
+  const contactLine = [data.issuer.phone, data.issuer.email].filter(Boolean).join(" -- ");
+  if (contactLine) doc.fontSize(9).font("Helvetica").text(contactLine, { width: pageWidth * 0.65 });
   doc.moveDown(0.5);
   doc.fontSize(14).font("Helvetica-Bold").text(data.documentTypeLabel);
   doc.moveDown(0.5);
@@ -58,6 +64,15 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
   doc.text(`Ambiente: ${data.environment}`);
   doc.text(`Estado: ${data.status}${data.signed ? " (firmado)" : " (sin firmar)"}`);
   doc.text(`${data.uniqueCodeLabel}: ${data.uniqueCode}`, { width: pageWidth * 0.65 });
+  if (data.resolution) {
+    const r = data.resolution;
+    doc.fontSize(8).font("Helvetica").fillColor("#444444").text(
+      `Resolucion DIAN No. ${r.resolutionNumber}: autoriza del ${r.prefix}${r.rangeFrom} al ${r.prefix}${r.rangeTo}, ` +
+        `vigente del ${formatDate(r.validFrom)} al ${formatDate(r.validUntil)}`,
+      { width: pageWidth * 0.65 }
+    );
+    doc.fillColor("black").fontSize(10);
+  }
 
   doc.image(qrPngBuffer, PAGE_MARGIN + pageWidth - 140, infoTop, { width: 140, height: 140 });
   doc.moveDown(1);

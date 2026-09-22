@@ -19,6 +19,13 @@ export class PrismaCompanyReaderRepository implements ICompanyReader {
       logoUrl: row.logoUrl,
       electronicInvoicingProvider: row.electronicInvoicingProvider,
       factusCredentialsEncrypted: row.factusCredentialsEncrypted,
+      address: row.address,
+      municipality: row.municipality,
+      department: row.department,
+      taxRegime: row.taxRegime,
+      fiscalResponsibilities: row.fiscalResponsibilities,
+      phone: row.phone,
+      email: row.email,
     };
   }
 

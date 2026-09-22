@@ -34,6 +34,13 @@ const COMPANY: CompanyRecord = {
   logoUrl: null,
   electronicInvoicingProvider: "DIRECT",
   factusCredentialsEncrypted: null,
+  address: null,
+  municipality: null,
+  department: null,
+  taxRegime: null,
+  fiscalResponsibilities: null,
+  phone: null,
+  email: "facturacion@minimarket.co",
 };
 
 class FakeCompanyReader implements Partial<ICompanyReader> {

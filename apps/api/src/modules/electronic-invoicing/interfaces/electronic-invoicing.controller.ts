@@ -14,12 +14,20 @@ import type { ResubmitElectronicPayrollUseCase } from "../application/use-cases/
 import type { SetElectronicInvoicingProviderUseCase } from "../application/use-cases/set-electronic-invoicing-provider.use-case";
 import type { GetElectronicInvoicingProviderSettingsUseCase } from "../application/use-cases/get-electronic-invoicing-provider-settings.use-case";
 import type { GetElectronicDocumentUsageUseCase } from "../application/use-cases/get-electronic-document-usage.use-case";
-import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSupportDocumentToRideData } from "../application/ride-data-mapper";
+import {
+  findResolutionForFullNumber,
+  mapInvoiceToRideData,
+  mapNoteToRideData,
+  mapPayrollToRideData,
+  mapSupportDocumentToRideData,
+} from "../application/ride-data-mapper";
+import type { RideCompanyInfo, RideDocumentData, RideResolutionInfo } from "../application/ride-data-mapper";
 import { renderRidePdf, renderThermalReceiptPdf } from "../infrastructure/pdfkit-ride-renderer";
-import type { RideDocumentData } from "../application/ride-data-mapper";
 import type { SendInvoiceWhatsAppUseCase } from "../application/use-cases/send-invoice-whatsapp.use-case";
 import type { ISaleRepository } from "../../pos/sale/domain/sale.repository";
 import type { IWhatsAppDeliveryLogRepository } from "../../whatsapp/domain/whatsapp-delivery-log.repository";
+import type { ICompanyReader } from "../domain/company-reader.repository";
+import type { DianDocumentType, IInvoiceNumberingResolutionRepository } from "../domain/invoice-numbering-resolution.repository";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { createNumberingResolutionSchema, setElectronicInvoicingProviderSchema } from "./electronic-invoicing.validators";
 
@@ -42,7 +50,9 @@ export class ElectronicInvoicingController {
     private readonly whatsAppDeliveryLogRepo: IWhatsAppDeliveryLogRepository,
     private readonly setProviderUseCase: SetElectronicInvoicingProviderUseCase,
     private readonly getProviderSettingsUseCase: GetElectronicInvoicingProviderSettingsUseCase,
-    private readonly getDocumentUsageUseCase: GetElectronicDocumentUsageUseCase
+    private readonly getDocumentUsageUseCase: GetElectronicDocumentUsageUseCase,
+    private readonly companyReader: ICompanyReader,
+    private readonly numberingResolutionRepo: IInvoiceNumberingResolutionRepository
   ) {}
 
   getProviderSettings = async (_req: Request, res: Response, next: NextFunction) => {
@@ -268,10 +278,20 @@ export class ElectronicInvoicingController {
     return req.query.format === "thermal" ? renderThermalReceiptPdf(data) : renderRidePdf(data);
   }
 
+  private async getCompanyInfo(): Promise<RideCompanyInfo> {
+    return this.companyReader.findByIdOrThrow(getTenantContext().companyId);
+  }
+
+  private async findResolutionInfo(documentType: DianDocumentType, fullNumber: string): Promise<RideResolutionInfo | null> {
+    const resolutions = await this.numberingResolutionRepo.list();
+    return findResolutionForFullNumber(resolutions, documentType, fullNumber);
+  }
+
   getPdfBySale = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const invoice = await this.getInvoiceUseCase.execute({ type: "sale", id: req.params.saleId });
-      const pdf = await this.renderPdf(mapInvoiceToRideData(invoice), req);
+      const [company, resolution] = await Promise.all([this.getCompanyInfo(), this.findResolutionInfo("FACTURA_VENTA", invoice.fullNumber)]);
+      const pdf = await this.renderPdf(mapInvoiceToRideData(invoice, company, resolution), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -281,7 +301,8 @@ export class ElectronicInvoicingController {
   getPdfByManualInvoice = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const invoice = await this.getInvoiceUseCase.execute({ type: "manual", id: req.params.manualInvoiceId });
-      const pdf = await this.renderPdf(mapInvoiceToRideData(invoice), req);
+      const [company, resolution] = await Promise.all([this.getCompanyInfo(), this.findResolutionInfo("FACTURA_VENTA", invoice.fullNumber)]);
+      const pdf = await this.renderPdf(mapInvoiceToRideData(invoice, company, resolution), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -291,7 +312,8 @@ export class ElectronicInvoicingController {
   getPdfByCreditNote = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const note = await this.getCreditNoteUseCase.execute(req.params.creditNoteId);
-      const pdf = await this.renderPdf(mapNoteToRideData(note, "CREDIT"), req);
+      const [company, resolution] = await Promise.all([this.getCompanyInfo(), this.findResolutionInfo("NOTA_CREDITO", note.fullNumber)]);
+      const pdf = await this.renderPdf(mapNoteToRideData(note, "CREDIT", company, resolution), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -301,7 +323,8 @@ export class ElectronicInvoicingController {
   getPdfByDebitNote = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const note = await this.getDebitNoteUseCase.execute(req.params.debitNoteId);
-      const pdf = await this.renderPdf(mapNoteToRideData(note, "DEBIT"), req);
+      const [company, resolution] = await Promise.all([this.getCompanyInfo(), this.findResolutionInfo("NOTA_DEBITO", note.fullNumber)]);
+      const pdf = await this.renderPdf(mapNoteToRideData(note, "DEBIT", company, resolution), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -311,7 +334,8 @@ export class ElectronicInvoicingController {
   getPdfBySupportDocument = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const doc = await this.getSupportDocumentUseCase.execute(req.params.purchaseId);
-      const pdf = await this.renderPdf(mapSupportDocumentToRideData(doc), req);
+      const [company, resolution] = await Promise.all([this.getCompanyInfo(), this.findResolutionInfo("DOCUMENTO_SOPORTE", doc.fullNumber)]);
+      const pdf = await this.renderPdf(mapSupportDocumentToRideData(doc, company, resolution), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);
@@ -321,7 +345,8 @@ export class ElectronicInvoicingController {
   getPdfByPayrollDetail = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const doc = await this.getPayrollUseCase.execute(req.params.payrollDetailId);
-      const pdf = await this.renderPdf(mapPayrollToRideData(doc), req);
+      const company = await this.getCompanyInfo();
+      const pdf = await this.renderPdf(mapPayrollToRideData(doc, company), req);
       res.type("application/pdf").send(pdf);
     } catch (err) {
       next(err);

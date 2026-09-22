@@ -178,6 +178,19 @@ como unico proveedor tecnologico.
     "HABILITACION - NO VALIDO COMO DOCUMENTO FISCAL". **Ver limitaciones**: el formato del QR y el
     layout en si no estan validados contra el Anexo Tecnico DIAN vigente, y el documento soporte
     no tiene desglose de lineas (hereda el hueco de su XML, ver punto 8).
+    **Encabezado con datos de la empresa + resolucion DIAN (2026-09-22)**: a diferencia del resto
+    del RIDE (que parsea solo el XML), el encabezado del A4 (`renderRidePdf`, no la tirilla
+    termica) ahora completa `issuer` con datos que **no viajan en el XML firmado** —
+    `Company.address/municipality/department/taxRegime/fiscalResponsibilities/phone/email`,
+    consultados EN VIVO al momento de imprimir vía `ICompanyReader` (ya no solo nit+legalName del
+    XML) — y agrega un bloque "Resolucion DIAN No. X: autoriza del PREFIJO-desde al PREFIJO-hasta,
+    vigente del ... al ..." resuelto con `findResolutionForFullNumber` (`ride-data-mapper.ts`),
+    que empareja el `fullNumber` ya emitido con la `InvoiceNumberingResolution` que lo autorizo por
+    prefijo + rango (necesario porque una empresa puede tener resoluciones vencidas ademas de la
+    vigente). Nomina no tiene resolucion (numeracion propia, ver punto 12) asi que ese campo queda
+    `null` ahi. `SendInvoiceWhatsAppUseCase` usa el mismo camino. Sigue sin logo (deliberadamente
+    fuera de alcance: no existe infraestructura de subida de archivos en Contapro todavia —
+    `Company.logoUrl` es un campo sin usar, pendiente de decidir Supabase Storage vs. BD).
 14. **Proveedor tecnologico (Factus API)** — alternativa al envio directo a la DIAN (puntos 4-5
     de arriba), solo para **facturas de venta** por ahora. `Company.electronicInvoicingProvider`
     (`DIRECT` default | `FACTUS`) decide el camino en `GenerateElectronicInvoiceUseCase` /

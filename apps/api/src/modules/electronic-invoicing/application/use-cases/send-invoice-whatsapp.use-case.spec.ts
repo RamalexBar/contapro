@@ -8,6 +8,8 @@ import type { IWhatsAppDeliveryLogRepository, RecordWhatsAppDeliveryData, WhatsA
 import { buildUblInvoiceXml } from "../ubl-invoice-xml-builder";
 import type { GetElectronicInvoiceUseCase } from "./get-electronic-invoice.use-case";
 import { SendInvoiceWhatsAppUseCase } from "./send-invoice-whatsapp.use-case";
+import type { CompanyRecord, ICompanyReader } from "../../domain/company-reader.repository";
+import type { IInvoiceNumberingResolutionRepository, NumberingResolutionRecord } from "../../domain/invoice-numbering-resolution.repository";
 
 const issueDate = new Date("2026-07-29T15:30:00.000Z");
 const xmlContent = buildUblInvoiceXml({
@@ -87,6 +89,35 @@ class FakeAuditLogRepository implements IAuditLogRepository {
   }
 }
 
+const FAKE_COMPANY: CompanyRecord = {
+  id: "company-1",
+  nit: "900123456-7",
+  legalName: "Minimarket La Esquina S.A.S.",
+  name: "Minimarket La Esquina",
+  logoUrl: null,
+  electronicInvoicingProvider: "DIRECT",
+  factusCredentialsEncrypted: null,
+  address: null,
+  municipality: null,
+  department: null,
+  taxRegime: null,
+  fiscalResponsibilities: null,
+  phone: null,
+  email: "facturacion@minimarket.co",
+};
+
+class FakeCompanyReader implements Partial<ICompanyReader> {
+  async findByIdOrThrow(): Promise<CompanyRecord> {
+    return FAKE_COMPANY;
+  }
+}
+
+class FakeNumberingResolutionRepo implements Partial<IInvoiceNumberingResolutionRepository> {
+  async list(): Promise<NumberingResolutionRecord[]> {
+    return [];
+  }
+}
+
 function withTenantContext<T>(fn: () => Promise<T>): Promise<T> {
   return tenantStorage.run(
     { companyId: "company-1", branchId: null, userId: "user-1", roles: [], permissions: new Set() },
@@ -124,7 +155,9 @@ describe("SendInvoiceWhatsAppUseCase", () => {
       makeGetInvoiceUseCase(),
       sender,
       deliveryRepo as unknown as IWhatsAppDeliveryLogRepository,
-      new AuditService(new FakeAuditLogRepository())
+      new AuditService(new FakeAuditLogRepository()),
+      new FakeCompanyReader() as unknown as ICompanyReader,
+      new FakeNumberingResolutionRepo() as unknown as IInvoiceNumberingResolutionRepository
     );
 
     await withTenantContext(() => useCase.execute({ saleId: "sale-1", customerId: null }));
@@ -141,7 +174,9 @@ describe("SendInvoiceWhatsAppUseCase", () => {
       makeGetInvoiceUseCase(),
       sender,
       deliveryRepo as unknown as IWhatsAppDeliveryLogRepository,
-      new AuditService(new FakeAuditLogRepository())
+      new AuditService(new FakeAuditLogRepository()),
+      new FakeCompanyReader() as unknown as ICompanyReader,
+      new FakeNumberingResolutionRepo() as unknown as IInvoiceNumberingResolutionRepository
     );
 
     await withTenantContext(() => useCase.execute({ saleId: "sale-1", customerId: "customer-2" }));
@@ -159,7 +194,9 @@ describe("SendInvoiceWhatsAppUseCase", () => {
       makeGetInvoiceUseCase(),
       sender,
       deliveryRepo as unknown as IWhatsAppDeliveryLogRepository,
-      new AuditService(auditRepo)
+      new AuditService(auditRepo),
+      new FakeCompanyReader() as unknown as ICompanyReader,
+      new FakeNumberingResolutionRepo() as unknown as IInvoiceNumberingResolutionRepository
     );
 
     await withTenantContext(() => useCase.execute({ saleId: "sale-1", customerId: "customer-1" }));
@@ -183,7 +220,9 @@ describe("SendInvoiceWhatsAppUseCase", () => {
       makeGetInvoiceUseCase(),
       sender,
       deliveryRepo as unknown as IWhatsAppDeliveryLogRepository,
-      new AuditService(auditRepo)
+      new AuditService(auditRepo),
+      new FakeCompanyReader() as unknown as ICompanyReader,
+      new FakeNumberingResolutionRepo() as unknown as IInvoiceNumberingResolutionRepository
     );
 
     await withTenantContext(() => useCase.execute({ saleId: "sale-1", customerId: "customer-1" }));

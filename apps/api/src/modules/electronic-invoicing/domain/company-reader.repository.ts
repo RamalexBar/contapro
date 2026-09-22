@@ -9,6 +9,15 @@ export interface CompanyRecord {
   /** Cifrado (credential-cipher.ts): JSON de {clientId, clientSecret, email, password,
    * numberingRangeId} -- ver factus-invoicing-client.ts. */
   factusCredentialsEncrypted: string | null;
+  /** Datos de cumplimiento/visualizacion, usados para completar el encabezado del RIDE impreso
+   * (ver ride-data-mapper.ts, RideCompanyInfo) -- no viajan en el XML firmado. */
+  address: string | null;
+  municipality: string | null;
+  department: string | null;
+  taxRegime: string | null;
+  fiscalResponsibilities: string | null;
+  phone: string | null;
+  email: string;
 }
 
 /**

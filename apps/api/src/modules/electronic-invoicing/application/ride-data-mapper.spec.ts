@@ -4,12 +4,33 @@ import { buildUblNoteXml } from "./ubl-note-xml-builder";
 import { buildUblSupportDocumentXml } from "./ubl-support-document-xml-builder";
 import { buildDianPayrollXml } from "./dian-payroll-xml-builder";
 import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSupportDocumentToRideData } from "./ride-data-mapper";
+import type { RideCompanyInfo } from "./ride-data-mapper";
 import type { ElectronicInvoiceWithXml } from "../domain/electronic-invoice.repository";
 import type { ElectronicCreditNoteWithXml } from "../domain/electronic-credit-note.repository";
 import type { ElectronicSupportDocumentWithXml } from "../domain/electronic-support-document.repository";
 import type { ElectronicPayrollWithXml } from "../domain/electronic-payroll.repository";
 
 const issueDate = new Date("2026-07-29T15:30:00.000Z");
+
+const emptyCompany: RideCompanyInfo = {
+  address: null,
+  municipality: null,
+  department: null,
+  taxRegime: null,
+  fiscalResponsibilities: null,
+  phone: null,
+  email: null,
+};
+
+const fullCompany: RideCompanyInfo = {
+  address: "Cra 45 # 12-30",
+  municipality: "Manizales",
+  department: "Caldas",
+  taxRegime: "Responsable de IVA",
+  fiscalResponsibilities: "O-13 Gran contribuyente",
+  phone: "3001234567",
+  email: "facturacion@minimarket.co",
+};
 
 describe("mapInvoiceToRideData", () => {
   const xmlContent = buildUblInvoiceXml({
@@ -45,7 +66,7 @@ describe("mapInvoiceToRideData", () => {
   };
 
   it("extracts issuer, buyer, totals, and lines from the stored XML", () => {
-    const ride = mapInvoiceToRideData(doc);
+    const ride = mapInvoiceToRideData(doc, emptyCompany, null);
     expect(ride.documentTypeLabel).toBe("FACTURA ELECTRONICA DE VENTA");
     expect(ride.uniqueCode).toBe("a".repeat(96));
     expect(ride.issuer).toEqual({ nit: "900123456-7", legalName: "Minimarket La Esquina S.A.S." });
@@ -57,11 +78,17 @@ describe("mapInvoiceToRideData", () => {
     expect(ride.signed).toBe(true);
     expect(ride.lines).toHaveLength(1);
     expect(ride.lines[0]).toMatchObject({ description: "Arroz 500g", total: "10000.00" });
+    expect(ride.resolution).toBeNull();
   });
 
   it("marks signed as false when signedXmlContent is null", () => {
-    const ride = mapInvoiceToRideData({ ...doc, signedXmlContent: null });
+    const ride = mapInvoiceToRideData({ ...doc, signedXmlContent: null }, emptyCompany, null);
     expect(ride.signed).toBe(false);
+  });
+
+  it("merges the live company's compliance/display data into the issuer (nit/legalName still come from the signed XML)", () => {
+    const ride = mapInvoiceToRideData(doc, fullCompany, null);
+    expect(ride.issuer).toEqual({ nit: "900123456-7", legalName: "Minimarket La Esquina S.A.S.", ...fullCompany });
   });
 });
 
@@ -96,7 +123,7 @@ describe("mapNoteToRideData", () => {
   };
 
   it("synthesizes a single line from the note's reason", () => {
-    const ride = mapNoteToRideData(doc, "CREDIT");
+    const ride = mapNoteToRideData(doc, "CREDIT", emptyCompany, null);
     expect(ride.documentTypeLabel).toBe("NOTA CREDITO ELECTRONICA");
     expect(ride.uniqueCode).toBe("b".repeat(96));
     expect(ride.total).toBe("26180.00");
@@ -134,7 +161,7 @@ describe("mapSupportDocumentToRideData", () => {
   };
 
   it("inverts issuer/counterparty roles (company is issuer, supplier is the counterparty)", () => {
-    const ride = mapSupportDocumentToRideData(doc);
+    const ride = mapSupportDocumentToRideData(doc, emptyCompany, null);
     expect(ride.issuer).toEqual({ nit: "900123456-7", legalName: "Minimarket La Esquina S.A.S." });
     expect(ride.counterpartyLabel).toBe("Proveedor");
     expect(ride.counterparty).toEqual({ documentType: "CC", documentNumber: "80123456", name: "Vendedor Informal" });
@@ -142,7 +169,7 @@ describe("mapSupportDocumentToRideData", () => {
   });
 
   it("has no itemized lines (the XML builder does not emit InvoiceLine yet)", () => {
-    const ride = mapSupportDocumentToRideData(doc);
+    const ride = mapSupportDocumentToRideData(doc, emptyCompany, null);
     expect(ride.lines).toEqual([]);
   });
 });
@@ -200,7 +227,7 @@ describe("mapPayrollToRideData", () => {
   };
 
   it("extracts employer/employee, earnings, and deductions (including RetencionFuente fixed at 0)", () => {
-    const ride = mapPayrollToRideData(doc);
+    const ride = mapPayrollToRideData(doc, emptyCompany);
     expect(ride.documentTypeLabel).toBe("NOMINA ELECTRONICA (COMPROBANTE INDIVIDUAL)");
     expect(ride.issuer).toEqual({ nit: "900123456-7", legalName: "Minimarket La Esquina S.A.S." });
     expect(ride.counterparty).toEqual({ documentType: "CC", documentNumber: "1023456789", name: "Laura Gomez" });

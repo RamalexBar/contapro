@@ -3,6 +3,26 @@ import { buildUblInvoiceXml } from "../application/ubl-invoice-xml-builder";
 import { mapInvoiceToRideData } from "../application/ride-data-mapper";
 import { renderRidePdf, renderThermalReceiptPdf } from "./pdfkit-ride-renderer";
 import type { ElectronicInvoiceWithXml } from "../domain/electronic-invoice.repository";
+import type { RideCompanyInfo, RideResolutionInfo } from "../application/ride-data-mapper";
+
+const testCompany: RideCompanyInfo = {
+  address: "Cra 45 # 12-30",
+  municipality: "Manizales",
+  department: "Caldas",
+  taxRegime: "Responsable de IVA",
+  fiscalResponsibilities: "O-13 Gran contribuyente",
+  phone: "3001234567",
+  email: "facturacion@minimarket.co",
+};
+
+const testResolution: RideResolutionInfo = {
+  resolutionNumber: "18760000001",
+  prefix: "SETP",
+  rangeFrom: 990000001,
+  rangeTo: 990001000,
+  validFrom: new Date("2026-01-01T00:00:00.000Z"),
+  validUntil: new Date("2027-01-01T00:00:00.000Z"),
+};
 
 function makeInvoice(overrides: Partial<Parameters<typeof buildUblInvoiceXml>[0]> = {}): ElectronicInvoiceWithXml {
   const issueDate = new Date("2026-07-29T15:30:00.000Z");
@@ -42,7 +62,7 @@ function makeInvoice(overrides: Partial<Parameters<typeof buildUblInvoiceXml>[0]
 
 describe("renderRidePdf", () => {
   it("produces a well-formed, non-trivial PDF buffer", async () => {
-    const pdfBuffer = await renderRidePdf(mapInvoiceToRideData(makeInvoice()));
+    const pdfBuffer = await renderRidePdf(mapInvoiceToRideData(makeInvoice(), testCompany, testResolution));
 
     expect(pdfBuffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");
     expect(pdfBuffer.length).toBeGreaterThan(1000);
@@ -51,7 +71,7 @@ describe("renderRidePdf", () => {
 
 describe("renderThermalReceiptPdf", () => {
   it("produces a well-formed, non-trivial, narrow (80mm) single-page PDF buffer", async () => {
-    const pdfBuffer = await renderThermalReceiptPdf(mapInvoiceToRideData(makeInvoice()));
+    const pdfBuffer = await renderThermalReceiptPdf(mapInvoiceToRideData(makeInvoice(), testCompany, testResolution));
 
     expect(pdfBuffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");
     expect(pdfBuffer.length).toBeGreaterThan(1000);
@@ -73,7 +93,7 @@ describe("renderThermalReceiptPdf", () => {
       total: 1190,
     }));
     const pdfBuffer = await renderThermalReceiptPdf(
-      mapInvoiceToRideData(makeInvoice({ items: manyItems, subtotal: 20000, taxTotal: 3800, total: 23800 }))
+      mapInvoiceToRideData(makeInvoice({ items: manyItems, subtotal: 20000, taxTotal: 3800, total: 23800 }), testCompany, testResolution)
     );
 
     expect(pdfBuffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");

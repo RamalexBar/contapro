@@ -126,7 +126,9 @@ export const sendInvoiceWhatsAppUseCase = new SendInvoiceWhatsAppUseCase(
   getInvoiceUseCase,
   whatsAppSender,
   whatsAppDeliveryLogRepo,
-  auditService
+  auditService,
+  companyReader,
+  numberingResolutionRepo
 );
 const resubmitPayrollUseCase = new ResubmitElectronicPayrollUseCase(
   electronicPayrollRepo,
@@ -153,7 +155,9 @@ export const electronicInvoicingController = new ElectronicInvoicingController(
   whatsAppDeliveryLogRepo,
   setProviderUseCase,
   getProviderSettingsUseCase,
-  getDocumentUsageUseCase
+  getDocumentUsageUseCase,
+  companyReader,
+  numberingResolutionRepo
 );
 
 /** Usado por sale.container.ts para generar el CUFE/XML local (y firmar si hay certificado
