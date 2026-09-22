@@ -75,17 +75,12 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().default(""),
 
   // ---- Proveedor tecnologico DIAN alternativo al envio directo (ver README del modulo,
-  // seccion "Proveedor tecnologico (MATIAS API)") ----
-  // El token de cada empresa emisora NO va aqui -- es un dato por Company (Company.electronicInvoicingProvider
-  // / matiasApiTokenEncrypted, cifrado con CREDENTIALS_ENCRYPTION_KEY), porque Contapro es
-  // multiempresa y cada empresa cliente necesita su propia cuenta/token de MATIAS (o Plemsi mas
-  // adelante), nunca uno global compartido entre empresas distintas.
-  MATIAS_BASE_URL: z.string().default("https://sandbox-api.matias-api.com/api/ubl2.1"),
-  // Segundo proveedor tecnologico DIAN (ver README, seccion "Proveedor tecnologico (Factus
-  // API)") -- verificado en vivo contra este sandbox el 2026-09-18 (autenticacion OAuth2 +
-  // creacion real de una factura con CUFE valido). Igual que MATIAS_BASE_URL, es la unica pieza
-  // de Factus que es global: las 4 credenciales OAuth2 + el numbering_range_id son por Company
-  // (Company.factusCredentialsEncrypted).
+  // seccion "Proveedor tecnologico (Factus API)") ----
+  // Verificado en vivo contra este sandbox el 2026-09-18 (autenticacion OAuth2 + creacion real de
+  // una factura con CUFE valido). Es la unica pieza de Factus que es global: las 4 credenciales
+  // OAuth2 + el numbering_range_id (auto-provisionado, ver
+  // factus-account-provisioning.service.ts) son por Company (Company.factusCredentialsEncrypted)
+  // -- nunca un token/credencial global compartido entre empresas distintas.
   FACTUS_BASE_URL: z.string().default("https://api-sandbox.factus.com.co"),
   // Clave maestra (32 bytes, hex o base64) para cifrar/descifrar los tokens de proveedor por
   // empresa -- ej.: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))".

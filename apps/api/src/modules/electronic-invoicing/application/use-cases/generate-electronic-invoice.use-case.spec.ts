@@ -31,8 +31,8 @@ const COMPANY: CompanyRecord = {
   nit: "900123456-7",
   legalName: "Minimarket La Esquina S.A.S.",
   name: "Minimarket La Esquina",
+  logoUrl: null,
   electronicInvoicingProvider: "DIRECT",
-  matiasApiTokenEncrypted: null,
   factusCredentialsEncrypted: null,
 };
 
@@ -138,7 +138,6 @@ describe("GenerateElectronicInvoiceUseCase source discriminator", () => {
       new AuditService(auditRepo),
       noopCertificateLoader,
       noopXmlSigner,
-      noopThirdPartyClient,
       noopThirdPartyClient
     );
 
@@ -164,7 +163,6 @@ describe("GenerateElectronicInvoiceUseCase source discriminator", () => {
       new AuditService(auditRepo),
       noopCertificateLoader,
       noopXmlSigner,
-      noopThirdPartyClient,
       noopThirdPartyClient
     );
 

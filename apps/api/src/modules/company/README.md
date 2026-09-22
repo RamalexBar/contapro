@@ -23,10 +23,9 @@ registrar la cuenta.
 
 ## Limitaciones conocidas
 
-- **No se envian a MATIAS**: el payload de `POST /invoice` de MATIAS
-  (`modules/electronic-invoicing/infrastructure/matias-invoicing-client.ts`) no tiene objeto
-  seller/emisor — la identidad del emisor vive en la cuenta/token de MATIAS, configurada una vez
-  en su propio dashboard. Estos campos sirven para (1) el gate de completitud antes de la primera
+- **No se envian a Factus**: la identidad del emisor vive en la cuenta autenticada de Factus
+  (`modules/electronic-invoicing/infrastructure/factus-invoicing-client.ts`), configurada una vez
+  al activar el proveedor. Estos campos sirven para (1) el gate de completitud antes de la primera
   factura manual, (2) futuro enriquecimiento del XML UBL del camino DIRECT (`ubl-invoice-xml-builder.ts`
   solo usa `nit`/`legalName` del emisor hoy), (3) datos de cumplimiento/visualizacion.
 - **Sin catalogo DANE de municipio/departamento**: `municipality`/`department` son texto libre que

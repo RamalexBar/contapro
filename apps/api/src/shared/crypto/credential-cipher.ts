@@ -2,10 +2,10 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 /**
  * Cifrado simetrico (AES-256-GCM) para credenciales de terceros que Contapro necesita poder
- * volver a leer en texto plano (ej. el token de MATIAS/Plemsi de cada empresa, para reenviarlo en
- * cada llamada saliente) -- a diferencia de los API keys salientes de public-api/webhooks, que se
- * guardan hasheados porque solo hace falta *verificarlos*, nunca reenviarlos. No existia ninguna
- * utilidad de cifrado reversible en el repo antes de esto.
+ * volver a leer en texto plano (ej. las credenciales de Factus de cada empresa, para reenviarlas
+ * en cada llamada saliente) -- a diferencia de los API keys salientes de public-api/webhooks, que
+ * se guardan hasheados porque solo hace falta *verificarlos*, nunca reenviarlos. No existia
+ * ninguna utilidad de cifrado reversible en el repo antes de esto.
  */
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12; // recomendado para GCM

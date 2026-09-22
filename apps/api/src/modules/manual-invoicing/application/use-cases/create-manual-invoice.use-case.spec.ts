@@ -142,7 +142,7 @@ describe("CreateManualInvoiceUseCase", () => {
     const manualInvoiceRepo = new FakeManualInvoiceRepository();
     const companyProfileRepo = new FakeCompanyProfileRepository(COMPLETE_PROFILE);
     const generateElectronicInvoice = {
-      execute: vi.fn().mockRejectedValue(new Error("MATIAS no responde")),
+      execute: vi.fn().mockRejectedValue(new Error("Factus no responde")),
     } as unknown as GenerateElectronicInvoiceUseCase;
     const auditRepo = new FakeAuditLogRepository();
     const useCase = new CreateManualInvoiceUseCase(

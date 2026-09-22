@@ -11,9 +11,12 @@ export interface CreateCustomerData {
   priceListId?: string;
   // Item 37 de docs/ALCANCE.md (informacion exogena DIAN): codigo DANE de municipio del tercero.
   municipalityCode?: string;
-  // Catalogos del proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md,
-  // seccion "Proveedor tecnologico (MATIAS API)") -- opcionales, solo necesarios para facturar
-  // este cliente via proveedor externo.
+  // Catalogos DIAN opcionales para facturar este cliente via proveedor tecnologico externo (ver
+  // modules/electronic-invoicing/README.md). Solo dianCityId lo consume hoy Factus
+  // (municipality_code); el resto (dianIdentityDocumentId/dianTypeOrganizationId/dianTaxRegimeId/
+  // dianTaxLevelId) se agrego para el catalogo interno de MATIAS y quedo sin uso cuando ese
+  // proveedor se elimino (2026-09-21) -- se dejan en el schema por si un proveedor futuro los
+  // necesita, no se leen en ningun lado hoy.
   dianIdentityDocumentId?: string;
   dianTypeOrganizationId?: string;
   dianTaxRegimeId?: string;

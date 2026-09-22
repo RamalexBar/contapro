@@ -27,8 +27,8 @@ export interface ElectronicInvoiceRecord {
   number: number;
   fullNumber: string;
   /** Numero de resolucion DIAN administrativo (InvoiceNumberingResolution.resolutionNumber) --
-   * necesario para GenerateElectronicInvoiceUseCase cuando factura via proveedor tecnologico
-   * (ver domain/third-party-invoicing-client.ts), MATIAS lo exige como campo separado del prefijo. */
+   * parte del shape generico que espera domain/third-party-invoicing-client.ts para cualquier
+   * proveedor tecnologico (campo separado del prefijo). */
   resolutionNumber: string;
   cufe: string;
   issueDate: Date;

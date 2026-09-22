@@ -1,23 +1,24 @@
 import { env } from "../../../config/env";
 import type { IThirdPartyInvoicingClient, ThirdPartyInvoiceInput, ThirdPartyInvoiceResult } from "../domain/third-party-invoicing-client";
+import { authenticateFactus, type FactusOAuthCredentials } from "./factus-auth";
 
 /**
  * Integracion real con Factus API (https://www.factus.com.co, docs en developers.factus.com.co)
  * -- VERIFICADA contra su sandbox real el 2026-09-18: autenticacion OAuth2 exitosa y una factura
  * de prueba real (NIT sandbox 1000789002) fue creada y devuelta con `is_validated: true` y un
- * CUFE real, mismo nivel de verificacion que matias-invoicing-client.ts.
+ * CUFE real -- y ademas verificada de punta a punta a traves de una venta real completada en
+ * Contapro (ver README del modulo).
  *
- * Diferencias de arquitectura con MATIAS (por eso es un cliente separado, no una variante del
- * mismo): (1) autenticacion es OAuth2 "password grant" (client_id + client_secret + email +
- * password -> access_token de 1h, NO un token fijo por empresa) -- este cliente se re-autentica
- * en cada llamada en vez de cachear/refrescar el token, mas simple y evita bugs de token
- * vencido a costa de una llamada HTTP extra por factura. (2) Factus NO acepta el
- * prefijo/resolucion/consecutivo de Contapro directamente -- exige un `numbering_range_id`
- * (id interno que Factus asigna al crear el rango de numeracion EN SU plataforma) y es Factus
- * quien decide el numero final del documento (`data.number`, ej. "SETP990019699") -- el
- * `invoice.fullNumber` que Contapro ya reservo localmente (via InvoiceNumberingResolution) queda
- * solo como `reference_code` de correlacion, no como el numero real del documento DIAN. Mismo
- * aviso que ya existe para el CUFE local provisional vs el real del proveedor (ver
+ * Notas de arquitectura: (1) autenticacion es OAuth2 "password grant" (client_id + client_secret
+ * + email + password -> access_token de 1h) -- este cliente se re-autentica en cada llamada en
+ * vez de cachear/refrescar el token, mas simple a costa de una llamada HTTP extra por factura.
+ * (2) Factus NO acepta el prefijo/resolucion/consecutivo de Contapro directamente -- exige un
+ * `numbering_range_id` (id interno que Factus asigna al crear el rango de numeracion EN SU
+ * plataforma, ver factus-account-provisioning.service.ts) y es Factus quien decide el numero
+ * final del documento (`data.number`, ej. "SETP990019699") -- el `invoice.fullNumber` que
+ * Contapro ya reservo localmente (via InvoiceNumberingResolution) queda solo como
+ * `reference_code` de correlacion, no como el numero real del documento DIAN. Mismo aviso que ya
+ * existe para el CUFE local provisional vs el real del proveedor (ver
  * domain/third-party-invoicing-client.ts). (3) el XML firmado NO viene en la respuesta de
  * creacion -- hay que pedirlo aparte con GET /v2/bills/{number}/download-xml.
  *
@@ -26,27 +27,17 @@ import type { IThirdPartyInvoicingClient, ThirdPartyInvoiceInput, ThirdPartyInvo
  * porque el puerto `IThirdPartyInvoicingClient.submitInvoice` solo recibe un `apiToken: string` --
  * mas simple que ampliar la firma del puerto para un solo proveedor.
  *
- * Catalogos DIAN fijados a mano (Contapro no captura estos datos por venta todavia, mismo criterio
- * que MATIAS): `document: "01"` (factura de venta), `operation_type: "10"` (estandar),
- * `payment_form: "1"` (contado) + `payment_method_code: "42"` (tomado tal cual del ejemplo oficial
- * de Factus, sin verificar contra otros codigos), `unit_measure_code: "94"` (unidad),
- * `standard_code: "999"` (estandar de adopcion del contribuyente), `tribute_code: "ZZ"` (no
- * aplica) y `responsibilities: ["R-99-PN"]` (no responsable) para el comprador -- mismo hueco ya
- * documentado para MATIAS: Customer no tiene hoy un regimen/responsabilidad DIAN real capturado.
+ * Catalogos DIAN fijados a mano (Contapro no captura estos datos por venta todavia): `document:
+ * "01"` (factura de venta), `operation_type: "10"` (estandar), `payment_form: "1"` (contado) +
+ * `payment_method_code: "42"` (tomado tal cual del ejemplo oficial de Factus, sin verificar
+ * contra otros codigos), `unit_measure_code: "94"` (unidad), `standard_code: "999"` (estandar de
+ * adopcion del contribuyente), `tribute_code: "ZZ"` (no aplica) y `responsibilities: ["R-99-PN"]`
+ * (no responsable) para el comprador -- Customer no tiene hoy un regimen/responsabilidad DIAN
+ * real capturado.
  */
 
-interface FactusCredentials {
-  clientId: string;
-  clientSecret: string;
-  email: string;
-  password: string;
+interface FactusCredentials extends FactusOAuthCredentials {
   numberingRangeId: number;
-}
-
-interface FactusAuthResponse {
-  access_token?: string;
-  token_type?: string;
-  expires_in?: number;
 }
 
 interface FactusBillResponse {
@@ -142,7 +133,7 @@ export class FactusInvoicingClient implements IThirdPartyInvoicingClient {
   async submitInvoice(credentialsJson: string, input: ThirdPartyInvoiceInput): Promise<ThirdPartyInvoiceResult> {
     const credentials: FactusCredentials = JSON.parse(credentialsJson);
 
-    const accessToken = await this.authenticate(credentials);
+    const accessToken = await authenticateFactus(credentials);
     const billResult = await this.createBill(accessToken, input, credentials.numberingRangeId);
 
     if (billResult.status !== "ACCEPTED") {
@@ -157,39 +148,6 @@ export class FactusInvoicingClient implements IThirdPartyInvoicingClient {
     const signedXmlContent = await this.downloadSignedXml(accessToken, billResult.rawResponse);
 
     return { ...billResult, signedXmlContent };
-  }
-
-  private async authenticate(credentials: FactusCredentials): Promise<string> {
-    const body = new URLSearchParams({
-      grant_type: "password",
-      client_id: credentials.clientId,
-      client_secret: credentials.clientSecret,
-      username: credentials.email,
-      password: credentials.password,
-    });
-
-    const res = await fetch(`${env.FACTUS_BASE_URL}/oauth/token`, {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
-
-    const raw = await res.text();
-    if (!res.ok) {
-      throw new Error(`Factus rechazo la autenticacion (status ${res.status}): ${raw.slice(0, 500)}`);
-    }
-
-    let parsed: FactusAuthResponse;
-    try {
-      parsed = JSON.parse(raw) as FactusAuthResponse;
-    } catch {
-      throw new Error(`Factus devolvio una respuesta no-JSON al autenticar (status ${res.status}): ${raw.slice(0, 500)}`);
-    }
-
-    if (!parsed.access_token) {
-      throw new Error(`Factus no devolvio access_token al autenticar: ${raw.slice(0, 500)}`);
-    }
-    return parsed.access_token;
   }
 
   private async createBill(
@@ -212,7 +170,7 @@ export class FactusInvoicingClient implements IThirdPartyInvoicingClient {
     const rawResponse = await res.text();
 
     // Fallas de transporte/autenticacion (token invalido, 5xx, timeout): no son un rechazo de
-    // negocio, se propagan como excepcion -- mismo criterio que matias-invoicing-client.ts.
+    // negocio, se propagan como excepcion en vez de disfrazarse de REJECTED.
     if (res.status === 401 || res.status === 403 || res.status >= 500) {
       throw new Error(`Factus respondio ${res.status}: ${rawResponse.slice(0, 500)}`);
     }

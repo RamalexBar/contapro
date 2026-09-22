@@ -54,10 +54,10 @@ export interface ThirdPartyInvoiceResult {
  * ya firmado como IDianClient) y devuelven el resultado final -- CUFE, XML firmado, estado -- en
  * la misma llamada (sincrono, sin submit+poll: a diferencia del envio directo a la DIAN, el
  * proveedor ya resuelve la generacion de CUFE/XML/firma/transmision el mismo, ver README del
- * modulo). Implementado por MatiasInvoicingClient (infrastructure/matias-invoicing-client.ts),
- * verificado contra su sandbox real -- el proximo proveedor (ej. Plemsi) suma una segunda
- * implementacion de este mismo puerto el dia que se verifique su formato real, sin tocar el
- * caso de uso.
+ * modulo). Implementado por FactusInvoicingClient (infrastructure/factus-invoicing-client.ts),
+ * verificado contra su sandbox real -- un proveedor previo (MATIAS) implemento este mismo puerto
+ * pero se elimino del codebase el 2026-09-21 (decision del usuario, ver README). Este puerto
+ * queda como esta para que sumar otro proveedor el dia de mañana no toque el caso de uso.
  */
 export interface IThirdPartyInvoicingClient {
   submitInvoice(apiToken: string, input: ThirdPartyInvoiceInput): Promise<ThirdPartyInvoiceResult>;

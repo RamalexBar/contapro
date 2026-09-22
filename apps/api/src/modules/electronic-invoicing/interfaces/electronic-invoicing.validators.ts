@@ -11,17 +11,16 @@ export const createNumberingResolutionSchema = z.object({
   validUntil: z.coerce.date(),
 });
 
-// Ver README, seccion "Proveedor tecnologico (MATIAS API / Factus API)".
+// Ver README, seccion "Proveedor tecnologico (Factus API)". No pide numberingRangeId -- lo
+// provisiona solo SetElectronicInvoicingProviderUseCase (ver factus-account-provisioner.ts).
 export const setElectronicInvoicingProviderSchema = z.object({
-  provider: z.enum(["DIRECT", "MATIAS", "FACTUS"]),
-  apiToken: z.string().min(1).optional(),
+  provider: z.enum(["DIRECT", "FACTUS"]),
   factusCredentials: z
     .object({
       clientId: z.string().min(1),
       clientSecret: z.string().min(1),
       email: z.string().email(),
       password: z.string().min(1),
-      numberingRangeId: z.number().int().positive(),
     })
     .optional(),
 });
