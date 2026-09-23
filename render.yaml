@@ -53,10 +53,12 @@ services:
         value: 30d
       - key: JWT_PLATFORM_ADMIN_EXPIRES_IN
         value: 8h
-      # Ajustar tras el primer deploy si Render le asigna una URL distinta a "contapro-web"
-      # (pasa si el nombre ya esta tomado por otra cuenta) -- ver docs/DESPLIEGUE.md paso 4.
+      # Dominio propio (contapro.com.co) desde 2026-09-22 -- ver docs/DESPLIEGUE.md, seccion
+      # "Dominio propio", para el paso a paso de DNS + custom domain en Render. Si el dominio
+      # todavia no esta verificado en Render, usar temporalmente la URL de *.onrender.com real del
+      # servicio contapro-web (ver paso 3 del mismo doc).
       - key: CORS_ORIGIN
-        value: https://contapro-web.onrender.com
+        value: https://contapro.com.co
       # sync: false = "completar a mano en el dashboard de Render despues de crear el servicio",
       # nunca en este archivo -- son secretos reales, no deben quedar en el repo. Vacio hasta
       # completarse = mismo comportamiento ya documentado en config/env.ts (falla con mensaje
@@ -126,9 +128,11 @@ services:
     buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @erp/web run build
     staticPublishPath: apps/web/dist
     envVars:
-      # Ajustar tras el primer deploy si Render le asigna otra URL a "contapro-api".
+      # Dominio propio (contapro.com.co) desde 2026-09-22 -- ver docs/DESPLIEGUE.md, seccion
+      # "Dominio propio". Vite incrusta este valor en el bundle en tiempo de build -- cambiarlo
+      # exige un rebuild manual de contapro-web, no solo un redeploy (ver paso 3 del mismo doc).
       - key: VITE_API_BASE_URL
-        value: https://contapro-api.onrender.com/api
+        value: https://api.contapro.com.co/api
       # Llave PUBLICA de Wompi (no la privada) -- se usa para tokenizar tarjetas directo desde el
       # navegador (apps/web/src/features/billing/lib/wompi.ts), nunca toca nuestro backend. Debe
       # ser la misma llave que WOMPI_PUBLIC_KEY en contapro-api. Sin valor, el bloque "Renovacion

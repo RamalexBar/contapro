@@ -63,6 +63,52 @@ coincide:
 3. **Redeploy manual de `contapro-web`** después de cambiar `VITE_API_BASE_URL` — Vite lo
    incrusta en el bundle en tiempo de build, cambiar la variable sin reconstruir no tiene efecto.
 
+## Dominio propio (contapro.com.co)
+
+Esquema elegido (2026-09-22): `contapro.com.co` (raíz del dominio) → `contapro-web`,
+`api.contapro.com.co` → `contapro-api`. Las URLs de `*.onrender.com` siguen funcionando en
+paralelo (Render nunca las retira), pero una vez que `CORS_ORIGIN` apunte al dominio propio, la
+API deja de aceptar pedidos desde el origen viejo — no hace falta apagar nada a mano, simplemente
+dejará de usarse.
+
+1. **En Render, agregar el dominio a cada servicio** (dashboard → `contapro-web` → Settings →
+   Custom Domains → Add Custom Domain → `contapro.com.co`; repetir en `contapro-api` con
+   `api.contapro.com.co`). Render muestra los registros DNS exactos que hay que crear — puede
+   variar según el proveedor, pero en general:
+   - `contapro.com.co` (raíz del dominio, sin subdominio) → registro **ALIAS/ANAME** (si el
+     proveedor de DNS lo soporta — Namecheap, Cloudflare, DNSimple, etc. sí; GoDaddy no siempre) al
+     hostname `*.onrender.com` real de `contapro-web`. Si el proveedor **no** soporta ALIAS/ANAME
+     en la raíz, Render da un registro **A** con una IP fija como alternativa.
+   - `api.contapro.com.co` (subdominio) → registro **CNAME** normal al hostname `*.onrender.com`
+     real de `contapro-api` — esto no tiene la limitación de la raíz, cualquier proveedor lo
+     soporta.
+2. **Esperar la verificación** — Render revisa el DNS automáticamente cada pocos minutos; una vez
+   propagado (minutos a un par de horas según el TTL del proveedor), emite el certificado SSL
+   (Let's Encrypt) solo. No hay ningún paso manual de certificado.
+3. **Actualizar las variables de entorno** en el dashboard (además de lo que ya quedó en
+   `render.yaml`, por si el Blueprint no re-sincroniza servicios ya existentes):
+   - `contapro-api` → Environment → `CORS_ORIGIN` = `https://contapro.com.co`
+   - `contapro-web` → Environment → `VITE_API_BASE_URL` = `https://api.contapro.com.co/api`
+4. **Redeploy manual de `contapro-web`** (mismo motivo del Paso 3 arriba: Vite incrusta
+   `VITE_API_BASE_URL` en el bundle en build-time).
+5. **Probar**: `https://contapro.com.co` debe cargar la landing, y el login/registro debe llegar
+   a `https://api.contapro.com.co/api` sin errores de CORS en la consola del navegador.
+
+**De paso, dos cosas que dependen de tener un dominio propio y que hasta ahora no se podían
+resolver** (no son parte de la migración en sí, pero conviene resolverlas ahora que ya hay
+dominio):
+
+- **Correos reales con Resend**: mientras `RESEND_API_KEY` no tenga un dominio verificado en el
+  dashboard de Resend (Domains), la cuenta queda en modo sandbox y solo entrega al correo con el
+  que te registraste ahí (ver Paso 2 arriba). Con `contapro.com.co` ya propio, se puede verificar
+  el dominio en Resend (agrega sus propios registros DNS, SPF/DKIM) y actualizar
+  `RESEND_FROM_EMAIL` a algo como `notificaciones@contapro.com.co` en vez de
+  `onboarding@resend.dev`.
+- **Certificado digital de facturación electrónica / cuenta de aliado en Factus**: un dominio
+  propio (vs. `*.onrender.com`) suele pedirse como parte de la verificación de identidad de
+  negocio en trámites formales — no es un requisito confirmado por Factus todavía, pero vale la
+  pena tenerlo en cuenta si piden algo así durante la activación de una empresa cliente.
+
 ## Paso 4: Sembrar la base de datos
 
 **Nunca correr el seed de desarrollo (`pnpm db:seed`) contra producción** — crea una empresa de
