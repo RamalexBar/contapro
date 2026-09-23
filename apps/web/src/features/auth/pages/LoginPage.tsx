@@ -129,9 +129,11 @@ export function LoginPage() {
             </Link>
           </p>
         </Card>
-        <p className="mt-4 text-center text-xs text-slate-400">
-          Demo: admin@demo.com / cajero@demo.com — contraseña Demo1234!
-        </p>
+        {import.meta.env.DEV && (
+          <p className="mt-4 text-center text-xs text-slate-400">
+            Demo: admin@demo.com / cajero@demo.com — contraseña Demo1234!
+          </p>
+        )}
       </div>
     </div>
   );
