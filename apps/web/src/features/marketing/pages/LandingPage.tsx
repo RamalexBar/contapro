@@ -30,8 +30,8 @@ const FEATURES = [
 ];
 
 const COMPETITORS = [
-  { name: "Siigo", price: "$145.993 – $191.327", note: "módulos separados" },
-  { name: "World Office", price: "$170.000 – $182.750", note: "nómina solo en el plan tope" },
+  { name: "Siigo", price: "Desde $145.993", note: "módulos separados" },
+  { name: "World Office", price: "Desde $170.000", note: "nómina solo en el plan tope" },
 ];
 
 type AccountingStandard = "PUC" | "NIIF";
@@ -242,7 +242,7 @@ export function LandingPage() {
             ))}
             <div className="rounded-xl border-2 border-brand-600 bg-brand-50 p-5 text-left">
               <p className="text-sm font-semibold text-brand-700">Contapro</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">$69.900 – $279.900</p>
+              <p className="mt-1 text-xl font-bold text-slate-900">Desde $69.900</p>
               <p className="mt-1 text-xs text-brand-700">todo incluido · COP/mes</p>
             </div>
           </div>
