@@ -53,10 +53,17 @@ const PLANS: {
   users: string;
   highlight: boolean;
 }[] = [
-  { code: "BASICO", name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 720000, branches: "1 sucursal", users: "3 usuarios", highlight: false },
-  { code: "PYME", name: "Plan Pyme", priceMonthly: 149900, priceYearly: 1528900, branches: "3 sucursales", users: "10 usuarios", highlight: true },
-  { code: "PRO", name: "Plan Plus", priceMonthly: 279900, priceYearly: 2854900, branches: "10 sucursales", users: "50 usuarios", highlight: false },
+  { code: "BASICO", name: "Plan Emprendedor", priceMonthly: 69900, priceYearly: 754920, branches: "1 sucursal", users: "3 usuarios", highlight: false },
+  { code: "PYME", name: "Plan Pyme", priceMonthly: 149900, priceYearly: 1618920, branches: "3 sucursales", users: "10 usuarios", highlight: true },
+  { code: "PRO", name: "Plan Plus", priceMonthly: 279900, priceYearly: 3022920, branches: "10 sucursales", users: "50 usuarios", highlight: false },
 ];
+
+// Descuento anual bajado de 14-15% a un 10% parejo (2026-09-24) a cambio de incluir el
+// certificado digital de firma electronica ($130.000, ver CERTIFICATE_PRICE abajo) gratis en el
+// pago anual -- en valor total para el cliente (descuento + certificado) queda igual o mejor que
+// antes en los 3 planes, y a nosotros nos sale mas barato en Pyme/Plus (pagamos $130.000 reales
+// del certificado en vez de resignar $269.900/$503.900 en ingresos). Ver docs/PRECIOS.md si se
+// revisita esta cuenta.
 
 const SHARED_FEATURES = [
   "Facturación electrónica DIAN (factura, notas crédito/débito, documento soporte)",
@@ -270,16 +277,16 @@ export function LandingPage() {
               role="switch"
               aria-checked={billingCycle === "ANNUAL"}
               onClick={() => setBillingCycle((c) => (c === "MONTHLY" ? "ANNUAL" : "MONTHLY"))}
-              className="relative h-6 w-11 rounded-full bg-brand-600 transition-colors"
+              className="relative inline-flex h-6 w-11 items-center rounded-full bg-brand-600 transition-colors"
             >
               <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
                   billingCycle === "ANNUAL" ? "translate-x-[22px]" : "translate-x-0.5"
                 }`}
               />
             </button>
             <span className={`text-sm font-medium ${billingCycle === "ANNUAL" ? "text-slate-900" : "text-slate-400"}`}>
-              Anual <span className="text-success-600">(ahorra hasta 15%)</span>
+              Anual <span className="text-success-600">(ahorra 10% + certificado digital gratis)</span>
             </span>
           </div>
 
@@ -316,7 +323,12 @@ export function LandingPage() {
                       <span className="text-sm text-slate-500">{period}</span>
                     </p>
                     {billingCycle === "ANNUAL" && (
-                      <p className="text-xs font-medium text-success-600">Ahorrás {savings}% vs. pagar mes a mes</p>
+                      <div className="mt-1 space-y-0.5">
+                        <p className="text-xs font-medium text-success-600">Ahorrás {savings}% vs. pagar mes a mes</p>
+                        <p className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700">
+                          <ShieldCheck size={13} /> + Certificado digital ({formatCOP(CERTIFICATE_PRICE)}) incluido gratis
+                        </p>
+                      </div>
                     )}
 
                     <ul className="mt-4 flex-1 space-y-2 text-sm text-slate-600">
@@ -351,12 +363,17 @@ export function LandingPage() {
 
       {/* Certificado digital -- deliberadamente separado de la tabla de planes, con un estilo
           distinto (fondo gris, icono de escudo) para que se note que es un cargo aparte, cobrado
-          por una entidad certificadora externa (ej. Certicamara, GSE), no por Contapro. */}
+          por una entidad certificadora externa (ej. Certicamara, GSE), no por Contapro. Pagando
+          anual (2026-09-24) va incluido gratis -- ver el comentario junto a PLANS.priceYearly. */}
       <section className="px-4 py-10">
-        <div className="mx-auto max-w-4xl rounded-xl border border-slate-200 bg-slate-100 p-6 sm:p-8">
+        <div className={`mx-auto max-w-4xl rounded-xl border p-6 sm:p-8 ${
+          billingCycle === "ANNUAL" ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-slate-100"
+        }`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-200">
-              <ShieldCheck size={22} className="text-slate-600" />
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+              billingCycle === "ANNUAL" ? "bg-brand-100" : "bg-slate-200"
+            }`}>
+              <ShieldCheck size={22} className={billingCycle === "ANNUAL" ? "text-brand-700" : "text-slate-600"} />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-slate-900">Certificado digital de firma electrónica</h3>
@@ -364,12 +381,22 @@ export function LandingPage() {
                 Todos los planes requieren un certificado digital de firma electrónica, exigido por
                 la DIAN para poder emitir facturación electrónica.
               </p>
-              <p className="mt-2 text-sm">
-                <span className="text-lg font-bold text-slate-900">{formatCOP(CERTIFICATE_PRICE)}</span>{" "}
-                <span className="text-slate-500">/año, facturación anual única</span>
-              </p>
+              {billingCycle === "ANNUAL" ? (
+                <p className="mt-2 text-sm">
+                  <span className="text-slate-400 line-through">{formatCOP(CERTIFICATE_PRICE)}</span>{" "}
+                  <span className="text-lg font-bold text-brand-700">Incluido gratis</span>{" "}
+                  <span className="text-slate-500">con tu pago anual</span>
+                </p>
+              ) : (
+                <p className="mt-2 text-sm">
+                  <span className="text-lg font-bold text-slate-900">{formatCOP(CERTIFICATE_PRICE)}</span>{" "}
+                  <span className="text-slate-500">/año, facturación anual única</span>
+                </p>
+              )}
               <p className="mt-1 text-xs text-slate-500">
-                Este valor se cobra por separado y no está incluido en la suscripción mensual.
+                {billingCycle === "ANNUAL"
+                  ? "Pagando mes a mes, este valor se cobra por separado."
+                  : "Este valor se cobra por separado y no está incluido en la suscripción mensual. Cambiá a pago anual para que quede incluido."}
               </p>
 
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
