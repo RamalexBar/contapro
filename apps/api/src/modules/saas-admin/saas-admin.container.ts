@@ -4,6 +4,7 @@ import { PrismaPlatformAdminRepository } from "./infrastructure/prisma-platform-
 import { PrismaPlanRepository } from "./infrastructure/prisma-plan.repository";
 import { PrismaSubscriptionRepository } from "./infrastructure/prisma-subscription.repository";
 import { ResendEmailNotifier } from "./infrastructure/resend-email-notifier";
+import { ResendFactusActivationNotifier } from "./infrastructure/resend-factus-activation-notifier";
 import { WompiPaymentGateway } from "./infrastructure/wompi-payment-gateway";
 import { LoginPlatformAdminUseCase } from "./application/use-cases/login-platform-admin.use-case";
 import { CreatePlanUseCase } from "./application/use-cases/create-plan.use-case";
@@ -21,6 +22,7 @@ import { ConfirmWompiPaymentUseCase } from "./application/use-cases/confirm-womp
 import { SavePaymentSourceUseCase } from "./application/use-cases/save-payment-source.use-case";
 import { DisableAutoRenewUseCase } from "./application/use-cases/disable-auto-renew.use-case";
 import { RunSubscriptionAutoChargesUseCase } from "./application/use-cases/run-subscription-auto-charges.use-case";
+import { SendFactusActivationRequestUseCase } from "./application/use-cases/send-factus-activation-request.use-case";
 import { whatsAppSender } from "../whatsapp/whatsapp.container";
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
 
@@ -53,7 +55,8 @@ export const saasAdminController = new SaasAdminController(
   new ListCompaniesUseCase(subscriptionRepo),
   new GetSaasDashboardUseCase(subscriptionRepo),
   createSubscriptionCheckoutUseCase,
-  new ConfirmWompiPaymentUseCase(subscriptionRepo, paymentGateway, auditService)
+  new ConfirmWompiPaymentUseCase(subscriptionRepo, paymentGateway, auditService),
+  new SendFactusActivationRequestUseCase(subscriptionRepo, new ResendFactusActivationNotifier(), auditService)
 );
 
 /** Usado por server.ts para arrancar el poller de recordatorios/vencimientos/suspension. */

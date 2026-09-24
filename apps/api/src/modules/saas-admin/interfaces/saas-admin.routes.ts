@@ -32,3 +32,9 @@ saasAdminRouter.post("/admin/subscriptions/webhooks/wompi", saasAdminController.
 
 saasAdminRouter.get("/admin/companies", requirePlatformAdmin, saasAdminController.listCompanies);
 saasAdminRouter.get("/admin/dashboard", requirePlatformAdmin, saasAdminController.getDashboard);
+
+saasAdminRouter.post(
+  "/admin/companies/:id/factus-activation-request",
+  requirePlatformAdmin,
+  saasAdminController.sendFactusActivationRequest
+);

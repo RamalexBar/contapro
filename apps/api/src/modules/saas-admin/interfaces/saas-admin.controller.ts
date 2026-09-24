@@ -11,6 +11,7 @@ import type { ListCompaniesUseCase } from "../application/use-cases/list-compani
 import type { GetSaasDashboardUseCase } from "../application/use-cases/get-saas-dashboard.use-case";
 import type { CreateSubscriptionCheckoutUseCase } from "../application/use-cases/create-subscription-checkout.use-case";
 import type { ConfirmWompiPaymentUseCase } from "../application/use-cases/confirm-wompi-payment.use-case";
+import type { SendFactusActivationRequestUseCase } from "../application/use-cases/send-factus-activation-request.use-case";
 import type { SubscriptionStatus } from "../domain/subscription.repository";
 import {
   createPlanSchema,
@@ -18,6 +19,7 @@ import {
   createSubscriptionSchema,
   loginPlatformAdminSchema,
   registerSubscriptionPaymentSchema,
+  sendFactusActivationRequestSchema,
   updatePlanSchema,
   wompiWebhookSchema,
 } from "./saas-admin.validators";
@@ -35,7 +37,8 @@ export class SaasAdminController {
     private readonly listCompaniesUseCase: ListCompaniesUseCase,
     private readonly getSaasDashboardUseCase: GetSaasDashboardUseCase,
     private readonly createSubscriptionCheckoutUseCase: CreateSubscriptionCheckoutUseCase,
-    private readonly confirmWompiPaymentUseCase: ConfirmWompiPaymentUseCase
+    private readonly confirmWompiPaymentUseCase: ConfirmWompiPaymentUseCase,
+    private readonly sendFactusActivationRequestUseCase: SendFactusActivationRequestUseCase
   ) {}
 
   login = async (req: Request, res: Response, next: NextFunction) => {
@@ -149,6 +152,20 @@ export class SaasAdminController {
   getDashboard = async (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(await this.getSaasDashboardUseCase.execute());
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  sendFactusActivationRequest = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = sendFactusActivationRequestSchema.parse(req.body);
+      await this.sendFactusActivationRequestUseCase.execute({
+        companyId: req.params.id,
+        platformAdminId: res.locals.platformAdminId,
+        ...body,
+      });
+      res.status(204).send();
     } catch (err) {
       next(err);
     }

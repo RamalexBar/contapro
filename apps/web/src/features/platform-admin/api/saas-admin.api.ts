@@ -106,3 +106,24 @@ export interface SaasDashboardStats {
 export function getSaasDashboard(): Promise<SaasDashboardStats> {
   return platformApiFetch("/admin/dashboard");
 }
+
+export type FactusActivationMediaType = "application/pdf" | "image/jpeg" | "image/png";
+
+export interface FactusActivationAttachmentInput {
+  filename: string;
+  mediaType: FactusActivationMediaType;
+  base64: string;
+}
+
+export interface SendFactusActivationRequestInput {
+  integrationVersion: "v1" | "v2";
+  rut: FactusActivationAttachmentInput;
+  legalRepCertificate: FactusActivationAttachmentInput | null;
+  legalRepId: FactusActivationAttachmentInput;
+  purchaseProof: FactusActivationAttachmentInput;
+  logo: FactusActivationAttachmentInput;
+}
+
+export function sendFactusActivationRequest(companyId: string, input: SendFactusActivationRequestInput): Promise<void> {
+  return platformApiFetch(`/admin/companies/${companyId}/factus-activation-request`, { method: "POST", body: input });
+}

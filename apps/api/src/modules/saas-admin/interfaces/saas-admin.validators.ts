@@ -45,6 +45,26 @@ export const createSubscriptionCheckoutSchema = z.object({
   redirectUrl: z.string().url().optional(),
 });
 
+// ~7MB en base64 (base64 pesa ~4/3 del binario, asi que son ~5MB reales) por archivo -- generoso
+// para un PDF escaneado o una foto de cedula/RUT, con margen bajo el limite de 30mb del body JSON
+// completo (5 archivos, ver express.json({ limit }) en app.ts).
+const MAX_ACTIVATION_ATTACHMENT_BASE64_LENGTH = 7_000_000;
+
+const factusActivationAttachmentSchema = z.object({
+  filename: z.string().min(1),
+  mediaType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
+  base64: z.string().min(1).max(MAX_ACTIVATION_ATTACHMENT_BASE64_LENGTH),
+});
+
+export const sendFactusActivationRequestSchema = z.object({
+  integrationVersion: z.enum(["v1", "v2"]),
+  rut: factusActivationAttachmentSchema,
+  legalRepCertificate: factusActivationAttachmentSchema.nullable(),
+  legalRepId: factusActivationAttachmentSchema,
+  purchaseProof: factusActivationAttachmentSchema,
+  logo: factusActivationAttachmentSchema,
+});
+
 /**
  * Passthrough deliberado: el payload real de Wompi puede traer mas campos de los que este
  * sistema usa (o cambiar con el tiempo) -- validar solo lo minimo necesario para procesar el

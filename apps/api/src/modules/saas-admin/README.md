@@ -223,6 +223,30 @@ suscripcion se cobra sola cada periodo hasta que la cancele — sin volver a red
   `modules/whatsapp/README.md` para el detalle completo (incluye el envio de documentos por
   WhatsApp: RIDE de factura y desprendible de nomina, tambien parte del item 41).
 
+## Solicitud de activacion Factus (iteracion 2026-09-24)
+
+Herramienta **interna** del panel de plataforma (no autoservicio del cliente final -- decision
+explicita del usuario, ver memoria del proyecto): `POST /admin/companies/:id/factus-activation-request`
+(`SendFactusActivationRequestUseCase`, `domain/factus-activation-notifier.ts`,
+`infrastructure/resend-factus-activation-notifier.ts`). Un operador de Contapro recibe por fuera
+del sistema (WhatsApp/correo) los 5 documentos que Factus exige para activar un NIT nuevo (RUT,
+certificado de existencia y representacion legal -- no aplica a persona natural --, cedula del
+representante legal, comprobante de compra del paquete/certificado, logo) y los carga en el panel
+(`CompaniesPage.tsx` en `apps/web/src/features/platform-admin`, boton "Solicitar activacion
+Factus" por fila); el backend arma un correo con los 5 adjuntos y lo manda a
+`activacion@factus.com.co` (confirmado por Factus por escrito el 2026-09-24), usando el mismo
+patron de `ResendEmailNotifier` (`fetch` directo a la API de Resend, sin SDK).
+
+- **No persiste los archivos**: se reciben en base64 dentro del body JSON (mismo patron que
+  `POST /purchases/extract`, ver `modules/suppliers/README.md`), se adjuntan al correo saliente y
+  se descartan -- por eso esta feature NO dependia de resolver la infraestructura de storage
+  (Supabase) que sigue pendiente para el logo de empresa en el RIDE.
+- `express.json` subio de 20mb a 30mb (`app.ts`) para cubrir los hasta 5 adjuntos (7mb base64 cada
+  uno, ver `MAX_ACTIVATION_ATTACHMENT_BASE64_LENGTH` en `saas-admin.validators.ts`).
+- Mismo aviso de siempre para la integracion Resend: **NO PROBADO end-to-end** contra el servicio
+  real (sin `RESEND_API_KEY`, `send` lanza `ValidationError` con mensaje claro, 422, verificado en
+  vivo). Auditado como `FACTUS_ACTIVATION_REQUEST_SENT` solo si el correo se mando con exito.
+
 ## Que falta implementar
 
 1. Verificacion end-to-end de WhatsApp contra la API real de Meta — ver

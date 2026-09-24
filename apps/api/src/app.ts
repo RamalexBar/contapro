@@ -52,10 +52,11 @@ export const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
-// 20mb: el default (100kb) rechazaria de entrada la foto/PDF en base64 de
-// POST /purchases/extract (lectura automatica de facturas, ver suppliers.container.ts) -- unico
-// endpoint que hoy manda un archivo en el body, no hay parser JSON por ruta en este proyecto.
-app.use(express.json({ limit: "20mb" }));
+// 30mb: el default (100kb) rechazaria de entrada la foto/PDF en base64 de POST /purchases/extract
+// (lectura automatica de facturas, ver suppliers.container.ts) o los hasta 5 adjuntos de
+// POST /admin/companies/:id/factus-activation-request (ver saas-admin.validators.ts) -- no hay
+// parser JSON por ruta en este proyecto, un solo limite global cubre a los dos.
+app.use(express.json({ limit: "30mb" }));
 app.use(morgan(env.NODE_ENV === "development" ? "dev" : "combined"));
 app.use("/api", apiRateLimiter);
 
