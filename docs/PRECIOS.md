@@ -52,24 +52,32 @@ de Contapro habilitan el mismo set de funcionalidad (`pos`/`inventory`/`cash`/`p
 `accounting` = `true` en los 4); lo único que escala con el precio es `maxBranches`/`maxUsers`, no
 qué módulos están prendidos.
 
-## Planes de Contapro (definidos en `seed-base.ts`, actualizado 2026-09-16)
+## Planes de Contapro (definidos en `seed-base.ts`, actualizado 2026-09-24)
 
 | Plan | Código | Mensual | Anual | Sucursales | Usuarios | Referencia de precio |
 |---|---|---|---|---|---|---|
 | Prueba gratuita | `TRIAL` | $0 | $0 | 1 | 3 | 14 días, todo habilitado (ver `register-company.use-case.ts`) |
-| Plan Emprendedor | `BASICO` | $69.900 | $720.000 (~14,2% desc.) | 1 | 3 | = Alegra Emprendedor ($69.900, solo contabilidad) |
-| Plan Pyme | `PYME` | $149.900 | $1.528.900 (15% desc.) | 3 | 10 | = Alegra Pyme ($149.900, solo contabilidad) |
-| Plan Plus | `PRO` | $279.900 | $2.854.900 (15% desc.) | 10 | 50 | = Alegra Plus ($279.900, solo contabilidad) |
+| Plan Emprendedor | `BASICO` | $69.900 | $754.920 (10% desc.) | 1 | 3 | = Alegra Emprendedor ($69.900, solo contabilidad) |
+| Plan Pyme | `PYME` | $149.900 | $1.618.920 (10% desc.) | 3 | 10 | = Alegra Pyme ($149.900, solo contabilidad) |
+| Plan Plus | `PRO` | $279.900 | $3.022.920 (10% desc.) | 10 | 50 | = Alegra Plus ($279.900, solo contabilidad) |
 
 Los códigos internos (`BASICO`, `PRO`) se mantuvieron iguales a los del scaffold original aunque
 el nombre visible cambió (`Plan Emprendedor`, `Plan Plus`) — evita dejar filas de `Plan`
 huérfanas en bases de datos que ya tenían suscripciones apuntando a esos ids. `PYME` es un plan
 nuevo (no existía en el scaffold). Precios mensuales subidos el 2026-08-27 desde
 $39.900/$79.900/$149.900 a los actuales — ver historial de git para el razonamiento completo.
-**Anual repriced el 2026-09-16** (antes 10% de descuento parejo: $754.900/$1.618.900/$3.022.900) a
-pedido explícito del usuario, sin ligarlo a un descuento de la competencia (no hay dato propio de
-cuánto descuenta Alegra en su plan anual) — el de `BASICO` es un valor fijo elegido a mano
-($720.000, no una fórmula de %), los otros dos sí siguen una regla pareja de 15% sobre 12 meses.
+
+**Anual repriced el 2026-09-24** (antes 14-15% de descuento: $720.000/$1.528.900/$2.854.900, fijado
+el 2026-09-16) a un 10% parejo en los 3 planes, **a cambio de incluir gratis el certificado digital
+de firma electrónica** ($130.000, exigido por la DIAN, normalmente cargado aparte — ver la sección
+de abajo). En valor total para el cliente (descuento + certificado) queda igual o mejor que antes
+en los 3 planes (Emprendedor y Pyme incluso mejoran); para Pyme/Plus además nos sale más barato en
+efectivo real (pagamos $130.000 del certificado en vez de resignar $269.900/$503.900 en ingresos
+del descuento anterior). El precio mensual no se tocó. **Importante — proceso, no automatizado**:
+cuando se active Factus para un cliente que pagó anual, Contapro debe cubrir el costo del
+certificado directamente con el proveedor (Factus lo tramita si se compra con ellos) — no hay
+ningún control en el código que aplique este descuento automáticamente, es un compromiso comercial
+a cumplir manualmente por ahora.
 
 ## Cobro real: SÍ está integrado (Wompi/Bancolombia)
 
