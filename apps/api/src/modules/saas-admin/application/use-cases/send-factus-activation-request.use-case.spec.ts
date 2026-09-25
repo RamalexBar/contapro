@@ -113,6 +113,7 @@ const COMPANY: CompanyWithSubscriptionRecord = {
   planName: "Plan Emprendedor",
   currentPeriodEnd: new Date("2027-01-01"),
   graceEndsAt: null,
+  registeredAt: new Date("2026-01-01"),
 };
 
 describe("SendFactusActivationRequestUseCase", () => {

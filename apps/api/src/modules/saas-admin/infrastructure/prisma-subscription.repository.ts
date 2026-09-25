@@ -246,7 +246,9 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
           include: { plan: { select: { name: true } } },
         },
       },
-      orderBy: { name: "asc" },
+      // Mas recientes primero -- para "quien se acaba de inscribir" importa mas el orden
+      // cronologico que el alfabetico (antes: name asc).
+      orderBy: { createdAt: "desc" },
     });
 
     return companies.map((company) => {
@@ -260,6 +262,7 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
         planName: subscription?.plan.name ?? null,
         currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
         graceEndsAt: subscription?.graceEndsAt ?? null,
+        registeredAt: company.createdAt,
       };
     });
   }

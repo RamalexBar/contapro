@@ -161,6 +161,7 @@ export function CompaniesPage() {
                 <Th>Activa</Th>
                 <Th>Suscripcion</Th>
                 <Th>Plan</Th>
+                <Th>Registrada</Th>
                 <Th>Vence</Th>
                 <Th></Th>
               </tr>
@@ -175,6 +176,7 @@ export function CompaniesPage() {
                   </Td>
                   <Td>{c.subscriptionStatus ?? "-"}</Td>
                   <Td>{c.planName ?? "-"}</Td>
+                  <Td>{c.registeredAt.slice(0, 10)}</Td>
                   <Td>{c.currentPeriodEnd ? c.currentPeriodEnd.slice(0, 10) : "-"}</Td>
                   <Td>
                     <Button

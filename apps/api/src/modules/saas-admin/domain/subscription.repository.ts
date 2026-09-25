@@ -103,6 +103,9 @@ export interface CompanyWithSubscriptionRecord {
   planName: string | null;
   currentPeriodEnd: Date | null;
   graceEndsAt: Date | null;
+  /** Fecha de registro (Company.createdAt) -- para que el panel de plataforma pueda mostrar quien
+   * se inscribio y cuando, sin tener que ir a buscarlo en la base de datos. */
+  registeredAt: Date;
 }
 
 export interface SaasDashboardStats {
