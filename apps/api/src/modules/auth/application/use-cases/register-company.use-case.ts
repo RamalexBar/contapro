@@ -5,6 +5,7 @@ import { ConflictError } from "../../../../shared/errors/app-error";
 import { basePrisma, seedDefaultChartOfAccounts, seedDefaultExpenseCategories, seedDefaultWithholdingConcepts } from "@erp/database";
 import type { IPlanRepository } from "../../../saas-admin/domain/plan.repository";
 import type { ISubscriptionRepository } from "../../../saas-admin/domain/subscription.repository";
+import type { INewCompanyNotifier } from "../../domain/new-company-notifier";
 
 /** Codigo del plan de prueba asignado automaticamente al registrar una empresa -- debe existir
  * en la tabla Plan (ver seed.ts). Si no existe, el registro sigue funcionando igual (la empresa
@@ -18,7 +19,8 @@ export class RegisterCompanyUseCase {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly planRepo: IPlanRepository,
-    private readonly subscriptionRepo: ISubscriptionRepository
+    private readonly subscriptionRepo: ISubscriptionRepository,
+    private readonly newCompanyNotifier: INewCompanyNotifier
   ) {}
 
   async execute(input: RegisterCompanyInput): Promise<{ companyId: string; branchId: string; adminUserId: string }> {
@@ -62,6 +64,18 @@ export class RegisterCompanyUseCase {
         startDate,
         currentPeriodEnd,
       });
+    }
+
+    try {
+      await this.newCompanyNotifier.send({
+        companyName: input.companyName,
+        nit: input.nit,
+        companyEmail: input.companyEmail,
+        adminFullName: input.adminFullName,
+        adminEmail: input.adminEmail,
+      });
+    } catch (err) {
+      console.error("No se pudo enviar el aviso interno de empresa nueva:", err);
     }
 
     return result;

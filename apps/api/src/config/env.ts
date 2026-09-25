@@ -46,6 +46,11 @@ const envSchema = z.object({
   // que las variables DIAN_* de arriba.
   RESEND_API_KEY: z.string().default(""),
   RESEND_FROM_EMAIL: z.string().default("no-reply@erp-saas.demo"),
+  // Correo interno de Contapro que recibe el aviso de "se registro una empresa nueva" (ver
+  // modules/auth/infrastructure/resend-new-company-notifier.ts). Vacio por defecto = el aviso se
+  // omite en silencio (a diferencia de RESEND_API_KEY: esto es una comodidad opcional, no un
+  // feature roto si falta).
+  INTERNAL_NOTIFICATIONS_EMAIL: z.string().default(""),
 
   // ---- Cobro de suscripciones via Wompi/Bancolombia (ver modules/saas-admin/README.md) ----
   // Vacios por defecto = generar un link de cobro falla con mensaje claro (mismo criterio que

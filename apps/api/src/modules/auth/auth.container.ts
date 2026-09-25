@@ -9,6 +9,7 @@ import { PrismaSubscriptionRepository } from "../saas-admin/infrastructure/prism
 import { PrismaUserRepository } from "./infrastructure/prisma-user.repository";
 import { PrismaPasswordResetTokenRepository } from "./infrastructure/prisma-password-reset-token.repository";
 import { ResendPasswordResetNotifier } from "./infrastructure/resend-password-reset-notifier";
+import { ResendNewCompanyNotifier } from "./infrastructure/resend-new-company-notifier";
 import { LoginUseCase } from "./application/use-cases/login.use-case";
 import { RegisterCompanyUseCase } from "./application/use-cases/register-company.use-case";
 import { RefreshTokenUseCase } from "./application/use-cases/refresh-token.use-case";
@@ -23,10 +24,11 @@ const subscriptionRepo = new PrismaSubscriptionRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 const passwordResetTokenRepo = new PrismaPasswordResetTokenRepository();
 const passwordResetNotifier = new ResendPasswordResetNotifier();
+const newCompanyNotifier = new ResendNewCompanyNotifier();
 
 export const authController = new AuthController(
   new LoginUseCase(userRepo, auditService),
-  new RegisterCompanyUseCase(userRepo, planRepo, subscriptionRepo),
+  new RegisterCompanyUseCase(userRepo, planRepo, subscriptionRepo, newCompanyNotifier),
   new RefreshTokenUseCase(userRepo),
   new LogoutUseCase(userRepo, auditService),
   new RequestPasswordResetUseCase(userRepo, passwordResetTokenRepo, passwordResetNotifier),
