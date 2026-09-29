@@ -37,7 +37,7 @@ export function ContactWidget() {
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success-50 text-success-600">
               <MessageCircle size={16} />
             </span>
-            WhatsApp: 300 845 3690
+            WhatsApp
           </a>
           <a
             href={`mailto:${EMAIL}`}
@@ -46,7 +46,7 @@ export function ContactWidget() {
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
               <Mail size={16} />
             </span>
-            {EMAIL}
+            <span className="min-w-0 break-words">{EMAIL}</span>
           </a>
           <a
             href={`https://instagram.com/${INSTAGRAM_HANDLE}`}
