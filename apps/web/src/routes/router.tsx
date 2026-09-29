@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
+import { RootLayout } from "./RootLayout";
 import { HomeRoute } from "./HomeRoute";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { RegisterPage } from "../features/auth/pages/RegisterPage";
@@ -41,234 +42,241 @@ import { PlatformProtectedRoute } from "../features/platform-admin/routes/Platfo
 import { ProtectedRoute } from "./ProtectedRoute";
 
 export const router = createBrowserRouter([
-  { path: "/", element: <HomeRoute /> },
-  { path: "/login", element: <LoginPage /> },
-  { path: "/register", element: <RegisterPage /> },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
-  { path: "/reset-password", element: <ResetPasswordPage /> },
   {
-    path: "/dashboard",
-    element: (
-      <ProtectedRoute>
-        <DashboardPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/products",
-    element: (
-      <ProtectedRoute>
-        <ProductListPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/pos",
-    element: (
-      <ProtectedRoute>
-        <POSPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/cash",
-    element: (
-      <ProtectedRoute>
-        <CashSessionPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/employees",
-    element: (
-      <ProtectedRoute>
-        <EmployeeListPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/payroll",
-    element: (
-      <ProtectedRoute>
-        <PayrollPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/timetracking",
-    element: (
-      <ProtectedRoute>
-        <TimeTrackingPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/time-off",
-    element: (
-      <ProtectedRoute>
-        <TimeOffPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/rbac",
-    element: (
-      <ProtectedRoute>
-        <RbacPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/customers",
-    element: (
-      <ProtectedRoute>
-        <CustomerListPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/crm",
-    element: (
-      <ProtectedRoute>
-        <OpportunitiesPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/audit",
-    element: (
-      <ProtectedRoute>
-        <AuditLogPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/quotes-notes",
-    element: (
-      <ProtectedRoute>
-        <QuotesAndNotesPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/accounting",
-    element: (
-      <ProtectedRoute>
-        <AccountingPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/accounting/journal",
-    element: (
-      <ProtectedRoute>
-        <JournalBookPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/accounting/banks",
-    element: (
-      <ProtectedRoute>
-        <BankingPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/accounting/exogena",
-    element: (
-      <ProtectedRoute>
-        <ExogenaPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/suppliers",
-    element: (
-      <ProtectedRoute>
-        <SuppliersPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/purchase-orders",
-    element: (
-      <ProtectedRoute>
-        <PurchaseOrdersPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/expenses",
-    element: (
-      <ProtectedRoute>
-        <ExpensesPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/collections",
-    element: (
-      <ProtectedRoute>
-        <CollectionsPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/billing",
-    element: (
-      <ProtectedRoute>
-        <BillingPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/recurring-invoices",
-    element: (
-      <ProtectedRoute>
-        <RecurringInvoicesPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/commissions",
-    element: (
-      <ProtectedRoute>
-        <CommissionsPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/fixed-assets",
-    element: (
-      <ProtectedRoute>
-        <FixedAssetsPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/integrations",
-    element: (
-      <ProtectedRoute>
-        <IntegrationsPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/company/profile",
-    element: (
-      <ProtectedRoute>
-        <CompanyProfilePage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/manual-invoices",
-    element: (
-      <ProtectedRoute>
-        <ManualInvoicePage />
-      </ProtectedRoute>
-    ),
+    // ContactWidget se monta una sola vez aca (ver RootLayout.tsx) y aparece en toda la landing y
+    // la app -- las rutas de /admin/* (panel de plataforma) quedan FUERA a proposito, abajo.
+    element: <RootLayout />,
+    children: [
+      { path: "/", element: <HomeRoute /> },
+      { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
+      { path: "/forgot-password", element: <ForgotPasswordPage /> },
+      { path: "/reset-password", element: <ResetPasswordPage /> },
+      {
+        path: "/dashboard",
+        element: (
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/products",
+        element: (
+          <ProtectedRoute>
+            <ProductListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/pos",
+        element: (
+          <ProtectedRoute>
+            <POSPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/cash",
+        element: (
+          <ProtectedRoute>
+            <CashSessionPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/employees",
+        element: (
+          <ProtectedRoute>
+            <EmployeeListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/payroll",
+        element: (
+          <ProtectedRoute>
+            <PayrollPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/timetracking",
+        element: (
+          <ProtectedRoute>
+            <TimeTrackingPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/time-off",
+        element: (
+          <ProtectedRoute>
+            <TimeOffPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/rbac",
+        element: (
+          <ProtectedRoute>
+            <RbacPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/customers",
+        element: (
+          <ProtectedRoute>
+            <CustomerListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/crm",
+        element: (
+          <ProtectedRoute>
+            <OpportunitiesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/audit",
+        element: (
+          <ProtectedRoute>
+            <AuditLogPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/quotes-notes",
+        element: (
+          <ProtectedRoute>
+            <QuotesAndNotesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/accounting",
+        element: (
+          <ProtectedRoute>
+            <AccountingPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/accounting/journal",
+        element: (
+          <ProtectedRoute>
+            <JournalBookPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/accounting/banks",
+        element: (
+          <ProtectedRoute>
+            <BankingPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/accounting/exogena",
+        element: (
+          <ProtectedRoute>
+            <ExogenaPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/suppliers",
+        element: (
+          <ProtectedRoute>
+            <SuppliersPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/purchase-orders",
+        element: (
+          <ProtectedRoute>
+            <PurchaseOrdersPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/expenses",
+        element: (
+          <ProtectedRoute>
+            <ExpensesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/collections",
+        element: (
+          <ProtectedRoute>
+            <CollectionsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/billing",
+        element: (
+          <ProtectedRoute>
+            <BillingPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/recurring-invoices",
+        element: (
+          <ProtectedRoute>
+            <RecurringInvoicesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/commissions",
+        element: (
+          <ProtectedRoute>
+            <CommissionsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/fixed-assets",
+        element: (
+          <ProtectedRoute>
+            <FixedAssetsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/integrations",
+        element: (
+          <ProtectedRoute>
+            <IntegrationsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/company/profile",
+        element: (
+          <ProtectedRoute>
+            <CompanyProfilePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/manual-invoices",
+        element: (
+          <ProtectedRoute>
+            <ManualInvoicePage />
+          </ProtectedRoute>
+        ),
+      },
+    ],
   },
   { path: "/admin/login", element: <PlatformAdminLoginPage /> },
   {
