@@ -191,7 +191,7 @@ export function LandingPage() {
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-4 py-16 text-center sm:py-24">
         <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-          El ERP todo-en-uno para tu negocio, a un precio que sí es de pyme
+          El sistema todo-en-uno para tu negocio, a un precio que sí es de pyme
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
           Facturación electrónica DIAN, punto de venta, inventario, contabilidad y nómina — en un
@@ -463,7 +463,7 @@ export function LandingPage() {
 
       <footer className="border-t border-slate-100 py-8 text-center text-xs text-slate-400">
         <Logo heightClassName="h-6" className="mb-2" />
-        <p>Contapro — ERP para pequeños y medianos negocios en Colombia.</p>
+        <p>Contapro — sistema para pequeños y medianos negocios en Colombia.</p>
       </footer>
     </div>
   );
