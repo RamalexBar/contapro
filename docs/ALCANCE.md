@@ -742,3 +742,53 @@ cuando se implemente, mismo criterio que la lista de arriba:
 45. **IA (categorización automática, asistente conversacional, insights)** — gancho de marketing
     de Alegra/Siigo en 2026. Prioridad deliberadamente más baja: no es funcionalidad ERP core, es
     percepción de producto — revisar solo después de cerrar el 29-39.
+46. ~~Integración con un POS externo tipo +Control (gimnasios, ferreterías, restaurantes,
+    talleres): contabilidad y facturación electrónica como servicio~~ — implementado 2026-09-29/
+    10-02. Decisión de alcance confirmada con el usuario: el POS externo (que se integra por API
+    key) mantiene su **propio** catálogo de productos, inventario, planes y facturación al
+    cliente final — Contapro solo aporta (i) la contabilidad y (ii) la facturación electrónica
+    DIAN como servicios, sin que el POS use el catálogo/inventario de Contapro en ningún punto
+    (`POST /sales` no sirve para esto). Tres piezas nuevas bajo `/api/public/v1`, cada una
+    resolviendo un problema de doble contabilización distinto (detalle completo en
+    `apps/api/src/modules/public-api/README.md`):
+    - **`POST /shift-closes`**: un solo comprobante contable por **cierre de turno** (no uno por
+      venta — un restaurante con cientos de ventas diarias llenaría la contabilidad de
+      comprobantes que nadie revisa). El POS manda conceptos (`CASH`/`CARD`/`TRANSFER`/
+      `TRADE_IN`/`PLATFORM`, desglose de ventas por tarifa IVA/INC, devoluciones, gastos de caja,
+      retiros, anticipos de apartados/órdenes de servicio, equipos usados recibidos como parte de
+      pago, pedidos de plataformas tipo Rappi, arqueo), nunca códigos de cuenta —
+      `PostShiftCloseJournalEntryUseCase` (módulo `accounting`) los resuelve al PUC de cada
+      empresa. Idempotencia real por header `Idempotency-Key` (tabla `ExternalShiftClose`): un
+      cierre `POSTED` nunca se duplica en un reintento, uno `FAILED` sí se puede reintentar.
+    - **`POST /electronic-invoices`**: solo la factura electrónica DIAN (capa sobre
+      `CreateManualInvoiceUseCase`), sin mover inventario, sin catálogo y **sin generar
+      comprobante contable** — la venta ya se contabilizó completa por el cierre de turno;
+      facturarla de nuevo aquí duplicaría el ingreso. Verificado en vivo contra el sandbox real de
+      Factus (CUFE y PDF reales).
+    - **`POST /purchases` + `POST /purchases/:id/cancel` + `POST /supplier-payments`**: compras a
+      proveedor, a diferencia de las ventas, **sí se contabilizan por este endpoint** (el usuario
+      las excluyó del cierre de turno justo porque son un movimiento de dinero distinto, no
+      porque no deban contabilizarse). Proveedor resuelto por NIT+DV (dígito de verificación
+      validado antes de tocar nada); desglose de IVA por tarifa (`taxBreakdown`) en vez de un
+      total plano; fecha real de la factura del proveedor para el comprobante (no la fecha de
+      sincronización); mercancía (Inventario) o servicio (`expenseCategoryCode` → cuenta de la
+      categoría ya configurada por el contador); contado (abono total inmediato) o crédito
+      (cuenta por pagar con vencimiento); corrección vía `/purchases/:id/cancel`
+      (`CancelPurchaseUseCase`, reversa abonos y comprobantes) para un costo mal digitado.
+      Idempotencia genérica por `Idempotency-Key` (tabla `ExternalApiRequest`, reusable por
+      cualquier endpoint público futuro, guarda la respuesta completa servida la primera vez).
+    - **`POST /expenses`**: gasto operativo pagado de caja/banco, con categoría resuelta por
+      `code` (capa sobre `CreateExpenseUseCase`, mismo criterio que `expenseCategoryCode` en
+      `/purchases`).
+    Verificado en vivo contra Postgres local en cada una de las tres piezas (API key con los
+    scopes exactos → ejercitar el endpoint → inspeccionar journal entries/balances reales),
+    incluyendo reintentos idempotentes que no duplican, rechazo de NIT con DV incorrecto, y
+    cancelación de una compra reversando su abono. **Fuera de alcance a propósito**: órdenes de
+    compra y recepción de mercancía como pasos propios de Contapro (`PurchaseOrder`/
+    `GoodsReceipt` del panel interno exigen catálogo e inventario reales — el POS ya las maneja
+    de su lado, Contapro solo necesita el hecho financiero final); cuenta de tarjeta configurable
+    (hoy fija a Bancos); fiado por cliente con desglose (requiere relajar `AccountReceivable.
+    saleId`); propinas/recargos de plataforma separados del ingreso propio; listar/consultar
+    compras, pagos o gastos ya registrados vía API pública. Ver el README del módulo para el
+    detalle completo de cada decisión y de las correcciones encontradas durante la
+    implementación.
