@@ -33,6 +33,9 @@ independiente del límite general de la API interna).
 | POST | `/api/public/v1/sales` | `sale.create` | Crea una venta (mismo shape que `POST /sales` interno) |
 | GET | `/api/public/v1/shift-closes` | `accounting.read` | Lista cierres de turno reportados (`?take=&skip=`), con su estado |
 | POST | `/api/public/v1/shift-closes` | `accounting.manage` | Contabiliza un cierre de turno completo, ver abajo |
+| POST | `/api/public/v1/electronic-invoices` | `sale.create` | Genera una factura electrónica DIAN sin inventario/catálogo/contabilización, ver abajo |
+| GET | `/api/public/v1/electronic-invoices/:id` | `sale.read` | Número, CUFE y estado de una factura ya pedida |
+| GET | `/api/public/v1/electronic-invoices/:id/pdf` | `sale.read` | El RIDE (PDF) de la factura |
 
 `POST /api/public/v1/sales` es el punto de integración de mayor valor: un pedido de e-commerce se
 registra como una venta real, con su factura electrónica DIAN generada automáticamente (mismo
@@ -96,9 +99,41 @@ revisa).
     payload para separarlos explícitamente del resto de las ventas.
 - **Doble contabilización — regla de diseño, no solo documentación**: la facturación electrónica
   DIAN de un POS externo **no debe** generar comprobante contable (eso ya sale completo del cierre
-  de turno). Ver el endpoint `POST /api/public/v1/electronic-invoices` (planeado, construido sobre
-  `CreateManualInvoiceUseCase` del módulo `manual-invoicing`, que ya no contabiliza ni mueve
-  inventario) para la factura en sí.
+  de turno). Ver `POST /api/public/v1/electronic-invoices` (abajo) para la factura en sí.
+
+## Factura electrónica sin inventario (item nuevo 2026-10-02)
+
+`POST /api/public/v1/electronic-invoices`: un POS externo le pide a Contapro **solo** la factura
+electrónica DIAN (número, CUFE, estado, PDF) para un pedido ya facturado del lado del POS — sin
+mover inventario, sin usar el catálogo de productos de Contapro, y **sin generar ningún
+comprobante contable** (eso ya sale completo del cierre de turno, ver arriba — por diseño, para
+que una misma venta no se contabilice dos veces).
+
+- **Capa delgada sobre `CreateManualInvoiceUseCase`** (módulo `manual-invoicing`) — esa pieza ya
+  hacía exactamente esto (factura sin POS/producto/inventario/contabilización) para el caso de
+  una empresa que factura "solo con esto" desde el panel web. No se duplicó lógica de negocio, el
+  endpoint público es un wrapper que además resuelve el comprador.
+- **Comprador por documento, no por `customerId`**: el POS externo no conoce los ids internos de
+  Contapro — manda `buyer: {documentType, documentNumber, name, email?, phone?}` (opcional, sin
+  `buyer` factura a consumidor final genérico) y el endpoint busca o crea el cliente por
+  `documentNumber` (`Customer.@@unique([companyId, documentNumber])` garantiza que nunca duplica).
+- **No recibe `payments`**: confirmado que `GenerateElectronicInvoiceUseCase` no usa la forma de
+  pago para nada del lado DIAN, y como la contabilidad ya sale del cierre de turno, pedirle ese
+  dato al POS no serviría para nada.
+- **El PDF reusa el renderer existente tal cual** (`GET .../pdf` monta directamente
+  `electronicInvoicingController.getPdfByManualInvoice`, el mismo handler que ya sirve el RIDE de
+  una factura manual por JWT — cero código nuevo de renderizado, solo se expone bajo auth por API
+  key).
+- **`status: "PENDING"`** si la factura se creó pero la generación DIAN todavía no corrió o falló
+  (`CreateManualInvoiceUseCase` nunca bloquea por esto) — cualquier otro valor es el estado real
+  de `ElectronicInvoice` (`GENERATED`/`PENDING_SUBMISSION`/`ACCEPTED`/`REJECTED`, según el
+  proveedor configurado por la empresa).
+- **Verificado en vivo contra el sandbox real de Factus** (2026-10-02): número/CUFE reales,
+  estado `ACCEPTED`, PDF generado y leído con contenido correcto. Con un comprador específico
+  (`documentType: "CC"`) el sandbox compartido devolvió `REJECTED` ("Error de validación") — con
+  consumidor final (`buyer` omitido) se aceptó sin problema. No se investigó más a fondo porque es
+  el mismo tipo de limitación de catálogos DIAN sin verificar ya documentada en
+  `modules/electronic-invoicing/README.md` (no específico de este endpoint).
 
 ## Webhooks salientes
 

@@ -11,8 +11,11 @@ import { ManualInvoicingController } from "./interfaces/manual-invoicing.control
 const manualInvoiceRepo = new PrismaManualInvoiceRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
-const createUseCase = new CreateManualInvoiceUseCase(manualInvoiceRepo, companyProfileRepo, generateElectronicInvoiceUseCase, auditService);
-const getUseCase = new GetManualInvoiceUseCase(manualInvoiceRepo);
+/** Exportados (no solo locales): public-api.container.ts los reusa tal cual para el endpoint
+ * POST /public/v1/electronic-invoices -- una factura "solo factura" (sin POS/producto/inventario/
+ * contabilizacion) es exactamente lo que ya hace este caso de uso, ver su README. */
+export const createUseCase = new CreateManualInvoiceUseCase(manualInvoiceRepo, companyProfileRepo, generateElectronicInvoiceUseCase, auditService);
+export const getUseCase = new GetManualInvoiceUseCase(manualInvoiceRepo);
 const listUseCase = new ListManualInvoicesUseCase(manualInvoiceRepo);
 
 export const manualInvoicingController = new ManualInvoicingController(createUseCase, getUseCase, listUseCase);

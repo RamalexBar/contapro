@@ -57,6 +57,11 @@ export interface ICustomerRepository {
   create(data: CreateCustomerData): Promise<CustomerRecord>;
   list(search?: string): Promise<CustomerRecord[]>;
   findByIdOrThrow(id: string): Promise<CustomerRecord>;
+  /** Busqueda EXACTA (no `list(search)`, que solo busca por nombre con `contains`) -- usado para
+   * "buscar o crear" un cliente por su documento (ver Customer.@@unique([companyId,
+   * documentNumber])), ej. desde POST /public/v1/electronic-invoices cuando el POS externo manda
+   * el comprador por documento, no por un customerId que no conoce. */
+  findByDocumentNumber(documentNumber: string): Promise<CustomerRecord | null>;
   /** Endpoint angosto de un solo campo (`PATCH /customers/:id/price-list`) -- el modulo
    * `customers` no tiene edicion general hoy, mismo criterio que `PATCH /products/:id/price`. */
   updatePriceList(id: string, priceListId: string | null): Promise<CustomerRecord>;

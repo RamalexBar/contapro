@@ -83,7 +83,9 @@ const getDocumentUsageUseCase = new GetElectronicDocumentUsageUseCase(documentUs
 
 const createResolutionUseCase = new CreateNumberingResolutionUseCase(numberingResolutionRepo, auditService);
 const listResolutionsUseCase = new ListNumberingResolutionsUseCase(numberingResolutionRepo);
-const getInvoiceUseCase = new GetElectronicInvoiceUseCase(electronicInvoiceRepo);
+/** Exportado (no solo local): public-api.container.ts lo reusa para devolver fullNumber/cufe/status
+ * de una factura generada via el endpoint publico (ver register-electronic-invoice.use-case.ts). */
+export const getInvoiceUseCase = new GetElectronicInvoiceUseCase(electronicInvoiceRepo);
 const resubmitUseCase = new ResubmitElectronicInvoiceUseCase(
   electronicInvoiceRepo,
   certificateLoader,

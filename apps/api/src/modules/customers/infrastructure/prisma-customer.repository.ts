@@ -88,6 +88,11 @@ export class PrismaCustomerRepository implements ICustomerRepository {
     return toRecord(row);
   }
 
+  async findByDocumentNumber(documentNumber: string): Promise<CustomerRecord | null> {
+    const row = await prisma.customer.findFirst({ where: { documentNumber } });
+    return row ? toRecord(row) : null;
+  }
+
   async updatePriceList(id: string, priceListId: string | null): Promise<CustomerRecord> {
     // findByIdOrThrow confirma pertenencia al tenant primero -- update() por id no queda cubierto
     // por tenant.extension.ts, mismo criterio ya aplicado en otros repos de este repo.

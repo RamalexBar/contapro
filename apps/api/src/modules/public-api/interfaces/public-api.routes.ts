@@ -3,6 +3,9 @@ import { apiKeyAuthMiddleware } from "../../../shared/middlewares/api-key-auth.m
 import { publicApiRateLimiter } from "../../../shared/middlewares/public-api-rate-limit.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
 import { publicApiController } from "../public-api.container";
+// Reusado tal cual (mismo handler que ya sirve el PDF de una factura manual via JWT) -- cero
+// logica nueva, solo se monta bajo auth por API key en vez de JWT. Ver README: "Factura en si".
+import { electronicInvoicingController } from "../../electronic-invoicing/electronic-invoicing.container";
 
 export const publicApiRouter = Router();
 publicApiRouter.use("/public/v1", publicApiRateLimiter, apiKeyAuthMiddleware);
@@ -16,3 +19,11 @@ publicApiRouter.post("/public/v1/sales", requirePermission("sale.create"), publi
 
 publicApiRouter.get("/public/v1/shift-closes", requirePermission("accounting.read"), publicApiController.listShiftCloses);
 publicApiRouter.post("/public/v1/shift-closes", requirePermission("accounting.manage"), publicApiController.registerShiftClose);
+
+publicApiRouter.post("/public/v1/electronic-invoices", requirePermission("sale.create"), publicApiController.registerElectronicInvoice);
+publicApiRouter.get("/public/v1/electronic-invoices/:id", requirePermission("sale.read"), publicApiController.getElectronicInvoice);
+publicApiRouter.get(
+  "/public/v1/electronic-invoices/:manualInvoiceId/pdf",
+  requirePermission("sale.read"),
+  electronicInvoicingController.getPdfByManualInvoice
+);
