@@ -27,3 +27,11 @@ publicApiRouter.get(
   requirePermission("sale.read"),
   electronicInvoicingController.getPdfByManualInvoice
 );
+
+publicApiRouter.post("/public/v1/purchases", requirePermission("suppliers.manage"), publicApiController.registerPurchase);
+publicApiRouter.post(
+  "/public/v1/accounts-payable/:accountPayableId/payments",
+  requirePermission("suppliers.manage"),
+  publicApiController.registerSupplierPayment
+);
+publicApiRouter.post("/public/v1/expenses", requirePermission("expense.manage"), publicApiController.registerExpense);

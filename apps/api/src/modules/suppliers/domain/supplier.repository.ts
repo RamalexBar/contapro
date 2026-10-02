@@ -31,4 +31,7 @@ export interface ISupplierRepository {
   create(data: CreateSupplierData): Promise<SupplierRecord>;
   list(search?: string): Promise<SupplierRecord[]>;
   findByIdOrThrow(id: string): Promise<SupplierRecord>;
+  /** Usado por la API publica para resolver/crear un proveedor por NIT sin que el POS externo
+   * conozca el id interno de Contapro -- mismo criterio que ICustomerRepository.findByDocumentNumber. */
+  findByNit(nit: string): Promise<SupplierRecord | null>;
 }

@@ -1,5 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
-import { createSaleSchema, registerExternalElectronicInvoiceSchema, registerShiftCloseBodySchema } from "@erp/shared-types";
+import {
+  createSaleSchema,
+  registerExternalElectronicInvoiceSchema,
+  registerShiftCloseBodySchema,
+  registerExternalPurchaseSchema,
+  registerExternalSupplierPaymentSchema,
+  registerExternalExpenseSchema,
+} from "@erp/shared-types";
 import { NotFoundError, ValidationError } from "../../../shared/errors/app-error";
 import { createCustomerSchema } from "../../customers/interfaces/customer.validators";
 import type { IProductRepository } from "../../inventory/product/domain/product.repository";
@@ -11,6 +18,9 @@ import type { ListShiftClosesUseCase } from "../application/use-cases/list-shift
 import type { RegisterExternalElectronicInvoiceUseCase } from "../application/use-cases/register-external-electronic-invoice.use-case";
 import type { GetManualInvoiceUseCase } from "../../manual-invoicing/application/use-cases/get-manual-invoice.use-case";
 import type { GetElectronicInvoiceUseCase } from "../../electronic-invoicing/application/use-cases/get-electronic-invoice.use-case";
+import type { RegisterExternalPurchaseUseCase } from "../application/use-cases/register-external-purchase.use-case";
+import type { RegisterExternalExpenseUseCase } from "../application/use-cases/register-external-expense.use-case";
+import type { RegisterSupplierPaymentUseCase } from "../../suppliers/application/use-cases/register-supplier-payment.use-case";
 
 /**
  * Controlador de la API publica (item 40 de docs/ALCANCE.md, `/api/public/v1/*`): solo
@@ -28,7 +38,10 @@ export class PublicApiController {
     private readonly listShiftClosesUseCase: ListShiftClosesUseCase,
     private readonly registerExternalElectronicInvoiceUseCase: RegisterExternalElectronicInvoiceUseCase,
     private readonly getManualInvoiceUseCase: GetManualInvoiceUseCase,
-    private readonly getElectronicInvoiceUseCase: GetElectronicInvoiceUseCase
+    private readonly getElectronicInvoiceUseCase: GetElectronicInvoiceUseCase,
+    private readonly registerExternalPurchaseUseCase: RegisterExternalPurchaseUseCase,
+    private readonly registerSupplierPaymentUseCase: RegisterSupplierPaymentUseCase,
+    private readonly registerExternalExpenseUseCase: RegisterExternalExpenseUseCase
   ) {}
 
   listProducts = async (req: Request, res: Response, next: NextFunction) => {
@@ -131,6 +144,35 @@ export class PublicApiController {
         }
         throw err;
       }
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  registerPurchase = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = registerExternalPurchaseSchema.parse(req.body);
+      res.status(201).json(await this.registerExternalPurchaseUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  registerSupplierPayment = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = registerExternalSupplierPaymentSchema.parse(req.body);
+      res
+        .status(201)
+        .json(await this.registerSupplierPaymentUseCase.execute({ accountPayableId: req.params.accountPayableId, ...body }));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  registerExpense = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = registerExternalExpenseSchema.parse(req.body);
+      res.status(201).json(await this.registerExternalExpenseUseCase.execute(body));
     } catch (err) {
       next(err);
     }

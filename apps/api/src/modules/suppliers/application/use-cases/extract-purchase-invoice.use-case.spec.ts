@@ -23,6 +23,9 @@ class FakeSupplierRepo implements ISupplierRepository {
   findByIdOrThrow(): Promise<SupplierRecord> {
     throw new Error("not used in this spec");
   }
+  findByNit(): Promise<SupplierRecord | null> {
+    throw new Error("not used in this spec");
+  }
 }
 
 function makeSupplier(overrides: Partial<SupplierRecord> = {}): SupplierRecord {

@@ -56,6 +56,11 @@ export class PrismaExpenseCategoryRepository implements IExpenseCategoryReposito
     return this.toRecord(row);
   }
 
+  async findByCode(code: string): Promise<ExpenseCategoryRecord | null> {
+    const row = await prisma.expenseCategory.findFirst({ where: { code } });
+    return row ? this.toRecord(row) : null;
+  }
+
   private toRecord(row: {
     id: string;
     code: string;

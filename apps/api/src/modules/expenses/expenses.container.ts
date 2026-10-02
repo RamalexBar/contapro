@@ -16,12 +16,24 @@ const categoryRepo = new PrismaExpenseCategoryRepository();
 const expenseRepo = new PrismaExpenseRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
+export const createExpenseUseCase = new CreateExpenseUseCase(
+  expenseRepo,
+  categoryRepo,
+  postExpenseJournalEntryUseCase,
+  costCenterRepository,
+  auditService
+);
+
+// Exportado para la API publica (resolver la categoria por `code` configurado por el contador,
+// sin exponer el id interno de Contapro al POS externo).
+export { categoryRepo as expenseCategoryRepo };
+
 export const expensesController = new ExpensesController(
   new CreateExpenseCategoryUseCase(categoryRepo, auditService),
   new UpdateExpenseCategoryUseCase(categoryRepo, auditService),
   new DeactivateExpenseCategoryUseCase(categoryRepo, auditService),
   new ListExpenseCategoriesUseCase(categoryRepo),
-  new CreateExpenseUseCase(expenseRepo, categoryRepo, postExpenseJournalEntryUseCase, costCenterRepository, auditService),
+  createExpenseUseCase,
   new CancelExpenseUseCase(expenseRepo, voidJournalEntryUseCase, auditService),
   new ListExpensesUseCase(expenseRepo),
   expenseRepo,

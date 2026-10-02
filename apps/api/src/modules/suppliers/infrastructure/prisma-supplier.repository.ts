@@ -72,4 +72,9 @@ export class PrismaSupplierRepository implements ISupplierRepository {
     if (!row) throw new NotFoundError("Supplier", id);
     return toRecord(row);
   }
+
+  async findByNit(nit: string): Promise<SupplierRecord | null> {
+    const row = await prisma.supplier.findFirst({ where: { nit } });
+    return row ? toRecord(row) : null;
+  }
 }

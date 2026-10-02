@@ -45,17 +45,30 @@ const accountPayableRepo = new PrismaAccountPayableRepository();
 const journalRepo = new PrismaJournalEntryRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
+export const createPurchaseUseCase = new CreatePurchaseUseCase(
+  purchaseRepo,
+  supplierRepo,
+  withholdingConceptRepository,
+  postPurchaseJournalEntryUseCase,
+  generateElectronicSupportDocumentUseCase,
+  auditService
+);
+
+export const registerSupplierPaymentUseCase = new RegisterSupplierPaymentUseCase(
+  accountPayableRepo,
+  supplierRepo,
+  postSupplierPaymentJournalEntryUseCase,
+  auditService
+);
+
+// Exportado para la API publica (resolver/crear proveedor por NIT sin exponer el id interno de
+// Contapro al POS externo) -- mismo criterio que customerRepo en customers.container.ts.
+export { supplierRepo };
+
 export const suppliersController = new SuppliersController(
   new CreateSupplierUseCase(supplierRepo, auditService),
   new ListSuppliersUseCase(supplierRepo),
-  new CreatePurchaseUseCase(
-    purchaseRepo,
-    supplierRepo,
-    withholdingConceptRepository,
-    postPurchaseJournalEntryUseCase,
-    generateElectronicSupportDocumentUseCase,
-    auditService
-  ),
+  createPurchaseUseCase,
   new ListPurchasesUseCase(purchaseRepo),
   new CreatePurchaseOrderUseCase(purchaseOrderRepo, auditService),
   new SendPurchaseOrderUseCase(purchaseOrderRepo, auditService),
@@ -65,7 +78,7 @@ export const suppliersController = new SuppliersController(
   new ListGoodsReceiptsUseCase(goodsReceiptRepo),
   new GetGoodsReceiptUseCase(goodsReceiptRepo),
   new ListAccountsPayableUseCase(accountPayableRepo),
-  new RegisterSupplierPaymentUseCase(accountPayableRepo, supplierRepo, postSupplierPaymentJournalEntryUseCase, auditService),
+  registerSupplierPaymentUseCase,
   new CancelPurchaseUseCase(purchaseRepo, accountPayableRepo, journalRepo, voidJournalEntryUseCase, auditService),
   new ExtractPurchaseInvoiceUseCase(invoiceExtractionService, supplierRepo),
   supplierRepo,
