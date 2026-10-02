@@ -37,7 +37,8 @@ independiente del límite general de la API interna).
 | GET | `/api/public/v1/electronic-invoices/:id` | `sale.read` | Número, CUFE y estado de una factura ya pedida |
 | GET | `/api/public/v1/electronic-invoices/:id/pdf` | `sale.read` | El RIDE (PDF) de la factura |
 | POST | `/api/public/v1/purchases` | `suppliers.manage` | Registra una compra a proveedor (costo + cuenta por pagar + comprobante), ver abajo |
-| POST | `/api/public/v1/accounts-payable/:accountPayableId/payments` | `suppliers.manage` | Abono a la cuenta por pagar creada por `/purchases` |
+| POST | `/api/public/v1/purchases/:id/cancel` | `suppliers.manage` | Anula una compra mal registrada (reversa abonos y comprobantes), ver abajo |
+| POST | `/api/public/v1/supplier-payments` | `suppliers.manage` | Abono a una cuenta por pagar creada por `/purchases` |
 | POST | `/api/public/v1/expenses` | `expense.manage` | Registra un gasto operativo pagado de caja/banco, ver abajo |
 
 `POST /api/public/v1/sales` es el punto de integración de mayor valor: un pedido de e-commerce se
@@ -142,45 +143,87 @@ que una misma venta no se contabilice dos veces).
 ## Compras, pagos a proveedores y gastos (item nuevo 2026-10-02)
 
 Tercera pieza de la integración con un POS externo (después de cierre de turno y factura
-electrónica): el POS también maneja órdenes de compra, recepción de mercancía al costo, cuentas
-por pagar a proveedores y sus abonos, y gastos operativos con categoría. A diferencia del resumen
-de ventas (que se consolida en un solo comprobante por turno, ver arriba), cada compra/gasto es un
-movimiento de dinero independiente que **sí se contabiliza por su cuenta** — el usuario los excluyó
-del cierre de turno justo porque son un movimiento distinto, no porque no deban contabilizarse.
+electrónica). **Decisión confirmada con el usuario**: la orden de compra y la recepción de
+mercancía son pasos puramente internos del POS (que ya las crea, envía, recibe parcial o total,
+cierra o cancela por su cuenta) — Contapro **no** las modela (`PurchaseOrder`/`GoodsReceipt` del
+panel interno exigen `productId` del catálogo de Contapro y mueven su inventario real, justo lo
+que esta integración evita en los otros 3 endpoints). A Contapro solo le interesa **cuando llega
+la mercancía**: en cada recepción, el POS llama a `POST /purchases` con el costo real. A
+diferencia del resumen de ventas (un solo comprobante por turno, ver arriba), cada compra/pago es
+un movimiento de dinero independiente que **sí se contabiliza por su cuenta** — se excluyó del
+cierre de turno porque es un movimiento distinto, no porque no deba contabilizarse.
 
-- **`POST /api/public/v1/purchases`**: capa delgada sobre `CreatePurchaseUseCase` (módulo
-  `suppliers`), la misma pieza que ya usa el panel interno — crea la cuenta por pagar y contabiliza
-  (Inventario/Gasto + IVA descontable contra Proveedores) en el mismo paso. Sin líneas de producto:
-  solo recibe los totales de la factura del proveedor (`subtotal`/`taxTotal`/`total`), igual que el
-  formulario interno — el POS no usa el catálogo de Contapro aquí tampoco.
-  - **Proveedor por NIT, no por id interno**: se manda `supplier: {nit, name, documentType?,
-    isObligatedToInvoice?}` y se busca/crea por NIT (`Supplier.@@unique([companyId, nit])`
-    garantiza que nunca duplica) — mismo criterio que el comprador de `/electronic-invoices`.
+- **`POST /api/public/v1/purchases`**: capa de orquestación sobre `CreatePurchaseUseCase` (módulo
+  `suppliers`), la misma pieza que ya usa el panel interno. Requiere el header `Idempotency-Key`
+  (el id de la recepción en el POS).
+  - **Proveedor por NIT+DV, no por id interno**: `supplier: {nit, dv, name, documentType?,
+    isObligatedToInvoice?}`. El `dv` se valida contra el NIT (`calculateNitCheckDigit`) **antes**
+    de tocar nada — atrapa errores de digitación del lado del POS con un 422 claro. Se busca/crea
+    por NIT (`Supplier.@@unique([companyId, nit])` garantiza que nunca duplica).
+  - **Desglose de IVA por tarifa, no un total plano**: `taxBreakdown: [{taxRate, taxableBase,
+    taxAmount}]` (una o más líneas) + `total`. El endpoint suma el desglose para obtener
+    `subtotal`/`taxTotal` y valida que cuadre con `total` — el motor contable sigue neteando todo
+    en la cuenta 2408 sin importar la tarifa (igual que el IVA generado de ventas), así que esto es
+    solo para que el POS pueda mandar su propio desglose sin tener que sumarlo él mismo primero.
+  - **`invoiceDate` real de la factura del proveedor** (no "ahora"): se usa como fecha del
+    comprobante contable — un POS puede sincronizar una recepción días después de la factura real,
+    y el comprobante debe quedar en el período correcto. `CreatePurchaseData.date` es el campo
+    nuevo que lo permite (opcional, el formulario interno sigue sin mandarlo y usa el momento del
+    registro, sin cambios).
+  - **Mercancía o servicio**: por defecto se contabiliza como Inventario (1435). Si la compra es un
+    servicio, se manda `expenseCategoryCode` (el `code` de una categoría de gasto YA configurada
+    por el contador, mismo mecanismo que `/expenses` abajo) y se usa su cuenta PUC en vez de
+    Inventario — `PostPurchaseJournalEntryUseCase` acepta un `destinationAccount` opcional para
+    esto, sin tocar el resto del motor.
+  - **Contado o crédito**: `payment: {term: "CASH", method}` o `{term: "CREDIT", dueDate}`. Crédito
+    simplemente crea la cuenta por pagar con esa fecha de vencimiento, sin pagar nada. Contado crea
+    la cuenta por pagar y **en el mismo llamado** registra un abono por el total vía
+    `RegisterSupplierPaymentUseCase` (`method` decide Caja vs. Bancos) — dos comprobantes en vez de
+    uno, mismo efecto económico neto (Inventario/Gasto contra Caja/Bancos), sin necesidad de una
+    rama "contado" en el motor contable de compras.
   - **Sin retenciones**: el POS no las calcula, siempre se manda `withholdings: []` (igual que
-    cuando el contador no marca ninguna en el formulario interno). Si una empresa necesita que el
-    POS también reporte retenciones, es una extensión futura, no construida.
-  - Devuelve `accountPayableId`, necesario para el siguiente endpoint.
-- **`POST /api/public/v1/accounts-payable/:accountPayableId/payments`**: reusa
-  `RegisterSupplierPaymentUseCase` tal cual (mismo caso de uso que el panel interno) — body
-  `{amount, method}`. Contabiliza el abono (Proveedores contra Caja/Bancos) en el mismo llamado.
+    cuando el contador no marca ninguna en el formulario interno).
+  - Devuelve `{id, accountPayableId, total, accountPayableStatus}` — `accountPayableStatus` es
+    `"PAID"` si fue contado, `"PENDING"` si quedó a crédito.
+- **`POST /api/public/v1/purchases/:id/cancel`**: respuesta a la pregunta explícita del usuario
+  ("si una compra se registra con un costo errado, ¿cómo se anula o corrige?") — reusa
+  `CancelPurchaseUseCase` tal cual (mismo caso de uso que el panel interno), que ya reversa
+  cualquier abono registrado (incluido el abono automático de una compra de contado) y anula los
+  comprobantes contables correspondientes. El POS vuelve a registrar la compra correcta con un
+  nuevo `POST /purchases` (y su propio `Idempotency-Key`, distinto al de la que se anuló).
+- **`POST /api/public/v1/supplier-payments`**: abonos posteriores a una compra a crédito —
+  `{accountPayableId, amount, method}` + header `Idempotency-Key` (el id del abono en el POS).
+  Capa de idempotencia sobre `RegisterSupplierPaymentUseCase` tal cual (mismo caso de uso que el
+  panel interno) — un abono no es naturalmente idempotente (reintentarlo sin protección pagaría
+  dos veces), a diferencia de un `GET`.
+- **Idempotencia de `/purchases` y `/supplier-payments`**: tabla genérica
+  `ExternalApiRequest` (`companyId` + `endpoint` + `externalReference`, única) — guarda la
+  respuesta completa servida la primera vez, así que un reintento con la misma
+  `Idempotency-Key` la devuelve tal cual sin volver a ejecutar nada (nunca duplica la compra ni el
+  abono). Mismo principio que `ExternalShiftClose`, generalizado para no repetir esa tabla por cada
+  endpoint nuevo.
 - **`POST /api/public/v1/expenses`**: capa delgada sobre `CreateExpenseUseCase` (módulo
   `expenses`) — un gasto se contabiliza y se paga completo en el mismo momento (sin cuenta por
   pagar, a diferencia de una compra a proveedor).
   - **Categoría por `code`, no por id interno**: el contador configura de antemano las categorías
     de gasto en Contapro (cada una con su cuenta PUC, ej. `ARRIENDO` → 5120) y le pasa esos códigos
     al integrador del POS — mismo criterio que los conceptos de cierre de turno
-    (`CASH`/`CARD`/etc.). Un código desconocido o de una categoría inactiva se rechaza con un 422
-    claro, nunca se inventa una cuenta.
-- **Verificado en vivo contra Postgres local** (2026-10-02): compra creada con proveedor nuevo
-  (resuelto por NIT), abono parcial registrado contra la cuenta por pagar correcta (`balance`
-  bajó de 119.000 a 69.000), gasto registrado contra una categoría real ya configurada en la
-  empresa demo, y el rechazo de un `categoryCode` inexistente confirmado. Los tres comprobantes
-  contables (`journalEntryId`) se verificaron no nulos consultando `GET /purchases` y
-  `GET /expenses` después de cada llamada.
+    (`CASH`/`CARD`/etc.) y que `expenseCategoryCode` en `/purchases`. Un código desconocido o de
+    una categoría inactiva se rechaza con un 422 claro, nunca se inventa una cuenta.
+  - Sin `Idempotency-Key` todavía — a diferencia de `/purchases`, no se confirmó con el usuario que
+    el POS necesite reintentar gastos de forma segura; si hace falta, es el mismo mecanismo de
+    `ExternalApiRequest` ya construido.
+- **Verificado en vivo contra Postgres local** (2026-10-02): compra a crédito con proveedor nuevo
+  (resuelto por NIT+DV) y desglose de IVA; reintento con la misma `Idempotency-Key` confirmado que
+  no duplica (mismo `id`/`accountPayableId` devuelto); DV incorrecto rechazado con 422; compra de
+  contado de un servicio (`expenseCategoryCode`) contabilizada contra la cuenta de la categoría en
+  vez de Inventario, con `accountPayableStatus: "PAID"` de una vez; abono parcial vía
+  `/supplier-payments` con reintento idempotente confirmado (balance no bajó dos veces); cancelación
+  de la compra a crédito confirmada reversando el abono (`balance` volvió a `amount` completo,
+  `status: CANCELLED`).
 - **Fuera de alcance a propósito**: órdenes de compra y recepción de mercancía como pasos
-  separados (el POS ya los maneja de su lado — Contapro solo necesita el hecho financiero final,
-  igual que no necesita el detalle ticket por ticket de las ventas); listar/consultar compras o
-  gastos ya registrados vía API pública (el panel interno ya lo permite por JWT si hace falta).
+  separados en Contapro (decisión explicada arriba); listar/consultar compras, pagos o gastos ya
+  registrados vía API pública (el panel interno ya lo permite por JWT si hace falta).
 
 ## Webhooks salientes
 

@@ -44,6 +44,7 @@ const TENANT_MODELS = new Set([
   "ChartOfAccounts",
   "JournalEntry",
   "ExternalShiftClose",
+  "ExternalApiRequest",
   "FinancialPeriod",
   "WithholdingConcept",
   "CostCenter",

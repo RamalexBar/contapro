@@ -52,3 +52,24 @@ model WebhookDelivery {
   @@index([webhookSubscriptionId])
   @@map("webhook_deliveries")
 }
+
+// Idempotencia generica para endpoints de la API publica que no son el cierre de turno (que ya
+// tiene su propia tabla, ExternalShiftClose en accounting.prisma, con journalEntryIds propios).
+// `responseBody` guarda la respuesta completa servida la primera vez -- un reintento con la misma
+// (companyId, endpoint, externalReference) la devuelve tal cual, sin volver a ejecutar nada
+// (mismo criterio de "no duplicar" que ExternalShiftClose, generalizado a cualquier endpoint que
+// registre algo nuevo: ver POST /purchases y POST /supplier-payments).
+model ExternalApiRequest {
+  id                String   @id @default(uuid())
+  companyId         String
+  endpoint          String
+  externalReference String
+  status            String // POSTED, FAILED
+  responseBody      Json?
+  errorMessage      String?
+  createdAt         DateTime @default(now())
+
+  @@unique([companyId, endpoint, externalReference])
+  @@index([companyId, createdAt])
+  @@map("external_api_requests")
+}

@@ -21,6 +21,15 @@ export interface CreatePurchaseData {
   // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- ver suppliers.prisma.
   currency: string;
   exchangeRate: number;
+  // Fecha real de la factura del proveedor, para contabilizar en el periodo correcto -- si se
+  // omite (unico caso hoy: el formulario interno) se usa el momento del registro, igual que
+  // siempre. Usado por la API publica (POST /purchases), donde el POS puede sincronizar una
+  // recepcion dias despues de la fecha real de la factura.
+  date?: Date;
+  // Cuenta de destino alternativa a Inventario (1435) cuando la compra es un servicio, no
+  // mercancia -- ver PostPurchaseJournalEntryUseCase. Si se omite, se contabiliza como siempre
+  // (Inventario).
+  destinationAccount?: { code: string; name: string };
 }
 
 export interface PurchaseRecord {

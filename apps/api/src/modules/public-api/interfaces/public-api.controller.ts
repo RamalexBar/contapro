@@ -20,7 +20,16 @@ import type { GetManualInvoiceUseCase } from "../../manual-invoicing/application
 import type { GetElectronicInvoiceUseCase } from "../../electronic-invoicing/application/use-cases/get-electronic-invoice.use-case";
 import type { RegisterExternalPurchaseUseCase } from "../application/use-cases/register-external-purchase.use-case";
 import type { RegisterExternalExpenseUseCase } from "../application/use-cases/register-external-expense.use-case";
-import type { RegisterSupplierPaymentUseCase } from "../../suppliers/application/use-cases/register-supplier-payment.use-case";
+import type { RegisterExternalSupplierPaymentUseCase } from "../application/use-cases/register-external-supplier-payment.use-case";
+import type { CancelPurchaseUseCase } from "../../suppliers/application/use-cases/cancel-purchase.use-case";
+
+function requireIdempotencyKey(req: Request): string {
+  const idempotencyKey = req.headers["idempotency-key"];
+  if (typeof idempotencyKey !== "string" || !idempotencyKey) {
+    throw new ValidationError('Falta el header "Idempotency-Key"');
+  }
+  return idempotencyKey;
+}
 
 /**
  * Controlador de la API publica (item 40 de docs/ALCANCE.md, `/api/public/v1/*`): solo
@@ -40,8 +49,9 @@ export class PublicApiController {
     private readonly getManualInvoiceUseCase: GetManualInvoiceUseCase,
     private readonly getElectronicInvoiceUseCase: GetElectronicInvoiceUseCase,
     private readonly registerExternalPurchaseUseCase: RegisterExternalPurchaseUseCase,
-    private readonly registerSupplierPaymentUseCase: RegisterSupplierPaymentUseCase,
-    private readonly registerExternalExpenseUseCase: RegisterExternalExpenseUseCase
+    private readonly registerExternalSupplierPaymentUseCase: RegisterExternalSupplierPaymentUseCase,
+    private readonly registerExternalExpenseUseCase: RegisterExternalExpenseUseCase,
+    private readonly cancelPurchaseUseCase: CancelPurchaseUseCase
   ) {}
 
   listProducts = async (req: Request, res: Response, next: NextFunction) => {
@@ -101,10 +111,7 @@ export class PublicApiController {
 
   registerShiftClose = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const idempotencyKey = req.headers["idempotency-key"];
-      if (typeof idempotencyKey !== "string" || !idempotencyKey) {
-        throw new ValidationError('Falta el header "Idempotency-Key" (id propio del cierre de turno)');
-      }
+      const idempotencyKey = requireIdempotencyKey(req);
       const body = registerShiftCloseBodySchema.parse(req.body);
       res.status(201).json(await this.registerShiftCloseUseCase.execute({ ...body, externalReference: idempotencyKey }));
     } catch (err) {
@@ -151,8 +158,17 @@ export class PublicApiController {
 
   registerPurchase = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const idempotencyKey = requireIdempotencyKey(req);
       const body = registerExternalPurchaseSchema.parse(req.body);
-      res.status(201).json(await this.registerExternalPurchaseUseCase.execute(body));
+      res.status(201).json(await this.registerExternalPurchaseUseCase.execute(body, idempotencyKey));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  cancelPurchase = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.cancelPurchaseUseCase.execute(req.params.id));
     } catch (err) {
       next(err);
     }
@@ -160,10 +176,9 @@ export class PublicApiController {
 
   registerSupplierPayment = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const idempotencyKey = requireIdempotencyKey(req);
       const body = registerExternalSupplierPaymentSchema.parse(req.body);
-      res
-        .status(201)
-        .json(await this.registerSupplierPaymentUseCase.execute({ accountPayableId: req.params.accountPayableId, ...body }));
+      res.status(201).json(await this.registerExternalSupplierPaymentUseCase.execute(body, idempotencyKey));
     } catch (err) {
       next(err);
     }

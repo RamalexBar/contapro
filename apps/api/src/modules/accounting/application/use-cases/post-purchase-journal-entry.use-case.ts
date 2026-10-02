@@ -39,10 +39,14 @@ export interface PurchaseJournalEntryInput {
   // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- ver post-sale-journal-entry.use-case.ts.
   currency?: string;
   exchangeRate?: number;
+  // Si la compra es un servicio (no mercancia), la cuenta de gasto correspondiente en vez de
+  // Inventario -- ver create-purchase.use-case.ts / public-api/README.md.
+  destinationAccount?: { code: string; name: string };
 }
 
 /**
- * Contabiliza una compra registrada: debito Inventario (base) + IVA descontable, credito
+ * Contabiliza una compra registrada: debito Inventario (base) -- o la cuenta de
+ * `destinationAccount` si la compra es un servicio, no mercancia -- + IVA descontable, credito
  * Proveedores nacionales por el NETO de retencion (lo que realmente se le debe al proveedor,
  * ver PrismaPurchaseRepository) + las retenciones practicadas (pasivo a favor de la DIAN, ver
  * STANDARD_ACCOUNTS arriba). `total` sigue siendo el bruto legal de la factura del proveedor.
@@ -60,6 +64,9 @@ export class PostPurchaseJournalEntryUseCase {
 
     const accounts = await this.ensureAccounts();
     const netTotal = round2(input.total - input.retentionTotal);
+    const destination = input.destinationAccount
+      ? await this.accountRepo.resolvePostingAccount({ ...input.destinationAccount, type: "EXPENSE" })
+      : accounts.inventario;
 
     const withholdingLines = (Object.entries(input.withholdingsByType) as [WithholdingType, number][]).map(
       ([type, amount]) => ({
@@ -85,7 +92,12 @@ export class PostPurchaseJournalEntryUseCase {
       sourceType: "Purchase",
       sourceId: input.purchaseId,
       lines: [
-        { accountId: accounts.inventario.id, debit: input.subtotal, credit: 0, description: "Inventario" },
+        {
+          accountId: destination.id,
+          debit: input.subtotal,
+          credit: 0,
+          description: input.destinationAccount ? "Gasto" : "Inventario",
+        },
         { accountId: accounts.ivaPorPagar.id, debit: input.taxTotal, credit: 0, description: "IVA descontable" },
         { accountId: accounts.proveedores.id, debit: 0, credit: netTotal, description: "Cuenta por pagar" },
         ...withholdingLines,

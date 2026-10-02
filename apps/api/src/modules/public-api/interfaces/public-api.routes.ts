@@ -29,9 +29,6 @@ publicApiRouter.get(
 );
 
 publicApiRouter.post("/public/v1/purchases", requirePermission("suppliers.manage"), publicApiController.registerPurchase);
-publicApiRouter.post(
-  "/public/v1/accounts-payable/:accountPayableId/payments",
-  requirePermission("suppliers.manage"),
-  publicApiController.registerSupplierPayment
-);
+publicApiRouter.post("/public/v1/purchases/:id/cancel", requirePermission("suppliers.manage"), publicApiController.cancelPurchase);
+publicApiRouter.post("/public/v1/supplier-payments", requirePermission("suppliers.manage"), publicApiController.registerSupplierPayment);
 publicApiRouter.post("/public/v1/expenses", requirePermission("expense.manage"), publicApiController.registerExpense);

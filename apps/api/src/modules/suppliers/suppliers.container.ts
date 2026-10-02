@@ -61,6 +61,14 @@ export const registerSupplierPaymentUseCase = new RegisterSupplierPaymentUseCase
   auditService
 );
 
+export const cancelPurchaseUseCase = new CancelPurchaseUseCase(
+  purchaseRepo,
+  accountPayableRepo,
+  journalRepo,
+  voidJournalEntryUseCase,
+  auditService
+);
+
 // Exportado para la API publica (resolver/crear proveedor por NIT sin exponer el id interno de
 // Contapro al POS externo) -- mismo criterio que customerRepo en customers.container.ts.
 export { supplierRepo };
@@ -79,7 +87,7 @@ export const suppliersController = new SuppliersController(
   new GetGoodsReceiptUseCase(goodsReceiptRepo),
   new ListAccountsPayableUseCase(accountPayableRepo),
   registerSupplierPaymentUseCase,
-  new CancelPurchaseUseCase(purchaseRepo, accountPayableRepo, journalRepo, voidJournalEntryUseCase, auditService),
+  cancelPurchaseUseCase,
   new ExtractPurchaseInvoiceUseCase(invoiceExtractionService, supplierRepo),
   supplierRepo,
   accountPayableRepo

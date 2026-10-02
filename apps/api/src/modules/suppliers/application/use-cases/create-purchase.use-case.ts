@@ -19,9 +19,12 @@ export type CreatePurchaseInput = Omit<CreatePurchaseData, "retentionTotal" | "w
 };
 
 /**
- * Registro minimo de una factura de compra (sin flujo de orden de compra/recepcion de
- * mercancia todavia, ver README.md): crea el Purchase + su AccountPayable y contabiliza de
- * una vez el comprobante (Inventario + IVA descontable vs Proveedores).
+ * Registro minimo de una factura de compra: crea el Purchase + su AccountPayable y contabiliza
+ * de una vez el comprobante (Inventario, o la cuenta de `destinationAccount` si es un servicio,
+ * + IVA descontable vs Proveedores). La orden de compra/recepcion de mercancia es un flujo
+ * interno (PurchaseOrder/GoodsReceipt, con catalogo de productos e inventario reales) separado
+ * de este -- un POS externo con su propio catalogo nunca las usa, solo esto (ver
+ * public-api/README.md, decision confirmada con el usuario 2026-10-02).
  */
 export class CreatePurchaseUseCase {
   constructor(
@@ -78,7 +81,9 @@ export class CreatePurchaseUseCase {
     const journalEntry = await this.postPurchaseJournalEntry.execute({
       purchaseId: purchase.id,
       branchId: purchase.branchId,
-      date: purchase.createdAt,
+      // Fecha real de la factura si se mando (ej. API publica, POS sincroniza dias despues) --
+      // si no, el momento del registro, igual que siempre.
+      date: data.date ?? purchase.createdAt,
       invoiceNumber: purchase.invoiceNumber,
       subtotal: purchase.subtotal,
       taxTotal: purchase.taxTotal,
@@ -87,6 +92,7 @@ export class CreatePurchaseUseCase {
       withholdingsByType: sumWithholdingsByType(purchase.withholdings),
       currency: purchase.currency,
       exchangeRate: purchase.exchangeRate,
+      destinationAccount: data.destinationAccount,
     });
     if (journalEntry) {
       await this.purchaseRepo.setJournalEntryId(purchase.id, journalEntry.id);
