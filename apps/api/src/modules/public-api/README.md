@@ -31,11 +31,74 @@ independiente del límite general de la API interna).
 | POST | `/api/public/v1/customers` | `customer.manage` | Crea un cliente |
 | GET | `/api/public/v1/sales` | `sale.read` | Lista ventas (`?take=&skip=`) |
 | POST | `/api/public/v1/sales` | `sale.create` | Crea una venta (mismo shape que `POST /sales` interno) |
+| GET | `/api/public/v1/shift-closes` | `accounting.read` | Lista cierres de turno reportados (`?take=&skip=`), con su estado |
+| POST | `/api/public/v1/shift-closes` | `accounting.manage` | Contabiliza un cierre de turno completo, ver abajo |
 
 `POST /api/public/v1/sales` es el punto de integración de mayor valor: un pedido de e-commerce se
 registra como una venta real, con su factura electrónica DIAN generada automáticamente (mismo
 flujo que una venta desde el POS). Requiere `branchId` explícito en el body — una integración
 externa no conoce la sucursal interna, así que debe configurarse una vez en la integración misma.
+
+## Cierre de turno (item nuevo 2026-09-29/10-02)
+
+Pensado para un POS externo de alto volumen (restaurante, droguería, ferretería) que se integra
+via API key para que Contapro le lleve la contabilidad **sin** usar `POST /sales` (que exige
+catálogo de productos propio de Contapro y mueve inventario — no aplica si el POS externo lleva
+su propio inventario). El POS no manda una venta a la vez: manda **un resumen por cierre de
+turno**, y Contapro lo convierte en **un solo comprobante contable** (no uno por venta — un
+restaurante con cientos de ventas diarias llenaría la contabilidad de comprobantes que nadie
+revisa).
+
+- **Idempotencia real, no solo un chequeo cosmético**: el header `Idempotency-Key` (el id propio
+  del turno en el POS externo) es obligatorio. Un reintento con la misma key:
+  - Si el cierre anterior quedó **POSTED**, devuelve ese mismo resultado sin reprocesar (nunca
+    duplica el comprobante).
+  - Si el cierre anterior quedó **FAILED** (ej. timeout de red, dato inconsistente ya corregido),
+    **sí se reintenta** — un fallo no deja el turno atascado para siempre.
+- **El POS manda conceptos** (`CASH`/`CARD`/`TRANSFER`/`TRADE_IN`/`PLATFORM`, desglose de ventas
+  por tarifa IVA/INC, devoluciones, gastos, retiros, anticipos, arqueo), **nunca códigos de
+  cuenta** — `PostShiftCloseJournalEntryUseCase` (módulo `accounting`) los resuelve a las cuentas
+  del PUC de cada empresa (se crean solas la primera vez, mismo patrón `resolvePostingAccount` que
+  el resto de comprobantes automáticos del sistema).
+- **Cubre todo lo que mueve dinero en el turno**, no solo ventas: devoluciones, gastos pagados de
+  caja, retiros del propietario, anticipos de apartados/órdenes de servicio (pasivo, **nunca
+  ingreso** hasta que se entregue lo comprado), equipos usados recibidos como parte de pago
+  (`TRADE_IN`, entra como activo — inventario de usados, no como caja/banco), pedidos de
+  plataformas tipo Rappi (`PLATFORM`, queda como cuenta por cobrar a la plataforma, no como caja),
+  y el faltante/sobrante del arqueo (`cashExpected` vs `cashCounted`).
+- **Varios movimientos del mismo concepto se consolidan en una sola línea** — 200 ventas en
+  efectivo generan UNA línea de Caja, no 200 (se acumula en memoria antes de armar el
+  comprobante). Una cuenta puede acumular débitos Y créditos a la vez en el mismo turno (ej. Caja
+  recibe ventas pero también paga un gasto) — se **netea** antes de emitir, nunca se manda una
+  línea con débito y crédito simultáneos (el motor de comprobantes lo rechazaría).
+- **Si los totales que manda el POS no cuadran** (ej. la suma de `payments` no coincide con la
+  suma de `salesTaxBreakdown`), el comprobante se rechaza con un 422 claro (`CreateJournalEntryUseCase`
+  ya valida débito=crédito) — nunca se postea un comprobante descuadrado.
+- **Cuentas nuevas creadas para este item marcadas "SIN VERIFICAR"** contra el PUC oficial
+  colombiano (ver comentarios en `post-shift-close-journal-entry.use-case.ts`) — son un código
+  razonable pero el contador de cada empresa puede reclasificarlas. Las que ya usaban otros
+  comprobantes del sistema (Caja 1105, Bancos 1110, Ingresos 4135, IVA 2408, Sobrantes 4295,
+  Faltantes 5195) se reusan tal cual.
+- **Fuera de alcance a propósito** (confirmado con el usuario 2026-10-02):
+  - **Compras a proveedores**: el POS externo también las maneja (órdenes de compra, recepción al
+    costo, cuentas por pagar, pagos) — queda para un endpoint aparte, no entra en el cierre de
+    turno.
+  - **Cuenta de tarjeta configurable**: hoy el método `CARD`/`TRANSFER` siempre va a la cuenta fija
+    1110 "Bancos". Dejar que el contador elija otra cuenta (ej. neta de comisión del datáfono)
+    queda pendiente.
+  - **Fiado por cliente** (nuevas ventas a crédito y cobros de cartera con desglose por cliente):
+    requiere integrarse con el módulo `collections` (`AccountReceivable`), que hoy exige un
+    `saleId` real — un POS externo sin `Sale` interno no puede crear ahí directo sin antes
+    relajar esa dependencia. Pendiente, evaluado pero no construido todavía.
+  - **Propinas y recargos de plataforma**: decisión de negocio confirmada (no son ingreso propio
+    del negocio — las propinas son del mesero, de un recargo de plataforma solo la comisión que
+    efectivamente se queda el negocio es ingreso) pero todavía no hay un concepto dedicado en el
+    payload para separarlos explícitamente del resto de las ventas.
+- **Doble contabilización — regla de diseño, no solo documentación**: la facturación electrónica
+  DIAN de un POS externo **no debe** generar comprobante contable (eso ya sale completo del cierre
+  de turno). Ver el endpoint `POST /api/public/v1/electronic-invoices` (planeado, construido sobre
+  `CreateManualInvoiceUseCase` del módulo `manual-invoicing`, que ya no contabiliza ni mueve
+  inventario) para la factura en sí.
 
 ## Webhooks salientes
 

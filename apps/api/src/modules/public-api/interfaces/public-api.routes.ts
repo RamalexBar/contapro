@@ -13,3 +13,6 @@ publicApiRouter.get("/public/v1/customers", requirePermission("customer.read"), 
 publicApiRouter.post("/public/v1/customers", requirePermission("customer.manage"), publicApiController.createCustomer);
 publicApiRouter.get("/public/v1/sales", requirePermission("sale.read"), publicApiController.listSales);
 publicApiRouter.post("/public/v1/sales", requirePermission("sale.create"), publicApiController.createSale);
+
+publicApiRouter.get("/public/v1/shift-closes", requirePermission("accounting.read"), publicApiController.listShiftCloses);
+publicApiRouter.post("/public/v1/shift-closes", requirePermission("accounting.manage"), publicApiController.registerShiftClose);

@@ -33,6 +33,7 @@ import { PostExpenseJournalEntryUseCase } from "./application/use-cases/post-exp
 import { PostCommissionJournalEntryUseCase } from "./application/use-cases/post-commission-journal-entry.use-case";
 import { PostDepreciationJournalEntryUseCase } from "./application/use-cases/post-depreciation-journal-entry.use-case";
 import { PostReceivableCollectionJournalEntryUseCase } from "./application/use-cases/post-receivable-collection-journal-entry.use-case";
+import { PostShiftCloseJournalEntryUseCase } from "./application/use-cases/post-shift-close-journal-entry.use-case";
 import { CreateBankAccountUseCase } from "./application/use-cases/create-bank-account.use-case";
 import { ListBankAccountsUseCase } from "./application/use-cases/list-bank-accounts.use-case";
 import { RegisterBankTransactionUseCase } from "./application/use-cases/register-bank-transaction.use-case";
@@ -136,6 +137,9 @@ export const postPayrollJournalEntryUseCase = new PostPayrollJournalEntryUseCase
 
 /** Usado por sale.container.ts para contabilizar una venta al completarse. */
 export const postSaleJournalEntryUseCase = new PostSaleJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
+
+/** Usado por public-api.container.ts para contabilizar un cierre de turno de un POS externo. */
+export const postShiftCloseJournalEntryUseCase = new PostShiftCloseJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
 
 /** Usado por return.container.ts para contabilizar una devolucion al registrarse. */
 export const postReturnJournalEntryUseCase = new PostReturnJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);

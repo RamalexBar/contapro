@@ -203,3 +203,27 @@ model CompanyJournalEntryCounter {
 
   @@map("company_journal_entry_counters")
 }
+
+/**
+ * Cierre de turno de caja reportado por un POS externo (via API key, ver
+ * modules/public-api/README.md, seccion "Cierre de turno"). Un solo registro contabiliza TODO el
+ * turno en pocos comprobantes (no uno por venta -- decision explicita del usuario 2026-09-29: un
+ * POS de alto volumen (restaurante, droguería) generaría cientos de comprobantes al día que nadie
+ * revisa). `externalReference` es el id propio del POS externo para ese cierre -- unico por
+ * empresa, permite reintentos idempotentes (si el POS reintenta un envio que ya se proceso, se
+ * responde el resultado guardado en vez de duplicar el comprobante).
+ */
+model ExternalShiftClose {
+  id                String   @id @default(uuid())
+  companyId         String
+  branchId          String
+  externalReference String
+  status            String // POSTED, FAILED
+  journalEntryIds   String[]
+  errorMessage      String?
+  createdAt         DateTime @default(now())
+
+  @@unique([companyId, externalReference])
+  @@index([companyId, createdAt])
+  @@map("external_shift_closes")
+}

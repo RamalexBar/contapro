@@ -43,6 +43,7 @@ const TENANT_MODELS = new Set([
   "CashSession",
   "ChartOfAccounts",
   "JournalEntry",
+  "ExternalShiftClose",
   "FinancialPeriod",
   "WithholdingConcept",
   "CostCenter",

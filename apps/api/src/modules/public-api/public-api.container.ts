@@ -4,10 +4,14 @@ import { productRepo } from "../inventory/product/product.container";
 import { customerRepo } from "../customers/customer.container";
 import { createSaleUseCase } from "../pos/sale/sale.container";
 import { PrismaSaleRepository } from "../pos/sale/infrastructure/prisma-sale.repository";
+import { postShiftCloseJournalEntryUseCase } from "../accounting/accounting.container";
 import { PrismaApiKeyRepository } from "./infrastructure/prisma-api-key.repository";
+import { PrismaExternalShiftCloseRepository } from "./infrastructure/prisma-external-shift-close.repository";
 import { CreateApiKeyUseCase } from "./application/use-cases/create-api-key.use-case";
 import { ListApiKeysUseCase } from "./application/use-cases/list-api-keys.use-case";
 import { DeactivateApiKeyUseCase } from "./application/use-cases/deactivate-api-key.use-case";
+import { RegisterShiftCloseUseCase } from "./application/use-cases/register-shift-close.use-case";
+import { ListShiftClosesUseCase } from "./application/use-cases/list-shift-closes.use-case";
 import { ApiKeyController } from "./interfaces/api-key.controller";
 import { PublicApiController } from "./interfaces/public-api.controller";
 
@@ -25,4 +29,15 @@ export const apiKeyController = new ApiKeyController(
 // createSaleUseCase completo (con toda su logica de negocio), nunca el repo directo.
 const saleRepoForListing = new PrismaSaleRepository();
 
-export const publicApiController = new PublicApiController(productRepo, customerRepo, saleRepoForListing, createSaleUseCase);
+const externalShiftCloseRepo = new PrismaExternalShiftCloseRepository();
+const registerShiftCloseUseCase = new RegisterShiftCloseUseCase(externalShiftCloseRepo, postShiftCloseJournalEntryUseCase, auditService);
+const listShiftClosesUseCase = new ListShiftClosesUseCase(externalShiftCloseRepo);
+
+export const publicApiController = new PublicApiController(
+  productRepo,
+  customerRepo,
+  saleRepoForListing,
+  createSaleUseCase,
+  registerShiftCloseUseCase,
+  listShiftClosesUseCase
+);
