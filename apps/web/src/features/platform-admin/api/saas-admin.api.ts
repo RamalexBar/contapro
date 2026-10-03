@@ -42,6 +42,16 @@ export function createPlan(input: CreatePlanInput): Promise<PlanRecord> {
 
 export type SubscriptionStatus = "TRIALING" | "ACTIVE" | "GRACE_PERIOD" | "SUSPENDED" | "CANCELLED";
 
+export interface SubscriptionPaymentRecord {
+  id: string;
+  amount: number;
+  method: string;
+  reference: string | null;
+  status: string;
+  paidAt: string | null;
+  createdAt: string;
+}
+
 export interface SubscriptionRecord {
   id: string;
   companyId: string;
@@ -56,6 +66,8 @@ export interface SubscriptionRecord {
   companyName: string;
   planName: string;
   planCode: string;
+  // Ultimo pago CONFIRMED (el mas reciente), null si todavia no ha pagado ninguno (ej. TRIAL).
+  lastPayment: SubscriptionPaymentRecord | null;
 }
 
 export interface CreateSubscriptionInput {

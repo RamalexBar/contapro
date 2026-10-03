@@ -126,7 +126,11 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
   async list(filter?: { status?: SubscriptionStatus }): Promise<SubscriptionWithDetails[]> {
     const rows = await basePrisma.subscription.findMany({
       where: filter?.status ? { status: filter.status } : undefined,
-      include: { company: { select: { name: true } }, plan: { select: { name: true, code: true } } },
+      include: {
+        company: { select: { name: true } },
+        plan: { select: { name: true, code: true } },
+        payments: { where: { status: "CONFIRMED" }, orderBy: { paidAt: "desc" }, take: 1 },
+      },
       orderBy: { currentPeriodEnd: "asc" },
     });
     return rows.map((row) => ({
@@ -134,6 +138,7 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
       companyName: row.company.name,
       planName: row.plan.name,
       planCode: row.plan.code,
+      lastPayment: row.payments[0] ? toPaymentRecord(row.payments[0]) : null,
     }));
   }
 

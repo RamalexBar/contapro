@@ -25,6 +25,12 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   CANCELLED: "Cancelada",
 };
 
+const BILLING_CYCLE_LABELS: Record<string, string> = { MONTHLY: "Mensual", YEARLY: "Anual" };
+
+function formatCurrency(amount: number): string {
+  return amount.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+}
+
 function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -48,6 +54,9 @@ export function SubscriptionsPage() {
     mutationFn: () => createSubscription(form),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["saas-admin", "subscriptions"] }),
   });
+
+  const [onlyYearly, setOnlyYearly] = useState(false);
+  const rows = onlyYearly ? data?.data.filter((s) => s.billingCycle === "YEARLY") : data?.data;
 
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payForm, setPayForm] = useState({ amount: "", method: "CASH", reference: "" });
@@ -111,6 +120,11 @@ export function SubscriptionsPage() {
         )}
       </Card>
 
+      <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" checked={onlyYearly} onChange={(e) => setOnlyYearly(e.target.checked)} />
+        Solo pago anual (candidatas a certificado de firma digital gratis)
+      </label>
+
       <Card noPadding>
         {isLoading ? (
           <Spinner />
@@ -121,17 +135,30 @@ export function SubscriptionsPage() {
                 <Th>Empresa</Th>
                 <Th>Plan</Th>
                 <Th>Estado</Th>
+                <Th>Ciclo</Th>
                 <Th>Vence</Th>
+                <Th>Último pago</Th>
                 <Th></Th>
               </tr>
             </TableHead>
             <TableBody>
-              {data?.data.map((s) => (
+              {rows?.map((s) => (
                 <TableRow key={s.id}>
                   <Td>{s.companyName}</Td>
                   <Td>{s.planName}</Td>
                   <Td>{STATUS_LABELS[s.status]}</Td>
+                  <Td>{BILLING_CYCLE_LABELS[s.billingCycle] ?? s.billingCycle}</Td>
                   <Td>{s.currentPeriodEnd.slice(0, 10)}</Td>
+                  <Td>
+                    {s.lastPayment ? (
+                      <>
+                        {(s.lastPayment.paidAt ?? s.lastPayment.createdAt).slice(0, 10)}
+                        <span className="text-slate-400"> · {formatCurrency(s.lastPayment.amount)}</span>
+                      </>
+                    ) : (
+                      <span className="text-slate-400">Sin pagos</span>
+                    )}
+                  </Td>
                   <Td className="text-right">
                     {payingId !== s.id && (
                       <Button size="sm" variant="secondary" onClick={() => setPayingId(s.id)}>

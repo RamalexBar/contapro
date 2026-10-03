@@ -48,6 +48,10 @@ export interface SubscriptionWithDetails extends SubscriptionRecord {
   companyName: string;
   planName: string;
   planCode: string;
+  // Ultimo pago CONFIRMED (el mas reciente por paidAt), null si todavia no ha pagado ninguno
+  // (ej. sigue en TRIAL). Para que el panel de plataforma pueda ver quien pago y cuando sin
+  // tener que entrar a cada suscripcion por separado.
+  lastPayment: SubscriptionPaymentRecord | null;
 }
 
 export interface SubscriptionForLifecycleCheck extends SubscriptionRecord {
