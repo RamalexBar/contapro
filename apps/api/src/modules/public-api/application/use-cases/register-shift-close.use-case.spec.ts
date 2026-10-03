@@ -22,6 +22,7 @@ class FakeExternalShiftCloseRepository implements IExternalShiftCloseRepository 
       externalReference: data.externalReference,
       status: data.status,
       journalEntryIds: data.journalEntryIds,
+      journalEntryNumbers: data.journalEntryNumbers,
       errorMessage: data.errorMessage ?? null,
       createdAt: new Date(),
     };
@@ -33,6 +34,7 @@ class FakeExternalShiftCloseRepository implements IExternalShiftCloseRepository 
     if (!record) throw new Error("not found");
     record.status = data.status;
     record.journalEntryIds = data.journalEntryIds;
+    record.journalEntryNumbers = data.journalEntryNumbers;
     record.errorMessage = data.errorMessage ?? null;
     return record;
   }
@@ -71,7 +73,12 @@ const INPUT: RegisterShiftCloseInput = {
   returns: [],
   expenses: [],
   withdrawals: [],
+  deposits: [],
   advances: [],
+  forfeitedAdvances: [],
+  tipsReceived: [],
+  tipsPaidOut: 0,
+  thirdPartyIncome: [],
   cashExpected: 119_000,
   cashCounted: 119_000,
 };

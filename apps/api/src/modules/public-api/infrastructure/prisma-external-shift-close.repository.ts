@@ -14,6 +14,7 @@ function toRecord(row: {
   externalReference: string;
   status: string;
   journalEntryIds: string[];
+  journalEntryNumbers: number[];
   errorMessage: string | null;
   createdAt: Date;
 }): ExternalShiftCloseRecord {
@@ -24,6 +25,7 @@ function toRecord(row: {
     externalReference: row.externalReference,
     status: row.status as "POSTED" | "FAILED",
     journalEntryIds: row.journalEntryIds,
+    journalEntryNumbers: row.journalEntryNumbers,
     errorMessage: row.errorMessage,
     createdAt: row.createdAt,
   };
@@ -40,6 +42,7 @@ export class PrismaExternalShiftCloseRepository implements IExternalShiftCloseRe
         externalReference: data.externalReference,
         status: data.status,
         journalEntryIds: data.journalEntryIds,
+        journalEntryNumbers: data.journalEntryNumbers,
         errorMessage: data.errorMessage ?? null,
       },
     });
@@ -54,7 +57,12 @@ export class PrismaExternalShiftCloseRepository implements IExternalShiftCloseRe
     if (!existing) throw new Error(`ExternalShiftClose ${id} no encontrado`);
     const row = await prisma.externalShiftClose.update({
       where: { id },
-      data: { status: data.status, journalEntryIds: data.journalEntryIds, errorMessage: data.errorMessage ?? null },
+      data: {
+        status: data.status,
+        journalEntryIds: data.journalEntryIds,
+        journalEntryNumbers: data.journalEntryNumbers,
+        errorMessage: data.errorMessage ?? null,
+      },
     });
     return toRecord(row);
   }

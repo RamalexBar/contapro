@@ -29,6 +29,9 @@ const STANDARD_ACCOUNTS = {
   retirosPropietario: { code: "3115", name: "Retiros del propietario", type: "EQUITY" as const }, // NUEVA, SIN VERIFICAR -- depende del tipo societario, el contador puede necesitar otra
   sobrantes: { code: "4295", name: "Diversos (otros ingresos)", type: "INCOME" as const }, // reusa (mismo codigo que PostCashSessionAdjustmentJournalEntryUseCase)
   faltantes: { code: "5195", name: "Diversos (gastos)", type: "EXPENSE" as const }, // reusa (idem)
+  propinasPorPagar: { code: "280510", name: "Propinas por pagar a empleados", type: "LIABILITY" as const }, // NUEVA, SIN VERIFICAR -- propina no es ingreso del negocio, pasivo hasta que se reparte
+  ingresosPorComisiones: { code: "4210", name: "Comisiones", type: "INCOME" as const }, // NUEVA, SIN VERIFICAR
+  saldoTercerosPorPagar: { code: "280515", name: "Saldo por pagar a terceros (recargas/plataformas)", type: "LIABILITY" as const }, // NUEVA, SIN VERIFICAR
 };
 
 type AccountKey = keyof typeof STANDARD_ACCOUNTS;
@@ -105,12 +108,47 @@ export class PostShiftCloseJournalEntryUseCase {
       add("caja", 0, withdrawal.amount);
     }
 
+    // 5b. Depositos a caja: entra plata desde afuera (ej. el dueno repone base) -- direccion
+    // opuesta al retiro, mismas dos cuentas.
+    for (const deposit of input.deposits) {
+      add("caja", deposit.amount, 0);
+      add("bancos", 0, deposit.amount);
+    }
+
     // 6. Anticipos (apartados/ordenes de servicio): entra plata, pero es pasivo, NO ingreso,
     // hasta que se entregue lo comprado.
     for (const advance of input.advances) {
       if (advance.method === "CASH") add("caja", advance.amount, 0);
       else add("bancos", advance.amount, 0);
       add("anticiposClientes", 0, advance.amount);
+    }
+
+    // 6b. Anticipos retenidos: el cliente cancela sin devolucion, el negocio se queda con lo
+    // abonado -- deja de ser pasivo y pasa a ser ingreso (misma cuenta "Diversos" que un sobrante
+    // de arqueo, ver STANDARD_ACCOUNTS.sobrantes).
+    for (const forfeited of input.forfeitedAdvances) {
+      add("anticiposClientes", forfeited.amount, 0);
+      add("sobrantes", 0, forfeited.amount);
+    }
+
+    // 6c. Propinas: no son ingreso del negocio, pasivo hasta que se reparten al empleado.
+    for (const tip of input.tipsReceived) {
+      if (tip.method === "CASH") add("caja", tip.amount, 0);
+      else add("bancos", tip.amount, 0);
+      add("propinasPorPagar", 0, tip.amount);
+    }
+    if (input.tipsPaidOut > 0) {
+      add("propinasPorPagar", input.tipsPaidOut, 0);
+      add("caja", 0, input.tipsPaidOut);
+    }
+
+    // 6d. Ingresos de terceros (recargas, pedidos de plataformas con comision): el efectivo/banco
+    // ya entro via `payments` (el POS lo cuenta como cobrado en el turno) -- aqui solo se parte
+    // ese ingreso entre la comision real (ingreso del negocio) y lo que se le debe al tercero.
+    for (const thirdParty of input.thirdPartyIncome) {
+      add("ingresosPorComisiones", 0, thirdParty.commission);
+      const owedToThirdParty = round2(thirdParty.amount - thirdParty.commission);
+      if (owedToThirdParty > 0) add("saldoTercerosPorPagar", 0, owedToThirdParty);
     }
 
     // 7. Arqueo: diferencia entre lo esperado y lo contado -- sobrante (otro ingreso) o faltante

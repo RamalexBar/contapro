@@ -220,6 +220,9 @@ model ExternalShiftClose {
   externalReference String
   status            String // POSTED, FAILED
   journalEntryIds   String[]
+  // Numero humano del comprobante (JournalEntry.number), paralelo a journalEntryIds -- para que
+  // el POS externo pueda mostrarlo sin resolver el id contra otro endpoint.
+  journalEntryNumbers Int[]
   errorMessage      String?
   createdAt         DateTime @default(now())
 

@@ -63,16 +63,24 @@ revisa).
   - Si el cierre anterior quedó **FAILED** (ej. timeout de red, dato inconsistente ya corregido),
     **sí se reintenta** — un fallo no deja el turno atascado para siempre.
 - **El POS manda conceptos** (`CASH`/`CARD`/`TRANSFER`/`TRADE_IN`/`PLATFORM`, desglose de ventas
-  por tarifa IVA/INC, devoluciones, gastos, retiros, anticipos, arqueo), **nunca códigos de
-  cuenta** — `PostShiftCloseJournalEntryUseCase` (módulo `accounting`) los resuelve a las cuentas
-  del PUC de cada empresa (se crean solas la primera vez, mismo patrón `resolvePostingAccount` que
-  el resto de comprobantes automáticos del sistema).
+  por tarifa IVA/INC/EXEMPT/EXCLUDED, devoluciones, gastos, retiros, depósitos, anticipos,
+  arqueo), **nunca códigos de cuenta** — `PostShiftCloseJournalEntryUseCase` (módulo `accounting`)
+  los resuelve a las cuentas del PUC de cada empresa (se crean solas la primera vez, mismo patrón
+  `resolvePostingAccount` que el resto de comprobantes automáticos del sistema).
 - **Cubre todo lo que mueve dinero en el turno**, no solo ventas: devoluciones, gastos pagados de
-  caja, retiros del propietario, anticipos de apartados/órdenes de servicio (pasivo, **nunca
-  ingreso** hasta que se entregue lo comprado), equipos usados recibidos como parte de pago
-  (`TRADE_IN`, entra como activo — inventario de usados, no como caja/banco), pedidos de
-  plataformas tipo Rappi (`PLATFORM`, queda como cuenta por cobrar a la plataforma, no como caja),
-  y el faltante/sobrante del arqueo (`cashExpected` vs `cashCounted`).
+  caja, retiros del propietario, **depósitos a caja** (`deposits[]`, dirección opuesta a un
+  retiro — ej. el dueño repone base), anticipos de apartados/órdenes de servicio (pasivo, **nunca
+  ingreso** hasta que se entregue lo comprado), **anticipos retenidos al cancelar sin devolución**
+  (`forfeitedAdvances[]`, pasa de pasivo a "otros ingresos", misma cuenta que un sobrante de
+  arqueo), equipos usados recibidos como parte de pago (`TRADE_IN`, entra como activo — inventario
+  de usados, no como caja/banco), pedidos de plataformas tipo Rappi (`PLATFORM`, queda como cuenta
+  por cobrar a la plataforma, no como caja), **propinas** (`tipsReceived[]`/`tipsPaidOut`, pasivo
+  con el empleado — nunca ingreso del negocio), **ingresos de terceros con comisión** (ej. recargas
+  de celular: `thirdPartyIncome[]`, solo la comisión es ingreso real, el resto queda como cuenta
+  por pagar al tercero — el efectivo/banco ya entró por `payments`, este campo solo lo reparte), y
+  el faltante/sobrante del arqueo (`cashExpected` vs `cashCounted`).
+- **`EXCLUDED` se trata igual que `EXEMPT`** en el comprobante (ingreso sin IVA generado) — la
+  distinción solo le importa al formulario 300/información exógena DIAN, no al asiento contable.
 - **Varios movimientos del mismo concepto se consolidan en una sola línea** — 200 ventas en
   efectivo generan UNA línea de Caja, no 200 (se acumula en memoria antes de armar el
   comprobante). Una cuenta puede acumular débitos Y créditos a la vez en el mismo turno (ej. Caja
@@ -85,23 +93,26 @@ revisa).
   colombiano (ver comentarios en `post-shift-close-journal-entry.use-case.ts`) — son un código
   razonable pero el contador de cada empresa puede reclasificarlas. Las que ya usaban otros
   comprobantes del sistema (Caja 1105, Bancos 1110, Ingresos 4135, IVA 2408, Sobrantes 4295,
-  Faltantes 5195) se reusan tal cual.
-- **Fuera de alcance a propósito** (confirmado con el usuario 2026-10-02):
+  Faltantes 5195) se reusan tal cual. Nuevas de esta ronda (2026-10-03): Propinas por pagar
+  280510, Comisiones 4210, Saldo por pagar a terceros 280515.
+- **La respuesta incluye `journalEntryNumbers`** (ej. `[13]`), el número humano del comprobante
+  (`JournalEntry.number`), no solo su `journalEntryIds` (uuid) — para que el POS pueda mostrarlo
+  sin tener que resolverlo contra otro endpoint.
+- **Fuera de alcance a propósito** (confirmado con el usuario 2026-10-02/10-03):
   - **Compras a proveedores**: no entran en el cierre de turno — van por `POST
     /api/public/v1/purchases`, un endpoint aparte (ver sección propia abajo). Son un movimiento de
     dinero distinto al de la caja de ventas, así que no hay riesgo de doble contabilización entre
-    los dos.
+    los dos. **Pagos a proveedores** tampoco van embebidos en el cierre: van por `POST
+    /api/public/v1/supplier-payments`, que exige el `accountPayableId` devuelto por `/purchases`
+    (no un proveedor suelto por documento).
   - **Cuenta de tarjeta configurable**: hoy el método `CARD`/`TRANSFER` siempre va a la cuenta fija
     1110 "Bancos". Dejar que el contador elija otra cuenta (ej. neta de comisión del datáfono)
     queda pendiente.
   - **Fiado por cliente** (nuevas ventas a crédito y cobros de cartera con desglose por cliente):
     requiere integrarse con el módulo `collections` (`AccountReceivable`), que hoy exige un
     `saleId` real — un POS externo sin `Sale` interno no puede crear ahí directo sin antes
-    relajar esa dependencia. Pendiente, evaluado pero no construido todavía.
-  - **Propinas y recargos de plataforma**: decisión de negocio confirmada (no son ingreso propio
-    del negocio — las propinas son del mesero, de un recargo de plataforma solo la comisión que
-    efectivamente se queda el negocio es ingreso) pero todavía no hay un concepto dedicado en el
-    payload para separarlos explícitamente del resto de las ventas.
+    relajar esa dependencia. Pendiente, evaluado pero no construido todavía — es, con diferencia,
+    el gap más grande que queda (afecta `payments[].method=CREDIT` y `debtCollections[]`).
 - **Doble contabilización — regla de diseño, no solo documentación**: la facturación electrónica
   DIAN de un POS externo **no debe** generar comprobante contable (eso ya sale completo del cierre
   de turno). Ver `POST /api/public/v1/electronic-invoices` (abajo) para la factura en sí.

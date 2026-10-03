@@ -178,11 +178,26 @@ function baseInput() {
     externalReference: "shift-1",
     date: new Date("2026-09-29"),
     payments: [] as { method: "CASH" | "CARD" | "TRANSFER" | "TRADE_IN" | "PLATFORM"; amount: number; platformName?: string }[],
-    salesTaxBreakdown: [] as { taxType: "IVA" | "INC" | "EXEMPT"; taxRate: number; taxableBase: number; taxAmount: number }[],
-    returns: [] as { taxType: "IVA" | "INC" | "EXEMPT"; taxableAmount: number; taxAmount: number; refundMethod: "CASH" | "CARD" | "TRANSFER" }[],
+    salesTaxBreakdown: [] as {
+      taxType: "IVA" | "INC" | "EXEMPT" | "EXCLUDED";
+      taxRate: number;
+      taxableBase: number;
+      taxAmount: number;
+    }[],
+    returns: [] as {
+      taxType: "IVA" | "INC" | "EXEMPT" | "EXCLUDED";
+      taxableAmount: number;
+      taxAmount: number;
+      refundMethod: "CASH" | "CARD" | "TRANSFER";
+    }[],
     expenses: [] as { amount: number; description: string }[],
     withdrawals: [] as { amount: number; description: string }[],
+    deposits: [] as { amount: number; description: string }[],
     advances: [] as { amount: number; method: "CASH" | "CARD" | "TRANSFER"; description?: string }[],
+    forfeitedAdvances: [] as { amount: number; description?: string }[],
+    tipsReceived: [] as { method: "CASH" | "CARD" | "TRANSFER"; amount: number }[],
+    tipsPaidOut: 0,
+    thirdPartyIncome: [] as { concept: string; amount: number; commission: number }[],
     cashExpected: 0,
     cashCounted: 0,
   };
@@ -340,6 +355,84 @@ describe("PostShiftCloseJournalEntryUseCase", () => {
     expect(lines.find((l) => l.accountId === "acc-1105")).toMatchObject({ debit: 2_000, credit: 0 });
   });
 
+  it("books revenue with no tax line for an EXCLUDED sale, same as EXEMPT", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+    const input = {
+      ...baseInput(),
+      payments: [{ method: "CASH" as const, amount: 15_000 }],
+      salesTaxBreakdown: [{ taxType: "EXCLUDED" as const, taxRate: 0, taxableBase: 15_000, taxAmount: 0 }],
+      cashExpected: 15_000,
+      cashCounted: 15_000,
+    };
+
+    await withTenantContext(() => useCase.execute("close-1", input));
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-4135")).toMatchObject({ debit: 0, credit: 15_000 });
+    expect(lines.find((l) => l.accountId === "acc-2408")).toBeUndefined();
+    expect(lines.find((l) => l.accountId === "acc-240810")).toBeUndefined();
+  });
+
+  it("books a cash deposit as money moving from bancos into caja", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+    const input = { ...baseInput(), deposits: [{ amount: 50_000, description: "Reposicion de base" }] };
+
+    await withTenantContext(() => useCase.execute("close-1", input));
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-1105")).toMatchObject({ debit: 50_000, credit: 0 });
+    expect(lines.find((l) => l.accountId === "acc-1110")).toMatchObject({ debit: 0, credit: 50_000 });
+  });
+
+  it("books a forfeited advance as other income, reducing the liability", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+    const input = { ...baseInput(), forfeitedAdvances: [{ amount: 20_000, description: "Orden cancelada sin devolucion" }] };
+
+    await withTenantContext(() => useCase.execute("close-1", input));
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-2805")).toMatchObject({ debit: 20_000, credit: 0 });
+    expect(lines.find((l) => l.accountId === "acc-4295")).toMatchObject({ debit: 0, credit: 20_000 });
+  });
+
+  it("books tips received as a liability, not revenue, and nets what's paid out the same shift", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+    const input = {
+      ...baseInput(),
+      tipsReceived: [{ method: "CASH" as const, amount: 8_000 }],
+      tipsPaidOut: 5_000,
+      cashExpected: 3_000,
+      cashCounted: 3_000,
+    };
+
+    await withTenantContext(() => useCase.execute("close-1", input));
+
+    const lines = journalRepo.entries[0].lines;
+    // Caja: +8.000 recibidas - 5.000 repartidas = 3.000 neto (una sola linea, neteada).
+    expect(lines.find((l) => l.accountId === "acc-1105")).toMatchObject({ debit: 3_000, credit: 0 });
+    expect(lines.find((l) => l.accountId === "acc-280510")).toMatchObject({ debit: 0, credit: 3_000 });
+  });
+
+  it("splits a third-party recharge between commission revenue and what's owed to the platform", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+    // El efectivo de la recarga ya entra por `payments` (el POS lo cuenta como cobrado) --
+    // `thirdPartyIncome` solo reparte ese ingreso entre comision real y lo que se debe al tercero.
+    const input = {
+      ...baseInput(),
+      payments: [{ method: "CASH" as const, amount: 10_000 }],
+      thirdPartyIncome: [{ concept: "Recargas Claro", amount: 10_000, commission: 500 }],
+      cashExpected: 10_000,
+      cashCounted: 10_000,
+    };
+
+    await withTenantContext(() => useCase.execute("close-1", input));
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-1105")).toMatchObject({ debit: 10_000, credit: 0 });
+    expect(lines.find((l) => l.accountId === "acc-4210")).toMatchObject({ debit: 0, credit: 500 });
+    expect(lines.find((l) => l.accountId === "acc-280515")).toMatchObject({ debit: 0, credit: 9_500 });
+  });
+
   it("throws (via CreateJournalEntryUseCase) when the POS sends inconsistent totals that do not balance", async () => {
     const { useCase } = makeUseCase();
     // payments = 119.000 pero salesTaxBreakdown solo suma 100.000 -- no cuadra.
@@ -358,15 +451,26 @@ describe("PostShiftCloseJournalEntryUseCase", () => {
       branchId: "branch-1",
       externalReference: "shift-full",
       date: new Date("2026-09-29"),
+      // CASH incluye 18.000 que en realidad son el ingreso de terceros (10.000) + la venta
+      // EXCLUDED (8.000) -- en la vida real ese efectivo ya esta en `payments`, solo se reparte
+      // entre las cuentas de ingreso/pasivo correctas aparte (ver pasos 6d y 2 del motor).
       payments: [
-        { method: "CASH" as const, amount: 119_000 },
+        { method: "CASH" as const, amount: 137_000 },
         { method: "CARD" as const, amount: 238_000 },
       ],
-      salesTaxBreakdown: [{ taxType: "IVA" as const, taxRate: 19, taxableBase: 300_000, taxAmount: 57_000 }],
+      salesTaxBreakdown: [
+        { taxType: "IVA" as const, taxRate: 19, taxableBase: 300_000, taxAmount: 57_000 },
+        { taxType: "EXCLUDED" as const, taxRate: 0, taxableBase: 8_000, taxAmount: 0 },
+      ],
       returns: [{ taxType: "IVA" as const, taxableAmount: 5_000, taxAmount: 950, refundMethod: "CASH" as const }],
       expenses: [{ amount: 10_000, description: "Aseo" }],
       withdrawals: [{ amount: 15_000, description: "Retiro" }],
+      deposits: [{ amount: 5_000, description: "Reposicion de base" }],
       advances: [{ amount: 20_000, method: "TRANSFER" as const }],
+      forfeitedAdvances: [{ amount: 3_000, description: "Apartado cancelado sin devolucion" }],
+      tipsReceived: [{ method: "CASH" as const, amount: 2_000 }],
+      tipsPaidOut: 1_000,
+      thirdPartyIncome: [{ concept: "Recargas Movilway", amount: 10_000, commission: 500 }],
       cashExpected: 92_050,
       cashCounted: 92_000,
     };
@@ -381,5 +485,8 @@ describe("PostShiftCloseJournalEntryUseCase", () => {
     expect(lines.filter((l) => l.accountId === "acc-1105")).toHaveLength(1);
     expect(lines.filter((l) => l.accountId === "acc-1110")).toHaveLength(1);
     expect(lines.find((l) => l.accountId === "acc-5195")).toMatchObject({ debit: 50, credit: 0 }); // faltante
+    expect(lines.find((l) => l.accountId === "acc-280510")).toMatchObject({ debit: 0, credit: 1_000 }); // propinas: 2.000 recibidas - 1.000 repartidas
+    expect(lines.find((l) => l.accountId === "acc-4210")).toMatchObject({ debit: 0, credit: 500 }); // comision de recargas
+    expect(lines.find((l) => l.accountId === "acc-280515")).toMatchObject({ debit: 0, credit: 9_500 }); // saldo a favor de la plataforma de recargas
   });
 });

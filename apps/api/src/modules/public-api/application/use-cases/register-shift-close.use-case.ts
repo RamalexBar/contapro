@@ -33,9 +33,17 @@ export class RegisterShiftCloseUseCase {
     try {
       const entry = await this.postShiftCloseJournalEntry.execute(id, input);
       const journalEntryIds = entry ? [entry.id] : [];
+      const journalEntryNumbers = entry ? [entry.number] : [];
       const record = existing
-        ? await this.repo.update(id, { status: "POSTED", journalEntryIds })
-        : await this.repo.create({ id, branchId: input.branchId, externalReference: input.externalReference, status: "POSTED", journalEntryIds });
+        ? await this.repo.update(id, { status: "POSTED", journalEntryIds, journalEntryNumbers })
+        : await this.repo.create({
+            id,
+            branchId: input.branchId,
+            externalReference: input.externalReference,
+            status: "POSTED",
+            journalEntryIds,
+            journalEntryNumbers,
+          });
 
       await this.audit.record({
         action: "SHIFT_CLOSE_POSTED",
@@ -48,8 +56,16 @@ export class RegisterShiftCloseUseCase {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       const record = existing
-        ? await this.repo.update(id, { status: "FAILED", journalEntryIds: [], errorMessage })
-        : await this.repo.create({ id, branchId: input.branchId, externalReference: input.externalReference, status: "FAILED", journalEntryIds: [], errorMessage });
+        ? await this.repo.update(id, { status: "FAILED", journalEntryIds: [], journalEntryNumbers: [], errorMessage })
+        : await this.repo.create({
+            id,
+            branchId: input.branchId,
+            externalReference: input.externalReference,
+            status: "FAILED",
+            journalEntryIds: [],
+            journalEntryNumbers: [],
+            errorMessage,
+          });
 
       await this.audit.record({
         action: "SHIFT_CLOSE_FAILED",

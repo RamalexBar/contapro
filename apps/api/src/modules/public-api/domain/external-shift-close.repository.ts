@@ -5,6 +5,10 @@ export interface ExternalShiftCloseRecord {
   externalReference: string;
   status: "POSTED" | "FAILED";
   journalEntryIds: string[];
+  // Numero humano del/de los comprobante(s) (JournalEntry.number, ej. 412) -- para que el POS
+  // pueda mostrarlo sin tener que resolver journalEntryIds contra otro endpoint. Paralelo a
+  // journalEntryIds en todo (mismo orden, mismo largo).
+  journalEntryNumbers: number[];
   errorMessage: string | null;
   createdAt: Date;
 }
@@ -18,6 +22,7 @@ export interface CreateExternalShiftCloseData {
   externalReference: string;
   status: "POSTED" | "FAILED";
   journalEntryIds: string[];
+  journalEntryNumbers: number[];
   errorMessage?: string | null;
 }
 
@@ -29,6 +34,7 @@ export interface CreateExternalShiftCloseData {
 export interface UpdateExternalShiftCloseData {
   status: "POSTED" | "FAILED";
   journalEntryIds: string[];
+  journalEntryNumbers: number[];
   errorMessage?: string | null;
 }
 
