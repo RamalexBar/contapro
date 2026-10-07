@@ -16,6 +16,11 @@ accountingRouter.post(
   requirePermission("accounting.manage"),
   accountingController.createAccount
 );
+accountingRouter.post(
+  "/chart-of-accounts/import",
+  requirePermission("accounting.manage"),
+  accountingController.importChartOfAccounts
+);
 accountingRouter.patch(
   "/chart-of-accounts/:id",
   requirePermission("accounting.manage"),

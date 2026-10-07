@@ -1,12 +1,16 @@
-// SheetJS pesa ~400 KB: se carga solo cuando alguien abre el importador, no en el bundle principal
-// (que tambien sirve la landing publica).
-const loadXlsx = () => import("xlsx");
+import {
+  createColumnMatcher,
+  downloadWorkbook,
+  normalizeHeader,
+  parseText,
+  readSpreadsheet,
+  type ColumnMapping as GenericColumnMapping,
+  type ParsedSheet,
+} from "../../../lib/spreadsheet";
 
-/**
- * Lectura de Excel/CSV para la importacion masiva de productos, 100% en el navegador (SheetJS):
- * el archivo nunca se sube, solo las filas ya mapeadas a JSON. SheetJS lee .xlsx, el .xls viejo
- * y .csv -- cubre la plantilla propia y las exportaciones de Alegra/Siigo.
- */
+/** Importacion masiva de productos: plantilla propia o exportacion de Alegra/Siigo (ver lib/spreadsheet). */
+
+export type { ParsedSheet };
 
 export type ImportField =
   | "name"
@@ -36,8 +40,7 @@ export const IMPORT_FIELDS: { field: ImportField; label: string; required?: bool
 /**
  * Nombres de columna conocidos (plantilla propia + los que usan Alegra/Siigo en sus exportaciones,
  * que no se han verificado contra un archivo real -- si no se detecta una columna, el usuario la
- * elige a mano). Se comparan normalizados: minusculas, sin tildes ni signos. El orden importa: el
- * primer alias que coincida exacto gana; si ninguno coincide exacto, se busca por "empieza con".
+ * elige a mano).
  */
 const ALIASES: Record<ImportField, string[]> = {
   name: ["nombre", "nombre del producto", "producto", "descripcion", "nombre item", "item"],
@@ -52,84 +55,14 @@ const ALIASES: Record<ImportField, string[]> = {
   unit: ["unidad", "unidad de medida", "und", "um"],
 };
 
-export function normalizeHeader(value: unknown): string {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9% ]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+const matcher = createColumnMatcher(
+  IMPORT_FIELDS.map((f) => f.field),
+  ALIASES
+);
 
-export interface ParsedSheet {
-  headers: string[];
-  /** Fila de encabezado en numeracion de Excel (1 = primera fila). */
-  headerRowNumber: number;
-  /** Filas de datos con su numero de fila real en Excel; las filas totalmente vacias se omiten. */
-  rows: { rowNumber: number; cells: unknown[] }[];
-}
-
-export async function readSpreadsheet(file: File): Promise<ParsedSheet> {
-  const XLSX = await loadXlsx();
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false });
-  const firstSheetName = workbook.SheetNames[0];
-  const sheet = firstSheetName ? workbook.Sheets[firstSheetName] : undefined;
-  if (!sheet) throw new Error("El archivo no tiene hojas");
-  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "", blankrows: true });
-
-  // Las exportaciones suelen traer filas de titulo arriba ("Listado de productos", fecha...). El
-  // encabezado es la primera fila (de las 15 primeras) con al menos 2 nombres de columna conocidos;
-  // si ninguna los tiene, la primera fila no vacia.
-  const firstNonEmpty = matrix.findIndex((r) => r.some((c) => String(c).trim() !== ""));
-  if (firstNonEmpty === -1) throw new Error("El archivo esta vacio");
-  let headerIndex = firstNonEmpty;
-  for (let i = firstNonEmpty; i < Math.min(matrix.length, firstNonEmpty + 15); i++) {
-    const known = (matrix[i] ?? []).filter((c) => matchField(normalizeHeader(c), "exact") !== null).length;
-    if (known >= 2) {
-      headerIndex = i;
-      break;
-    }
-  }
-
-  const headers = (matrix[headerIndex] ?? []).map((c) => String(c).trim());
-  const rows = matrix
-    .slice(headerIndex + 1)
-    .map((cells, i) => ({ rowNumber: headerIndex + i + 2, cells }))
-    .filter((r) => r.cells.some((c) => String(c).trim() !== ""));
-  return { headers, headerRowNumber: headerIndex + 1, rows };
-}
-
-function matchField(header: string, mode: "exact" | "prefix"): ImportField | null {
-  if (!header) return null;
-  // Gana el alias mas largo que coincida: "precio compra unitario" es costo (alias "precio compra"),
-  // no precio de venta (alias "precio"); "codigo de barras ean" es barras, no referencia ("codigo").
-  let best: { field: ImportField; length: number } | null = null;
-  for (const { field } of IMPORT_FIELDS) {
-    for (const alias of ALIASES[field]) {
-      const hit = mode === "exact" ? header === alias : header === alias || header.startsWith(`${alias} `);
-      if (hit && (!best || alias.length > best.length)) best = { field, length: alias.length };
-    }
-  }
-  return best?.field ?? null;
-}
-
-/** Columna (indice) asignada a cada campo; -1 = sin asignar. */
-export type ColumnMapping = Record<ImportField, number>;
-
-export function detectMapping(headers: string[]): ColumnMapping {
-  const mapping = Object.fromEntries(IMPORT_FIELDS.map((f) => [f.field, -1])) as ColumnMapping;
-  const normalized = headers.map(normalizeHeader);
-  for (const mode of ["exact", "prefix"] as const) {
-    normalized.forEach((header, index) => {
-      if (Object.values(mapping).includes(index)) return;
-      const field = matchField(header, mode);
-      // El modo exacto corre primero en todas las columnas; el prefijo solo llena lo que quedo libre.
-      if (field && mapping[field] === -1) mapping[field] = index;
-    });
-  }
-  return mapping;
-}
+export type ColumnMapping = GenericColumnMapping<ImportField>;
+export const detectMapping = matcher.detectMapping;
+export const readProductSpreadsheet = (file: File) => readSpreadsheet(file, matcher.isKnownHeader);
 
 /**
  * Numero escrito a la colombiana o a la gringa: "$ 3.500", "3.500,50", "3,500.50", "19%", 0.19.
@@ -166,15 +99,11 @@ export function parseTaxRate(value: unknown): number | null | undefined {
   return parsed > 0 && parsed < 1 ? Math.round(parsed * 10000) / 100 : parsed;
 }
 
-function parseText(value: unknown): string | undefined {
-  const text = String(value ?? "").trim();
-  return text === "" ? undefined : text;
-}
-
 /** Arma las filas que espera POST /products/import segun el mapeo de columnas elegido. */
 export function buildImportRows(sheet: ParsedSheet, mapping: ColumnMapping) {
   const cell = (cells: unknown[], field: ImportField) => (mapping[field] >= 0 ? cells[mapping[field]] : undefined);
   const rows = sheet.rows.map(({ cells }) => {
+    // undefined no viaja en JSON (campo opcional ausente); null si, y la API lo marca invalido.
     const row: Record<string, unknown> = {
       name: parseText(cell(cells, "name")) ?? "",
       sku: parseText(cell(cells, "sku")),
@@ -187,21 +116,20 @@ export function buildImportRows(sheet: ParsedSheet, mapping: ColumnMapping) {
       initialStock: parseNumber(cell(cells, "initialStock")),
       minStock: parseNumber(cell(cells, "minStock")),
     };
-    // undefined no viaja en JSON (campo opcional ausente); null si, y la API lo marca invalido.
     return row;
   });
   return { rows, rowNumbers: sheet.rows.map((r) => r.rowNumber) };
 }
 
-export async function downloadTemplate() {
-  const XLSX = await loadXlsx();
-  const sheet = XLSX.utils.aoa_to_sheet([
-    ["Nombre", "Referencia", "Codigo de barras", "Precio de venta", "Costo", "IVA", "Categoria", "Stock inicial", "Stock minimo", "Unidad"],
-    ["Gaseosa 400 ml", "GAS-400", "7702004003508", 3000, 1800, 19, "Bebidas", 24, 6, "UN"],
-    ["Pan tajado", "", "", 5500, 3900, 5, "Panaderia", 10, 2, "UN"],
-  ]);
-  sheet["!cols"] = [28, 14, 18, 16, 12, 8, 16, 14, 14, 10].map((wch) => ({ wch }));
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, "Productos");
-  XLSX.writeFile(workbook, "plantilla-productos-contapro.xlsx");
+export function downloadTemplate() {
+  return downloadWorkbook(
+    "plantilla-productos-contapro.xlsx",
+    "Productos",
+    [
+      ["Nombre", "Referencia", "Codigo de barras", "Precio de venta", "Costo", "IVA", "Categoria", "Stock inicial", "Stock minimo", "Unidad"],
+      ["Gaseosa 400 ml", "GAS-400", "7702004003508", 3000, 1800, 19, "Bebidas", 24, 6, "UN"],
+      ["Pan tajado", "", "", 5500, 3900, 5, "Panaderia", 10, 2, "UN"],
+    ],
+    [28, 14, 18, 16, 12, 8, 16, 14, 14, 10]
+  );
 }

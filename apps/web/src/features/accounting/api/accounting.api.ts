@@ -1,3 +1,4 @@
+import type { ImportChartOfAccountsResult } from "@erp/shared-types";
 import { apiFetch, openPdfInNewTab } from "../../../lib/api-client";
 
 export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
@@ -133,6 +134,14 @@ export function listAccounts(): Promise<{ data: AccountRecord[] }> {
 
 export function createAccount(input: CreateAccountInput): Promise<AccountRecord> {
   return apiFetch("/chart-of-accounts", { method: "POST", body: input });
+}
+
+export function importChartOfAccounts(input: {
+  rows: { code: string; name: string }[];
+  rowNumbers: number[];
+  dryRun: boolean;
+}): Promise<ImportChartOfAccountsResult> {
+  return apiFetch("/chart-of-accounts/import", { method: "POST", body: input });
 }
 
 export function updateAccount(id: string, input: UpdateAccountInput): Promise<AccountRecord> {

@@ -11,6 +11,39 @@ export const createAccountSchema = z.object({
 });
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
 
+/**
+ * Importacion del plan de cuentas propio de la empresa desde Excel/CSV (catalogo NIIF o PUC
+ * extendido, exportado de otro programa). Igual que la importacion de productos: el archivo se lee
+ * en el navegador y aqui llegan solo codigo + nombre por fila, con su numero de fila real.
+ */
+export const importChartOfAccountsSchema = z.object({
+  rows: z
+    .array(z.object({ code: z.string(), name: z.string() }))
+    .min(1, "El archivo no tiene cuentas")
+    .max(10000, "Maximo 10.000 cuentas por archivo"),
+  rowNumbers: z.array(z.number().int().positive()).optional(),
+  dryRun: z.boolean().default(false),
+});
+export type ImportChartOfAccountsInput = z.infer<typeof importChartOfAccountsSchema>;
+
+export interface ImportChartOfAccountsResult {
+  dryRun: boolean;
+  totalRows: number;
+  /** Cuentas nuevas (no existian en Contapro). */
+  created: number;
+  /** Ya existian pero estaban inactivas en el catalogo PUC precargado. */
+  activated: number;
+  /** Subcuentas/auxiliares existentes cuyo nombre se cambio por el del archivo. */
+  renamed: number;
+  unchanged: number;
+  /** Cuentas principales (clase/grupo/cuenta) cuyo nombre en el archivo es distinto: se conserva el
+   * nombre PUC de Contapro porque son fijas, se informa para que el usuario lo sepa. */
+  principalNamesKept: { code: string; fileName: string; currentName: string }[];
+  /** Filas que no se importan pero no bloquean el resto (ej. cuentas de orden, clases 8 y 9). */
+  skipped: { rowNumber: number; code: string; reason: string }[];
+  errors: { rowNumber: number; messages: string[] }[];
+}
+
 export const updateAccountSchema = z.object({
   name: z.string().min(1),
 });

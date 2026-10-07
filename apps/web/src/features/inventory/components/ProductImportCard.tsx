@@ -13,7 +13,7 @@ import {
   buildImportRows,
   detectMapping,
   downloadTemplate,
-  readSpreadsheet,
+  readProductSpreadsheet,
   type ColumnMapping,
   type ImportField,
   type ParsedSheet,
@@ -50,7 +50,7 @@ export function ProductImportCard() {
     if (!file) return;
     setFileName(file.name);
     try {
-      const parsed = await readSpreadsheet(file);
+      const parsed = await readProductSpreadsheet(file);
       if (parsed.rows.length === 0) throw new Error("El archivo no tiene productos debajo del encabezado");
       setSheet(parsed);
       setMapping(detectMapping(parsed.headers));

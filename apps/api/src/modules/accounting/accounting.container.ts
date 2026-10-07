@@ -19,6 +19,7 @@ import { PrismaThirdPartyResolver } from "./infrastructure/prisma-third-party-re
 import { CreateAccountUseCase } from "./application/use-cases/create-account.use-case";
 import { UpdateAccountUseCase } from "./application/use-cases/update-account.use-case";
 import { SetAccountActiveUseCase } from "./application/use-cases/set-account-active.use-case";
+import { ImportChartOfAccountsUseCase } from "./application/use-cases/import-chart-of-accounts.use-case";
 import { EnableAccountDirectEntriesUseCase } from "./application/use-cases/enable-account-direct-entries.use-case";
 import { CreateJournalEntryUseCase } from "./application/use-cases/create-journal-entry.use-case";
 import { PostJournalEntryUseCase } from "./application/use-cases/post-journal-entry.use-case";
@@ -76,6 +77,12 @@ const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessi
 const createAccountUseCase = new CreateAccountUseCase(accountRepo, auditService);
 const updateAccountUseCase = new UpdateAccountUseCase(accountRepo, auditService);
 const setAccountActiveUseCase = new SetAccountActiveUseCase(accountRepo, auditService);
+const importChartOfAccountsUseCase = new ImportChartOfAccountsUseCase(
+  accountRepo,
+  createAccountUseCase,
+  updateAccountUseCase,
+  setAccountActiveUseCase
+);
 const enableAccountDirectEntriesUseCase = new EnableAccountDirectEntriesUseCase(accountRepo, auditService);
 const createEntryUseCase = new CreateJournalEntryUseCase(journalRepo, accountRepo, financialPeriodRepo, costCenterRepo, auditService);
 const postEntryUseCase = new PostJournalEntryUseCase(journalRepo, auditService);
@@ -117,7 +124,8 @@ export const accountingController = new AccountingController(
   new UpdateCostCenterUseCase(costCenterRepo, auditService),
   new DeactivateCostCenterUseCase(costCenterRepo, auditService),
   new ListCostCentersUseCase(costCenterRepo),
-  companyReader
+  companyReader,
+  importChartOfAccountsUseCase
 );
 
 /** Usado por sale.container.ts y suppliers.container.ts para resolver los conceptos de retencion

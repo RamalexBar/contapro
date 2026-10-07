@@ -349,6 +349,31 @@ compras y centros de costo, todo implementado.**
       demo: el desglose por tercero de `1305`/`2205` suma exactamente el mismo total que la vista
       agregada.
 
+12. **Importacion del plan de cuentas propio desde Excel/CSV** (item 48 de `docs/ALCANCE.md`,
+    2026-10-07): `POST /chart-of-accounts/import` (`ImportChartOfAccountsUseCase`, permiso
+    `accounting.manage`), pensado para el cliente que llega con el catalogo de su contador (NIIF o
+    PUC extendido con sus subcuentas). NIIF no trae un catalogo oficial en Colombia -- casi todos
+    parten de los codigos del PUC --, asi que se trabaja por codigo sobre el PUC precargado del
+    punto 11: codigo existente se activa si estaba inactivo y, si es subcuenta/auxiliar (nivel > 3),
+    se renombra con el nombre del archivo; las principales (clase/grupo/cuenta) conservan el nombre
+    PUC (son fijas, misma regla que `UpdateAccountUseCase`) y la diferencia se informa en
+    `principalNamesKept`. Codigo nuevo se crea con `CreateAccountUseCase` debajo del prefijo mas
+    largo que exista en Contapro o en el mismo archivo (110505 -> 1105), asi que el padre deja de
+    admitir movimientos igual que al crear la subcuenta a mano y `resolvePostingAccount` sigue
+    llevando la contabilizacion automatica al auxiliar correcto. Clases 8 y 9 (cuentas de orden) se
+    omiten con aviso (`skipped`) porque `AccountType` no las modela; clase 7 entra como `EXPENSE`
+    si el archivo trae su clase/grupo. Codigos "1105.05"/"11 05 05" se normalizan; nombres que solo
+    difieren en tildes/mayusculas no cuentan como cambio. Todo o nada a nivel de validacion
+    (codigo/nombre faltante, codigo con letras, repetido, sin cuenta padre), con `dryRun` de vista
+    previa; las cuentas de Contapro que no estan en el archivo no se tocan. UI: tarjeta "Importar tu
+    plan de cuentas desde Excel" arriba de "Nueva cuenta" en Contabilidad -> Plan de cuentas, con
+    plantilla descargable; el lector de Excel (`apps/web/src/lib/spreadsheet.ts`) es el mismo de la
+    importacion de productos. Verificado: 6 specs + carga real contra Postgres local (jerarquia,
+    nivel, `acceptsEntries` del padre, activacion, segunda carga sin cambios) + prueba de la
+    pantalla en Chrome con un .xlsx con fila de titulo y codigos guardados como numero. **No
+    resuelve NIIF completo**: los estados financieros siguen con nombre/formato PUC y no hay
+    ajustes NIIF vs. fiscal -- eso queda pendiente y necesita validacion de un contador.
+
 ## Que falta implementar
 
 1. Flujo de caja como Estado de Flujo de Efectivo formal (metodo indirecto desde el Estado de

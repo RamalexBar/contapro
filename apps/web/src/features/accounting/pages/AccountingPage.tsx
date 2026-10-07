@@ -12,6 +12,7 @@ import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { AccountCombobox } from "../components/AccountCombobox";
+import { ChartOfAccountsImportCard } from "../components/ChartOfAccountsImportCard";
 import {
   type AccountType,
   type WithholdingType,
@@ -133,6 +134,8 @@ function AccountsSection({ canManage }: { canManage: boolean }) {
 
   return (
     <div className="space-y-6">
+      {canManage && <ChartOfAccountsImportCard />}
+
       {canManage && (
         <Card title="Nueva cuenta">
           <p className="mb-3 text-sm text-slate-500">

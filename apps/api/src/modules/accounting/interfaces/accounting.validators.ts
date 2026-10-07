@@ -3,6 +3,7 @@ import { z } from "zod";
 export {
   createAccountSchema,
   updateAccountSchema,
+  importChartOfAccountsSchema,
   createJournalEntrySchema,
   createBankAccountSchema,
   registerBankTransactionSchema,

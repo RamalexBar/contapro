@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { AccountingReportsService } from "../application/accounting-reports.service";
 import type { CreateAccountUseCase } from "../application/use-cases/create-account.use-case";
 import type { UpdateAccountUseCase } from "../application/use-cases/update-account.use-case";
+import type { ImportChartOfAccountsUseCase } from "../application/use-cases/import-chart-of-accounts.use-case";
 import type { SetAccountActiveUseCase } from "../application/use-cases/set-account-active.use-case";
 import type { EnableAccountDirectEntriesUseCase } from "../application/use-cases/enable-account-direct-entries.use-case";
 import type { CreateJournalEntryUseCase } from "../application/use-cases/create-journal-entry.use-case";
@@ -38,6 +39,7 @@ import { ValidationError } from "../../../shared/errors/app-error";
 import {
   createAccountSchema,
   updateAccountSchema,
+  importChartOfAccountsSchema,
   createBankAccountSchema,
   createJournalEntrySchema,
   matchBankReconciliationItemSchema,
@@ -84,12 +86,23 @@ export class AccountingController {
     private readonly updateCostCenterUseCase: UpdateCostCenterUseCase,
     private readonly deactivateCostCenterUseCase: DeactivateCostCenterUseCase,
     private readonly listCostCentersUseCase: ListCostCentersUseCase,
-    private readonly companyReader: ICompanyReader
+    private readonly companyReader: ICompanyReader,
+    private readonly importChartOfAccountsUseCase: ImportChartOfAccountsUseCase
   ) {}
 
   listAccounts = async (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ data: await this.accountRepo.list() });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** Vista previa (dryRun) o carga real del plan de cuentas propio desde Excel/CSV. */
+  importChartOfAccounts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = importChartOfAccountsSchema.parse(req.body);
+      res.json(await this.importChartOfAccountsUseCase.execute(body));
     } catch (err) {
       next(err);
     }
