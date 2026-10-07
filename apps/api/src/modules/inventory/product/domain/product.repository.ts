@@ -40,4 +40,9 @@ export interface IProductRepository {
   savePriceAndCost(product: Product): Promise<Product>;
   updateBarcode(id: string, code: string, type?: string): Promise<void>;
   softDelete(id: string): Promise<void>;
+  /**
+   * SKUs y codigos de barras ya usados por la empresa, incluidos productos dados de baja (el
+   * @@unique de Prisma tambien los cuenta). Lo usa la importacion masiva para validar antes de crear.
+   */
+  listTakenIdentifiers(): Promise<{ skus: string[]; barcodes: string[] }>;
 }

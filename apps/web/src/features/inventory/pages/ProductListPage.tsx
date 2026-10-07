@@ -28,6 +28,7 @@ import { BrandsSection } from "../components/BrandsSection";
 import { BranchStockSection } from "../components/BranchStockSection";
 import { StockMovementsSection } from "../components/StockMovementsSection";
 import { KardexSection } from "../components/KardexSection";
+import { ProductImportCard } from "../components/ProductImportCard";
 
 function ProductsSection() {
   const queryClient = useQueryClient();
@@ -98,6 +99,8 @@ function ProductsSection() {
 
   return (
     <div className="space-y-6">
+      {canCreate && <ProductImportCard />}
+
       {canCreate && (
         <Card title="Nuevo producto">
           <form

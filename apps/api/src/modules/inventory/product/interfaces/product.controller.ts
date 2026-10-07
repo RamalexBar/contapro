@@ -6,11 +6,13 @@ import type { UpdateProductUseCase } from "../application/use-cases/update-produ
 import type { UpdateProductPriceUseCase } from "../application/use-cases/update-product-price.use-case";
 import type { UpdateProductBarcodeUseCase } from "../application/use-cases/update-product-barcode.use-case";
 import type { DeleteProductUseCase } from "../application/use-cases/delete-product.use-case";
+import type { ImportProductsUseCase } from "../application/use-cases/import-products.use-case";
 import type { ListProductsUseCase } from "../application/use-cases/list-products.use-case";
 import type { IProductRepository } from "../domain/product.repository";
 import { toProductResponse } from "./product.mapper";
 import {
   createProductSchema,
+  importProductsSchema,
   updateProductBarcodeSchema,
   updateProductPriceSchema,
   updateProductSchema,
@@ -24,7 +26,8 @@ export class ProductController {
     private readonly updatePriceUseCase: UpdateProductPriceUseCase,
     private readonly updateBarcodeUseCase: UpdateProductBarcodeUseCase,
     private readonly deleteUseCase: DeleteProductUseCase,
-    private readonly listUseCase: ListProductsUseCase
+    private readonly listUseCase: ListProductsUseCase,
+    private readonly importUseCase: ImportProductsUseCase
   ) {}
 
   list = async (req: Request, res: Response, next: NextFunction) => {
@@ -52,6 +55,19 @@ export class ProductController {
       if (!branchId) throw new ValidationError("El usuario no tiene una sucursal activa");
       const product = await this.createUseCase.execute(body, branchId);
       res.status(201).json(toProductResponse(product));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** Vista previa (dryRun) o carga real; las filas invalidas vuelven con su numero de fila. */
+  importProducts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = importProductsSchema.parse(req.body);
+      const branchId = getTenantContext().branchId;
+      if (!branchId) throw new ValidationError("El usuario no tiene una sucursal activa");
+      const result = await this.importUseCase.execute(body, branchId);
+      res.status(!body.dryRun && result.created > 0 ? 201 : 200).json(result);
     } catch (err) {
       next(err);
     }

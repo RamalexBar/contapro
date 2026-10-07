@@ -1,5 +1,6 @@
 export {
   createProductSchema,
+  importProductsSchema,
   updateProductSchema,
   updateProductPriceSchema,
   updateProductBarcodeSchema,

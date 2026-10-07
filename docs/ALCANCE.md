@@ -13,7 +13,7 @@ la base de datos.
 |---|---|
 | **Auth** | Registro de empresa, login, refresh token, logout, JWT (access+refresh) |
 | **RBAC** | Roles de sistema (Administrador, Propietario, Contador, Supervisor, Cajero, Empleado), permisos por rol, permisos individuales (override), matriz de permisos |
-| **Inventario** | Categorías, marcas, productos, códigos de barras, presentaciones, stock por sucursal (mín/máx), movimientos de stock (entradas/salidas/ajustes). **Listas de precios múltiples** (iteración 35, ver fila más abajo): un producto puede tener overrides de precio por lista (mayorista/minorista/etc.), asignable por cliente |
+| **Inventario** | Categorías, marcas, productos, códigos de barras, presentaciones, stock por sucursal (mín/máx), movimientos de stock (entradas/salidas/ajustes). **Importación masiva desde Excel/CSV** (plantilla propia o exportación de Alegra/Siigo, ítem 47). **Listas de precios múltiples** (iteración 35, ver fila más abajo): un producto puede tener overrides de precio por lista (mayorista/minorista/etc.), asignable por cliente |
 | **POS / Facturación** | Venta rápida con carrito, cotizaciones, notas crédito/débito, **autorización de descuento por PIN/contraseña** cuando un cajero supera su límite configurado. **Devoluciones** (`Return`, iteración 22, `modules/pos/return`): registra una devolución parcial/total sobre una venta `COMPLETED`/`RETURNED_PARTIAL`, valida contra lo ya devuelto antes (dentro de la misma transacción, evita sobregiro concurrente), restaura stock (lote nuevo si el producto rastrea lotes — no reinserta en el lote FIFO original consumido, ver limitación en `suppliers/README.md`) y contabiliza el reverso de la venta (`PostReturnJournalEntryUseCase`, permite elegir el medio de reembolso independiente del medio de pago original). UI web agregada en `/quotes-notes` |
 | **Caja** | Apertura/cierre de caja asociada a un empleado, arqueo (conteo de denominaciones), diferencias, movimientos (ingresos/egresos/retiros/consignaciones) |
 | **Auditoría** | Registro inmutable (solo `INSERT`) de cambios de precio/costo/código de barras, creación/eliminación de productos, ventas anuladas, devoluciones, apertura/cierre de caja, cambios de permisos/usuarios, login/logout, intentos fallidos, autorización de descuentos |
@@ -792,3 +792,29 @@ cuando se implemente, mismo criterio que la lista de arriba:
     compras, pagos o gastos ya registrados vía API pública. Ver el README del módulo para el
     detalle completo de cada decisión y de las correcciones encontradas durante la
     implementación.
+47. ~~Importación masiva de productos desde Excel (plantilla propia, Alegra, Siigo)~~ — implementado
+    el 2026-10-07, a raíz de la publicidad pagada: era la pregunta más previsible de un cliente que
+    llega de otro sistema ("¿tengo que crear mis productos uno por uno?"). El archivo se lee **en el
+    navegador** con SheetJS (`.xlsx`, `.xls` viejo y `.csv`, cargado bajo demanda en su propio chunk
+    para no engordar el bundle de la landing) y solo viajan las filas ya mapeadas a JSON:
+    `POST /products/import` (`ImportProductsUseCase`, permiso `product.create`). Detecta la fila de
+    encabezado aunque haya filas de título arriba, mapea columnas por alias (plantilla + nombres
+    típicos de Alegra/Siigo, **no verificados contra un archivo real exportado de ninguno de los
+    dos** — el usuario puede reasignar cualquier columna a mano), entiende "$ 3.500", "3.500,50",
+    "IVA 19%", 0,19 y "Excluido". **Todo o nada**: si una fila tiene error (nombre/precio faltante,
+    referencia o código de barras repetido en el archivo o ya existente en la empresa — incluidos
+    productos dados de baja, que el `@@unique` también cuenta), no se crea nada y se devuelve la
+    lista de errores con el número de fila real de Excel. `dryRun` = vista previa sin escribir.
+    Cada producto se crea con el mismo `CreateProductUseCase` del alta manual (stock inicial en la
+    sucursal activa, kardex y auditoría `PRODUCT_CREATED` por producto, idénticos a crearlo a mano);
+    categorías faltantes se crean por nombre sin distinguir mayúsculas; referencia generada
+    `PROD-0001…` cuando la fila no trae una; opción "los precios incluyen IVA" que guarda el precio
+    base. UI: tarjeta "Importar productos desde Excel" arriba de "Nuevo producto" en `/products`,
+    con plantilla descargable. Verificado: 8 specs del caso de uso + prueba en vivo contra Postgres
+    local (lote con errores no crea nada, vista previa, carga real con categoría nueva, stock,
+    kardex, precio sin IVA y auditoría correctos, segunda carga detecta duplicados) + lectura de
+    tres archivos sintéticos (.xls tipo Siigo con título y fila vacía, .xlsx tipo Alegra, .csv) +
+    prueba de la pantalla en Chrome contra la API local (detección de columnas, error con fila real
+    de Excel, vista previa, carga y mensaje de confirmación). **Pendiente**:
+    importación de clientes y proveedores (mismo patrón), y ajustar los alias con un archivo real
+    de Alegra/Siigo cuando haya uno.

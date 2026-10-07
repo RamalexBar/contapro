@@ -179,6 +179,14 @@ export class PrismaProductRepository implements IProductRepository {
     }
   }
 
+  async listTakenIdentifiers(): Promise<{ skus: string[]; barcodes: string[] }> {
+    const [products, barcodes] = await Promise.all([
+      prisma.product.findMany({ select: { sku: true } }),
+      prisma.barcode.findMany({ select: { code: true } }),
+    ]);
+    return { skus: products.map((p) => p.sku), barcodes: barcodes.map((b) => b.code) };
+  }
+
   async softDelete(id: string): Promise<void> {
     await this.assertBelongsToCompany(id);
     await prisma.product.update({ where: { id }, data: { isActive: false } });

@@ -28,6 +28,55 @@ export const createProductSchema = z.object({
 });
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 
+/**
+ * Importacion masiva desde Excel/CSV. El archivo se lee en el navegador (cada fila llega con las
+ * columnas ya mapeadas a estos campos); la API valida todo antes de crear nada. `sku` es opcional
+ * porque las exportaciones de Alegra/Siigo no siempre traen referencia -- se genera una.
+ */
+export const importProductRowSchema = z.object({
+  name: z.string().trim().min(1, "Falta el nombre"),
+  sku: z.string().trim().min(1).optional(),
+  barcode: z.string().trim().min(1).optional(),
+  category: z.string().trim().min(1).optional(),
+  unit: z.string().trim().min(1).optional(),
+  price: z.number({ invalid_type_error: "Precio invalido", required_error: "Falta el precio" }).nonnegative("El precio no puede ser negativo"),
+  cost: z.number({ invalid_type_error: "Costo invalido" }).nonnegative("El costo no puede ser negativo").optional(),
+  taxRate: z.number({ invalid_type_error: "IVA invalido" }).min(0, "IVA fuera de rango (0-100)").max(100, "IVA fuera de rango (0-100)").optional(),
+  initialStock: z.number({ invalid_type_error: "Stock invalido" }).nonnegative("El stock no puede ser negativo").optional(),
+  minStock: z.number({ invalid_type_error: "Stock minimo invalido" }).nonnegative("El stock minimo no puede ser negativo").optional(),
+});
+export type ImportProductRow = z.infer<typeof importProductRowSchema>;
+
+export const importProductsSchema = z.object({
+  // Filas crudas: cada una se valida por separado contra importProductRowSchema para reportar el
+  // error con su numero de fila, en vez de rechazar el lote entero con un 400 opaco.
+  rows: z.array(z.unknown()).min(1, "El archivo no tiene filas").max(5000, "Maximo 5.000 productos por archivo"),
+  /**
+   * Numero de fila real en Excel de cada elemento de `rows` (mismo orden). El archivo puede traer
+   * filas de titulo antes del encabezado o filas vacias en medio (exportaciones de Alegra/Siigo);
+   * sin esto se asume encabezado en la fila 1 y filas seguidas.
+   */
+  rowNumbers: z.array(z.number().int().positive()).optional(),
+  pricesIncludeTax: z.boolean().default(false),
+  dryRun: z.boolean().default(false),
+});
+export type ImportProductsInput = z.infer<typeof importProductsSchema>;
+
+export interface ImportProductsRowError {
+  /** Numero de fila tal como lo ve el usuario en Excel (la fila 1 es el encabezado). */
+  rowNumber: number;
+  messages: string[];
+}
+
+export interface ImportProductsResult {
+  dryRun: boolean;
+  totalRows: number;
+  validRows: number;
+  created: number;
+  categoriesCreated: string[];
+  errors: ImportProductsRowError[];
+}
+
 export const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),

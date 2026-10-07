@@ -1,4 +1,4 @@
-import type { CreateProductInput, UpdateProductInput } from "@erp/shared-types";
+import type { CreateProductInput, ImportProductsResult, UpdateProductInput } from "@erp/shared-types";
 import { apiFetch } from "../../../lib/api-client";
 
 export interface ProductListItem {
@@ -56,4 +56,13 @@ export function updateProductBarcode(id: string, code: string, type = "EAN13"): 
 
 export function deleteProduct(id: string) {
   return apiFetch(`/products/${id}`, { method: "DELETE" });
+}
+
+export function importProducts(input: {
+  rows: Record<string, unknown>[];
+  rowNumbers: number[];
+  pricesIncludeTax: boolean;
+  dryRun: boolean;
+}): Promise<ImportProductsResult> {
+  return apiFetch("/products/import", { method: "POST", body: input });
 }
