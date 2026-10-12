@@ -64,8 +64,8 @@ export function requestVacation(input: RequestVacationInput): Promise<VacationRe
 export function approveVacation(id: string): Promise<VacationRecord> {
   return apiFetch(`/vacations/${id}/approve`, { method: "POST" });
 }
-export function rejectVacation(id: string): Promise<VacationRecord> {
-  return apiFetch(`/vacations/${id}/reject`, { method: "POST" });
+export function rejectVacation(id: string, reason: string): Promise<VacationRecord> {
+  return apiFetch(`/vacations/${id}/reject`, { method: "POST", body: { reason } });
 }
 
 export function listLeavePermissions(filter?: ListFilter): Promise<{ data: LeavePermissionRecord[] }> {
@@ -77,8 +77,8 @@ export function requestLeavePermission(input: RequestLeavePermissionInput): Prom
 export function approveLeavePermission(id: string): Promise<LeavePermissionRecord> {
   return apiFetch(`/leave-permissions/${id}/approve`, { method: "POST" });
 }
-export function rejectLeavePermission(id: string): Promise<LeavePermissionRecord> {
-  return apiFetch(`/leave-permissions/${id}/reject`, { method: "POST" });
+export function rejectLeavePermission(id: string, reason: string): Promise<LeavePermissionRecord> {
+  return apiFetch(`/leave-permissions/${id}/reject`, { method: "POST", body: { reason } });
 }
 
 export function listAbsences(filter?: ListFilter): Promise<{ data: AbsenceRecord[] }> {
@@ -97,6 +97,6 @@ export function submitSickLeave(input: SubmitSickLeaveInput): Promise<SickLeaveR
 export function approveSickLeave(id: string): Promise<SickLeaveRecord> {
   return apiFetch(`/sick-leaves/${id}/approve`, { method: "POST" });
 }
-export function rejectSickLeave(id: string): Promise<SickLeaveRecord> {
-  return apiFetch(`/sick-leaves/${id}/reject`, { method: "POST" });
+export function rejectSickLeave(id: string, reason: string): Promise<SickLeaveRecord> {
+  return apiFetch(`/sick-leaves/${id}/reject`, { method: "POST", body: { reason } });
 }

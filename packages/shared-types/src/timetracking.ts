@@ -54,6 +54,21 @@ export const submitSickLeaveSchema = z.object({
 });
 export type SubmitSickLeaveInput = z.infer<typeof submitSickLeaveSchema>;
 
+/** Aprobar una solicitud: tal cual, o con otras fechas (y dias, en vacaciones) y una nota. */
+export const approveTimeOffSchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  daysTaken: z.number().int().positive().optional(),
+  note: z.string().max(500).optional(),
+});
+export type ApproveTimeOffInput = z.infer<typeof approveTimeOffSchema>;
+
+/** Rechazar exige el motivo: el empleado lo ve en su aviso. */
+export const rejectTimeOffSchema = z.object({
+  reason: z.string().trim().min(3, "Escribe el motivo del rechazo").max(500),
+});
+export type RejectTimeOffInput = z.infer<typeof rejectTimeOffSchema>;
+
 export const listTimeOffQuerySchema = z.object({
   employeeId: z.string().uuid().optional(),
   status: z.string().optional(),

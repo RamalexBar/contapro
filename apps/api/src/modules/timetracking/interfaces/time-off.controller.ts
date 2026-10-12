@@ -2,6 +2,8 @@ import type { NextFunction, Request, Response } from "express";
 import type { ApproveTimeOffUseCase } from "../application/use-cases/approve-time-off.use-case";
 import type { RegisterAbsenceUseCase } from "../application/use-cases/register-absence.use-case";
 import type { RejectTimeOffUseCase } from "../application/use-cases/reject-time-off.use-case";
+import type { TimeOffNotificationsUseCase } from "../application/use-cases/time-off-notifications.use-case";
+import { approveTimeOffSchema, rejectTimeOffSchema } from "@erp/shared-types";
 import type { RequestLeavePermissionUseCase } from "../application/use-cases/request-leave-permission.use-case";
 import type { RequestVacationUseCase } from "../application/use-cases/request-vacation.use-case";
 import type { SubmitSickLeaveUseCase } from "../application/use-cases/submit-sick-leave.use-case";
@@ -22,8 +24,26 @@ export class TimeOffController {
     private readonly registerAbsenceUseCase: RegisterAbsenceUseCase,
     private readonly submitSickLeaveUseCase: SubmitSickLeaveUseCase,
     private readonly approveTimeOffUseCase: ApproveTimeOffUseCase,
-    private readonly rejectTimeOffUseCase: RejectTimeOffUseCase
+    private readonly rejectTimeOffUseCase: RejectTimeOffUseCase,
+    private readonly notificationsUseCase: TimeOffNotificationsUseCase
   ) {}
+
+  notifications = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.notificationsUseCase.execute());
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  markNotificationsSeen = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.notificationsUseCase.markSeen();
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
 
   // ---- Vacaciones ----
   listVacations = async (req: Request, res: Response, next: NextFunction) => {
@@ -46,7 +66,7 @@ export class TimeOffController {
 
   approveVacation = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      res.json(await this.approveTimeOffUseCase.execute("vacation", req.params.id));
+      res.json(await this.approveTimeOffUseCase.execute("vacation", req.params.id, approveTimeOffSchema.parse(req.body ?? {})));
     } catch (err) {
       next(err);
     }
@@ -54,7 +74,7 @@ export class TimeOffController {
 
   rejectVacation = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      res.json(await this.rejectTimeOffUseCase.execute("vacation", req.params.id));
+      res.json(await this.rejectTimeOffUseCase.execute("vacation", req.params.id, rejectTimeOffSchema.parse(req.body ?? {}).reason));
     } catch (err) {
       next(err);
     }
@@ -81,7 +101,7 @@ export class TimeOffController {
 
   approveLeavePermission = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      res.json(await this.approveTimeOffUseCase.execute("leave-permission", req.params.id));
+      res.json(await this.approveTimeOffUseCase.execute("leave-permission", req.params.id, approveTimeOffSchema.parse(req.body ?? {})));
     } catch (err) {
       next(err);
     }
@@ -89,7 +109,7 @@ export class TimeOffController {
 
   rejectLeavePermission = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      res.json(await this.rejectTimeOffUseCase.execute("leave-permission", req.params.id));
+      res.json(await this.rejectTimeOffUseCase.execute("leave-permission", req.params.id, rejectTimeOffSchema.parse(req.body ?? {}).reason));
     } catch (err) {
       next(err);
     }
@@ -135,7 +155,7 @@ export class TimeOffController {
 
   approveSickLeave = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      res.json(await this.approveTimeOffUseCase.execute("sick-leave", req.params.id));
+      res.json(await this.approveTimeOffUseCase.execute("sick-leave", req.params.id, approveTimeOffSchema.parse(req.body ?? {})));
     } catch (err) {
       next(err);
     }
@@ -143,7 +163,7 @@ export class TimeOffController {
 
   rejectSickLeave = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      res.json(await this.rejectTimeOffUseCase.execute("sick-leave", req.params.id));
+      res.json(await this.rejectTimeOffUseCase.execute("sick-leave", req.params.id, rejectTimeOffSchema.parse(req.body ?? {}).reason));
     } catch (err) {
       next(err);
     }

@@ -198,7 +198,12 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacations"] }),
   });
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => rejectVacation(id),
+    mutationFn: (id: string) => {
+      // El empleado ve el motivo del rechazo.
+      const reason = window.prompt("Motivo del rechazo (el empleado lo va a ver):")?.trim();
+      if (!reason) return Promise.reject(new Error("Escribe el motivo del rechazo"));
+      return rejectVacation(id, reason);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacations"] }),
   });
 
@@ -311,7 +316,12 @@ function LeavePermissionSection({ canRequest, canManage, canRead, employees, emp
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leave-permissions"] }),
   });
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => rejectLeavePermission(id),
+    mutationFn: (id: string) => {
+      // El empleado ve el motivo del rechazo.
+      const reason = window.prompt("Motivo del rechazo (el empleado lo va a ver):")?.trim();
+      if (!reason) return Promise.reject(new Error("Escribe el motivo del rechazo"));
+      return rejectLeavePermission(id, reason);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leave-permissions"] }),
   });
 
@@ -427,7 +437,12 @@ function SickLeaveSection({ canRequest, canManage, canRead, employees, employeeN
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sick-leaves"] }),
   });
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => rejectSickLeave(id),
+    mutationFn: (id: string) => {
+      // El empleado ve el motivo del rechazo.
+      const reason = window.prompt("Motivo del rechazo (el empleado lo va a ver):")?.trim();
+      if (!reason) return Promise.reject(new Error("Escribe el motivo del rechazo"));
+      return rejectSickLeave(id, reason);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sick-leaves"] }),
   });
 

@@ -10,8 +10,31 @@ import type {
   ITimeOffRepository,
   LeavePermissionRecord,
   SickLeaveRecord,
+  TimeOffDecision,
+  UnseenTimeOffDecision,
   VacationRecord,
 } from "../domain/time-off.repository";
+
+/** Campos comunes de la decision; si cambian las fechas, guarda las pedidas. */
+function decisionData(current: { startDate: Date; endDate: Date }, d: TimeOffDecision) {
+  const datesChanged =
+    (d.startDate && d.startDate.getTime() !== current.startDate.getTime()) ||
+    (d.endDate && d.endDate.getTime() !== current.endDate.getTime());
+  return {
+    status: d.status,
+    decisionNote: d.note ?? null,
+    decidedAt: new Date(),
+    decisionSeenAt: null,
+    ...(datesChanged
+      ? {
+          requestedStartDate: current.startDate,
+          requestedEndDate: current.endDate,
+          startDate: d.startDate ?? current.startDate,
+          endDate: d.endDate ?? current.endDate,
+        }
+      : {}),
+  };
+}
 
 /**
  * Vacation/LeavePermission/Absence/SickLeave NO tienen columna companyId (igual que TimeEntry,
@@ -37,9 +60,16 @@ export class PrismaTimeOffRepository implements ITimeOffRepository {
     return vacation;
   }
 
-  async updateVacationStatus(id: string, status: string, approvedByUserId?: string): Promise<VacationRecord> {
-    await this.findVacationByIdOrThrow(id);
-    return prisma.vacation.update({ where: { id }, data: { status, approvedByUserId } });
+  async decideVacation(id: string, decision: TimeOffDecision): Promise<VacationRecord> {
+    const current = await this.findVacationByIdOrThrow(id);
+    return prisma.vacation.update({
+      where: { id },
+      data: {
+        ...decisionData(current, decision),
+        approvedByUserId: decision.approvedByUserId,
+        ...(decision.daysTaken !== undefined ? { daysTaken: decision.daysTaken } : {}),
+      },
+    });
   }
 
   async createLeavePermission(data: CreateLeavePermissionData): Promise<LeavePermissionRecord> {
@@ -61,13 +91,12 @@ export class PrismaTimeOffRepository implements ITimeOffRepository {
     return permission;
   }
 
-  async updateLeavePermissionStatus(
-    id: string,
-    status: string,
-    approvedByUserId?: string
-  ): Promise<LeavePermissionRecord> {
-    await this.findLeavePermissionByIdOrThrow(id);
-    return prisma.leavePermission.update({ where: { id }, data: { status, approvedByUserId } });
+  async decideLeavePermission(id: string, decision: TimeOffDecision): Promise<LeavePermissionRecord> {
+    const current = await this.findLeavePermissionByIdOrThrow(id);
+    return prisma.leavePermission.update({
+      where: { id },
+      data: { ...decisionData(current, decision), approvedByUserId: decision.approvedByUserId },
+    });
   }
 
   async createAbsence(data: CreateAbsenceData): Promise<AbsenceRecord> {
@@ -101,8 +130,54 @@ export class PrismaTimeOffRepository implements ITimeOffRepository {
     return sickLeave;
   }
 
-  async updateSickLeaveStatus(id: string, status: string): Promise<SickLeaveRecord> {
-    await this.findSickLeaveByIdOrThrow(id);
-    return prisma.sickLeave.update({ where: { id }, data: { status } });
+  async decideSickLeave(id: string, decision: TimeOffDecision): Promise<SickLeaveRecord> {
+    const current = await this.findSickLeaveByIdOrThrow(id);
+    return prisma.sickLeave.update({ where: { id }, data: decisionData(current, decision) });
+  }
+
+  async countPending(): Promise<{ vacations: number; leavePermissions: number; sickLeaves: number }> {
+    const companyId = getTenantContext().companyId;
+    const [vacations, leavePermissions, sickLeaves] = await Promise.all([
+      prisma.vacation.count({ where: { status: "REQUESTED", employee: { companyId } } }),
+      prisma.leavePermission.count({ where: { status: "REQUESTED", employee: { companyId } } }),
+      prisma.sickLeave.count({ where: { status: "SUBMITTED", employee: { companyId } } }),
+    ]);
+    return { vacations, leavePermissions, sickLeaves };
+  }
+
+  async listUnseenDecisions(employeeId: string): Promise<UnseenTimeOffDecision[]> {
+    const companyId = getTenantContext().companyId;
+    const where = { employeeId, employee: { companyId }, decidedAt: { not: null }, decisionSeenAt: null };
+    const select = {
+      id: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      requestedStartDate: true,
+      requestedEndDate: true,
+      decisionNote: true,
+      decidedAt: true,
+    } as const;
+    const [vacations, permissions, sickLeaves] = await Promise.all([
+      prisma.vacation.findMany({ where, select }),
+      prisma.leavePermission.findMany({ where, select }),
+      prisma.sickLeave.findMany({ where, select }),
+    ]);
+    return [
+      ...vacations.map((v) => ({ ...v, kind: "vacation" as const, decidedAt: v.decidedAt! })),
+      ...permissions.map((p) => ({ ...p, kind: "leave-permission" as const, decidedAt: p.decidedAt! })),
+      ...sickLeaves.map((s) => ({ ...s, kind: "sick-leave" as const, decidedAt: s.decidedAt! })),
+    ].sort((a, b) => b.decidedAt.getTime() - a.decidedAt.getTime());
+  }
+
+  async markDecisionsSeen(employeeId: string): Promise<void> {
+    const companyId = getTenantContext().companyId;
+    const where = { employeeId, employee: { companyId }, decidedAt: { not: null }, decisionSeenAt: null };
+    const data = { decisionSeenAt: new Date() };
+    await Promise.all([
+      prisma.vacation.updateMany({ where, data }),
+      prisma.leavePermission.updateMany({ where, data }),
+      prisma.sickLeave.updateMany({ where, data }),
+    ]);
   }
 }

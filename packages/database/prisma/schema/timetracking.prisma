@@ -26,6 +26,16 @@ model Vacation {
   status           String   @default("REQUESTED") // REQUESTED, APPROVED, REJECTED, TAKEN
   approvedByUserId String?
 
+  // Decision del administrador (aprobar/rechazar): nota (motivo del rechazo o comentario),
+  // cuando se decidio y cuando lo vio el empleado (aviso "tu solicitud fue aprobada"). Si se
+  // aprobo con otras fechas, requested* guarda las que pidio el empleado.
+  requestedStartDate DateTime?
+  requestedEndDate   DateTime?
+  decisionNote       String?
+  decidedAt          DateTime?
+  decisionSeenAt     DateTime?
+  createdAt          DateTime  @default(now())
+
   @@map("vacations")
 }
 
@@ -39,6 +49,16 @@ model LeavePermission {
   paid             Boolean  @default(false)
   status           String   @default("REQUESTED")
   approvedByUserId String?
+
+  // Decision del administrador (aprobar/rechazar): nota (motivo del rechazo o comentario),
+  // cuando se decidio y cuando lo vio el empleado (aviso "tu solicitud fue aprobada"). Si se
+  // aprobo con otras fechas, requested* guarda las que pidio el empleado.
+  requestedStartDate DateTime?
+  requestedEndDate   DateTime?
+  decisionNote       String?
+  decidedAt          DateTime?
+  decisionSeenAt     DateTime?
+  createdAt          DateTime  @default(now())
 
   @@map("leave_permissions")
 }
@@ -63,6 +83,16 @@ model SickLeave {
   type             String   // GENERAL, LABOR_ARL, MATERNITY
   supportingDocUrl String?
   status           String   @default("SUBMITTED")
+
+  // Decision del administrador (aprobar/rechazar): nota (motivo del rechazo o comentario),
+  // cuando se decidio y cuando lo vio el empleado (aviso "tu solicitud fue aprobada"). Si se
+  // aprobo con otras fechas, requested* guarda las que pidio el empleado.
+  requestedStartDate DateTime?
+  requestedEndDate   DateTime?
+  decisionNote       String?
+  decidedAt          DateTime?
+  decisionSeenAt     DateTime?
+  createdAt          DateTime  @default(now())
 
   @@map("sick_leaves")
 }

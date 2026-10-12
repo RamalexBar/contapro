@@ -12,6 +12,7 @@ import { RegisterAbsenceUseCase } from "./application/use-cases/register-absence
 import { SubmitSickLeaveUseCase } from "./application/use-cases/submit-sick-leave.use-case";
 import { ApproveTimeOffUseCase } from "./application/use-cases/approve-time-off.use-case";
 import { RejectTimeOffUseCase } from "./application/use-cases/reject-time-off.use-case";
+import { TimeOffNotificationsUseCase } from "./application/use-cases/time-off-notifications.use-case";
 import { TimeTrackingController } from "./interfaces/timetracking.controller";
 import { TimeOffController } from "./interfaces/time-off.controller";
 
@@ -34,7 +35,8 @@ export const timeOffController = new TimeOffController(
   new RegisterAbsenceUseCase(timeOffRepo, employeeRepo, auditService),
   new SubmitSickLeaveUseCase(timeOffRepo, employeeRepo, auditService),
   new ApproveTimeOffUseCase(timeOffRepo, auditService),
-  new RejectTimeOffUseCase(timeOffRepo, auditService)
+  new RejectTimeOffUseCase(timeOffRepo, auditService),
+  new TimeOffNotificationsUseCase(timeOffRepo, employeeRepo)
 );
 
 export { timeTrackingRepo, timeOffRepo };

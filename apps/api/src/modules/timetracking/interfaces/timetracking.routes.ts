@@ -16,6 +16,10 @@ timetrackingRouter.post("/time-entries/clock-in", requirePermission("timetrackin
 timetrackingRouter.post("/time-entries/:id/clock-out", requirePermission("timetracking.clock"), timeTrackingController.clockOut);
 
 // ---- Vacaciones ----
+// Avisos: pendientes por aprobar (quien tiene timeoff.manage) y respuestas que el empleado no ha
+// visto. Sin permiso propio: cada usuario solo recibe lo suyo.
+timetrackingRouter.get("/time-off/notifications", timeOffController.notifications);
+timetrackingRouter.post("/time-off/notifications/seen", timeOffController.markNotificationsSeen);
 timetrackingRouter.get("/vacations", requirePermission("timeoff.read"), timeOffController.listVacations);
 timetrackingRouter.post("/vacations", requirePermission("timeoff.request"), timeOffController.requestVacation);
 timetrackingRouter.post("/vacations/:id/approve", requirePermission("timeoff.manage"), timeOffController.approveVacation);
