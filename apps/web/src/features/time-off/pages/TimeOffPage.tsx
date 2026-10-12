@@ -59,24 +59,43 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge tone={tone}>{label[status] ?? status}</Badge>;
 }
 
+const NOT_LINKED_MESSAGE =
+  "Tu usuario no esta vinculado a un empleado, asi que no puedes hacer solicitudes a tu nombre. Pidele al administrador que te vincule en Nomina > Empleados > Usuario de cada empleado.";
+
 export function TimeOffPage() {
   const queryClient = useQueryClient();
   const canRequest = useAuthStore((s) => s.hasPermission("timeoff.request"));
   const canManage = useAuthStore((s) => s.hasPermission("timeoff.manage"));
   const canRead = useAuthStore((s) => s.hasPermission("timeoff.read"));
 
-  const { data: myEmployee } = useQuery({ queryKey: ["my-employee"], queryFn: getMyEmployee, enabled: canRequest });
+  const { data: myEmployee, isError: noEmployeeLinked } = useQuery({
+    queryKey: ["my-employee"],
+    queryFn: getMyEmployee,
+    enabled: canRequest && !canManage,
+    retry: false,
+  });
   const { data: employees } = useQuery({ queryKey: ["employees"], queryFn: () => listEmployees(), enabled: canManage });
   const employeeNames = new Map((employees?.data ?? []).map((e) => [e.id, `${e.firstName} ${e.lastName}`]));
 
-  function resolveEmployeeId(selected: string): string | null {
-    if (canManage) return selected || null;
-    return myEmployee?.id ?? null;
+  // Lanza con un mensaje claro en vez de mandar la solicitud sin empleado (la API respondia
+  // "Datos de entrada invalidos", sin decir que faltaba el vinculo usuario-empleado).
+  function resolveEmployeeId(selected: string): string {
+    if (canManage) {
+      if (!selected) throw new Error("Elige el empleado");
+      return selected;
+    }
+    if (!myEmployee) throw new Error(NOT_LINKED_MESSAGE);
+    return myEmployee.id;
   }
 
   return (
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Vacaciones y permisos</h1>
+      {noEmployeeLinked && (
+        <Alert tone="warning" className="mb-4">
+          {NOT_LINKED_MESSAGE}
+        </Alert>
+      )}
 
       <VacationSection
         canRequest={canRequest}
@@ -121,7 +140,7 @@ interface SectionProps {
   canRead: boolean;
   employees: { id: string; firstName: string; lastName: string; status: string }[];
   employeeNames: Map<string, string>;
-  resolveEmployeeId: (selected: string) => string | null;
+  resolveEmployeeId: (selected: string) => string;
   queryClient: ReturnType<typeof useQueryClient>;
 }
 
@@ -161,7 +180,7 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
   const requestMutation = useMutation({
     mutationFn: () =>
       requestVacation({
-        employeeId: resolveEmployeeId(employeeId)!,
+        employeeId: resolveEmployeeId(employeeId),
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         daysTaken: Number(daysTaken),
@@ -274,7 +293,7 @@ function LeavePermissionSection({ canRequest, canManage, canRead, employees, emp
   const requestMutation = useMutation({
     mutationFn: () =>
       requestLeavePermission({
-        employeeId: resolveEmployeeId(employeeId)!,
+        employeeId: resolveEmployeeId(employeeId),
         type: type as "PERSONAL" | "PATERNITY" | "MATERNITY" | "BEREAVEMENT" | "OTHER",
         startDate: new Date(startDate),
         endDate: new Date(endDate),
@@ -391,7 +410,7 @@ function SickLeaveSection({ canRequest, canManage, canRead, employees, employeeN
   const requestMutation = useMutation({
     mutationFn: () =>
       submitSickLeave({
-        employeeId: resolveEmployeeId(employeeId)!,
+        employeeId: resolveEmployeeId(employeeId),
         type: type as "GENERAL" | "LABOR_ARL" | "MATERNITY",
         startDate: new Date(startDate),
         endDate: new Date(endDate),

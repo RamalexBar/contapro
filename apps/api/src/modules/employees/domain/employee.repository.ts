@@ -56,6 +56,7 @@ export interface CreateEmployeeData {
 }
 
 export interface UpdateEmployeeData {
+  userId?: string | null;
   firstName?: string;
   lastName?: string;
   middleName?: string;
@@ -82,6 +83,8 @@ export interface IEmployeeRepository {
   findById(id: string): Promise<EmployeeRecord | null>;
   findByIdOrThrow(id: string): Promise<EmployeeRecord>;
   findByUserId(userId: string): Promise<EmployeeRecord | null>;
+  /** Para validar el vinculo empleado-usuario: el usuario debe ser de la misma empresa. */
+  userExists(userId: string): Promise<boolean>;
   list(filter?: { branchId?: string; status?: string }): Promise<EmployeeRecord[]>;
   update(id: string, data: UpdateEmployeeData): Promise<EmployeeRecord>;
   deactivate(id: string, terminationDate: Date): Promise<EmployeeRecord>;

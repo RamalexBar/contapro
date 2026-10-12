@@ -101,6 +101,11 @@ export class PrismaEmployeeRepository implements IEmployeeRepository {
     return row ? toRecord(row) : null;
   }
 
+  async userExists(userId: string): Promise<boolean> {
+    const user = await prisma.user.findFirst({ where: { id: userId }, select: { id: true } });
+    return user !== null;
+  }
+
   async list(filter?: { branchId?: string; status?: string }): Promise<EmployeeRecord[]> {
     const rows = await prisma.employee.findMany({
       where: { branchId: filter?.branchId, status: filter?.status },

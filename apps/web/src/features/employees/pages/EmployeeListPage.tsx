@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { EmployeeUsersCard } from "../components/EmployeeUsersCard";
 import { formatCOP } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
@@ -54,6 +55,8 @@ export function EmployeeListPage() {
   const canCreate = useAuthStore((s) => s.hasPermission("employee.create"));
   const canUpdate = useAuthStore((s) => s.hasPermission("employee.update"));
   const canDeactivate = useAuthStore((s) => s.hasPermission("employee.deactivate"));
+  // Listar usuarios exige rbac.manage (administrador).
+  const canLinkUsers = useAuthStore((s) => s.hasPermission("employee.update") && s.hasPermission("rbac.manage"));
 
   const { data, isLoading } = useQuery({ queryKey: ["employees"], queryFn: () => listEmployees() });
 
@@ -301,6 +304,7 @@ export function EmployeeListPage() {
           </Table>
         )}
       </Card>
+      {canLinkUsers && data && <EmployeeUsersCard employees={data.data} />}
     </AppLayout>
   );
 }

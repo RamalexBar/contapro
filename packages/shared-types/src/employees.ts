@@ -47,6 +47,9 @@ export const updateEmployeeSchema = z.object({
   compensationFund: z.string().optional(),
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
+  // Usuario de Contapro con el que el empleado entra (para pedir vacaciones, permisos e
+  // incapacidades a su nombre, y marcar horario). null lo desvincula.
+  userId: z.string().uuid().nullable().optional(),
 });
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
 
