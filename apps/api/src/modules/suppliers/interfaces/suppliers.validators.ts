@@ -25,6 +25,27 @@ export const createSupplierSchema = z.object({
   municipalityCode: z.string().optional(),
 });
 
+// Renglon de la factura que entra al inventario junto con la compra (ver CreatePurchaseUseCase):
+// un producto existente o uno nuevo que se crea en el mismo paso, nunca los dos.
+const purchaseItemSchema = z
+  .object({
+    productId: z.string().uuid().optional(),
+    newProduct: z
+      .object({
+        name: z.string().trim().min(1, "Falta el nombre del producto nuevo"),
+        salePrice: z.number().nonnegative(),
+        taxRate: z.number().min(0).max(100).optional(),
+        barcode: z.string().trim().optional(),
+        unit: z.string().trim().optional(),
+      })
+      .optional(),
+    quantity: z.number().positive(),
+    unitCost: z.number().nonnegative(),
+  })
+  .refine((item) => Boolean(item.productId) !== Boolean(item.newProduct), {
+    message: "Cada renglon debe tener un producto existente o uno nuevo, no ambos",
+  });
+
 export const createPurchaseSchema = z
   .object({
     branchId: z.string().uuid(),
@@ -39,6 +60,7 @@ export const createPurchaseSchema = z
     // @erp/shared-types, mismo criterio.
     currency: z.string().length(3).toUpperCase().default("COP"),
     exchangeRate: z.number().positive().default(1),
+    items: z.array(purchaseItemSchema).max(500).optional(),
   })
   .refine((v) => v.currency === "COP" || v.exchangeRate !== 1, {
     message: "Debes indicar la tasa de cambio (TRM) cuando la moneda no es COP",

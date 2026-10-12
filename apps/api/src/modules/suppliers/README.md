@@ -130,6 +130,33 @@ implementado. Consumo FIFO real (modulo POS) documentado abajo.
     la API por igual. UI conectada en `apps/web/src/features/suppliers` (boton "Leer factura
     (foto/PDF)" en el formulario de "Registrar factura de compra").
 
+12. **Compra con productos: inventario + contabilidad en un solo paso** (item 49 de
+    `docs/ALCANCE.md`, 2026-10-12). `POST /purchases` acepta `items` opcionales -- cada uno un
+    `productId` existente o un `newProduct` (nombre, precio de venta, IVA, codigo de barras), con
+    `quantity` y `unitCost` antes de IVA. `CreatePurchaseUseCase` valida todo antes de crear
+    nada (renglones que sumen el subtotal con margen de 1 peso por renglon, productos existentes,
+    codigos de barras libres, sin `destinationAccount` de servicios), crea los productos nuevos
+    con `CreateProductUseCase` (referencia `PROD-0001...` con el mismo generador de la
+    importacion, `inventory/product/application/sku-sequence.ts`), registra la compra y su
+    comprobante como siempre, y al final llama a `ReceiveGoodsUseCase` con
+    `GoodsReceipt.purchaseId` -- el mismo camino de existencias/lotes/costo promedio/kardex que la
+    recepcion contra una orden de compra. Responde `goodsReceiptId` y `createdProductIds`.
+    `CancelPurchaseUseCase` busca esa recepcion y, antes de tocar abonos o comprobantes, devuelve
+    la mercancia con `IStockRepository.returnGoods` (una transaccion, movimientos `RETURN_OUT`,
+    deshace el promedio ponderado): si alguna linea ya no tiene existencias suficientes (se vendio
+    parte), la cancelacion se rechaza sin cambiar nada. La lectura con IA (punto 11) ahora tambien
+    devuelve los renglones (`lines`, con `matchedProduct` por codigo de barras exacto o nombre
+    inequivoco, sin adivinar entre varios). UI: "Compras -> Registrar compra" (`/purchases`, misma
+    pantalla que Proveedores abierta en la pestana Compras), con buscador de productos y aviso si
+    los renglones no cuadran con el subtotal. Verificado en vivo: compra con un producto existente
+    y uno nuevo (existencias, costo promedio, kardex `PURCHASE_IN`, asiento 1435 = valor del
+    kardex), cancelacion con devolucion y costo restaurado, cancelacion bloqueada tras vender
+    parte, y la pantalla en Chrome cargando los renglones a mano. **Limitaciones**: varios pasos
+    sin transaccion comun (si la compra falla despues de crear un producto nuevo, el producto
+    queda creado sin existencias); `returnGoods` no descuenta el `Batch` creado para productos
+    con lotes; el emparejamiento por referencia del proveedor no existe (solo codigo de barras y
+    nombre), y la lectura de renglones no se ha probado con facturas reales.
+
 ## Consumo FIFO real (iteracion 16, `modules/pos/sale`)
 
 `PrismaSaleRepository.applyCompletionSideEffects` (unico punto donde una venta completada

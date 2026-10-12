@@ -61,6 +61,15 @@ export interface CreatePurchaseInput {
   withholdings: PurchaseWithholdingInput[];
   currency?: string;
   exchangeRate?: number;
+  /** Renglones que entran al inventario con la compra -- sin esto, la compra solo se contabiliza. */
+  items?: PurchaseItemInput[];
+}
+
+export interface PurchaseItemInput {
+  productId?: string;
+  newProduct?: { name: string; salePrice: number; taxRate?: number; barcode?: string };
+  quantity: number;
+  unitCost: number;
 }
 
 export interface AccountPayableRecord {
@@ -86,7 +95,9 @@ export function listPurchases(): Promise<{ data: PurchaseRecord[] }> {
   return apiFetch("/purchases");
 }
 
-export function createPurchase(input: CreatePurchaseInput): Promise<PurchaseRecord> {
+export function createPurchase(
+  input: CreatePurchaseInput
+): Promise<PurchaseRecord & { goodsReceiptId: string | null; createdProductIds: string[] }> {
   return apiFetch("/purchases", { method: "POST", body: input });
 }
 
@@ -99,13 +110,24 @@ export interface ExtractedPurchaseInvoice {
   taxTotal: number | null;
   total: number | null;
   currency: string;
+  items: ExtractedInvoiceLine[];
   warnings: string[];
+}
+
+export interface ExtractedInvoiceLine {
+  description: string;
+  code: string | null;
+  quantity: number | null;
+  unitPrice: number | null;
+  taxRate: number | null;
+  lineTotal: number | null;
 }
 
 export interface ExtractPurchaseInvoiceResult {
   extracted: ExtractedPurchaseInvoice;
   matchedSupplier: { id: string; name: string; nit: string } | null;
   suggestedDueDate: string | null;
+  lines: Array<ExtractedInvoiceLine & { matchedProduct: { id: string; name: string; sku: string } | null }>;
 }
 
 export function extractPurchaseInvoice(fileBase64: string, mediaType: string): Promise<ExtractPurchaseInvoiceResult> {

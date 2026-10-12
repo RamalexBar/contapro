@@ -7,6 +7,10 @@ import type { GenerateElectronicSupportDocumentUseCase } from "../../../electron
 import type { IWithholdingConceptRepository, WithholdingConceptRecord } from "../../../accounting/domain/withholding-concept.repository";
 import type { ISupplierRepository, SupplierRecord } from "../../domain/supplier.repository";
 import type { ComputedPurchaseWithholding, IPurchaseRepository, PurchaseRecord } from "../../domain/purchase.repository";
+import type { IProductRepository } from "../../../inventory/product/domain/product.repository";
+import type { Product } from "../../../inventory/product/domain/product.entity";
+import type { CreateProductUseCase } from "../../../inventory/product/application/use-cases/create-product.use-case";
+import type { ReceiveGoodsUseCase } from "./receive-goods.use-case";
 import { CreatePurchaseUseCase, type CreatePurchaseInput } from "./create-purchase.use-case";
 
 const SUPPLIER: SupplierRecord = {
@@ -108,8 +112,25 @@ function withTenantContext<T>(fn: () => Promise<T>): Promise<T> {
   );
 }
 
+class FakeProductRepository {
+  constructor(
+    private readonly existing: { id: string; sku: string; barcodes: string[] }[] = [{ id: "product-1", sku: "PROD-0001", barcodes: ["7700001"] }]
+  ) {}
+  async listTakenIdentifiers() {
+    return { skus: this.existing.map((p) => p.sku), barcodes: this.existing.flatMap((p) => p.barcodes) };
+  }
+  async findById(id: string) {
+    return this.existing.some((p) => p.id === id) ? ({ id } as unknown as Product) : null;
+  }
+}
+
 function makeUseCase(concepts?: WithholdingConceptRecord[]) {
   const purchaseRepo = new FakePurchaseRepository();
+  let createdCount = 0;
+  const createProduct = {
+    execute: vi.fn(async () => ({ id: `new-product-${++createdCount}` }) as unknown as Product),
+  };
+  const receiveGoods = { execute: vi.fn(async () => ({ id: "receipt-1" })) };
   const postPurchaseJournalEntry = { execute: vi.fn().mockResolvedValue(null) } as unknown as PostPurchaseJournalEntryUseCase & {
     execute: (input: PurchaseJournalEntryInput) => Promise<null>;
   };
@@ -124,10 +145,15 @@ function makeUseCase(concepts?: WithholdingConceptRecord[]) {
     new FakeWithholdingConceptRepository(concepts) as unknown as IWithholdingConceptRepository,
     postPurchaseJournalEntry,
     generateElectronicSupportDocument,
-    new AuditService(auditRepo)
+    new AuditService(auditRepo),
+    {
+      productRepo: new FakeProductRepository() as unknown as IProductRepository,
+      createProduct: createProduct as unknown as CreateProductUseCase,
+      receiveGoods: receiveGoods as unknown as ReceiveGoodsUseCase,
+    }
   );
 
-  return { useCase, purchaseRepo, postPurchaseJournalEntry };
+  return { useCase, purchaseRepo, postPurchaseJournalEntry, createProduct, receiveGoods };
 }
 
 const BASE_INPUT: CreatePurchaseInput = {
@@ -223,5 +249,114 @@ describe("CreatePurchaseUseCase — multi-moneda informativa (item 33 de docs/AL
     expect(purchaseRepo.created[0].currency).toBe("USD");
     expect(purchaseRepo.created[0].exchangeRate).toBe(4200);
     expect(purchase.total).toBe(119_000);
+  });
+});
+
+describe("CreatePurchaseUseCase — productos al inventario", () => {
+  it("does not touch inventory when the purchase has no items", async () => {
+    const { useCase, receiveGoods, createProduct } = makeUseCase();
+
+    const result = await withTenantContext(() => useCase.execute(BASE_INPUT));
+
+    expect(result.goodsReceiptId).toBeNull();
+    expect(receiveGoods.execute).not.toHaveBeenCalled();
+    expect(createProduct.execute).not.toHaveBeenCalled();
+  });
+
+  it("creates the new products and receives every line linked to the purchase", async () => {
+    const { useCase, receiveGoods, createProduct } = makeUseCase();
+
+    const result = await withTenantContext(() =>
+      useCase.execute({
+        ...BASE_INPUT,
+        items: [
+          { productId: "product-1", quantity: 10, unitCost: 6_000 },
+          { newProduct: { name: "Galletas surtidas", salePrice: 5_000, taxRate: 19 }, quantity: 20, unitCost: 2_000 },
+        ],
+      })
+    );
+
+    expect(createProduct.execute).toHaveBeenCalledTimes(1);
+    expect(createProduct.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ sku: "PROD-0002", name: "Galletas surtidas", currentPrice: 5_000, currentCost: 2_000, initialStock: 0 }),
+      "branch-1"
+    );
+    expect(receiveGoods.execute).toHaveBeenCalledWith({
+      branchId: "branch-1",
+      supplierId: SUPPLIER.id,
+      purchaseId: "purchase-1",
+      items: [
+        { productId: "product-1", quantity: 10, unitCost: 6_000 },
+        { productId: "new-product-1", quantity: 20, unitCost: 2_000 },
+      ],
+    });
+    expect(result).toMatchObject({ goodsReceiptId: "receipt-1", createdProductIds: ["new-product-1"] });
+  });
+
+  it("accepts a rounding difference of up to one peso per line", async () => {
+    const { useCase, receiveGoods } = makeUseCase();
+
+    await withTenantContext(() =>
+      useCase.execute({
+        ...BASE_INPUT,
+        subtotal: 1_000,
+        taxTotal: 190,
+        total: 1_190,
+        items: [{ productId: "product-1", quantity: 3, unitCost: 333.33 }],
+      })
+    );
+
+    expect(receiveGoods.execute).toHaveBeenCalled();
+  });
+
+  it("rejects lines that don't add up to the invoice subtotal, before creating anything", async () => {
+    const { useCase, purchaseRepo, createProduct } = makeUseCase();
+
+    await expect(
+      withTenantContext(() =>
+        useCase.execute({
+          ...BASE_INPUT,
+          items: [{ newProduct: { name: "Nuevo", salePrice: 1_000 }, quantity: 2, unitCost: 10_000 }],
+        })
+      )
+    ).rejects.toThrow(/suman 20000 y el subtotal de la factura es 100000/);
+    expect(createProduct.execute).not.toHaveBeenCalled();
+    expect(purchaseRepo.created).toHaveLength(0);
+  });
+
+  it("rejects a new product whose barcode already belongs to another product", async () => {
+    const { useCase, createProduct } = makeUseCase();
+
+    await expect(
+      withTenantContext(() =>
+        useCase.execute({
+          ...BASE_INPUT,
+          items: [{ newProduct: { name: "Repetido", salePrice: 1_000, barcode: "7700001" }, quantity: 1, unitCost: 100_000 }],
+        })
+      )
+    ).rejects.toThrow(/ya es de otro producto/);
+    expect(createProduct.execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown product id", async () => {
+    const { useCase } = makeUseCase();
+
+    await expect(
+      withTenantContext(() => useCase.execute({ ...BASE_INPUT, items: [{ productId: "nope", quantity: 1, unitCost: 100_000 }] }))
+    ).rejects.toThrow(/Renglon 1: el producto elegido no existe/);
+  });
+
+  it("rejects items on a service purchase posted to an expense account", async () => {
+    const { useCase } = makeUseCase();
+
+    await expect(
+      withTenantContext(() =>
+        useCase.execute({
+          ...BASE_INPUT,
+          destinationAccount: { code: "5135", name: "Servicios" },
+          items: [{ productId: "product-1", quantity: 1, unitCost: 100_000 }],
+        })
+      )
+    ).rejects.toThrow(/servicios/);
   });
 });

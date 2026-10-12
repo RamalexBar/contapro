@@ -26,4 +26,5 @@ export const productController = new ProductController(
   new ImportProductsUseCase(productRepo, new PrismaCategoryRepository(), createProductUseCase)
 );
 
-export { productRepo };
+// createProductUseCase se exporta para Registrar compra (suppliers): crea los productos nuevos que trae la factura.
+export { productRepo, createProductUseCase };

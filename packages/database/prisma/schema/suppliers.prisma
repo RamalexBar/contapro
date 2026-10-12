@@ -65,6 +65,9 @@ model GoodsReceipt {
   companyId        String
   branchId         String
   purchaseOrderId  String?
+  // Factura de compra (Purchase) que trajo esta mercancia cuando se registra todo en un solo paso
+  // desde "Registrar compra" -- null en la recepcion clasica contra una orden de compra.
+  purchaseId       String?
   supplierId       String
   receivedByUserId String
   createdAt        DateTime @default(now())
@@ -72,6 +75,7 @@ model GoodsReceipt {
   items GoodsReceiptItem[]
 
   @@index([companyId, branchId])
+  @@index([purchaseId])
   @@map("goods_receipts")
 }
 

@@ -32,4 +32,8 @@ export interface IStockRepository {
    * un Batch si el producto tracksBatches, y recalcula Product.currentCost segun costMethod (ver
    * README de suppliers para el detalle del calculo). */
   receiveGoods(items: ReceiveGoodsItem[], referenceType: string, referenceId: string, userId: string): Promise<StockMovementRecord[]>;
+  /** Reverso de receiveGoods (al anular una compra): resta cada cantidad en una sola transaccion,
+   * con movimiento RETURN_OUT, y deshace el promedio ponderado. Falla sin tocar nada si alguna
+   * linea ya no tiene existencias suficientes en la sucursal. */
+  returnGoods(items: ReceiveGoodsItem[], referenceType: string, referenceId: string, userId: string): Promise<StockMovementRecord[]>;
 }

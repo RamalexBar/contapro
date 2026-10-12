@@ -208,4 +208,58 @@ export class PrismaStockMovementRepository implements IStockRepository {
       return movements;
     });
   }
+
+  async returnGoods(items: ReceiveGoodsItem[], referenceType: string, referenceId: string, userId: string): Promise<StockMovementRecord[]> {
+    const companyId = getTenantContext().companyId;
+
+    return prisma.$transaction(async (tx) => {
+      const movements: StockMovementRecord[] = [];
+
+      for (const item of items) {
+        const product = await tx.product.findFirstOrThrow({ where: { id: item.productId } });
+        const stock = await tx.productBranchStock.findFirst({ where: { productId: item.productId, branchId: item.branchId } });
+        const available = Number(stock?.quantity ?? 0);
+        if (!stock || available < item.quantity) {
+          // Se lanza dentro de la transaccion: ninguna linea se devuelve si una no alcanza.
+          throw new ValidationError(
+            `No se puede devolver ${item.quantity} de "${product.name}": solo quedan ${available} en inventario (ya se vendio o se movio parte de lo comprado)`
+          );
+        }
+
+        const priorTotal = await tx.productBranchStock.aggregate({
+          where: { productId: item.productId },
+          _sum: { quantity: true },
+        });
+        const priorQty = Number(priorTotal._sum.quantity ?? 0);
+
+        await tx.productBranchStock.update({ where: { id: stock.id }, data: { quantity: { decrement: item.quantity } } });
+
+        const movement = await tx.stockMovement.create({
+          data: {
+            companyId,
+            branchId: item.branchId,
+            productId: item.productId,
+            type: "RETURN_OUT",
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            referenceType,
+            referenceId,
+            createdByUserId: userId,
+          },
+        });
+        movements.push(toRecord(movement));
+
+        // Deshace el promedio ponderado que hizo receiveGoods con esta misma entrada. Con LAST (o si
+        // no queda nada) se deja el costo como esta: no hay forma confiable de saber el anterior.
+        const remainingQty = priorQty - item.quantity;
+        if (product.costMethod !== "LAST" && remainingQty > 0) {
+          const newCost = (priorQty * Number(product.currentCost) - item.quantity * item.unitCost) / remainingQty;
+          if (newCost >= 0) await tx.product.update({ where: { id: item.productId }, data: { currentCost: newCost } });
+        }
+        await recordKardexEntry(tx, { branchId: item.branchId, productId: item.productId, movementId: movement.id });
+      }
+
+      return movements;
+    });
+  }
 }

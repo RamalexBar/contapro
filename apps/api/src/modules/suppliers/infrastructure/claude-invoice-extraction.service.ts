@@ -18,12 +18,24 @@ const extractionSchema = z.object({
   taxTotal: z.number().nullable().describe("Total de IVA/impuestos de la factura"),
   total: z.number().nullable().describe("Total final de la factura (subtotal + impuestos)"),
   currency: z.string().describe('Codigo ISO 4217 de la moneda, "COP" si no se indica ninguna otra'),
+  items: z
+    .array(
+      z.object({
+        description: z.string().describe("Nombre o descripcion del producto tal como aparece en el renglon"),
+        code: z.string().nullable().describe("Codigo, referencia o codigo de barras del renglon, si aparece"),
+        quantity: z.number().nullable().describe("Cantidad facturada"),
+        unitPrice: z.number().nullable().describe("Valor unitario ANTES de IVA y despues del descuento del renglon"),
+        taxRate: z.number().nullable().describe("Porcentaje de IVA del renglon (19, 5 o 0), null si no se indica"),
+        lineTotal: z.number().nullable().describe("Total del renglon antes de IVA"),
+      })
+    )
+    .describe("Un elemento por cada renglon de producto de la factura, en el mismo orden. Lista vacia si la factura no detalla productos."),
   warnings: z.array(z.string()).describe(
     "Notas cortas en español sobre datos ilegibles, inconsistentes (ej. subtotal+IVA != total) o que el usuario deberia revisar a mano. Lista vacia si todo se leyo con confianza."
   ),
 });
 
-const EXTRACTION_PROMPT = `Estas leyendo la foto o el PDF de una factura de compra colombiana para precargar un formulario de registro de compra. Extrae unicamente lo que dice el documento -- si un dato no aparece o no se puede leer con confianza, devuelve null en ese campo en vez de adivinar. Si subtotal + impuestos no cuadra con el total, o si hay retenciones/descuentos que no encajan en este esquema, dejalo anotado en "warnings" en vez de forzar el numero. No inventes NIT ni numero de factura.`;
+const EXTRACTION_PROMPT = `Estas leyendo la foto o el PDF de una factura de compra colombiana para precargar un formulario de registro de compra. Extrae unicamente lo que dice el documento -- si un dato no aparece o no se puede leer con confianza, devuelve null en ese campo en vez de adivinar. Si subtotal + impuestos no cuadra con el total, o si hay retenciones/descuentos que no encajan en este esquema, dejalo anotado en "warnings" en vez de forzar el numero. No inventes NIT ni numero de factura. En "items" copia cada renglon de producto: si el valor unitario impreso incluye IVA, calcula el valor antes de IVA y anotalo en "warnings"; no incluyas renglones de fletes, descuentos globales ni totales.`;
 
 type FileContentBlock =
   | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } }
@@ -54,7 +66,8 @@ export class ClaudeInvoiceExtractionService implements IInvoiceExtractionService
 
     const response = await client.messages.parse({
       model: "claude-opus-5",
-      max_tokens: 2048,
+      // Una factura con muchos renglones devuelve bastante JSON.
+      max_tokens: 16000,
       output_config: { effort: "medium", format: zodOutputFormat(extractionSchema) },
       messages: [
         {

@@ -8,6 +8,7 @@ type GoodsReceiptRow = {
   branchId: string;
   supplierId: string;
   purchaseOrderId: string | null;
+  purchaseId: string | null;
   receivedByUserId: string;
   createdAt: Date;
   items: { id: string; productId: string; quantity: unknown; unitCost: unknown; batchNumber: string | null; expirationDate: Date | null }[];
@@ -19,6 +20,7 @@ function toRecord(row: GoodsReceiptRow): GoodsReceiptRecord {
     branchId: row.branchId,
     supplierId: row.supplierId,
     purchaseOrderId: row.purchaseOrderId,
+    purchaseId: row.purchaseId,
     receivedByUserId: row.receivedByUserId,
     createdAt: row.createdAt,
     items: row.items.map((item) => ({
@@ -44,6 +46,7 @@ export class PrismaGoodsReceiptRepository implements IGoodsReceiptRepository {
         branchId: data.branchId,
         supplierId: data.supplierId,
         purchaseOrderId: data.purchaseOrderId,
+        purchaseId: data.purchaseId,
         receivedByUserId,
         items: {
           create: data.items.map((item) => ({
@@ -70,5 +73,10 @@ export class PrismaGoodsReceiptRepository implements IGoodsReceiptRepository {
   async list(): Promise<GoodsReceiptRecord[]> {
     const rows = await prisma.goodsReceipt.findMany({ include: INCLUDE, orderBy: { createdAt: "desc" } });
     return rows.map(toRecord);
+  }
+
+  async findByPurchaseId(purchaseId: string): Promise<GoodsReceiptRecord | null> {
+    const row = await prisma.goodsReceipt.findFirst({ where: { purchaseId }, include: INCLUDE });
+    return row ? toRecord(row) : null;
   }
 }

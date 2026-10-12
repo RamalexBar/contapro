@@ -4,6 +4,20 @@ export interface InvoiceFileInput {
   mediaType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
 }
 
+/** Renglon de producto de la factura, tal como lo trae el proveedor. */
+export interface ExtractedInvoiceLine {
+  description: string;
+  /** Codigo/referencia del proveedor o codigo de barras impreso en el renglon, si lo hay. */
+  code: string | null;
+  quantity: number | null;
+  /** Valor unitario antes de IVA y ya con el descuento del renglon. */
+  unitPrice: number | null;
+  /** Porcentaje de IVA del renglon (19, 5, 0). */
+  taxRate: number | null;
+  /** Total del renglon antes de IVA. */
+  lineTotal: number | null;
+}
+
 export interface ExtractedPurchaseInvoice {
   supplierName: string | null;
   supplierNit: string | null;
@@ -15,6 +29,8 @@ export interface ExtractedPurchaseInvoice {
   total: number | null;
   /** ISO 4217, "COP" si no se detecta ninguna otra moneda en el documento. */
   currency: string;
+  /** Renglones de productos -- lista vacia si la factura no los detalla o no se pudieron leer. */
+  items: ExtractedInvoiceLine[];
   /** Cosas que el modelo no pudo leer con confianza o que el usuario deberia revisar a mano
    * antes de confirmar -- nunca bloquea la extraccion, solo informa. */
   warnings: string[];

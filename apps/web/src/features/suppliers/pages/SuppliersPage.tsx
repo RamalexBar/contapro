@@ -26,6 +26,14 @@ import {
   type PurchaseWithholdingInput,
   type SupplierRecord,
 } from "../api/supplier.api";
+import {
+  PurchaseItemsEditor,
+  lineProblem,
+  linesFromExtraction,
+  linesMatchSubtotal,
+  linesToItems,
+  type PurchaseLine,
+} from "../components/PurchaseItemsEditor";
 
 const ACCEPTED_INVOICE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
@@ -191,6 +199,9 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
   const [extractResult, setExtractResult] = useState<ExtractPurchaseInvoiceResult | null>(null);
   const [fileTypeError, setFileTypeError] = useState(false);
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
+  // Renglones que entran al inventario con la compra (ver PurchaseItemsEditor) -- vacio = solo contabiliza.
+  const [lines, setLines] = useState<PurchaseLine[]>([]);
+  const [registeredMessage, setRegisteredMessage] = useState("");
 
   const extractMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -210,6 +221,7 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
         dueDate: suggestedDueDate ?? prev.dueDate,
         currency: extracted.currency || prev.currency,
       }));
+      setLines(linesFromExtraction(result));
     },
   });
 
@@ -223,6 +235,7 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
     }
     setFileTypeError(false);
     setExtractResult(null);
+    setRegisteredMessage("");
     extractMutation.mutate(file);
   }
 
@@ -234,6 +247,8 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
     }, 0)
   );
   const netTotal = round2(total - retentionTotal);
+  const linesIncomplete = lines.some((l) => lineProblem(l) !== null);
+  const linesOff = lines.length > 0 && !linesMatchSubtotal(lines, Number(form.subtotal) || 0);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -247,10 +262,22 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
         dueDate: form.dueDate,
         withholdings,
         ...(form.currency !== "COP" ? { currency: form.currency, exchangeRate: Number(form.exchangeRate) } : {}),
+        ...(lines.length > 0 ? { items: linesToItems(lines) } : {}),
       }),
-    onSuccess: () => {
+    onSuccess: (purchase) => {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
       queryClient.invalidateQueries({ queryKey: ["accounts-payable"] });
+      if (purchase.goodsReceiptId) {
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+        queryClient.invalidateQueries({ queryKey: ["goods-receipts"] });
+      }
+      const created = purchase.createdProductIds.length;
+      setRegisteredMessage(
+        purchase.goodsReceiptId
+          ? `Compra ${purchase.invoiceNumber} registrada y contabilizada. ${lines.length === 1 ? "1 producto entro" : `${lines.length} productos entraron`} al inventario${created > 0 ? ` (${created === 1 ? "1 nuevo" : `${created} nuevos`})` : ""}.`
+          : `Compra ${purchase.invoiceNumber} registrada y contabilizada (sin movimiento de inventario).`
+      );
+      setLines([]);
       setForm({ supplierId: "", invoiceNumber: "", subtotal: "", taxTotal: "", dueDate: todayStr(), currency: "COP", exchangeRate: "" });
       setTaxPercentHelper("");
       setWithholdings([]);
@@ -271,8 +298,8 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
     <div className="space-y-6">
       <Card title="Leer factura automaticamente">
         <p className="mb-3 text-sm text-slate-500">
-          Sube una foto o el PDF de la factura del proveedor y el formulario de abajo se precarga solo. Siempre revisa los datos antes
-          de registrar la compra.
+          Sube una foto o el PDF de la factura del proveedor: se llenan los datos de la factura y sus productos. Al registrarla, la
+          mercancia entra al inventario y la compra queda contabilizada en un solo paso. Siempre revisa los datos antes.
         </p>
         <input
           ref={invoiceFileInputRef}
@@ -316,6 +343,7 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
           className="grid grid-cols-2 gap-3 sm:grid-cols-6"
           onSubmit={(e) => {
             e.preventDefault();
+            setRegisteredMessage("");
             createMutation.mutate();
           }}
         >
@@ -379,13 +407,24 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
               required
             />
           )}
+          <div className="col-span-2 sm:col-span-6">
+            <PurchaseItemsEditor
+              lines={lines}
+              onChange={setLines}
+              subtotal={Number(form.subtotal) || 0}
+              onUseAsSubtotal={(value) => {
+                setTaxPercentHelper("");
+                setForm((prev) => ({ ...prev, subtotal: String(value) }));
+              }}
+            />
+          </div>
           <p className="col-span-2 text-sm text-slate-500 sm:col-span-4">
             Subtotal: {formatCOP(Number(form.subtotal) || 0)} · IVA: {formatCOP(Number(form.taxTotal) || 0)} ·{" "}
             <span className="font-semibold text-slate-700">Total: {formatCOP(total)}</span>
           </p>
           <Button
             type="submit"
-            disabled={form.currency !== "COP" && !(Number(form.exchangeRate) > 0)}
+            disabled={(form.currency !== "COP" && !(Number(form.exchangeRate) > 0)) || linesIncomplete || linesOff}
             loading={createMutation.isPending}
           >
             {retentionTotal > 0 ? `Neto a pagar: ${formatCOP(netTotal)}` : `Total: ${formatCOP(total)}`}
@@ -459,6 +498,11 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
         {createMutation.isError && (
           <Alert tone="danger" className="mt-2">
             {(createMutation.error as Error).message}
+          </Alert>
+        )}
+        {registeredMessage && (
+          <Alert tone="success" className="mt-2">
+            {registeredMessage}
           </Alert>
         )}
       </Card>
@@ -615,8 +659,8 @@ function AccountsPayableSection({ suppliers }: { suppliers: SupplierRecord[] }) 
 
 type Section = "suppliers" | "purchases" | "payable";
 
-export function SuppliersPage() {
-  const [section, setSection] = useState<Section>("suppliers");
+export function SuppliersPage({ initialSection = "suppliers" }: { initialSection?: Section }) {
+  const [section, setSection] = useState<Section>(initialSection);
   const { data: suppliers } = useQuery({ queryKey: ["suppliers"], queryFn: () => listSuppliers() });
 
   return (

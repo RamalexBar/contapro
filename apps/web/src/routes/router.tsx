@@ -192,7 +192,16 @@ export const router = createBrowserRouter([
         path: "/suppliers",
         element: (
           <ProtectedRoute>
-            <SuppliersPage />
+            <SuppliersPage key="suppliers" />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // Misma pantalla, abierta en la pestana Compras: es lo que se usa a diario (factura con foto).
+        path: "/purchases",
+        element: (
+          <ProtectedRoute>
+            <SuppliersPage key="purchases" initialSection="purchases" />
           </ProtectedRoute>
         ),
       },

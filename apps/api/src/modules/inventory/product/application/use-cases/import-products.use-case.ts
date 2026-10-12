@@ -8,6 +8,7 @@ import {
 import type { ICategoryRepository } from "../../../category/domain/category.repository";
 import type { IProductRepository } from "../../domain/product.repository";
 import type { CreateProductUseCase } from "./create-product.use-case";
+import { createSkuSequence, normalizeSkuKey as normalizeKey } from "../sku-sequence";
 
 const DEFAULT_TAX_RATE = 19;
 /** Fila 1 del Excel es el encabezado, asi que el primer producto es la fila 2. */
@@ -75,17 +76,7 @@ export class ImportProductsUseCase {
     });
 
     // Las referencias generadas no deben chocar ni con el sistema ni con las que si trae el archivo.
-    const usedSkus = new Set([...takenSkus, ...fileSkus.keys()]);
-    let sequence = 0;
-    const nextSku = () => {
-      let candidate: string;
-      do {
-        sequence += 1;
-        candidate = `PROD-${String(sequence).padStart(4, "0")}`;
-      } while (usedSkus.has(normalizeKey(candidate)));
-      usedSkus.add(normalizeKey(candidate));
-      return candidate;
-    };
+    const nextSku = createSkuSequence([...takenSkus, ...fileSkus.keys()]);
     const prepared: PreparedRow[] = valid.map((v) => ({ ...v, sku: v.data.sku ?? nextSku() }));
 
     const existingCategories = await this.categoryRepo.list();
@@ -147,10 +138,6 @@ export class ImportProductsUseCase {
     result.errors = sortByRow(errors);
     return result;
   }
-}
-
-function normalizeKey(value: string): string {
-  return value.trim().toLocaleLowerCase("es-CO");
 }
 
 function round2(value: number): number {

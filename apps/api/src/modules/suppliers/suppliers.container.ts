@@ -13,6 +13,7 @@ import {
 import { PrismaJournalEntryRepository } from "../accounting/infrastructure/prisma-journal-entry.repository";
 import { generateElectronicSupportDocumentUseCase } from "../electronic-invoicing/electronic-invoicing.container";
 import { stockRepo } from "../inventory/stock/stock.container";
+import { createProductUseCase, productRepo } from "../inventory/product/product.container";
 import { PrismaSupplierRepository } from "./infrastructure/prisma-supplier.repository";
 import { PrismaPurchaseRepository } from "./infrastructure/prisma-purchase.repository";
 import { PrismaPurchaseOrderRepository } from "./infrastructure/prisma-purchase-order.repository";
@@ -45,13 +46,16 @@ const accountPayableRepo = new PrismaAccountPayableRepository();
 const journalRepo = new PrismaJournalEntryRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
+const receiveGoodsUseCase = new ReceiveGoodsUseCase(goodsReceiptRepo, purchaseOrderRepo, stockRepo, auditService);
+
 export const createPurchaseUseCase = new CreatePurchaseUseCase(
   purchaseRepo,
   supplierRepo,
   withholdingConceptRepository,
   postPurchaseJournalEntryUseCase,
   generateElectronicSupportDocumentUseCase,
-  auditService
+  auditService,
+  { productRepo, createProduct: createProductUseCase, receiveGoods: receiveGoodsUseCase }
 );
 
 export const registerSupplierPaymentUseCase = new RegisterSupplierPaymentUseCase(
@@ -66,7 +70,9 @@ export const cancelPurchaseUseCase = new CancelPurchaseUseCase(
   accountPayableRepo,
   journalRepo,
   voidJournalEntryUseCase,
-  auditService
+  auditService,
+  goodsReceiptRepo,
+  stockRepo
 );
 
 // Exportado para la API publica (resolver/crear proveedor por NIT sin exponer el id interno de
@@ -82,13 +88,13 @@ export const suppliersController = new SuppliersController(
   new SendPurchaseOrderUseCase(purchaseOrderRepo, auditService),
   new ListPurchaseOrdersUseCase(purchaseOrderRepo),
   new GetPurchaseOrderUseCase(purchaseOrderRepo),
-  new ReceiveGoodsUseCase(goodsReceiptRepo, purchaseOrderRepo, stockRepo, auditService),
+  receiveGoodsUseCase,
   new ListGoodsReceiptsUseCase(goodsReceiptRepo),
   new GetGoodsReceiptUseCase(goodsReceiptRepo),
   new ListAccountsPayableUseCase(accountPayableRepo),
   registerSupplierPaymentUseCase,
   cancelPurchaseUseCase,
-  new ExtractPurchaseInvoiceUseCase(invoiceExtractionService, supplierRepo),
+  new ExtractPurchaseInvoiceUseCase(invoiceExtractionService, supplierRepo, productRepo),
   supplierRepo,
   accountPayableRepo
 );

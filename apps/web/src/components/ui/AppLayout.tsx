@@ -15,6 +15,7 @@ import {
   Landmark,
   Menu,
   Package,
+  PackagePlus,
   Percent,
   Plug,
   Receipt,
@@ -79,6 +80,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Compras",
     items: [
+      { to: "/purchases", label: "Registrar compra", icon: PackagePlus, permissions: ["suppliers.read"] },
       { to: "/suppliers", label: "Proveedores", icon: Truck, permissions: ["suppliers.read"] },
       { to: "/purchase-orders", label: "Órdenes de compra", icon: FileText, permissions: ["suppliers.read"] },
       { to: "/expenses", label: "Gastos", icon: Receipt, permissions: ["expense.read"] },
