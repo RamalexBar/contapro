@@ -21,7 +21,9 @@ import {
   mapPayrollToRideData,
   mapSupportDocumentToRideData,
 } from "../application/ride-data-mapper";
-import type { RideCompanyInfo, RideDocumentData, RideResolutionInfo } from "../application/ride-data-mapper";
+import { mapSaleToReceiptData, type RideCompanyInfo, type RideDocumentData, type RideResolutionInfo } from "../application/ride-data-mapper";
+import { NotFoundError } from "../../../shared/errors/app-error";
+import { prisma } from "../../../shared/prisma/prisma-client";
 import { renderRidePdf, renderThermalReceiptPdf } from "../infrastructure/pdfkit-ride-renderer";
 import type { SendInvoiceWhatsAppUseCase } from "../application/use-cases/send-invoice-whatsapp.use-case";
 import type { ISaleRepository } from "../../pos/sale/domain/sale.repository";
@@ -278,6 +280,35 @@ export class ElectronicInvoicingController {
     return req.query.format === "thermal" ? renderThermalReceiptPdf(data) : renderRidePdf(data);
   }
 
+  /** Comprobante de venta (sin factura electronica) con los datos de la venta, ver mapSaleToReceiptData. */
+  private async buildSaleReceipt(saleId: string): Promise<RideDocumentData> {
+    const sale = await this.saleRepo.findByIdOrThrow(saleId);
+    const company = await this.companyReader.findByIdOrThrow(getTenantContext().companyId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: sale.items.map((i) => i.productId) } },
+      select: { id: true, name: true },
+    });
+    const productName = new Map(products.map((p) => [p.id, p.name]));
+    const customer = sale.customerId
+      ? await prisma.customer.findFirst({ where: { id: sale.customerId }, select: { name: true, documentType: true, documentNumber: true } })
+      : null;
+    return mapSaleToReceiptData(
+      {
+        number: sale.number,
+        createdAt: sale.createdAt,
+        subtotal: sale.subtotal,
+        discountTotal: sale.discountTotal,
+        taxTotal: sale.taxTotal,
+        total: sale.total,
+        items: sale.items.map((i) => ({ productName: productName.get(i.productId) ?? "Producto", quantity: i.quantity, unitPrice: i.unitPrice, total: Math.round((i.total - i.taxAmount) * 100) / 100 })),
+        payments: sale.payments,
+        customer,
+      },
+      { nit: company.nit, legalName: company.legalName },
+      company
+    );
+  }
+
   private async getCompanyInfo(): Promise<RideCompanyInfo> {
     return this.companyReader.findByIdOrThrow(getTenantContext().companyId);
   }
@@ -289,7 +320,16 @@ export class ElectronicInvoicingController {
 
   getPdfBySale = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const invoice = await this.getInvoiceUseCase.execute({ type: "sale", id: req.params.saleId });
+      const invoice = await this.getInvoiceUseCase.execute({ type: "sale", id: req.params.saleId }).catch((err) => {
+        // Sin factura electronica (DIAN sin configurar o generacion fallida) la tirilla igual debe
+        // salir: el cajero se la entrega al cliente en cada venta.
+        if (err instanceof NotFoundError && req.query.format === "thermal") return null;
+        throw err;
+      });
+      if (!invoice) {
+        res.type("application/pdf").send(await renderThermalReceiptPdf(await this.buildSaleReceipt(req.params.saleId)));
+        return;
+      }
       const [company, resolution] = await Promise.all([this.getCompanyInfo(), this.findResolutionInfo("FACTURA_VENTA", invoice.fullNumber)]);
       const pdf = await this.renderPdf(mapInvoiceToRideData(invoice, company, resolution), req);
       res.type("application/pdf").send(pdf);

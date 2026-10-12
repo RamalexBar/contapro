@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildUblInvoiceXml } from "../application/ubl-invoice-xml-builder";
-import { mapInvoiceToRideData } from "../application/ride-data-mapper";
+import { mapInvoiceToRideData, mapSaleToReceiptData } from "../application/ride-data-mapper";
 import { renderRidePdf, renderThermalReceiptPdf } from "./pdfkit-ride-renderer";
 import type { ElectronicInvoiceWithXml } from "../domain/electronic-invoice.repository";
 import type { RideCompanyInfo, RideResolutionInfo } from "../application/ride-data-mapper";
@@ -98,5 +98,32 @@ describe("renderThermalReceiptPdf", () => {
 
     expect(pdfBuffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");
     expect((pdfBuffer.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
+  });
+});
+
+describe("renderThermalReceiptPdf — comprobante de venta sin factura electronica", () => {
+  it("renders a single-page receipt without QR or CUFE", async () => {
+    const data = mapSaleToReceiptData(
+      {
+        number: 42,
+        createdAt: new Date("2026-10-12T15:00:00Z"),
+        subtotal: 3500,
+        discountTotal: 0,
+        taxTotal: 665,
+        total: 4165,
+        items: [{ productName: "Arroz Diana 500g", quantity: 1, unitPrice: 3500, total: 3500 }],
+        payments: [{ method: "CASH", amount: 4165 }],
+        customer: null,
+      },
+      { nit: "900123456-7", legalName: "Tienda Demo SAS" },
+      testCompany
+    );
+
+    const pdf = await renderThermalReceiptPdf(data);
+
+    expect(pdf.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+    expect((pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
+    // Sin QR: ninguna imagen embebida.
+    expect(pdf.toString("latin1")).not.toContain("/Subtype /Image");
   });
 });

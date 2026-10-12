@@ -149,7 +149,7 @@ function estimateThermalHeight(data: RideDocumentData): number {
   const headerHeight = 120;
   const perLineHeight = 26; // descripcion + cant/precio/total en su propio renglon
   const totalsHeight = 50;
-  const qrBlockHeight = THERMAL_QR_SIZE + 45;
+  const qrBlockHeight = data.qrPayload ? THERMAL_QR_SIZE + 45 : 0;
   const footerHeight = 40;
   const habilitacionBanner = data.environment === "HABILITACION" ? 18 : 0;
   // +15% de colchon: mejor que sobre un poco de papel en blanco a que el contenido se corte o
@@ -159,7 +159,8 @@ function estimateThermalHeight(data: RideDocumentData): number {
 }
 
 export async function renderThermalReceiptPdf(data: RideDocumentData): Promise<Buffer> {
-  const qrPngBuffer = await QRCode.toBuffer(data.qrPayload, { margin: 1, width: THERMAL_QR_SIZE });
+  // Sin QR cuando es un comprobante de venta sin factura electronica (ver mapSaleToReceiptData).
+  const qrPngBuffer = data.qrPayload ? await QRCode.toBuffer(data.qrPayload, { margin: 1, width: THERMAL_QR_SIZE }) : null;
 
   const doc = new PDFDocument({ size: [THERMAL_WIDTH, estimateThermalHeight(data)], margin: THERMAL_MARGIN });
   const chunks: Buffer[] = [];
@@ -219,15 +220,17 @@ export async function renderThermalReceiptPdf(data: RideDocumentData): Promise<B
   twoCol("TOTAL", formatMoney(data.total), { bold: true, size: 9 });
   doc.moveDown(0.4);
 
-  const qrX = THERMAL_MARGIN + (pageWidth - THERMAL_QR_SIZE) / 2;
-  const qrTop = doc.y;
-  doc.image(qrPngBuffer, qrX, qrTop, { width: THERMAL_QR_SIZE, height: THERMAL_QR_SIZE });
-  doc.y = qrTop + THERMAL_QR_SIZE + 6;
+  if (qrPngBuffer) {
+    const qrX = THERMAL_MARGIN + (pageWidth - THERMAL_QR_SIZE) / 2;
+    const qrTop = doc.y;
+    doc.image(qrPngBuffer, qrX, qrTop, { width: THERMAL_QR_SIZE, height: THERMAL_QR_SIZE });
+    doc.y = qrTop + THERMAL_QR_SIZE + 6;
 
-  doc.fontSize(6).font("Helvetica").text(`${data.uniqueCodeLabel}: ${data.uniqueCode}`, { width: pageWidth, align: "center" });
-  doc.moveDown(0.4);
+    doc.fontSize(6).font("Helvetica").text(`${data.uniqueCodeLabel}: ${data.uniqueCode}`, { width: pageWidth, align: "center" });
+    doc.moveDown(0.4);
+  }
   doc.fontSize(6).fillColor("#666666").text(
-    "Representacion grafica no oficial, sin validar contra el Anexo Tecnico DIAN.",
+    data.footerNote ?? "Representacion grafica no oficial, sin validar contra el Anexo Tecnico DIAN.",
     { width: pageWidth, align: "center" }
   );
   doc.fillColor("black").fontSize(8).font("Helvetica-Bold").text("GRACIAS POR SU COMPRA", { width: pageWidth, align: "center" });

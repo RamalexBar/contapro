@@ -3,7 +3,7 @@ import { buildUblInvoiceXml } from "./ubl-invoice-xml-builder";
 import { buildUblNoteXml } from "./ubl-note-xml-builder";
 import { buildUblSupportDocumentXml } from "./ubl-support-document-xml-builder";
 import { buildDianPayrollXml } from "./dian-payroll-xml-builder";
-import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSupportDocumentToRideData } from "./ride-data-mapper";
+import { mapInvoiceToRideData, mapNoteToRideData, mapPayrollToRideData, mapSaleToReceiptData, mapSupportDocumentToRideData } from "./ride-data-mapper";
 import type { RideCompanyInfo } from "./ride-data-mapper";
 import type { ElectronicInvoiceWithXml } from "../domain/electronic-invoice.repository";
 import type { ElectronicCreditNoteWithXml } from "../domain/electronic-credit-note.repository";
@@ -236,5 +236,35 @@ describe("mapPayrollToRideData", () => {
     expect(descriptions).toEqual(
       expect.arrayContaining(["Sueldo trabajado", "Auxilio de transporte", "Salud", "Fondo de pension", "Retencion en la fuente"])
     );
+  });
+});
+
+describe("mapSaleToReceiptData", () => {
+  const sale = {
+    number: 7,
+    createdAt: new Date("2026-10-12T15:00:00Z"),
+    subtotal: 10000,
+    discountTotal: 1000,
+    taxTotal: 1710,
+    total: 10710,
+    items: [{ productName: "Gaseosa", quantity: 2, unitPrice: 5000, total: 10710 }],
+    payments: [{ method: "CASH", amount: 10710 }],
+    customer: null,
+  };
+
+  it("labels it as a sales receipt, not an invoice, with no QR or CUFE", () => {
+    const data = mapSaleToReceiptData(sale, { nit: "900", legalName: "Tienda" }, fullCompany);
+
+    expect(data).toMatchObject({ documentTypeLabel: "COMPROBANTE DE VENTA", fullNumber: "7", qrPayload: "", uniqueCode: "" });
+    expect(data.footerNote).toMatch(/no es una factura electronica/);
+    expect(data.issuer).toMatchObject({ nit: "900", legalName: "Tienda" });
+  });
+
+  it("uses consumidor final when there is no customer, and the net subtotal after discounts", () => {
+    const data = mapSaleToReceiptData(sale, { nit: "900", legalName: "Tienda" }, fullCompany);
+
+    expect(data.counterparty.name).toBe("Consumidor final");
+    expect(data).toMatchObject({ subtotal: "9000.00", taxTotal: "1710.00", total: "10710.00" });
+    expect(data.lines).toEqual([{ description: "Gaseosa", quantity: "2", unitPrice: "5000.00", total: "10710.00" }]);
   });
 });

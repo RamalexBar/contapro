@@ -34,6 +34,8 @@ export interface RideDocumentData {
    * ver README del modulo, punto 12). Para los otros 4 tipos, null unicamente si la resolucion ya
    * no existe en el momento de imprimir (no deberia pasar en la practica). */
   resolution: RideResolutionInfo | null;
+  /** Texto del pie en vez del aviso de representacion grafica (comprobante sin factura electronica). */
+  footerNote?: string;
 }
 
 /** nit/legalName siguen viniendo del XML ya firmado (identidad legal del documento, no cambia
@@ -125,6 +127,60 @@ export function findResolutionForFullNumber(
 function buildQrPayload(fullNumber: string, issueDate: Date, issuerNit: string, total: string, uniqueCode: string): string {
   const dateStr = issueDate.toISOString().slice(0, 10);
   return `NumFac:${fullNumber}|FecFac:${dateStr}|NitFac:${issuerNit}|ValFac:${total}|${uniqueCode}`;
+}
+
+/** Datos de la venta para la tirilla cuando no hay factura electronica (ver mapSaleToReceiptData). */
+export interface SaleReceiptSource {
+  number: number;
+  createdAt: Date;
+  subtotal: number;
+  discountTotal: number;
+  taxTotal: number;
+  total: number;
+  /** `total` del renglon antes de IVA, para que los renglones sumen el subtotal impreso. */
+  items: Array<{ productName: string; quantity: number; unitPrice: number; total: number }>;
+  payments: Array<{ method: string; amount: number }>;
+  customer: { name: string; documentType?: string; documentNumber: string } | null;
+}
+
+const money = (value: number) => value.toFixed(2);
+
+/**
+ * Tirilla de una venta que NO tiene factura electronica: la DIAN todavia no esta configurada, o
+ * la generacion fallo (la venta se guarda igual, ver CreateSaleUseCase). Antes el boton "Imprimir
+ * tirilla" del POS fallaba con 404 en ese caso; ahora sale un "Comprobante de venta" con los mismos
+ * datos (empresa, productos, totales), sin QR ni CUFE y con la leyenda de que no es factura.
+ */
+export function mapSaleToReceiptData(
+  sale: SaleReceiptSource,
+  issuer: { nit: string; legalName: string },
+  company: RideCompanyInfo
+): RideDocumentData {
+  return {
+    documentTypeLabel: "COMPROBANTE DE VENTA",
+    fullNumber: String(sale.number),
+    uniqueCodeLabel: "",
+    uniqueCode: "",
+    issueDate: sale.createdAt,
+    environment: "PRODUCCION",
+    status: "COMPLETED",
+    signed: false,
+    issuer: withCompanyInfo(issuer, company),
+    counterpartyLabel: "Cliente",
+    counterparty: sale.customer ?? { name: "Consumidor final", documentNumber: "222222222222" },
+    lines: sale.items.map((item) => ({
+      description: item.productName,
+      quantity: String(item.quantity),
+      unitPrice: money(item.unitPrice),
+      total: money(item.total),
+    })),
+    subtotal: money(sale.subtotal - sale.discountTotal),
+    taxTotal: money(sale.taxTotal),
+    total: money(sale.total),
+    qrPayload: "",
+    resolution: null,
+    footerNote: "Este comprobante no es una factura electronica.",
+  };
 }
 
 export function mapInvoiceToRideData(doc: ElectronicInvoiceWithXml, company: RideCompanyInfo, resolution: RideResolutionInfo | null): RideDocumentData {
