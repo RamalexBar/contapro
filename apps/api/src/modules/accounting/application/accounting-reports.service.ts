@@ -88,10 +88,10 @@ export class AccountingReportsService {
   /** byThirdParty (nuevo, a pedido del usuario): en vez de un solo total por cuenta, las cuentas
    * de THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES (Clientes/Proveedores) se desglosan en una fila por
    * tercero -- ver third-party-resolver.ts para por que solo esas dos cuentas. */
-  async getBalanceSheet(asOf: Date, options: { byThirdParty?: boolean } = {}): Promise<BalanceSheet> {
+  async getBalanceSheet(asOf: Date, options: { byThirdParty?: boolean; branchId?: string } = {}): Promise<BalanceSheet> {
     const accounts = await this.accountRepo.list();
     const accountById = new Map(accounts.map((a) => [a.id, a]));
-    const lines = await this.journalRepo.listPostedLines({ to: asOf });
+    const lines = await this.journalRepo.listPostedLines({ to: asOf, branchId: options.branchId });
     const isBreakdownAccount = (accountId: string) => {
       const account = accountById.get(accountId);
       return !!account && THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES.has(account.code);
@@ -195,9 +195,9 @@ export class AccountingReportsService {
     return rows.sort((a, b) => (a.thirdPartyName ?? "").localeCompare(b.thirdPartyName ?? ""));
   }
 
-  async getIncomeStatement(from: Date, to: Date, costCenterId?: string): Promise<IncomeStatement> {
+  async getIncomeStatement(from: Date, to: Date, costCenterId?: string, branchId?: string): Promise<IncomeStatement> {
     const accounts = await this.accountRepo.list();
-    const lines = await this.journalRepo.listPostedLines({ from, to, costCenterId });
+    const lines = await this.journalRepo.listPostedLines({ from, to, costCenterId, branchId });
     const byAccount = this.aggregateByAccount(lines);
 
     const income: AccountBalance[] = [];
@@ -227,9 +227,9 @@ export class AccountingReportsService {
     };
   }
 
-  async getLedger(accountId: string, from?: Date, to?: Date, costCenterId?: string): Promise<LedgerEntry[]> {
+  async getLedger(accountId: string, from?: Date, to?: Date, costCenterId?: string, branchId?: string): Promise<LedgerEntry[]> {
     const account = await this.accountRepo.findByIdOrThrow(accountId);
-    const lines = await this.journalRepo.listPostedLines({ accountId, from, to, costCenterId });
+    const lines = await this.journalRepo.listPostedLines({ accountId, from, to, costCenterId, branchId });
     const normalDebit = account.type === "ASSET" || account.type === "EXPENSE";
 
     let running = 0;

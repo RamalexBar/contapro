@@ -30,6 +30,13 @@ export interface CreatedCompanyWithAdmin {
   adminUserId: string;
 }
 
+/** Sucursal a la que el usuario puede cambiarse desde la barra superior. */
+export interface SelectableBranch {
+  id: string;
+  name: string;
+  isMain: boolean;
+}
+
 export interface CompanyMatch {
   companyId: string;
   companyName: string;
@@ -55,4 +62,9 @@ export interface IUserRepository {
    * con la contrasena vieja, queda deslogueado). */
   revokeAllRefreshTokensForUser(userId: string): Promise<void>;
   updatePassword(userId: string, passwordHash: string): Promise<void>;
+  /** Sucursales activas a las que el usuario puede entrar: las asignadas, o todas las de la
+   * empresa si `allOfCompany` (quien administra sucursales). */
+  listSelectableBranches(companyId: string, userId: string, allOfCompany: boolean): Promise<SelectableBranch[]>;
+  /** Marca esa sucursal como la por defecto del usuario (la crea si no estaba asignado). */
+  setDefaultBranch(userId: string, branchId: string): Promise<void>;
 }

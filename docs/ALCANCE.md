@@ -13,6 +13,7 @@ la base de datos.
 |---|---|
 | **Auth** | Registro de empresa, login, refresh token, logout, JWT (access+refresh) |
 | **RBAC** | Roles de sistema (Administrador, Propietario, Contador, Supervisor, Cajero, Empleado), permisos por rol, permisos individuales (override), matriz de permisos |
+| **Sucursales (ítem 50)** | Varias sedes: cada una con su caja, usuarios asignados a una o varias sucursales con selector en la barra superior, editar/desactivar/reactivar respetando el límite del plan, e informes contables filtrados por sucursal. Ver `apps/api/src/modules/branches/README.md` |
 | **Inventario** | Categorías, marcas, productos, códigos de barras, presentaciones, stock por sucursal (mín/máx), movimientos de stock (entradas/salidas/ajustes). **Importación masiva desde Excel/CSV** (plantilla propia o exportación de Alegra/Siigo, ítem 47). **Listas de precios múltiples** (iteración 35, ver fila más abajo): un producto puede tener overrides de precio por lista (mayorista/minorista/etc.), asignable por cliente |
 | **POS / Facturación** | Venta rápida con carrito, cotizaciones, notas crédito/débito, **autorización de descuento por PIN/contraseña** cuando un cajero supera su límite configurado. **Devoluciones** (`Return`, iteración 22, `modules/pos/return`): registra una devolución parcial/total sobre una venta `COMPLETED`/`RETURNED_PARTIAL`, valida contra lo ya devuelto antes (dentro de la misma transacción, evita sobregiro concurrente), restaura stock (lote nuevo si el producto rastrea lotes — no reinserta en el lote FIFO original consumido, ver limitación en `suppliers/README.md`) y contabiliza el reverso de la venta (`PostReturnJournalEntryUseCase`, permite elegir el medio de reembolso independiente del medio de pago original). UI web agregada en `/quotes-notes` |
 | **Caja** | Apertura/cierre de caja asociada a un empleado, arqueo (conteo de denominaciones), diferencias, movimientos (ingresos/egresos/retiros/consignaciones) |
@@ -844,3 +845,13 @@ cuando se implemente, mismo criterio que la lista de arriba:
     `apps/api/src/modules/suppliers/README.md`, punto 12. **Lectura de renglones sin probar con
     facturas reales** (mismo bloqueo de saldo en `ANTHROPIC_API_KEY`); el registro con renglones
     sí se verificó en vivo y en la pantalla, cargándolos a mano.
+50. ~~Sucursales operativas (varias sedes con su caja, sus cajeros y sus informes)~~ — implementado el
+    2026-10-12. Antes solo servían para el inventario: todo usuario quedaba en la principal y las
+    sucursales nuevas no tenían caja. Ahora cada sucursal nace con su caja (y una migración se la dio
+    a las existentes), se pueden editar/desactivar/reactivar, cada usuario se asigna a una o varias
+    sucursales con una principal, el selector de la barra superior cambia la sucursal activa (queda
+    guardada para el próximo ingreso), y Balance, Estado de Resultados y Libro mayor filtran por
+    sucursal. De paso se corrigió un error que ya existía: los informes contables y el kardex tomaban
+    la fecha "hasta" como la medianoche UTC, así que un informe hasta hoy no incluía lo de hoy; ahora
+    "desde"/"hasta" son el día completo en Colombia (`startOfDayInBogota`/`endOfDayInBogota` en
+    `@erp/shared-utils`). Detalle y limitaciones en `apps/api/src/modules/branches/README.md`.

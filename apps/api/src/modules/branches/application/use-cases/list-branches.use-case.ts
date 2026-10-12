@@ -3,7 +3,7 @@ import type { BranchRecord, IBranchRepository } from "../../domain/branch.reposi
 
 export class ListBranchesUseCase {
   constructor(private readonly repo: IBranchRepository) {}
-  async execute(): Promise<BranchRecord[]> {
-    return this.repo.list(getTenantContext().companyId);
+  async execute(options: { includeInactive?: boolean } = {}): Promise<BranchRecord[]> {
+    return this.repo.list(getTenantContext().companyId, options);
   }
 }

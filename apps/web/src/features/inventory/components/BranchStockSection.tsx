@@ -9,6 +9,7 @@ import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { createBranch, listBranches } from "../api/branch.api";
+import { BranchesAdminCard } from "./BranchesAdminCard";
 import { listProducts } from "../api/product.api";
 import { listBranchStock, transferStock } from "../api/stock.api";
 
@@ -36,6 +37,7 @@ export function BranchStockSection() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["branches"] });
+      queryClient.invalidateQueries({ queryKey: ["auth", "my-branches"] });
       setBranchForm({ name: "", address: "", phone: "" });
     },
   });
@@ -99,6 +101,8 @@ export function BranchStockSection() {
           )}
         </Card>
       )}
+
+      {canManageBranches && <BranchesAdminCard />}
 
       <Card title="Stock por sucursal">
         <Select className="mb-3" value={viewBranchId} onChange={(e) => setViewBranchId(e.target.value)}>

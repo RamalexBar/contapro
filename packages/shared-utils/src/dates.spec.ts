@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, calculateGraceEndsAt, calculateNextPeriodEnd, nowInBogota } from "./dates";
+import { addDays, calculateGraceEndsAt, calculateNextPeriodEnd, endOfDayInBogota, nowInBogota, startOfDayInBogota } from "./dates";
 
 // Los asserts comparan por componentes de fecha LOCAL (getFullYear/getMonth/getDate), no por
 // toISOString(): tanto addDays como calculateNextPeriodEnd operan con setDate()/setMonth(), que
@@ -73,5 +73,21 @@ describe("nowInBogota", () => {
     const first = nowInBogota();
     const second = nowInBogota();
     expect(second.getTime()).toBeGreaterThanOrEqual(first.getTime());
+  });
+});
+
+describe("startOfDayInBogota / endOfDayInBogota", () => {
+  it("takes a date-only value as the whole day in Colombia (UTC-5)", () => {
+    expect(startOfDayInBogota("2026-10-12").toISOString()).toBe("2026-10-12T05:00:00.000Z");
+    expect(endOfDayInBogota("2026-10-12").toISOString()).toBe("2026-10-13T04:59:59.999Z");
+  });
+
+  it("includes a sale made in the afternoon of the same day", () => {
+    const saleAt = new Date("2026-10-12T15:30:00-05:00");
+    expect(saleAt >= startOfDayInBogota("2026-10-12") && saleAt <= endOfDayInBogota("2026-10-12")).toBe(true);
+  });
+
+  it("leaves a full timestamp unchanged", () => {
+    expect(endOfDayInBogota("2026-10-12T10:00:00.000Z").toISOString()).toBe("2026-10-12T10:00:00.000Z");
   });
 });

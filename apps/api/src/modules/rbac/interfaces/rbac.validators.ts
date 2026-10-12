@@ -18,6 +18,7 @@ export const assignRoleSchema = z.object({
 });
 
 export const createUserSchema = z.object({
+  branchId: z.string().uuid().optional(),
   email: z.string().email(),
   fullName: z.string().min(2),
   password: z.string().min(8),

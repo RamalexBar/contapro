@@ -33,6 +33,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuthStore } from "../../features/auth/hooks/useAuthStore";
+import { BranchSwitcher } from "./BranchSwitcher";
 import { getOwnSubscription } from "../../features/billing/api/billing.api";
 import { Button } from "./Button";
 import { Logo } from "./Logo";
@@ -270,9 +271,12 @@ export function AppLayout({ children }: PropsWithChildren) {
             <Logo />
           </div>
           <div className="hidden md:block" />
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <UserCircle size={20} className="text-slate-400" />
-            <span className="max-w-[12rem] truncate">{user?.fullName}</span>
+          <div className="flex min-w-0 items-center gap-4">
+            <BranchSwitcher />
+            <div className="hidden items-center gap-2 text-sm font-medium text-slate-700 sm:flex">
+              <UserCircle size={20} className="text-slate-400" />
+              <span className="max-w-[12rem] truncate">{user?.fullName}</span>
+            </div>
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8">{children}</main>

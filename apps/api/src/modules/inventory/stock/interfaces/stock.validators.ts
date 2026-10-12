@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { endOfDayInBogota, startOfDayInBogota } from "@erp/shared-utils";
 
 export { stockEntrySchema, stockAdjustSchema } from "@erp/shared-types";
 
@@ -12,8 +13,9 @@ export const transferStockSchema = z.object({
 export const listKardexQuerySchema = z.object({
   productId: z.string().uuid(),
   branchId: z.string().uuid().optional(),
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
+  // Dia completo en Colombia: "hasta hoy" incluye los movimientos de hoy (ver endOfDayInBogota).
+  from: z.string().min(1).transform(startOfDayInBogota).optional(),
+  to: z.string().min(1).transform(endOfDayInBogota).optional(),
 });
 
 export const listBranchStockQuerySchema = z.object({

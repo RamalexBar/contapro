@@ -16,6 +16,7 @@ import { RefreshTokenUseCase } from "./application/use-cases/refresh-token.use-c
 import { LogoutUseCase } from "./application/use-cases/logout.use-case";
 import { RequestPasswordResetUseCase } from "./application/use-cases/request-password-reset.use-case";
 import { ResetPasswordUseCase } from "./application/use-cases/reset-password.use-case";
+import { SwitchBranchUseCase } from "./application/use-cases/switch-branch.use-case";
 import { AuthController } from "./interfaces/auth.controller";
 
 const userRepo = new PrismaUserRepository();
@@ -32,5 +33,6 @@ export const authController = new AuthController(
   new RefreshTokenUseCase(userRepo),
   new LogoutUseCase(userRepo, auditService),
   new RequestPasswordResetUseCase(userRepo, passwordResetTokenRepo, passwordResetNotifier),
-  new ResetPasswordUseCase(userRepo, passwordResetTokenRepo)
+  new ResetPasswordUseCase(userRepo, passwordResetTokenRepo),
+  new SwitchBranchUseCase(userRepo, auditService)
 );

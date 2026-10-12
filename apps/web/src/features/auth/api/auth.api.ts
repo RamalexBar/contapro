@@ -16,3 +16,18 @@ export function forgotPassword(email: string): Promise<{ message: string }> {
 export function resetPassword(token: string, newPassword: string): Promise<void> {
   return apiFetch("/auth/reset-password", { method: "POST", body: { token, newPassword } });
 }
+
+export interface SelectableBranch {
+  id: string;
+  name: string;
+  isMain: boolean;
+}
+
+/** Sucursales a las que el usuario puede cambiarse (las asignadas, o todas si administra sucursales). */
+export function listMyBranches(): Promise<{ data: SelectableBranch[]; currentBranchId: string | null }> {
+  return apiFetch("/auth/branches");
+}
+
+export function switchBranch(branchId: string): Promise<{ accessToken: string; user: AuthTokensResponse["user"] }> {
+  return apiFetch("/auth/switch-branch", { method: "POST", body: { branchId } });
+}

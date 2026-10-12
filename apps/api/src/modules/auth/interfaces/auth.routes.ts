@@ -9,5 +9,7 @@ authRouter.post("/auth/register-company", authRateLimiter, authController.regist
 authRouter.post("/auth/login", authRateLimiter, authController.login);
 authRouter.post("/auth/refresh", authRateLimiter, authController.refresh);
 authRouter.post("/auth/logout", tenantContextMiddleware, authController.logout);
+authRouter.get("/auth/branches", tenantContextMiddleware, authController.listMyBranches);
+authRouter.post("/auth/switch-branch", tenantContextMiddleware, authController.switchBranch);
 authRouter.post("/auth/forgot-password", authRateLimiter, authController.forgotPassword);
 authRouter.post("/auth/reset-password", authRateLimiter, authController.resetPassword);

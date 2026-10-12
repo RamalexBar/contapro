@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { endOfDayInBogota, startOfDayInBogota } from "@erp/shared-utils";
 import type { AccountingReportsService } from "../application/accounting-reports.service";
 import type { CreateAccountUseCase } from "../application/use-cases/create-account.use-case";
 import type { UpdateAccountUseCase } from "../application/use-cases/update-account.use-case";
@@ -51,6 +52,11 @@ import {
   createCostCenterSchema,
   updateCostCenterSchema,
 } from "./accounting.validators";
+
+/** `?branchId=` de los informes: sin el, toda la empresa (todas las sucursales juntas). */
+function queryBranchId(req: Request): string | undefined {
+  return typeof req.query.branchId === "string" && req.query.branchId ? req.query.branchId : undefined;
+}
 
 export class AccountingController {
   constructor(
@@ -227,9 +233,9 @@ export class AccountingController {
 
   getBalanceSheet = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = typeof req.query.asOf === "string" ? new Date(req.query.asOf) : new Date();
+      const asOf = typeof req.query.asOf === "string" ? endOfDayInBogota(req.query.asOf) : new Date();
       const byThirdParty = req.query.byThirdParty === "true";
-      res.json(await this.reports.getBalanceSheet(asOf, { byThirdParty }));
+      res.json(await this.reports.getBalanceSheet(asOf, { byThirdParty, branchId: queryBranchId(req) }));
     } catch (err) {
       next(err);
     }
@@ -237,10 +243,10 @@ export class AccountingController {
 
   getIncomeStatement = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const from = typeof req.query.from === "string" ? new Date(req.query.from) : new Date(0);
-      const to = typeof req.query.to === "string" ? new Date(req.query.to) : new Date();
+      const from = typeof req.query.from === "string" ? startOfDayInBogota(req.query.from) : new Date(0);
+      const to = typeof req.query.to === "string" ? endOfDayInBogota(req.query.to) : new Date();
       const costCenterId = typeof req.query.costCenterId === "string" ? req.query.costCenterId : undefined;
-      res.json(await this.reports.getIncomeStatement(from, to, costCenterId));
+      res.json(await this.reports.getIncomeStatement(from, to, costCenterId, queryBranchId(req)));
     } catch (err) {
       next(err);
     }
@@ -248,10 +254,10 @@ export class AccountingController {
 
   getLedger = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const from = typeof req.query.from === "string" ? new Date(req.query.from) : undefined;
-      const to = typeof req.query.to === "string" ? new Date(req.query.to) : undefined;
+      const from = typeof req.query.from === "string" ? startOfDayInBogota(req.query.from) : undefined;
+      const to = typeof req.query.to === "string" ? endOfDayInBogota(req.query.to) : undefined;
       const costCenterId = typeof req.query.costCenterId === "string" ? req.query.costCenterId : undefined;
-      res.json({ data: await this.reports.getLedger(req.params.accountId, from, to, costCenterId) });
+      res.json({ data: await this.reports.getLedger(req.params.accountId, from, to, costCenterId, queryBranchId(req)) });
     } catch (err) {
       next(err);
     }
@@ -259,8 +265,8 @@ export class AccountingController {
 
   getCashFlow = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const from = typeof req.query.from === "string" ? new Date(req.query.from) : new Date(0);
-      const to = typeof req.query.to === "string" ? new Date(req.query.to) : new Date();
+      const from = typeof req.query.from === "string" ? startOfDayInBogota(req.query.from) : new Date(0);
+      const to = typeof req.query.to === "string" ? endOfDayInBogota(req.query.to) : new Date();
       res.json(await this.reports.getCashFlow(from, to));
     } catch (err) {
       next(err);

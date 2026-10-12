@@ -8,6 +8,7 @@ export interface CreateUserUseCaseInput {
   fullName: string;
   password: string;
   roleId?: string;
+  branchId?: string;
 }
 
 export class CreateUserUseCase {
@@ -24,6 +25,7 @@ export class CreateUserUseCase {
       fullName: input.fullName,
       passwordHash,
       roleId: input.roleId,
+      branchId: input.branchId,
     });
 
     await this.audit.record({

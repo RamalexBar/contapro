@@ -21,3 +21,4 @@ branchesRouter.use(tenantContextMiddleware);
 
 branchesRouter.get("/branches", branchesController.list);
 branchesRouter.post("/branches", requirePermission("branch.manage"), branchesController.create);
+branchesRouter.patch("/branches/:id", requirePermission("branch.manage"), branchesController.update);

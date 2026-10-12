@@ -64,8 +64,9 @@ export interface IJournalEntryRepository {
   updateStatus(id: string, status: string, postedAt?: Date): Promise<JournalEntryRecord>;
   /** Lineas de comprobantes POSTED, para libro mayor y reportes financieros. `costCenterId`
    * filtra por el campo del mismo nombre en JournalEntry (item 34 de docs/ALCANCE.md) -- se
-   * omite del where cuando no se pasa, sin cambiar el comportamiento existente. */
-  listPostedLines(filter: { from?: Date; to?: Date; accountId?: string; costCenterId?: string }): Promise<PostedLineAggregate[]>;
+   * omite del where cuando no se pasa, sin cambiar el comportamiento existente. `branchId`
+   * igual, para los informes por sucursal. */
+  listPostedLines(filter: { from?: Date; to?: Date; accountId?: string; costCenterId?: string; branchId?: string }): Promise<PostedLineAggregate[]>;
   /** Para bloquear el cierre de un periodo con comprobantes sin publicar/anular pendientes. */
   hasDraftEntriesInPeriod(year: number, month: number): Promise<boolean>;
   /** Encuentra el comprobante generado automaticamente para un hecho economico dado (ej. un

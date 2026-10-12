@@ -186,17 +186,19 @@ export function printJournalEntryPdf(entryId: string): Promise<void> {
   return openPdfInNewTab(`/journal-entries/${entryId}/pdf`);
 }
 
-export function getBalanceSheet(asOf?: string, byThirdParty?: boolean): Promise<BalanceSheet> {
+export function getBalanceSheet(asOf?: string, byThirdParty?: boolean, branchId?: string): Promise<BalanceSheet> {
   const params = new URLSearchParams();
   if (asOf) params.set("asOf", asOf);
   if (byThirdParty) params.set("byThirdParty", "true");
+  if (branchId) params.set("branchId", branchId);
   const query = params.toString();
   return apiFetch(`/reports/balance-sheet${query ? `?${query}` : ""}`);
 }
 
-export function getIncomeStatement(from: string, to: string, costCenterId?: string): Promise<IncomeStatement> {
+export function getIncomeStatement(from: string, to: string, costCenterId?: string, branchId?: string): Promise<IncomeStatement> {
   const params = new URLSearchParams({ from, to });
   if (costCenterId) params.set("costCenterId", costCenterId);
+  if (branchId) params.set("branchId", branchId);
   return apiFetch(`/reports/income-statement?${params.toString()}`);
 }
 
@@ -204,11 +206,12 @@ export function getCashFlow(from: string, to: string): Promise<CashFlowReport> {
   return apiFetch(`/reports/cash-flow?from=${from}&to=${to}`);
 }
 
-export function getLedger(accountId: string, from?: string, to?: string, costCenterId?: string): Promise<{ data: LedgerEntry[] }> {
+export function getLedger(accountId: string, from?: string, to?: string, costCenterId?: string, branchId?: string): Promise<{ data: LedgerEntry[] }> {
   const params = new URLSearchParams();
   if (from) params.set("from", from);
   if (to) params.set("to", to);
   if (costCenterId) params.set("costCenterId", costCenterId);
+  if (branchId) params.set("branchId", branchId);
   const query = params.toString();
   return apiFetch(`/reports/ledger/${accountId}${query ? `?${query}` : ""}`);
 }

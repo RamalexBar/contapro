@@ -25,7 +25,7 @@ const SETTLEMENT_CALCULATED: CommissionSettlementRecord = {
   journalEntryId: null,
 };
 
-const SELLER: UserSummary = { id: "seller-1", email: "seller@demo.com", fullName: "Vendedor Uno", isActive: true, roles: ["CAJERO"] };
+const SELLER: UserSummary = { id: "seller-1", email: "seller@demo.com", fullName: "Vendedor Uno", isActive: true, roles: ["CAJERO"], branches: [] };
 
 class FakeSettlementRepository implements Partial<ICommissionSettlementRepository> {
   constructor(private settlement: CommissionSettlementRecord) {}

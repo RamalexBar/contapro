@@ -5,6 +5,9 @@ import type { RefreshTokenUseCase } from "../application/use-cases/refresh-token
 import type { LogoutUseCase } from "../application/use-cases/logout.use-case";
 import type { RequestPasswordResetUseCase } from "../application/use-cases/request-password-reset.use-case";
 import type { ResetPasswordUseCase } from "../application/use-cases/reset-password.use-case";
+import type { SwitchBranchUseCase } from "../application/use-cases/switch-branch.use-case";
+import { switchBranchSchema } from "@erp/shared-types";
+import { getTenantContext } from "../../../shared/context/request-context";
 import { forgotPasswordSchema, loginSchema, refreshTokenSchema, registerCompanySchema, resetPasswordSchema } from "./auth.validators";
 
 export class AuthController {
@@ -14,8 +17,36 @@ export class AuthController {
     private readonly refreshTokenUseCase: RefreshTokenUseCase,
     private readonly logoutUseCase: LogoutUseCase,
     private readonly requestPasswordResetUseCase: RequestPasswordResetUseCase,
-    private readonly resetPasswordUseCase: ResetPasswordUseCase
+    private readonly resetPasswordUseCase: ResetPasswordUseCase,
+    private readonly switchBranchUseCase: SwitchBranchUseCase
   ) {}
+
+  listMyBranches = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ctx = getTenantContext();
+      const data = await this.switchBranchUseCase.listSelectable(ctx.userId, ctx.companyId, ctx.permissions.has("branch.manage"));
+      res.json({ data, currentBranchId: ctx.branchId });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  switchBranch = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ctx = getTenantContext();
+      const body = switchBranchSchema.parse(req.body);
+      res.json(
+        await this.switchBranchUseCase.execute({
+          userId: ctx.userId,
+          companyId: ctx.companyId,
+          branchId: body.branchId,
+          canManageBranches: ctx.permissions.has("branch.manage"),
+        })
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
 
   login = async (req: Request, res: Response, next: NextFunction) => {
     try {

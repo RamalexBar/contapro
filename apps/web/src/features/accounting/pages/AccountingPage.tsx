@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { listAllBranches } from "../../inventory/api/branch.api";
 import { formatCOP } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
@@ -831,17 +832,21 @@ function ReportsSection() {
   const [ledgerCostCenterId, setLedgerCostCenterId] = useState("");
   const [showCode, setShowCode] = useState(true);
   const [byThirdParty, setByThirdParty] = useState(false);
+  // Vacio = toda la empresa. Incluye sucursales desactivadas: su historia contable sigue ahi.
+  const [reportBranchId, setReportBranchId] = useState("");
+  const { data: reportBranches } = useQuery({ queryKey: ["branches", "all"], queryFn: listAllBranches });
+  const branchFilter = reportBranchId || undefined;
 
   const { data: accounts } = useQuery({ queryKey: ["accounting", "accounts"], queryFn: listAccounts });
   const { data: costCenters } = useQuery({ queryKey: ["cost-centers"], queryFn: listCostCenters });
   const balanceQuery = useQuery({
-    queryKey: ["accounting", "balance-sheet", asOf, byThirdParty],
-    queryFn: () => getBalanceSheet(asOf, byThirdParty),
+    queryKey: ["accounting", "balance-sheet", asOf, byThirdParty, reportBranchId],
+    queryFn: () => getBalanceSheet(asOf, byThirdParty, branchFilter),
     enabled: reportTab === "balance",
   });
   const incomeQuery = useQuery({
-    queryKey: ["accounting", "income-statement", from, to, incomeCostCenterId],
-    queryFn: () => getIncomeStatement(from, to, incomeCostCenterId || undefined),
+    queryKey: ["accounting", "income-statement", from, to, incomeCostCenterId, reportBranchId],
+    queryFn: () => getIncomeStatement(from, to, incomeCostCenterId || undefined, branchFilter),
     enabled: reportTab === "income",
   });
   const cashFlowQuery = useQuery({
@@ -850,8 +855,8 @@ function ReportsSection() {
     enabled: reportTab === "cashflow",
   });
   const ledgerQuery = useQuery({
-    queryKey: ["accounting", "ledger", ledgerAccountId, from, to, ledgerCostCenterId],
-    queryFn: () => getLedger(ledgerAccountId, from, to, ledgerCostCenterId || undefined),
+    queryKey: ["accounting", "ledger", ledgerAccountId, from, to, ledgerCostCenterId, reportBranchId],
+    queryFn: () => getLedger(ledgerAccountId, from, to, ledgerCostCenterId || undefined, branchFilter),
     enabled: reportTab === "ledger" && !!ledgerAccountId,
   });
 
@@ -865,10 +870,29 @@ function ReportsSection() {
             </Button>
           ))}
         </div>
-        <Button size="sm" variant="secondary" onClick={() => window.print()}>
-          Imprimir
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {(reportBranches?.data.length ?? 0) > 1 && reportTab !== "cashflow" && (
+            <Select aria-label="Sucursal" value={reportBranchId} onChange={(e) => setReportBranchId(e.target.value)}>
+              <option value="">Todas las sucursales</option>
+              {reportBranches?.data.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                  {b.isActive ? "" : " (desactivada)"}
+                </option>
+              ))}
+            </Select>
+          )}
+          <Button size="sm" variant="secondary" onClick={() => window.print()}>
+            Imprimir
+          </Button>
+        </div>
       </div>
+      {reportBranchId && reportTab !== "cashflow" && (
+        <p className="text-sm text-slate-500">
+          Sucursal: <span className="font-medium text-slate-700">{reportBranches?.data.find((b) => b.id === reportBranchId)?.name}</span>. Solo los
+          movimientos registrados en esa sucursal (ventas, compras, caja y gastos de esa sede).
+        </p>
+      )}
 
       {reportTab === "balance" && (
         <Card>

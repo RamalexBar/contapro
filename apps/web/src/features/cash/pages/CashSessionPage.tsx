@@ -18,7 +18,9 @@ export function CashSessionPage() {
   const canOpen = useAuthStore((s) => s.hasPermission("cash.session.open"));
   const canClose = useAuthStore((s) => s.hasPermission("cash.session.close"));
   const { data: registers } = useQuery({ queryKey: ["cash-registers"], queryFn: listCashRegisters });
-  const registerId = registers?.data[0]?.id;
+  // Cada sucursal tiene su caja; GET /cash/registers ya devuelve solo las de la sucursal activa.
+  const register = registers?.data[0];
+  const registerId = register?.id;
 
   const { data: activeSession, isLoading } = useQuery({
     queryKey: ["cash-active-session", registerId],
@@ -41,7 +43,8 @@ export function CashSessionPage() {
 
   return (
     <AppLayout>
-      <h1 className="mb-4 text-lg font-semibold text-slate-900">Caja</h1>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900">Caja</h1>
+      <p className="mb-4 text-sm text-slate-500">{register ? register.name : "Esta sucursal no tiene caja"}</p>
       <Card className="max-w-md">
         {isLoading && <Spinner />}
 

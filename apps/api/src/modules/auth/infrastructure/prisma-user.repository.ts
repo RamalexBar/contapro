@@ -4,6 +4,7 @@ import type {
   CreateCompanyWithAdminInput,
   CreatedCompanyWithAdmin,
   IUserRepository,
+  SelectableBranch,
   UserWithAccess,
 } from "../domain/user.repository";
 import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS, SYSTEM_ROLES } from "@erp/shared-types";
@@ -90,6 +91,25 @@ export class PrismaUserRepository implements IUserRepository {
       roles: roleNames,
       permissions: Array.from(rolePermissionCodes),
     };
+  }
+
+  async listSelectableBranches(companyId: string, userId: string, allOfCompany: boolean): Promise<SelectableBranch[]> {
+    return basePrisma.branch.findMany({
+      where: { companyId, isActive: true, ...(allOfCompany ? {} : { userBranches: { some: { userId } } }) },
+      select: { id: true, name: true, isMain: true },
+      orderBy: [{ isMain: "desc" }, { name: "asc" }],
+    });
+  }
+
+  async setDefaultBranch(userId: string, branchId: string): Promise<void> {
+    await basePrisma.$transaction([
+      basePrisma.userBranch.updateMany({ where: { userId, isDefault: true }, data: { isDefault: false } }),
+      basePrisma.userBranch.upsert({
+        where: { userId_branchId: { userId, branchId } },
+        create: { userId, branchId, isDefault: true },
+        update: { isDefault: true },
+      }),
+    ]);
   }
 
   async registerFailedLogin(userId: string): Promise<void> {

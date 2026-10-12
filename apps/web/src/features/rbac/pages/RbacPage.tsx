@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { listBranches } from "../../inventory/api/branch.api";
+import { UserBranchesCard } from "../components/UserBranchesCard";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
@@ -110,7 +112,8 @@ export function RbacPage() {
     });
   }
 
-  const [newUser, setNewUser] = useState({ fullName: "", email: "", password: "", roleId: "" });
+  const [newUser, setNewUser] = useState({ fullName: "", email: "", password: "", roleId: "", branchId: "" });
+  const { data: branches } = useQuery({ queryKey: ["branches"], queryFn: listBranches });
   const createUserMutation = useMutation({
     mutationFn: () =>
       createUser({
@@ -118,10 +121,11 @@ export function RbacPage() {
         email: newUser.email,
         password: newUser.password,
         roleId: newUser.roleId || undefined,
+        branchId: newUser.branchId || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      setNewUser({ fullName: "", email: "", password: "", roleId: "" });
+      setNewUser({ fullName: "", email: "", password: "", roleId: "", branchId: "" });
     },
   });
 
@@ -208,7 +212,7 @@ export function RbacPage() {
 
       <Card title="Nuevo usuario" className="mb-6">
         <form
-          className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
           onSubmit={(e) => {
             e.preventDefault();
             createUserMutation.mutate();
@@ -243,6 +247,18 @@ export function RbacPage() {
               </option>
             ))}
           </Select>
+          {(branches?.data.length ?? 0) > 1 && (
+            <Select value={newUser.branchId} onChange={(e) => setNewUser({ ...newUser, branchId: e.target.value })}>
+              <option value="">Sucursal principal</option>
+              {branches?.data
+                .filter((b) => !b.isMain)
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+            </Select>
+          )}
           <Button type="submit" loading={createUserMutation.isPending}>
             Crear usuario
           </Button>
@@ -320,6 +336,8 @@ export function RbacPage() {
           </TableBody>
         </Table>
       </Card>
+
+      <UserBranchesCard users={users?.data ?? []} />
 
       <Card title="Permisos individuales (override por usuario)">
         <Select label="Usuario" value={overrideUserId} onChange={(e) => setOverrideUserId(e.target.value)} className="mb-3">

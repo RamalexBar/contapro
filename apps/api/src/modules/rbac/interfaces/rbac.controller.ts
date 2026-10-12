@@ -7,6 +7,8 @@ import type { GrantUserPermissionUseCase } from "../application/use-cases/grant-
 import type { ListEffectivePermissionsUseCase } from "../application/use-cases/list-effective-permissions.use-case";
 import type { AssignRoleUseCase } from "../application/use-cases/assign-role.use-case";
 import type { RemoveRoleUseCase } from "../application/use-cases/remove-role.use-case";
+import type { SetUserBranchesUseCase } from "../application/use-cases/set-user-branches.use-case";
+import { setUserBranchesSchema } from "@erp/shared-types";
 import type { IPermissionRepository, IRoleRepository, IUserDirectoryRepository } from "../domain/rbac.types";
 import {
   assignPermissionsSchema,
@@ -27,8 +29,18 @@ export class RbacController {
     private readonly grantUserPermissionUseCase: GrantUserPermissionUseCase,
     private readonly listEffectivePermissionsUseCase: ListEffectivePermissionsUseCase,
     private readonly assignRoleUseCase: AssignRoleUseCase,
-    private readonly removeRoleUseCase: RemoveRoleUseCase
+    private readonly removeRoleUseCase: RemoveRoleUseCase,
+    private readonly setUserBranchesUseCase: SetUserBranchesUseCase
   ) {}
+
+  setUserBranches = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = setUserBranchesSchema.parse(req.body);
+      res.json(await this.setUserBranchesUseCase.execute(req.params.userId, body));
+    } catch (err) {
+      next(err);
+    }
+  };
 
   listUsers = async (_req: Request, res: Response, next: NextFunction) => {
     try {

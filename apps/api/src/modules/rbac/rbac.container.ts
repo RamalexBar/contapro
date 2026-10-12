@@ -11,6 +11,7 @@ import { GrantUserPermissionUseCase } from "./application/use-cases/grant-user-p
 import { ListEffectivePermissionsUseCase } from "./application/use-cases/list-effective-permissions.use-case";
 import { AssignRoleUseCase } from "./application/use-cases/assign-role.use-case";
 import { RemoveRoleUseCase } from "./application/use-cases/remove-role.use-case";
+import { SetUserBranchesUseCase } from "./application/use-cases/set-user-branches.use-case";
 import { RbacController } from "./interfaces/rbac.controller";
 
 const roleRepo = new PrismaRoleRepository();
@@ -29,5 +30,6 @@ export const rbacController = new RbacController(
   new GrantUserPermissionUseCase(permissionRepo, auditService),
   new ListEffectivePermissionsUseCase(userRepo),
   new AssignRoleUseCase(userDirectoryRepo, auditService),
-  new RemoveRoleUseCase(userDirectoryRepo, auditService)
+  new RemoveRoleUseCase(userDirectoryRepo, auditService),
+  new SetUserBranchesUseCase(userDirectoryRepo, auditService)
 );

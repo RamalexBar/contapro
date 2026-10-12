@@ -146,7 +146,7 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
     return toRecord(row);
   }
 
-  async listPostedLines(filter: { from?: Date; to?: Date; accountId?: string; costCenterId?: string }): Promise<PostedLineAggregate[]> {
+  async listPostedLines(filter: { from?: Date; to?: Date; accountId?: string; costCenterId?: string; branchId?: string }): Promise<PostedLineAggregate[]> {
     const companyId = getTenantContext().companyId;
     const rows = await prisma.journalEntryLine.findMany({
       where: {
@@ -156,6 +156,7 @@ export class PrismaJournalEntryRepository implements IJournalEntryRepository {
           status: "POSTED",
           date: { gte: filter.from, lte: filter.to },
           costCenterId: filter.costCenterId,
+          branchId: filter.branchId,
         },
       },
       include: { journalEntry: true },

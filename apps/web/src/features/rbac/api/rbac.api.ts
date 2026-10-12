@@ -21,6 +21,8 @@ export interface UserSummary {
   fullName: string;
   isActive: boolean;
   roles: string[];
+  /** Sucursales donde trabaja; la isDefault es con la que entra. */
+  branches: { id: string; name: string; isDefault: boolean }[];
 }
 
 export interface EffectivePermissions {
@@ -48,7 +50,11 @@ export function listUsers(): Promise<{ data: UserSummary[] }> {
   return apiFetch("/users");
 }
 
-export function createUser(input: { email: string; fullName: string; password: string; roleId?: string }): Promise<UserSummary> {
+export function setUserBranches(userId: string, input: { branchIds: string[]; defaultBranchId: string }): Promise<UserSummary> {
+  return apiFetch(`/users/${userId}/branches`, { method: "PUT", body: input });
+}
+
+export function createUser(input: { email: string; fullName: string; password: string; roleId?: string; branchId?: string }): Promise<UserSummary> {
   return apiFetch("/users", { method: "POST", body: input });
 }
 
