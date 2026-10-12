@@ -9,6 +9,7 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { Alert } from "../../../components/ui/Alert";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { closeSession, getActiveSession, listCashRegisters, openSession, type CashSessionResponse } from "../api/cash.api";
+import { CashSessionHistory } from "../components/CashSessionHistory";
 
 export function CashSessionPage() {
   const queryClient = useQueryClient();
@@ -17,6 +18,7 @@ export function CashSessionPage() {
   // se enteraba de que no tenia permiso al recibir un 403 del backend al enviar el formulario.
   const canOpen = useAuthStore((s) => s.hasPermission("cash.session.open"));
   const canClose = useAuthStore((s) => s.hasPermission("cash.session.close"));
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const { data: registers } = useQuery({ queryKey: ["cash-registers"], queryFn: listCashRegisters });
   // Cada sucursal tiene su caja; GET /cash/registers ya devuelve solo las de la sucursal activa.
   const register = registers?.data[0];
@@ -40,6 +42,7 @@ export function CashSessionPage() {
     onSuccess: () => {
       setLastClosed(null);
       queryClient.invalidateQueries({ queryKey: ["cash-active-session"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-sessions"] });
     },
   });
 
@@ -50,6 +53,7 @@ export function CashSessionPage() {
       setClosingAmount("");
       setConfirmingDifference(false);
       queryClient.invalidateQueries({ queryKey: ["cash-active-session"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-sessions"] });
     },
   });
 
@@ -102,6 +106,11 @@ export function CashSessionPage() {
         {activeSession && (
           <div className="space-y-3">
             <dl className="grid grid-cols-2 gap-2 text-sm">
+              <dt className="text-slate-500">Abierta por</dt>
+              <dd className="text-right font-medium text-slate-900">
+                {activeSession.openedByName ?? "-"}
+                {activeSession.openedByUserId === currentUserId ? " (tu)" : ""}
+              </dd>
               <dt className="text-slate-500">Base al abrir</dt>
               <dd className="text-right text-slate-900">{formatCOP(activeSession.openingAmount)}</dd>
               <dt className="text-slate-500">Deberia haber en caja</dt>
@@ -111,6 +120,12 @@ export function CashSessionPage() {
               Base mas ventas en efectivo y entradas, menos salidas, desde{" "}
               {new Date(activeSession.openedAt).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
             </p>
+            {activeSession.openedByUserId !== currentUserId && (
+              <Alert tone="warning">
+                Este turno lo abrio {activeSession.openedByName ?? "otra persona"}. Si ahora te toca a ti, cuenta el efectivo con esa persona,
+                cierra su turno y abre el tuyo: asi lo que vendas queda a tu nombre.
+              </Alert>
+            )}
             {canClose ? (
               <>
                 <Input
@@ -157,6 +172,8 @@ export function CashSessionPage() {
           </div>
         )}
       </Card>
+
+      {registerId && <CashSessionHistory cashRegisterId={registerId} />}
     </AppLayout>
   );
 }

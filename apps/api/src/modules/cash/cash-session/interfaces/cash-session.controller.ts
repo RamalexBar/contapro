@@ -5,6 +5,7 @@ import type { OpenCashSessionUseCase } from "../application/use-cases/open-sessi
 import type { CloseCashSessionUseCase } from "../application/use-cases/close-session.use-case";
 import type { GetActiveSessionUseCase } from "../application/use-cases/get-active-session.use-case";
 import type { RegisterCashMovementUseCase } from "../application/use-cases/register-cash-movement.use-case";
+import type { ListCashSessionsUseCase } from "../application/use-cases/list-cash-sessions.use-case";
 import { cashMovementSchema, closeCashSessionSchema, openCashSessionSchema } from "./cash-session.validators";
 
 export class CashSessionController {
@@ -12,8 +13,18 @@ export class CashSessionController {
     private readonly openUseCase: OpenCashSessionUseCase,
     private readonly closeUseCase: CloseCashSessionUseCase,
     private readonly getActiveUseCase: GetActiveSessionUseCase,
-    private readonly registerMovementUseCase: RegisterCashMovementUseCase
+    private readonly registerMovementUseCase: RegisterCashMovementUseCase,
+    private readonly listSessionsUseCase: ListCashSessionsUseCase
   ) {}
+
+  listSessions = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) || undefined : undefined;
+      res.json({ data: await this.listSessionsUseCase.execute(req.params.cashRegisterId, limit) });
+    } catch (err) {
+      next(err);
+    }
+  };
 
   open = async (req: Request, res: Response, next: NextFunction) => {
     try {

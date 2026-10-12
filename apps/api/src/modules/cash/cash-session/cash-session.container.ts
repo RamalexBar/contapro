@@ -5,6 +5,7 @@ import { PrismaCashSessionRepository } from "./infrastructure/prisma-cash-sessio
 import { OpenCashSessionUseCase } from "./application/use-cases/open-session.use-case";
 import { CloseCashSessionUseCase } from "./application/use-cases/close-session.use-case";
 import { GetActiveSessionUseCase } from "./application/use-cases/get-active-session.use-case";
+import { ListCashSessionsUseCase } from "./application/use-cases/list-cash-sessions.use-case";
 import { RegisterCashMovementUseCase } from "./application/use-cases/register-cash-movement.use-case";
 import { CashSessionController } from "./interfaces/cash-session.controller";
 
@@ -19,5 +20,6 @@ export const cashSessionController = new CashSessionController(
   new OpenCashSessionUseCase(repo, auditService),
   new CloseCashSessionUseCase(repo, postCashSessionAdjustmentJournalEntryUseCase, auditService),
   new GetActiveSessionUseCase(repo),
-  registerCashMovementUseCase
+  registerCashMovementUseCase,
+  new ListCashSessionsUseCase(repo)
 );

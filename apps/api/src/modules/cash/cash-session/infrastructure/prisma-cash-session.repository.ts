@@ -117,6 +117,18 @@ export class PrismaCashSessionRepository implements ICashSessionRepository {
     return { id: movement.id };
   }
 
+  async listByRegister(cashRegisterId: string, limit: number): Promise<CashSessionRecord[]> {
+    const rows = await prisma.cashSession.findMany({ where: { cashRegisterId }, orderBy: { openedAt: "desc" }, take: limit });
+    return rows.map(toRecord);
+  }
+
+  async findUserNames(userIds: string[]): Promise<Map<string, string>> {
+    const ids = [...new Set(userIds)];
+    if (ids.length === 0) return new Map();
+    const users = await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, fullName: true } });
+    return new Map(users.map((u) => [u.id, u.fullName]));
+  }
+
   async sumMovements(cashSessionId: string): Promise<number> {
     const movements = await prisma.cashMovement.findMany({ where: { cashSessionId } });
     let net = 0;

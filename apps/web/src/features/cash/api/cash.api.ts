@@ -9,6 +9,9 @@ export interface CashSessionResponse {
   closingAmountCounted: number | null;
   difference: number | null;
   openedAt: string;
+  closedAt: string | null;
+  openedByUserId: string;
+  closedByUserId: string | null;
 }
 
 export interface CashRegister {
@@ -22,7 +25,14 @@ export function listCashRegisters(): Promise<{ data: CashRegister[] }> {
 }
 
 /** Sesion abierta + cuanto deberia haber en caja ahora (base + entradas - salidas de efectivo). */
-export type ActiveCashSessionResponse = CashSessionResponse & { expectedAmount: number };
+export type ActiveCashSessionResponse = CashSessionResponse & { expectedAmount: number; openedByName: string | null };
+
+export type CashSessionHistoryItem = CashSessionResponse & { openedByName: string | null; closedByName: string | null };
+
+/** Ultimos turnos de la caja, el mas reciente primero. */
+export function listCashSessions(cashRegisterId: string): Promise<{ data: CashSessionHistoryItem[] }> {
+  return apiFetch(`/cash/registers/${cashRegisterId}/sessions`);
+}
 
 export function getActiveSession(cashRegisterId: string): Promise<ActiveCashSessionResponse | null> {
   return apiFetch(`/cash/registers/${cashRegisterId}/active-session`);

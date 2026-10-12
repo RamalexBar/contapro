@@ -31,4 +31,8 @@ export interface ICashSessionRepository {
   /** Usado por AccountingReportsService.getCashFlow -- agregado por companyId via la relacion a
    * CashSession (CashMovement no tiene columna companyId propia). */
   sumMovementsByType(from: Date, to: Date): Promise<Array<{ type: string; total: number }>>;
+  /** Ultimos turnos de la caja, el mas reciente primero (historial de la pantalla de Caja). */
+  listByRegister(cashRegisterId: string, limit: number): Promise<CashSessionRecord[]>;
+  /** Nombre de cada usuario de la empresa, para mostrar quien abrio y cerro cada turno. */
+  findUserNames(userIds: string[]): Promise<Map<string, string>>;
 }
