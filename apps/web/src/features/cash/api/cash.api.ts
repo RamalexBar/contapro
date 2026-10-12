@@ -21,7 +21,10 @@ export function listCashRegisters(): Promise<{ data: CashRegister[] }> {
   return apiFetch("/cash/registers");
 }
 
-export function getActiveSession(cashRegisterId: string): Promise<CashSessionResponse | null> {
+/** Sesion abierta + cuanto deberia haber en caja ahora (base + entradas - salidas de efectivo). */
+export type ActiveCashSessionResponse = CashSessionResponse & { expectedAmount: number };
+
+export function getActiveSession(cashRegisterId: string): Promise<ActiveCashSessionResponse | null> {
   return apiFetch(`/cash/registers/${cashRegisterId}/active-session`);
 }
 

@@ -43,10 +43,17 @@ export class PrismaCashSessionRepository implements ICashSessionRepository {
     const existing = await prisma.cashSession.findFirst({ where: { cashRegisterId, status: "OPEN" } });
     if (existing) throw new ConflictError("Esta caja ya tiene una sesion abierta");
 
-    const row = await prisma.cashSession.create({
-      data: { companyId, branchId, cashRegisterId, openedByUserId: userId, openingAmount },
-    });
-    return toRecord(row);
+    // El indice unico parcial (una sesion OPEN por caja) cubre la carrera de dos aperturas a la vez
+    // (doble clic, dos pestanas) que el findFirst de arriba no alcanza a ver.
+    try {
+      const row = await prisma.cashSession.create({
+        data: { companyId, branchId, cashRegisterId, openedByUserId: userId, openingAmount },
+      });
+      return toRecord(row);
+    } catch (err) {
+      if ((err as { code?: string }).code === "P2002") throw new ConflictError("Esta caja ya tiene una sesion abierta");
+      throw err;
+    }
   }
 
   async findActiveByRegister(cashRegisterId: string): Promise<CashSessionRecord | null> {

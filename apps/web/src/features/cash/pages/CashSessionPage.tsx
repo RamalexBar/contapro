@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatCOP } from "@erp/shared-utils";
+import { formatCOP, round2 } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
@@ -8,7 +8,7 @@ import { Input } from "../../../components/ui/Input";
 import { Spinner } from "../../../components/ui/Spinner";
 import { Alert } from "../../../components/ui/Alert";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
-import { closeSession, getActiveSession, listCashRegisters, openSession } from "../api/cash.api";
+import { closeSession, getActiveSession, listCashRegisters, openSession, type CashSessionResponse } from "../api/cash.api";
 
 export function CashSessionPage() {
   const queryClient = useQueryClient();
@@ -30,21 +30,55 @@ export function CashSessionPage() {
 
   const [openingAmount, setOpeningAmount] = useState("100000");
   const [closingAmount, setClosingAmount] = useState("");
+  // Con diferencia, el cierre pide confirmar: un conteo vacio o con un cero de mas registraba un
+  // faltante o sobrante de millones con su asiento contable.
+  const [confirmingDifference, setConfirmingDifference] = useState(false);
+  const [lastClosed, setLastClosed] = useState<CashSessionResponse | null>(null);
 
   const openMutation = useMutation({
     mutationFn: () => openSession({ cashRegisterId: registerId as string, openingAmount: Number(openingAmount) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cash-active-session"] }),
+    onSuccess: () => {
+      setLastClosed(null);
+      queryClient.invalidateQueries({ queryKey: ["cash-active-session"] });
+    },
   });
 
   const closeMutation = useMutation({
     mutationFn: () => closeSession(activeSession!.id, { closingAmountCounted: Number(closingAmount) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cash-active-session"] }),
+    onSuccess: (closed) => {
+      setLastClosed(closed);
+      setClosingAmount("");
+      setConfirmingDifference(false);
+      queryClient.invalidateQueries({ queryKey: ["cash-active-session"] });
+    },
   });
+
+  const hasCount = closingAmount.trim() !== "" && Number(closingAmount) >= 0;
+  const difference = activeSession && hasCount ? round2(Number(closingAmount) - activeSession.expectedAmount) : 0;
+
+  function onClose() {
+    if (!hasCount) return;
+    if (difference !== 0 && !confirmingDifference) {
+      setConfirmingDifference(true);
+      return;
+    }
+    closeMutation.mutate();
+  }
 
   return (
     <AppLayout>
       <h1 className="mb-1 text-lg font-semibold text-slate-900">Caja</h1>
       <p className="mb-4 text-sm text-slate-500">{register ? register.name : "Esta sucursal no tiene caja"}</p>
+
+      {lastClosed && (
+        <Alert tone={lastClosed.difference ? "warning" : "success"} className="mb-4 max-w-md">
+          Caja cerrada. Esperado {formatCOP(lastClosed.closingAmountExpected ?? 0)}, contado {formatCOP(lastClosed.closingAmountCounted ?? 0)}
+          {lastClosed.difference
+            ? `: ${lastClosed.difference > 0 ? "sobrante" : "faltante"} de ${formatCOP(Math.abs(lastClosed.difference))}, registrado en contabilidad.`
+            : ", sin diferencia."}
+        </Alert>
+      )}
+
       <Card className="max-w-md">
         {isLoading && <Spinner />}
 
@@ -54,9 +88,10 @@ export function CashSessionPage() {
             {canOpen ? (
               <>
                 <Input label="Dinero inicial" type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} />
-                <Button onClick={() => openMutation.mutate()} disabled={!registerId} loading={openMutation.isPending}>
+                <Button onClick={() => openMutation.mutate()} disabled={!registerId || openMutation.isPending} loading={openMutation.isPending}>
                   Abrir caja
                 </Button>
+                {openMutation.isError && <Alert tone="danger">{(openMutation.error as Error).message}</Alert>}
               </>
             ) : (
               <Alert tone="warning">Tu usuario no tiene permiso para abrir caja.</Alert>
@@ -66,21 +101,55 @@ export function CashSessionPage() {
 
         {activeSession && (
           <div className="space-y-3">
-            <p className="text-sm text-slate-600">
-              Caja abierta con <strong className="text-slate-900">{formatCOP(activeSession.openingAmount)}</strong>
+            <dl className="grid grid-cols-2 gap-2 text-sm">
+              <dt className="text-slate-500">Base al abrir</dt>
+              <dd className="text-right text-slate-900">{formatCOP(activeSession.openingAmount)}</dd>
+              <dt className="text-slate-500">Deberia haber en caja</dt>
+              <dd className="text-right font-semibold text-slate-900">{formatCOP(activeSession.expectedAmount)}</dd>
+            </dl>
+            <p className="text-xs text-slate-500">
+              Base mas ventas en efectivo y entradas, menos salidas, desde{" "}
+              {new Date(activeSession.openedAt).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
             </p>
             {canClose ? (
               <>
-                <Input label="Dinero contado al cierre" type="number" value={closingAmount} onChange={(e) => setClosingAmount(e.target.value)} />
-                <Button variant="danger" onClick={() => closeMutation.mutate()} loading={closeMutation.isPending}>
-                  Cerrar caja (arqueo)
-                </Button>
-                {closeMutation.data && (
-                  <p className="text-sm text-slate-600">
-                    Esperado: {formatCOP(closeMutation.data.closingAmountExpected ?? 0)} — Diferencia:{" "}
-                    {formatCOP(closeMutation.data.difference ?? 0)}
+                <Input
+                  label="Dinero contado al cierre"
+                  type="number"
+                  min={0}
+                  placeholder="Cuenta el efectivo y escribelo"
+                  value={closingAmount}
+                  onChange={(e) => {
+                    setClosingAmount(e.target.value);
+                    setConfirmingDifference(false);
+                  }}
+                />
+                {hasCount && difference !== 0 && (
+                  <p className={`text-sm font-medium ${difference > 0 ? "text-warning-700" : "text-danger-600"}`}>
+                    {difference > 0 ? "Sobran" : "Faltan"} {formatCOP(Math.abs(difference))}
                   </p>
                 )}
+                {confirmingDifference ? (
+                  <Alert tone="warning">
+                    <p>
+                      Vas a cerrar con un <strong>{difference > 0 ? "sobrante" : "faltante"} de {formatCOP(Math.abs(difference))}</strong>, y se
+                      registra en contabilidad. Revisa el conteo antes de seguir.
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <Button size="sm" variant="danger" loading={closeMutation.isPending} onClick={onClose}>
+                        Si, cerrar con la diferencia
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => setConfirmingDifference(false)}>
+                        Revisar conteo
+                      </Button>
+                    </div>
+                  </Alert>
+                ) : (
+                  <Button variant="danger" onClick={onClose} disabled={!hasCount} loading={closeMutation.isPending}>
+                    Cerrar caja (arqueo)
+                  </Button>
+                )}
+                {closeMutation.isError && <Alert tone="danger">{(closeMutation.error as Error).message}</Alert>}
               </>
             ) : (
               <Alert tone="warning">Tu usuario no tiene permiso para cerrar caja.</Alert>

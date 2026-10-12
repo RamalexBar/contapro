@@ -855,3 +855,12 @@ cuando se implemente, mismo criterio que la lista de arriba:
     la fecha "hasta" como la medianoche UTC, así que un informe hasta hoy no incluía lo de hoy; ahora
     "desde"/"hasta" son el día completo en Colombia (`startOfDayInBogota`/`endOfDayInBogota` en
     `@erp/shared-utils`). Detalle y limitaciones en `apps/api/src/modules/branches/README.md`.
+51. ~~Cierre de caja seguro (una sola sesion abierta por caja)~~ — corregido el 2026-10-12 tras un
+    caso real en produccion: "Abrir caja" verificaba solo en el codigo que no hubiera otra sesion
+    abierta, asi que un doble clic o dos pestanas abrian dos sesiones de la misma caja. Las ventas
+    caian en una y la pantalla mostraba otra; al cerrar aparecia la siguiente, y un conteo vacio se
+    tomaba como $0 (faltante de millones con su asiento). Ahora: indice unico parcial en
+    `cash_sessions` (una sesion `OPEN` por caja) con una migracion que cierra las sesiones
+    duplicadas que ya existian sin diferencia (no generan asiento), `GET .../active-session` devuelve
+    `expectedAmount` y la pantalla de Caja muestra "Deberia haber en caja" antes de contar, exige el
+    conteo, pide confirmar si hay sobrante o faltante y deja el resultado del cierre a la vista.
