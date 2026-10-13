@@ -33,7 +33,12 @@ const API_SCOPE_OPTIONS = [
   { code: "customer.read", label: "Ver clientes" },
   { code: "customer.manage", label: "Crear clientes" },
   { code: "sale.read", label: "Ver ventas" },
-  { code: "sale.create", label: "Crear ventas" },
+  { code: "sale.create", label: "Crear ventas y facturas" },
+  // Para un POS externo que lleva su contabilidad aca (ej. Cajapro): cierres de turno, compras y pagos a proveedores.
+  { code: "accounting.read", label: "Ver contabilidad" },
+  { code: "accounting.manage", label: "Contabilizar cierres de turno" },
+  { code: "suppliers.manage", label: "Registrar compras y pagos a proveedores" },
+  { code: "expense.manage", label: "Registrar gastos" },
 ];
 
 const WEBHOOK_EVENT_OPTIONS = [{ code: "sale.created", label: "Venta creada" }];
