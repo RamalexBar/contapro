@@ -132,7 +132,8 @@ export class PublicApiController {
   registerElectronicInvoice = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = registerExternalElectronicInvoiceSchema.parse(req.body);
-      res.status(201).json(await this.registerExternalElectronicInvoiceUseCase.execute(body));
+      const idempotencyKey = typeof req.headers["idempotency-key"] === "string" && req.headers["idempotency-key"] ? req.headers["idempotency-key"] : undefined;
+      res.status(201).json(await this.registerExternalElectronicInvoiceUseCase.execute(body, idempotencyKey));
     } catch (err) {
       next(err);
     }
@@ -143,10 +144,10 @@ export class PublicApiController {
       const manualInvoice = await this.getManualInvoiceUseCase.execute(req.params.id);
       try {
         const electronicInvoice = await this.getElectronicInvoiceUseCase.execute({ type: "manual", id: manualInvoice.id });
-        res.json({ id: manualInvoice.id, fullNumber: electronicInvoice.fullNumber, cufe: electronicInvoice.cufe, status: electronicInvoice.status });
+        res.json({ id: manualInvoice.id, fullNumber: electronicInvoice.fullNumber, cufe: electronicInvoice.cufe, status: electronicInvoice.status, pdfPath: `/api/public/v1/electronic-invoices/${manualInvoice.id}/pdf` });
       } catch (err) {
         if (err instanceof NotFoundError) {
-          res.json({ id: manualInvoice.id, fullNumber: null, cufe: null, status: "PENDING" });
+          res.json({ id: manualInvoice.id, fullNumber: null, cufe: null, status: "PENDING", pdfPath: `/api/public/v1/electronic-invoices/${manualInvoice.id}/pdf` });
           return;
         }
         throw err;

@@ -6,10 +6,13 @@ import { publicApiController } from "../public-api.container";
 // Reusado tal cual (mismo handler que ya sirve el PDF de una factura manual via JWT) -- cero
 // logica nueva, solo se monta bajo auth por API key en vez de JWT. Ver README: "Factura en si".
 import { electronicInvoicingController } from "../../electronic-invoicing/electronic-invoicing.container";
+// Igual: la lista de sucursales ya existe para el panel; el POS la usa para escoger a cual va cada sede suya.
+import { branchesController } from "../../branches/branches.container";
 
 export const publicApiRouter = Router();
 publicApiRouter.use("/public/v1", publicApiRateLimiter, apiKeyAuthMiddleware);
 
+publicApiRouter.get("/public/v1/branches", requirePermission("sale.read"), branchesController.list);
 publicApiRouter.get("/public/v1/products", requirePermission("product.read"), publicApiController.listProducts);
 publicApiRouter.get("/public/v1/products/:id", requirePermission("product.read"), publicApiController.getProduct);
 publicApiRouter.get("/public/v1/customers", requirePermission("customer.read"), publicApiController.listCustomers);

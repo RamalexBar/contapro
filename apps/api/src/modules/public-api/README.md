@@ -171,6 +171,21 @@ que una misma venta no se contabilice dos veces).
   el mismo tipo de limitación de catálogos DIAN sin verificar ya documentada en
   `modules/electronic-invoicing/README.md` (no específico de este endpoint).
 
+- **Agregado 2026-10-13 (conexión con Cajapro)**:
+  - **`Idempotency-Key` (opcional, para no romper a quien ya integraba)**: con la key, un reintento
+    del POS devuelve la MISMA factura en vez de emitir otra (mismo `ExternalApiRequest` que
+    `/purchases`). Si el primer intento falló, el reintento sí factura.
+  - **`items[].taxType`**: `IVA` (por defecto, como antes) | `INC` | `EXEMPT` | `EXCLUDED`. Se
+    guarda en `ManualInvoiceItem.taxType` y llega a Factus como tributo `04` (INC) en vez de `01`
+    (IVA); el CUFE local separa el INC en su slot (ValImp2). **El código `04` en Factus NO se
+    verificó contra su sandbox** (sin credenciales en esta sesión) — probarlo antes de producción.
+  - **`unitPrice` va antes de impuestos y con el descuento ya aplicado** (el POS lo calcula): no
+    hay campo de descuento aparte.
+  - La respuesta trae **`pdfPath`** (`/api/public/v1/electronic-invoices/:id/pdf`), que se pide con
+    la misma API key.
+- **`GET /api/public/v1/branches`** (2026-10-13): las sucursales de la empresa (mismo handler del
+  panel), para que el POS escoja a cuál va cada sede suya (`branchId` del cierre y la factura).
+
 ## Compras, pagos a proveedores y gastos (item nuevo 2026-10-02)
 
 Tercera pieza de la integración con un POS externo (después de cierre de turno y factura

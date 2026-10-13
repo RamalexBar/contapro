@@ -12,6 +12,8 @@ export interface CreateManualInvoiceItemInput {
   quantity: number;
   unitPrice: number;
   taxPercent: number;
+  /** IVA (por defecto) | INC | EXEMPT | EXCLUDED */
+  taxType?: "IVA" | "INC" | "EXEMPT" | "EXCLUDED";
 }
 
 export interface CreateManualInvoiceInput {
@@ -67,6 +69,7 @@ export class CreateManualInvoiceUseCase {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         taxPercent: item.taxPercent,
+        taxType: item.taxType ?? "IVA",
         taxAmount,
         total: lineTotal,
       };
@@ -106,6 +109,7 @@ export class CreateManualInvoiceUseCase {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           taxPercent: item.taxPercent,
+          taxType: item.taxType,
           taxAmount: item.taxAmount,
           total: item.total,
         })),

@@ -3,6 +3,8 @@ export interface ManualInvoiceItemInput {
   quantity: number;
   unitPrice: number;
   taxPercent: number;
+  /** IVA (por defecto) | INC | EXEMPT | EXCLUDED */
+  taxType?: string;
   taxAmount: number;
   total: number;
 }

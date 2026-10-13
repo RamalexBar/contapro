@@ -63,6 +63,7 @@ function toRecord(row: {
     quantity: unknown;
     unitPrice: unknown;
     taxPercent: unknown;
+    taxType: string;
     taxAmount: unknown;
     total: unknown;
   }>;
@@ -85,6 +86,7 @@ function toRecord(row: {
       quantity: Number(item.quantity),
       unitPrice: Number(item.unitPrice),
       taxPercent: Number(item.taxPercent),
+      taxType: item.taxType,
       taxAmount: Number(item.taxAmount),
       total: Number(item.total),
     })),

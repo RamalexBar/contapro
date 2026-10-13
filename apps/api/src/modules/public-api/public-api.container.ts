@@ -47,13 +47,14 @@ const externalShiftCloseRepo = new PrismaExternalShiftCloseRepository();
 const registerShiftCloseUseCase = new RegisterShiftCloseUseCase(externalShiftCloseRepo, postShiftCloseJournalEntryUseCase, auditService);
 const listShiftClosesUseCase = new ListShiftClosesUseCase(externalShiftCloseRepo);
 
+const externalApiRequestRepo = new PrismaExternalApiRequestRepository();
+
 const registerExternalElectronicInvoiceUseCase = new RegisterExternalElectronicInvoiceUseCase(
   customerRepo,
   createManualInvoiceUseCase,
-  getElectronicInvoiceUseCase
+  getElectronicInvoiceUseCase,
+  externalApiRequestRepo
 );
-
-const externalApiRequestRepo = new PrismaExternalApiRequestRepository();
 
 const registerExternalPurchaseUseCase = new RegisterExternalPurchaseUseCase(
   supplierRepo,

@@ -18,6 +18,8 @@ export interface GenerateElectronicInvoiceItemInput {
   quantity: number;
   unitPrice: number;
   taxPercent: number;
+  /** IVA (por defecto, ventas del POS propio) | INC | EXEMPT | EXCLUDED */
+  taxType?: string;
   taxAmount: number;
   total: number;
 }
@@ -91,12 +93,14 @@ export class GenerateElectronicInvoiceUseCase {
         // este calculo (ver README del modulo).
         const icaAmount = input.withholdingTaxes.find((w) => w.type === "RETEICA")?.amount ?? 0;
 
+        // INC (impuesto al consumo) va en su propio slot del CUFE (ValImp2, codigo "04"); el resto es IVA.
+        const consumptionTaxAmount = Math.round(input.items.filter((i) => i.taxType === "INC").reduce((s, i) => s + i.taxAmount, 0) * 100) / 100;
         const cufe = generateCufe({
           fullNumber,
           issueDate: input.issueDate,
           subtotal: input.subtotal,
-          ivaAmount: input.taxTotal,
-          consumptionTaxAmount: 0,
+          ivaAmount: Math.round((input.taxTotal - consumptionTaxAmount) * 100) / 100,
+          consumptionTaxAmount,
           icaAmount,
           total: input.total,
           issuerNit: company.nit.replace(/\D/g, ""),
@@ -224,6 +228,7 @@ export class GenerateElectronicInvoiceUseCase {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           taxPercent: item.taxPercent,
+          taxType: item.taxType,
           taxAmount: item.taxAmount,
           lineTotal: item.total,
         })),

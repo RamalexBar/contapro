@@ -18,11 +18,17 @@ export const externalInvoiceBuyerSchema = z.object({
 });
 export type ExternalInvoiceBuyerInput = z.infer<typeof externalInvoiceBuyerSchema>;
 
+/** Tipo de impuesto del renglon (2026-10-13): INC = impuesto al consumo (restaurantes, bares). */
+export const invoiceTaxTypeSchema = z.enum(["IVA", "INC", "EXEMPT", "EXCLUDED"]);
+export type InvoiceTaxType = z.infer<typeof invoiceTaxTypeSchema>;
+
 export const externalInvoiceItemSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().positive(),
+  // Precio unitario ANTES de impuestos y ya con el descuento aplicado (el POS lo calcula).
   unitPrice: z.number().nonnegative(),
   taxPercent: z.number().min(0).max(100),
+  taxType: invoiceTaxTypeSchema.default("IVA"),
 });
 export type ExternalInvoiceItemInput = z.infer<typeof externalInvoiceItemSchema>;
 

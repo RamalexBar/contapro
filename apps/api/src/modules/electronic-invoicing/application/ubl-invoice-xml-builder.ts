@@ -3,6 +3,8 @@ export interface UblInvoiceLine {
   quantity: number;
   unitPrice: number;
   taxPercent: number;
+  /** IVA (por defecto) | INC | EXEMPT | EXCLUDED */
+  taxType?: string;
   taxAmount: number;
   total: number;
 }
@@ -87,6 +89,12 @@ function buildLine(item: UblInvoiceLine, index: number): string {
     <cac:TaxTotal>
       <cbc:TaxAmount currencyID="COP">${item.taxAmount.toFixed(2)}</cbc:TaxAmount>
       <cbc:Percent>${item.taxPercent}</cbc:Percent>
+      <cac:TaxCategory>
+        <cac:TaxScheme>
+          <cbc:ID>${item.taxType === "INC" ? "04" : "01"}</cbc:ID>
+          <cbc:Name>${item.taxType === "INC" ? "INC" : "IVA"}</cbc:Name>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
     </cac:TaxTotal>
     <cac:Item>
       <cbc:Description>${escapeXml(item.description)}</cbc:Description>

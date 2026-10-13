@@ -66,6 +66,9 @@ const PAYMENT_METHOD_FROM_OFFICIAL_EXAMPLE = "42";
 const UNIT_MEASURE_UNIT = "94";
 const STANDARD_CODE_TAXPAYER_ADOPTED = "999";
 const TAX_CODE_IVA = "01";
+// Codigo DIAN del impuesto nacional al consumo (restaurantes, bares). NO verificado contra el
+// sandbox de Factus (agregado 2026-10-13 sin credenciales) -- mismo aviso que el resto del cliente.
+const TAX_CODE_INC = "04";
 const GENERIC_TRIBUTE_CODE = "ZZ";
 const GENERIC_RESPONSIBILITY = "R-99-PN";
 
@@ -84,7 +87,7 @@ function dateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function buildBillPayload(input: ThirdPartyInvoiceInput, numberingRangeId: number): Record<string, unknown> {
+export function buildBillPayload(input: ThirdPartyInvoiceInput, numberingRangeId: number): Record<string, unknown> {
   const customer = input.customer;
 
   return {
@@ -124,7 +127,7 @@ function buildBillPayload(input: ThirdPartyInvoiceInput, numberingRangeId: numbe
       price: money(line.unitPrice),
       unit_measure_code: UNIT_MEASURE_UNIT,
       standard_code: STANDARD_CODE_TAXPAYER_ADOPTED,
-      taxes: line.taxAmount > 0 ? [{ code: TAX_CODE_IVA, rate: line.taxPercent.toFixed(2) }] : [],
+      taxes: line.taxAmount > 0 ? [{ code: line.taxType === "INC" ? TAX_CODE_INC : TAX_CODE_IVA, rate: line.taxPercent.toFixed(2) }] : [],
     })),
   };
 }

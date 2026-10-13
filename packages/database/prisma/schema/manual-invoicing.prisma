@@ -37,6 +37,8 @@ model ManualInvoiceItem {
   quantity        Decimal       @db.Decimal(14, 4)
   unitPrice       Decimal       @db.Decimal(14, 4)
   taxPercent      Decimal       @db.Decimal(5, 2)
+  // IVA | INC | EXEMPT | EXCLUDED -- codigo de tributo en la factura electronica (2026-10-13)
+  taxType         String        @default("IVA")
   taxAmount       Decimal       @db.Decimal(14, 2)
   total           Decimal       @db.Decimal(14, 2)
 
