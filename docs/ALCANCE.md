@@ -864,3 +864,8 @@ cuando se implemente, mismo criterio que la lista de arriba:
     duplicadas que ya existian sin diferencia (no generan asiento), `GET .../active-session` devuelve
     `expectedAmount` y la pantalla de Caja muestra "Deberia haber en caja" antes de contar, exige el
     conteo, pide confirmar si hay sobrante o faltante y deja el resultado del cierre a la vista.
+52. ~~Respuesta a vacaciones, permisos e incapacidades~~ — 2026-10-13. El rechazo exige motivo, se
+    puede aprobar con otras fechas (y dias, en vacaciones) guardando las pedidas, y el empleado ve
+    la respuesta en un aviso (Dashboard y Vacaciones) hasta pulsar "Entendido". Quien aprueba ve en
+    el Dashboard cuantas solicitudes tiene pendientes. Endpoints `GET /time-off/notifications` y
+    `POST /time-off/notifications/seen`; migracion `20261012230000_time_off_decisions`. Sin correo.

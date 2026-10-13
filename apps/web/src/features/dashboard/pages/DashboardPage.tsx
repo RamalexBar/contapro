@@ -6,6 +6,7 @@ import { StatCard } from "../components/StatCard";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Spinner } from "../../../components/ui/Spinner";
 import { Alert } from "../../../components/ui/Alert";
+import { TimeOffNotices } from "../../time-off/components/TimeOffNotices";
 
 export function DashboardPage() {
   const { data, isLoading, error } = useQuery({ queryKey: ["dashboard-metrics"], queryFn: getDashboardMetrics });
@@ -13,6 +14,7 @@ export function DashboardPage() {
   return (
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Dashboard</h1>
+      <TimeOffNotices showPending />
       {isLoading && <Spinner />}
       {error && (
         <Alert tone="danger">

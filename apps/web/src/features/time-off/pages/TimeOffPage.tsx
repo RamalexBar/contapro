@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
@@ -28,6 +28,9 @@ import {
   requestVacation,
   submitSickLeave,
 } from "../api/time-off.api";
+import type { ApproveTimeOffInput } from "../api/time-off.api";
+import { DecisionInfo, DecisionPanel, type DecisionMode } from "../components/TimeOffDecision";
+import { TimeOffNotices } from "../components/TimeOffNotices";
 
 const LEAVE_TYPES = [
   { value: "PERSONAL", label: "Personal" },
@@ -91,6 +94,7 @@ export function TimeOffPage() {
   return (
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Vacaciones y permisos</h1>
+      <TimeOffNotices showPending={false} />
       {noEmployeeLinked && (
         <Alert tone="warning" className="mb-4">
           {NOT_LINKED_MESSAGE}
@@ -193,19 +197,25 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
     },
   });
 
+  const [deciding, setDeciding] = useState<{ id: string; mode: DecisionMode } | null>(null);
+  const onDecided = () => {
+    queryClient.invalidateQueries({ queryKey: ["vacations"] });
+    queryClient.invalidateQueries({ queryKey: ["time-off-notifications"] });
+    setDeciding(null);
+  };
   const approveMutation = useMutation({
-    mutationFn: (id: string) => approveVacation(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacations"] }),
+    mutationFn: ({ id, input }: { id: string; input: ApproveTimeOffInput }) => approveVacation(id, input),
+    onSuccess: onDecided,
   });
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => {
-      // El empleado ve el motivo del rechazo.
-      const reason = window.prompt("Motivo del rechazo (el empleado lo va a ver):")?.trim();
-      if (!reason) return Promise.reject(new Error("Escribe el motivo del rechazo"));
-      return rejectVacation(id, reason);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacations"] }),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectVacation(id, reason),
+    onSuccess: onDecided,
   });
+  function openDecision(id: string, mode: DecisionMode) {
+    approveMutation.reset();
+    rejectMutation.reset();
+    setDeciding({ id, mode });
+  }
 
   return (
     <Card title="Vacaciones" className="mb-6">
@@ -252,10 +262,12 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
           </TableHead>
           <TableBody>
             {data.data.map((v) => (
-              <TableRow key={v.id}>
+              <Fragment key={v.id}>
+              <TableRow>
                 <Td>{employeeNames.get(v.employeeId) ?? v.employeeId}</Td>
                 <Td>
                   {formatDate(v.startDate)} a {formatDate(v.endDate)}
+                  <DecisionInfo record={v} />
                 </Td>
                 <Td>{v.daysTaken}</Td>
                 <Td>
@@ -264,21 +276,33 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
                 <Td className="space-x-2 text-right">
                   {canManage && v.status === "REQUESTED" && (
                     <>
-                      <Button size="sm" onClick={() => approveMutation.mutate(v.id)} loading={approveMutation.isPending}>
+                      <Button size="sm" onClick={() => openDecision(v.id, "approve")}>
                         Aprobar
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => rejectMutation.mutate(v.id)}
-                        loading={rejectMutation.isPending}
-                      >
+                      <Button size="sm" variant="danger" onClick={() => openDecision(v.id, "reject")}>
                         Rechazar
                       </Button>
                     </>
                   )}
                 </Td>
               </TableRow>
+              {deciding?.id === v.id && (
+                <TableRow>
+                  <Td colSpan={5}>
+                    <DecisionPanel
+                      mode={deciding.mode}
+                      record={v}
+                      withDays={true}
+                      pending={approveMutation.isPending || rejectMutation.isPending}
+                      error={((approveMutation.error ?? rejectMutation.error) as Error | null)?.message ?? null}
+                      onCancel={() => setDeciding(null)}
+                      onApprove={(input) => approveMutation.mutate({ id: v.id, input })}
+                      onReject={(reason) => rejectMutation.mutate({ id: v.id, reason })}
+                    />
+                  </Td>
+                </TableRow>
+              )}
+              </Fragment>
             ))}
           </TableBody>
         </Table>
@@ -311,19 +335,25 @@ function LeavePermissionSection({ canRequest, canManage, canRead, employees, emp
     },
   });
 
+  const [deciding, setDeciding] = useState<{ id: string; mode: DecisionMode } | null>(null);
+  const onDecided = () => {
+    queryClient.invalidateQueries({ queryKey: ["leave-permissions"] });
+    queryClient.invalidateQueries({ queryKey: ["time-off-notifications"] });
+    setDeciding(null);
+  };
   const approveMutation = useMutation({
-    mutationFn: (id: string) => approveLeavePermission(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leave-permissions"] }),
+    mutationFn: ({ id, input }: { id: string; input: ApproveTimeOffInput }) => approveLeavePermission(id, input),
+    onSuccess: onDecided,
   });
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => {
-      // El empleado ve el motivo del rechazo.
-      const reason = window.prompt("Motivo del rechazo (el empleado lo va a ver):")?.trim();
-      if (!reason) return Promise.reject(new Error("Escribe el motivo del rechazo"));
-      return rejectLeavePermission(id, reason);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leave-permissions"] }),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectLeavePermission(id, reason),
+    onSuccess: onDecided,
   });
+  function openDecision(id: string, mode: DecisionMode) {
+    approveMutation.reset();
+    rejectMutation.reset();
+    setDeciding({ id, mode });
+  }
 
   return (
     <Card title="Permisos" className="mb-6">
@@ -374,11 +404,13 @@ function LeavePermissionSection({ canRequest, canManage, canRead, employees, emp
           </TableHead>
           <TableBody>
             {data.data.map((p) => (
-              <TableRow key={p.id}>
+              <Fragment key={p.id}>
+              <TableRow>
                 <Td>{employeeNames.get(p.employeeId) ?? p.employeeId}</Td>
                 <Td>{LEAVE_TYPES.find((t) => t.value === p.type)?.label ?? p.type}</Td>
                 <Td>
                   {formatDate(p.startDate)} a {formatDate(p.endDate)}
+                  <DecisionInfo record={p} />
                 </Td>
                 <Td>{p.paid ? "Si" : "No"}</Td>
                 <Td>
@@ -387,21 +419,33 @@ function LeavePermissionSection({ canRequest, canManage, canRead, employees, emp
                 <Td className="space-x-2 text-right">
                   {canManage && p.status === "REQUESTED" && (
                     <>
-                      <Button size="sm" onClick={() => approveMutation.mutate(p.id)} loading={approveMutation.isPending}>
+                      <Button size="sm" onClick={() => openDecision(p.id, "approve")}>
                         Aprobar
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => rejectMutation.mutate(p.id)}
-                        loading={rejectMutation.isPending}
-                      >
+                      <Button size="sm" variant="danger" onClick={() => openDecision(p.id, "reject")}>
                         Rechazar
                       </Button>
                     </>
                   )}
                 </Td>
               </TableRow>
+              {deciding?.id === p.id && (
+                <TableRow>
+                  <Td colSpan={6}>
+                    <DecisionPanel
+                      mode={deciding.mode}
+                      record={p}
+                      withDays={false}
+                      pending={approveMutation.isPending || rejectMutation.isPending}
+                      error={((approveMutation.error ?? rejectMutation.error) as Error | null)?.message ?? null}
+                      onCancel={() => setDeciding(null)}
+                      onApprove={(input) => approveMutation.mutate({ id: p.id, input })}
+                      onReject={(reason) => rejectMutation.mutate({ id: p.id, reason })}
+                    />
+                  </Td>
+                </TableRow>
+              )}
+              </Fragment>
             ))}
           </TableBody>
         </Table>
@@ -432,19 +476,25 @@ function SickLeaveSection({ canRequest, canManage, canRead, employees, employeeN
     },
   });
 
+  const [deciding, setDeciding] = useState<{ id: string; mode: DecisionMode } | null>(null);
+  const onDecided = () => {
+    queryClient.invalidateQueries({ queryKey: ["sick-leaves"] });
+    queryClient.invalidateQueries({ queryKey: ["time-off-notifications"] });
+    setDeciding(null);
+  };
   const approveMutation = useMutation({
-    mutationFn: (id: string) => approveSickLeave(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sick-leaves"] }),
+    mutationFn: ({ id, input }: { id: string; input: ApproveTimeOffInput }) => approveSickLeave(id, input),
+    onSuccess: onDecided,
   });
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => {
-      // El empleado ve el motivo del rechazo.
-      const reason = window.prompt("Motivo del rechazo (el empleado lo va a ver):")?.trim();
-      if (!reason) return Promise.reject(new Error("Escribe el motivo del rechazo"));
-      return rejectSickLeave(id, reason);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sick-leaves"] }),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectSickLeave(id, reason),
+    onSuccess: onDecided,
   });
+  function openDecision(id: string, mode: DecisionMode) {
+    approveMutation.reset();
+    rejectMutation.reset();
+    setDeciding({ id, mode });
+  }
 
   return (
     <Card title="Incapacidades" className="mb-6">
@@ -490,11 +540,13 @@ function SickLeaveSection({ canRequest, canManage, canRead, employees, employeeN
           </TableHead>
           <TableBody>
             {data.data.map((s) => (
-              <TableRow key={s.id}>
+              <Fragment key={s.id}>
+              <TableRow>
                 <Td>{employeeNames.get(s.employeeId) ?? s.employeeId}</Td>
                 <Td>{SICK_LEAVE_TYPES.find((t) => t.value === s.type)?.label ?? s.type}</Td>
                 <Td>
                   {formatDate(s.startDate)} a {formatDate(s.endDate)}
+                  <DecisionInfo record={s} />
                 </Td>
                 <Td>
                   <StatusBadge status={s.status} />
@@ -502,21 +554,33 @@ function SickLeaveSection({ canRequest, canManage, canRead, employees, employeeN
                 <Td className="space-x-2 text-right">
                   {canManage && s.status === "SUBMITTED" && (
                     <>
-                      <Button size="sm" onClick={() => approveMutation.mutate(s.id)} loading={approveMutation.isPending}>
+                      <Button size="sm" onClick={() => openDecision(s.id, "approve")}>
                         Aprobar
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => rejectMutation.mutate(s.id)}
-                        loading={rejectMutation.isPending}
-                      >
+                      <Button size="sm" variant="danger" onClick={() => openDecision(s.id, "reject")}>
                         Rechazar
                       </Button>
                     </>
                   )}
                 </Td>
               </TableRow>
+              {deciding?.id === s.id && (
+                <TableRow>
+                  <Td colSpan={5}>
+                    <DecisionPanel
+                      mode={deciding.mode}
+                      record={s}
+                      withDays={false}
+                      pending={approveMutation.isPending || rejectMutation.isPending}
+                      error={((approveMutation.error ?? rejectMutation.error) as Error | null)?.message ?? null}
+                      onCancel={() => setDeciding(null)}
+                      onApprove={(input) => approveMutation.mutate({ id: s.id, input })}
+                      onReject={(reason) => rejectMutation.mutate({ id: s.id, reason })}
+                    />
+                  </Td>
+                </TableRow>
+              )}
+              </Fragment>
             ))}
           </TableBody>
         </Table>
