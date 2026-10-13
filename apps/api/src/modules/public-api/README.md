@@ -79,6 +79,27 @@ revisa).
   de celular: `thirdPartyIncome[]`, solo la comisión es ingreso real, el resto queda como cuenta
   por pagar al tercero — el efectivo/banco ya entró por `payments`, este campo solo lo reparte), y
   el faltante/sobrante del arqueo (`cashExpected` vs `cashCounted`).
+- **Conceptos agregados 2026-10-13 para la conexión con Cajapro** (todos opcionales con valor por
+  defecto — un POS que ya integraba sigue funcionando igual):
+  - Formas de pago nuevas: `CREDIT` (venta fiada → Clientes 1305), `ADVANCE` (pagada con un anticipo
+    que el cliente ya había dado: apartado, orden de servicio, reserva de hotel → baja Anticipos 2805),
+    `STORE_CREDIT` (pagada con saldo a favor de una devolución → 2805) y `COURIER` (la cobró el
+    domiciliario y aún no la entrega → Domiciliarios por legalizar 138095, NUEVA, SIN VERIFICAR).
+  - Devoluciones con `refundMethod` `CREDIT` (baja lo que el cliente debía) o `STORE_CREDIT` (le
+    queda saldo a favor, 2805).
+  - `expenses[].method` (antes todo gasto salía de Caja; ahora puede salir de Bancos).
+  - `advances[].kind` (LAYAWAY/SERVICE/HOTEL/OTHER, solo informativo) y `advancesRefunded[]`
+    (anticipo devuelto al cancelar: débito 2805, crédito Caja/Bancos).
+  - `debtCollections[]`: abonos de fiado cobrados en la caja (débito Caja/Bancos, crédito 1305).
+  - `courierMovements[]`: base que se lleva el domiciliario (`FLOAT_OUT`) y su liquidación
+    (`SETTLEMENT`), contra 138095.
+  - `thirdPartyPayments[]`: plata de la caja para pagarle al tercero (ej. cargar saldo de recargas,
+    débito 280515).
+  - `openAccounts { received, applied }`: cuentas abiertas (mesa, habitación) pagadas por partes en
+    turnos distintos — lo cobrado hoy de una cuenta que sigue abierta es anticipo (crédito 2805); lo
+    cobrado antes de una cuenta que se cerró hoy se aplica (débito 2805).
+  - Los **pagos a proveedores siguen fuera del cierre** a propósito (ver abajo): así no hay dos
+    caminos para lo mismo ni se desactualiza la cartera por proveedor.
 - **`EXCLUDED` se trata igual que `EXEMPT`** en el comprobante (ingreso sin IVA generado) — la
   distinción solo le importa al formulario 300/información exógena DIAN, no al asiento contable.
 - **Varios movimientos del mismo concepto se consolidan en una sola línea** — 200 ventas en
@@ -108,11 +129,10 @@ revisa).
   - **Cuenta de tarjeta configurable**: hoy el método `CARD`/`TRANSFER` siempre va a la cuenta fija
     1110 "Bancos". Dejar que el contador elija otra cuenta (ej. neta de comisión del datáfono)
     queda pendiente.
-  - **Fiado por cliente** (nuevas ventas a crédito y cobros de cartera con desglose por cliente):
-    requiere integrarse con el módulo `collections` (`AccountReceivable`), que hoy exige un
-    `saleId` real — un POS externo sin `Sale` interno no puede crear ahí directo sin antes
-    relajar esa dependencia. Pendiente, evaluado pero no construido todavía — es, con diferencia,
-    el gap más grande que queda (afecta `payments[].method=CREDIT` y `debtCollections[]`).
+  - **Fiado por cliente en el módulo `collections`**: desde 2026-10-13 el fiado (`CREDIT`) y sus
+    abonos (`debtCollections[]`) SÍ se contabilizan, pero consolidados en la cuenta 1305 (el saldo
+    contable es correcto). El desglose por cliente vive en el POS (`customer` viaja solo como dato
+    informativo); no se crean `AccountReceivable` porque ese módulo exige un `saleId` interno.
 - **Doble contabilización — regla de diseño, no solo documentación**: la facturación electrónica
   DIAN de un POS externo **no debe** generar comprobante contable (eso ya sale completo del cierre
   de turno). Ver `POST /api/public/v1/electronic-invoices` (abajo) para la factura en sí.

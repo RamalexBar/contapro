@@ -79,6 +79,11 @@ const INPUT: RegisterShiftCloseInput = {
   tipsReceived: [],
   tipsPaidOut: 0,
   thirdPartyIncome: [],
+  advancesRefunded: [],
+  debtCollections: [],
+  courierMovements: [],
+  thirdPartyPayments: [],
+  openAccounts: { received: 0, applied: 0 },
   cashExpected: 119_000,
   cashCounted: 119_000,
 };

@@ -177,7 +177,11 @@ function baseInput() {
     branchId: "branch-1",
     externalReference: "shift-1",
     date: new Date("2026-09-29"),
-    payments: [] as { method: "CASH" | "CARD" | "TRANSFER" | "TRADE_IN" | "PLATFORM"; amount: number; platformName?: string }[],
+    payments: [] as {
+      method: "CASH" | "CARD" | "TRANSFER" | "TRADE_IN" | "PLATFORM" | "CREDIT" | "ADVANCE" | "COURIER" | "STORE_CREDIT";
+      amount: number;
+      platformName?: string;
+    }[],
     salesTaxBreakdown: [] as {
       taxType: "IVA" | "INC" | "EXEMPT" | "EXCLUDED";
       taxRate: number;
@@ -188,16 +192,21 @@ function baseInput() {
       taxType: "IVA" | "INC" | "EXEMPT" | "EXCLUDED";
       taxableAmount: number;
       taxAmount: number;
-      refundMethod: "CASH" | "CARD" | "TRANSFER";
+      refundMethod: "CASH" | "CARD" | "TRANSFER" | "CREDIT" | "STORE_CREDIT";
     }[],
-    expenses: [] as { amount: number; description: string }[],
+    expenses: [] as { amount: number; description: string; method: "CASH" | "CARD" | "TRANSFER" }[],
     withdrawals: [] as { amount: number; description: string }[],
     deposits: [] as { amount: number; description: string }[],
-    advances: [] as { amount: number; method: "CASH" | "CARD" | "TRANSFER"; description?: string }[],
+    advances: [] as { amount: number; method: "CASH" | "CARD" | "TRANSFER"; description?: string; kind?: "LAYAWAY" | "SERVICE" | "HOTEL" | "OTHER" }[],
     forfeitedAdvances: [] as { amount: number; description?: string }[],
     tipsReceived: [] as { method: "CASH" | "CARD" | "TRANSFER"; amount: number }[],
     tipsPaidOut: 0,
     thirdPartyIncome: [] as { concept: string; amount: number; commission: number }[],
+    advancesRefunded: [] as { amount: number; method: "CASH" | "CARD" | "TRANSFER"; kind?: "LAYAWAY" | "SERVICE" | "HOTEL" | "OTHER" }[],
+    debtCollections: [] as { amount: number; method: "CASH" | "CARD" | "TRANSFER" }[],
+    courierMovements: [] as { type: "FLOAT_OUT" | "SETTLEMENT"; amount: number }[],
+    thirdPartyPayments: [] as { concept: string; amount: number }[],
+    openAccounts: { received: 0, applied: 0 },
     cashExpected: 0,
     cashCounted: 0,
   };
@@ -245,7 +254,7 @@ describe("PostShiftCloseJournalEntryUseCase", () => {
       ...baseInput(),
       payments: [{ method: "CASH" as const, amount: 119_000 }],
       salesTaxBreakdown: [{ taxType: "IVA" as const, taxRate: 19, taxableBase: 100_000, taxAmount: 19_000 }],
-      expenses: [{ amount: 30_000, description: "Domicilio de insumos" }],
+      expenses: [{ amount: 30_000, description: "Domicilio de insumos", method: "CASH" as const }],
       cashExpected: 89_000,
       cashCounted: 89_000,
     };
@@ -448,6 +457,7 @@ describe("PostShiftCloseJournalEntryUseCase", () => {
   it("combines every concept from a full shift into a single balanced entry", async () => {
     const { useCase, journalRepo } = makeUseCase();
     const input = {
+      ...baseInput(),
       branchId: "branch-1",
       externalReference: "shift-full",
       date: new Date("2026-09-29"),
@@ -463,7 +473,7 @@ describe("PostShiftCloseJournalEntryUseCase", () => {
         { taxType: "EXCLUDED" as const, taxRate: 0, taxableBase: 8_000, taxAmount: 0 },
       ],
       returns: [{ taxType: "IVA" as const, taxableAmount: 5_000, taxAmount: 950, refundMethod: "CASH" as const }],
-      expenses: [{ amount: 10_000, description: "Aseo" }],
+      expenses: [{ amount: 10_000, description: "Aseo", method: "CASH" as const }],
       withdrawals: [{ amount: 15_000, description: "Retiro" }],
       deposits: [{ amount: 5_000, description: "Reposicion de base" }],
       advances: [{ amount: 20_000, method: "TRANSFER" as const }],
@@ -488,5 +498,120 @@ describe("PostShiftCloseJournalEntryUseCase", () => {
     expect(lines.find((l) => l.accountId === "acc-280510")).toMatchObject({ debit: 0, credit: 1_000 }); // propinas: 2.000 recibidas - 1.000 repartidas
     expect(lines.find((l) => l.accountId === "acc-4210")).toMatchObject({ debit: 0, credit: 500 }); // comision de recargas
     expect(lines.find((l) => l.accountId === "acc-280515")).toMatchObject({ debit: 0, credit: 9_500 }); // saldo a favor de la plataforma de recargas
+  });
+});
+
+// Conceptos agregados 2026-10-13 para la conexion con Cajapro (fiado, anticipos usados, domiciliario,
+// saldo a favor, abonos, cuentas abiertas). Cada caso verifica el asiento y que cuadre.
+describe("PostShiftCloseJournalEntryUseCase -- conceptos de Cajapro", () => {
+  const line = (lines: { accountId: string; debit: number; credit: number }[], code: string) => lines.find((l) => l.accountId === `acc-${code}`);
+
+  async function post(overrides: Partial<ReturnType<typeof baseInput>>) {
+    const { useCase, journalRepo } = makeUseCase();
+    const entry = await withTenantContext(() => useCase.execute("close-1", { ...baseInput(), ...overrides }));
+    const lines = journalRepo.entries[0].lines;
+    const totals = sumDebitCredit(lines);
+    expect(totals.debit).toBe(totals.credit);
+    return { entry, lines };
+  }
+
+  it("venta fiada: debita Clientes en vez de Caja", async () => {
+    const { lines } = await post({
+      payments: [{ method: "CREDIT", amount: 119_000 }],
+      salesTaxBreakdown: [{ taxType: "IVA", taxRate: 19, taxableBase: 100_000, taxAmount: 19_000 }],
+    });
+    expect(line(lines, "1305")).toMatchObject({ debit: 119_000, credit: 0 });
+    expect(line(lines, "1105")).toBeUndefined();
+  });
+
+  it("venta pagada con anticipo (reserva de hotel) y con saldo a favor: baja Anticipos", async () => {
+    const { lines } = await post({
+      payments: [
+        { method: "ADVANCE", amount: 80_000 },
+        { method: "STORE_CREDIT", amount: 20_000 },
+        { method: "CASH", amount: 8_000 },
+      ],
+      salesTaxBreakdown: [{ taxType: "INC", taxRate: 8, taxableBase: 100_000, taxAmount: 8_000 }],
+      cashExpected: 8_000,
+      cashCounted: 8_000,
+    });
+    expect(line(lines, "2805")).toMatchObject({ debit: 100_000, credit: 0 });
+    expect(line(lines, "240810")).toMatchObject({ debit: 0, credit: 8_000 });
+  });
+
+  it("domiciliario: lo que cobro queda por legalizar; la base sale y vuelve con la liquidacion", async () => {
+    const { lines } = await post({
+      payments: [{ method: "COURIER", amount: 50_000 }],
+      salesTaxBreakdown: [{ taxType: "EXEMPT", taxRate: 0, taxableBase: 50_000, taxAmount: 0 }],
+      courierMovements: [
+        { type: "FLOAT_OUT", amount: 20_000 },
+        { type: "SETTLEMENT", amount: 70_000 },
+      ],
+      cashExpected: 50_000,
+      cashCounted: 50_000,
+    });
+    // 50.000 cobrados + 20.000 de base - 70.000 entregados = queda en cero por legalizar
+    expect(line(lines, "138095")).toBeUndefined();
+    expect(line(lines, "1105")).toMatchObject({ debit: 50_000, credit: 0 });
+  });
+
+  it("abono de fiado cobrado en la caja", async () => {
+    const { lines } = await post({
+      debtCollections: [{ amount: 30_000, method: "CASH" }],
+      cashExpected: 30_000,
+      cashCounted: 30_000,
+    });
+    expect(line(lines, "1305")).toMatchObject({ debit: 0, credit: 30_000 });
+    expect(line(lines, "1105")).toMatchObject({ debit: 30_000, credit: 0 });
+  });
+
+  it("anticipo de hotel recibido y otro devuelto al cancelar", async () => {
+    const { lines } = await post({
+      advances: [{ amount: 100_000, method: "TRANSFER", kind: "HOTEL" }],
+      advancesRefunded: [{ amount: 40_000, method: "CASH", kind: "HOTEL" }],
+      deposits: [{ amount: 40_000, description: "Base" }],
+      cashExpected: 0,
+      cashCounted: 0,
+    });
+    expect(line(lines, "2805")).toMatchObject({ debit: 0, credit: 60_000 });
+  });
+
+  it("devolucion que baja la deuda del cliente y otra que queda como saldo a favor", async () => {
+    const { lines } = await post({
+      returns: [
+        { taxType: "IVA", taxableAmount: 10_000, taxAmount: 1_900, refundMethod: "CREDIT" },
+        { taxType: "IVA", taxableAmount: 5_000, taxAmount: 950, refundMethod: "STORE_CREDIT" },
+      ],
+    });
+    expect(line(lines, "1305")).toMatchObject({ debit: 0, credit: 11_900 });
+    expect(line(lines, "2805")).toMatchObject({ debit: 0, credit: 5_950 });
+    expect(line(lines, "4175")).toMatchObject({ debit: 15_000, credit: 0 });
+  });
+
+  it("gasto pagado con transferencia sale de Bancos, no de Caja", async () => {
+    const { lines } = await post({ expenses: [{ amount: 25_000, description: "Gas", method: "TRANSFER" }] });
+    expect(line(lines, "1110")).toMatchObject({ debit: 0, credit: 25_000 });
+    expect(line(lines, "1105")).toBeUndefined();
+  });
+
+  it("cargar saldo de recargas baja lo que se le debe al tercero", async () => {
+    const { lines } = await post({
+      thirdPartyPayments: [{ concept: "Saldo Movilway", amount: 100_000 }],
+      deposits: [{ amount: 100_000, description: "Base" }],
+    });
+    expect(line(lines, "280515")).toMatchObject({ debit: 100_000, credit: 0 });
+  });
+
+  it("cuenta abierta pagada por partes: lo de hoy es anticipo, lo de antes se aplica al cerrarla", async () => {
+    // Hoy: se cobraron 30.000 de una mesa que sigue abierta, y se cerro otra de 119.000 que ya tenia 50.000 de ayer
+    const { lines } = await post({
+      payments: [{ method: "CASH", amount: 99_000 }],
+      salesTaxBreakdown: [{ taxType: "IVA", taxRate: 19, taxableBase: 100_000, taxAmount: 19_000 }],
+      openAccounts: { received: 30_000, applied: 50_000 },
+      cashExpected: 99_000,
+      cashCounted: 99_000,
+    });
+    expect(line(lines, "2805")).toMatchObject({ debit: 20_000, credit: 0 });
+    expect(line(lines, "4135")).toMatchObject({ debit: 0, credit: 100_000 });
   });
 });

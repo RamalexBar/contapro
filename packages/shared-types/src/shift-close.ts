@@ -11,8 +11,23 @@ import { z } from "zod";
 
 /** Como entro el dinero de las ventas del turno. TRADE_IN = equipo usado recibido como parte de
  * pago (entra como activo, no como caja/banco). PLATFORM = pedido de una plataforma tipo Rappi
- * (queda como cuenta por cobrar a la plataforma, no como caja/banco). */
-export const shiftClosePaymentMethodSchema = z.enum(["CASH", "CARD", "TRANSFER", "TRADE_IN", "PLATFORM"]);
+ * (queda como cuenta por cobrar a la plataforma, no como caja/banco).
+ * Agregados 2026-10-13 (conexion con Cajapro, docs de Cajapro paso 22):
+ * CREDIT = venta fiada (cuenta por cobrar al cliente), ADVANCE = pagada con un anticipo que el
+ * cliente ya habia dado (apartado, orden de servicio, reserva de hotel -- baja el pasivo),
+ * COURIER = la cobro el domiciliario y todavia no la entrega (por legalizar), STORE_CREDIT =
+ * pagada con el saldo a favor que le quedo al cliente de una devolucion. */
+export const shiftClosePaymentMethodSchema = z.enum([
+  "CASH",
+  "CARD",
+  "TRANSFER",
+  "TRADE_IN",
+  "PLATFORM",
+  "CREDIT",
+  "ADVANCE",
+  "COURIER",
+  "STORE_CREDIT",
+]);
 export type ShiftClosePaymentMethod = z.infer<typeof shiftClosePaymentMethodSchema>;
 
 export const shiftClosePaymentSchema = z.object({
@@ -21,6 +36,8 @@ export const shiftClosePaymentSchema = z.object({
   // Solo tiene sentido con method="PLATFORM" (ej. "Rappi") -- informativo, hoy todas las
   // plataformas comparten una sola cuenta contable (ver README, punto de "que falta").
   platformName: z.string().optional(),
+  // Solo informativo con method="CREDIT": a quien se le fio (hoy todo va a una sola cuenta Clientes).
+  customer: z.object({ documentNumber: z.string().nullish(), name: z.string() }).optional(),
 });
 export type ShiftClosePaymentInput = z.infer<typeof shiftClosePaymentSchema>;
 
@@ -42,13 +59,17 @@ export const shiftCloseReturnSchema = z.object({
   taxType: shiftCloseTaxTypeSchema,
   taxableAmount: z.number().nonnegative(),
   taxAmount: z.number().nonnegative().default(0),
-  refundMethod: z.enum(["CASH", "CARD", "TRANSFER"]),
+  // CREDIT = la devolucion baja lo que el cliente debia (fiado); STORE_CREDIT = le queda como
+  // saldo a favor para un cambio (agregados 2026-10-13).
+  refundMethod: z.enum(["CASH", "CARD", "TRANSFER", "CREDIT", "STORE_CREDIT"]),
 });
 export type ShiftCloseReturnInput = z.infer<typeof shiftCloseReturnSchema>;
 
 export const shiftCloseExpenseSchema = z.object({
   amount: z.number().positive(),
   description: z.string().min(1),
+  // De donde salio la plata (agregado 2026-10-13; antes siempre era Caja).
+  method: z.enum(["CASH", "CARD", "TRANSFER"]).default("CASH"),
 });
 export type ShiftCloseExpenseInput = z.infer<typeof shiftCloseExpenseSchema>;
 
@@ -92,12 +113,48 @@ export type ShiftCloseThirdPartyIncomeInput = z.infer<typeof shiftCloseThirdPart
 /** Abono de un apartado/orden de servicio: anticipo del cliente, todavia no es ingreso (pasivo)
  * hasta que se entregue el producto/servicio -- ver README para por que no se reconoce como
  * ingreso aca. */
+export const shiftCloseAdvanceKindSchema = z.enum(["LAYAWAY", "SERVICE", "HOTEL", "OTHER"]);
+
 export const shiftCloseAdvanceSchema = z.object({
   amount: z.number().positive(),
   method: z.enum(["CASH", "CARD", "TRANSFER"]),
   description: z.string().optional(),
+  // Solo informativo (apartado, orden de servicio, reserva de hotel): todos van a Anticipos 2805.
+  kind: shiftCloseAdvanceKindSchema.optional(),
 });
 export type ShiftCloseAdvanceInput = z.infer<typeof shiftCloseAdvanceSchema>;
+
+/** Anticipo que se le DEVUELVE al cliente (ej. cancela la reserva) -- baja el pasivo, sale plata. */
+export const shiftCloseAdvanceRefundSchema = z.object({
+  amount: z.number().positive(),
+  method: z.enum(["CASH", "CARD", "TRANSFER"]),
+  kind: shiftCloseAdvanceKindSchema.optional(),
+});
+export type ShiftCloseAdvanceRefundInput = z.infer<typeof shiftCloseAdvanceRefundSchema>;
+
+const shiftCloseCounterpartySchema = z.object({ documentNumber: z.string().nullish(), name: z.string() });
+
+/** Abono de un cliente a lo que debia (fiado) cobrado en la caja. */
+export const shiftCloseDebtCollectionSchema = z.object({
+  amount: z.number().positive(),
+  method: z.enum(["CASH", "CARD", "TRANSFER"]),
+  customer: shiftCloseCounterpartySchema.optional(),
+});
+export type ShiftCloseDebtCollectionInput = z.infer<typeof shiftCloseDebtCollectionSchema>;
+
+/** Domiciliario: FLOAT_OUT = se le da base (sale de caja); SETTLEMENT = entrega lo que cobro y la base. */
+export const shiftCloseCourierMovementSchema = z.object({
+  type: z.enum(["FLOAT_OUT", "SETTLEMENT"]),
+  amount: z.number().positive(),
+});
+export type ShiftCloseCourierMovementInput = z.infer<typeof shiftCloseCourierMovementSchema>;
+
+/** Plata que sale de la caja para pagarle a un tercero (ej. cargar saldo de recargas). */
+export const shiftCloseThirdPartyPaymentSchema = z.object({
+  concept: z.string().min(1),
+  amount: z.number().positive(),
+});
+export type ShiftCloseThirdPartyPaymentInput = z.infer<typeof shiftCloseThirdPartyPaymentSchema>;
 
 // externalReference NO va en el body -- viaja en el header HTTP "Idempotency-Key" (convencion
 // estandar, mismo criterio que Stripe/muchas APIs de pagos), ver public-api.controller.ts. Este
@@ -117,6 +174,17 @@ export const registerShiftCloseBodySchema = z
     tipsReceived: z.array(shiftCloseTipSchema).default([]),
     tipsPaidOut: z.number().nonnegative().default(0),
     thirdPartyIncome: z.array(shiftCloseThirdPartyIncomeSchema).default([]),
+    // Agregados 2026-10-13 (conexion con Cajapro):
+    advancesRefunded: z.array(shiftCloseAdvanceRefundSchema).default([]),
+    debtCollections: z.array(shiftCloseDebtCollectionSchema).default([]),
+    courierMovements: z.array(shiftCloseCourierMovementSchema).default([]),
+    thirdPartyPayments: z.array(shiftCloseThirdPartyPaymentSchema).default([]),
+    // Cuentas abiertas (mesa, habitacion) pagadas por partes en turnos distintos:
+    // received = lo cobrado en ESTE turno de cuentas que todavia no se cerraron (anticipo, pasivo);
+    // applied = lo cobrado en turnos ANTERIORES de cuentas que se cerraron en este (baja el pasivo).
+    openAccounts: z
+      .object({ received: z.number().nonnegative().default(0), applied: z.number().nonnegative().default(0) })
+      .default({ received: 0, applied: 0 }),
     // Arqueo: lo esperado (segun lo que registro el turno) vs. lo contado fisicamente.
     cashExpected: z.number().nonnegative(),
     cashCounted: z.number().nonnegative(),

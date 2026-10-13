@@ -32,9 +32,14 @@ const STANDARD_ACCOUNTS = {
   propinasPorPagar: { code: "280510", name: "Propinas por pagar a empleados", type: "LIABILITY" as const }, // NUEVA, SIN VERIFICAR -- propina no es ingreso del negocio, pasivo hasta que se reparte
   ingresosPorComisiones: { code: "4210", name: "Comisiones", type: "INCOME" as const }, // NUEVA, SIN VERIFICAR
   saldoTercerosPorPagar: { code: "280515", name: "Saldo por pagar a terceros (recargas/plataformas)", type: "LIABILITY" as const }, // NUEVA, SIN VERIFICAR
+  clientes: { code: "1305", name: "Clientes (cuentas por cobrar)", type: "ASSET" as const }, // reusa (ventas a credito)
+  domiciliariosPorLegalizar: { code: "138095", name: "Domiciliarios por legalizar", type: "ASSET" as const }, // NUEVA, SIN VERIFICAR -- plata que cobro el domiciliario y aun no entrega
 };
 
 type AccountKey = keyof typeof STANDARD_ACCOUNTS;
+
+/** Efectivo a Caja; tarjeta y transferencia a Bancos */
+const cashOrBank = (method: "CASH" | "CARD" | "TRANSFER"): AccountKey => (method === "CASH" ? "caja" : "bancos");
 
 const TAX_ACCOUNT_BY_TYPE: Partial<Record<ShiftCloseTaxType, AccountKey>> = {
   IVA: "ivaPorPagar",
@@ -77,7 +82,15 @@ export class PostShiftCloseJournalEntryUseCase {
       else if (payment.method === "CARD" || payment.method === "TRANSFER") add("bancos", payment.amount, 0);
       else if (payment.method === "TRADE_IN") add("inventarioUsados", payment.amount, 0);
       else if (payment.method === "PLATFORM") add("cuentasPorCobrarPlataformas", payment.amount, 0);
+      else if (payment.method === "CREDIT") add("clientes", payment.amount, 0); // fiado
+      else if (payment.method === "ADVANCE" || payment.method === "STORE_CREDIT") add("anticiposClientes", payment.amount, 0); // usa lo que el cliente ya habia dado
+      else if (payment.method === "COURIER") add("domiciliariosPorLegalizar", payment.amount, 0);
     }
+
+    // 1b. Cuentas abiertas pagadas por partes: lo cobrado de cuentas que siguen abiertas es anticipo;
+    // lo cobrado antes de cuentas que se cerraron en este turno ya no lo es.
+    if (input.openAccounts.received > 0) add("anticiposClientes", 0, input.openAccounts.received);
+    if (input.openAccounts.applied > 0) add("anticiposClientes", input.openAccounts.applied, 0);
 
     // 2. Ingreso + IVA/INC generado, por tarifa.
     for (const line of input.salesTaxBreakdown) {
@@ -92,14 +105,15 @@ export class PostShiftCloseJournalEntryUseCase {
       const taxAccount = TAX_ACCOUNT_BY_TYPE[ret.taxType];
       if (taxAccount && ret.taxAmount > 0) add(taxAccount, ret.taxAmount, 0);
       const refundTotal = round2(ret.taxableAmount + ret.taxAmount);
-      if (ret.refundMethod === "CASH") add("caja", 0, refundTotal);
-      else add("bancos", 0, refundTotal);
+      if (ret.refundMethod === "CREDIT") add("clientes", 0, refundTotal); // baja lo que debia
+      else if (ret.refundMethod === "STORE_CREDIT") add("anticiposClientes", 0, refundTotal); // le queda saldo a favor
+      else add(cashOrBank(ret.refundMethod), 0, refundTotal);
     }
 
     // 4. Gastos pagados de caja: salen de Caja, entran como gasto.
     for (const expense of input.expenses) {
       add("gastosCaja", expense.amount, 0);
-      add("caja", 0, expense.amount);
+      add(cashOrBank(expense.method), 0, expense.amount);
     }
 
     // 5. Retiros del propietario: salen de Caja.
@@ -129,6 +143,35 @@ export class PostShiftCloseJournalEntryUseCase {
     for (const forfeited of input.forfeitedAdvances) {
       add("anticiposClientes", forfeited.amount, 0);
       add("sobrantes", 0, forfeited.amount);
+    }
+
+    // 6a. Anticipos devueltos (ej. cancela la reserva y se le devuelve): baja el pasivo, sale plata.
+    for (const refund of input.advancesRefunded) {
+      add("anticiposClientes", refund.amount, 0);
+      add(cashOrBank(refund.method), 0, refund.amount);
+    }
+
+    // 6e. Abonos de fiado cobrados en la caja: entra plata, baja lo que debe el cliente.
+    for (const collection of input.debtCollections) {
+      add(cashOrBank(collection.method), collection.amount, 0);
+      add("clientes", 0, collection.amount);
+    }
+
+    // 6g. Domiciliario: la base que se lleva sale de caja; al legalizar entrega lo cobrado y la base.
+    for (const movement of input.courierMovements) {
+      if (movement.type === "FLOAT_OUT") {
+        add("domiciliariosPorLegalizar", movement.amount, 0);
+        add("caja", 0, movement.amount);
+      } else {
+        add("caja", movement.amount, 0);
+        add("domiciliariosPorLegalizar", 0, movement.amount);
+      }
+    }
+
+    // 6h. Plata de la caja para pagarle al tercero (ej. cargar saldo de recargas): baja lo que se le debe.
+    for (const payment of input.thirdPartyPayments) {
+      add("saldoTercerosPorPagar", payment.amount, 0);
+      add("caja", 0, payment.amount);
     }
 
     // 6c. Propinas: no son ingreso del negocio, pasivo hasta que se reparten al empleado.
