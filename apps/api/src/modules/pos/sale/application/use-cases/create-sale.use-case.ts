@@ -212,7 +212,10 @@ export class CreateSaleUseCase {
             taxPercent: item.taxPercent,
             taxAmount: item.taxAmount,
             total: item.total,
+            discountPercent: item.discountPercent,
           })),
+          payments: sale.payments.map((p) => ({ method: p.method, amount: p.amount })),
+          dueDate: receivable?.dueDate ?? null,
           withholdingTaxes: sale.withholdings.map((w) => ({
             type: w.type,
             base: w.base,

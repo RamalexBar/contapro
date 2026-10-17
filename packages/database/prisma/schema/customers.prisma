@@ -21,13 +21,11 @@ model Customer {
   // mismo campo/criterio que Company.municipalityCode y Supplier.municipalityCode. Nullable.
   municipalityCode String?
   // ---- Catalogos DIAN opcionales para facturar via proveedor tecnologico externo (ver
-  // modules/electronic-invoicing/README.md) -- NO son codigos DIAN oficiales genericos. Solo
-  // dianCityId lo consume hoy Factus (municipality_code). El resto
-  // (dianIdentityDocumentId/dianTypeOrganizationId/dianTaxRegimeId/dianTaxLevelId) se agrego para
-  // el catalogo interno de MATIAS (persona natural/juridica, regimen IVA, nivel de tributacion,
-  // tipo de documento de identidad) y quedo sin ningun consumidor cuando ese proveedor se elimino
-  // del codebase (2026-09-21) -- se dejan las columnas por si un proveedor futuro las necesita,
-  // ningun caso de uso las lee hoy. Todos opcionales, nunca bloquean la venta.
+  // modules/electronic-invoicing/README.md). Los consume Factus: dianCityId (municipality_code,
+  // si no hay se usa municipalityCode), dianTaxRegimeId (tributo del comprador: "01" responsable
+  // de IVA o "ZZ" no aplica) y dianTaxLevelId (responsabilidades fiscales separadas por coma, ej.
+  // "O-13,O-23"; vacio = "R-99-PN"). dianIdentityDocumentId/dianTypeOrganizationId quedaron del
+  // proveedor anterior (MATIAS) sin uso. Todos opcionales, nunca bloquean la venta.
   dianIdentityDocumentId String?
   dianTypeOrganizationId String?
   dianTaxRegimeId        String?

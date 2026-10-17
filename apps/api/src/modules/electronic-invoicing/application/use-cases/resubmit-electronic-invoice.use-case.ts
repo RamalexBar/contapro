@@ -20,6 +20,12 @@ import { extractUblDocument } from "../xml-document-extractor";
  * camino es sincrono (sin poller), asi que no hay "quien habla con la DIAN" que reusar como en
  * el flujo DIRECT.
  */
+function netUnitPrice(line: { quantity?: string; unitPrice?: string; taxAmount?: string; total: string }): number {
+  const quantity = Number(line.quantity ?? 1) || 1;
+  const net = Number(line.total) - Number(line.taxAmount ?? 0);
+  return net > 0 ? Math.round((net / quantity) * 10000) / 10000 : Number(line.unitPrice ?? 0);
+}
+
 export class ResubmitElectronicInvoiceUseCase {
   constructor(
     private readonly invoiceRepo: IElectronicInvoiceRepository,
@@ -53,8 +59,8 @@ export class ResubmitElectronicInvoiceUseCase {
       // y municipio del comprador se leen del cliente actual de la venta: si Factus rechazo por un
       // dato del cliente, se corrige el cliente y se reenvia desde aqui.
       const extracted = extractUblDocument(invoice.xmlContent);
-      const customerId = await this.invoiceRepo.findBuyerCustomerId(invoice);
-      const customer = customerId ? await this.customerRepo.findByIdOrThrow(customerId) : null;
+      const source = await this.invoiceRepo.findSourceBillingInfo(invoice);
+      const customer = source.customerId ? await this.customerRepo.findByIdOrThrow(source.customerId) : null;
       const token = decryptCredential(company.factusCredentialsEncrypted, env.CREDENTIALS_ENCRYPTION_KEY);
       const result = await this.factusClient.submitInvoice(token, {
         resolutionNumber: invoice.resolutionNumber,
@@ -83,12 +89,17 @@ export class ResubmitElectronicInvoiceUseCase {
           description: line.description,
           code: "ITEM",
           quantity: Number(line.quantity ?? 1),
-          unitPrice: Number(line.unitPrice ?? 0),
+          // El XML local guarda el precio antes del descuento y el total de la linea con IVA: el
+          // precio neto (total - IVA) / cantidad ya incluye el descuento, sin tener que enviarlo aparte.
+          unitPrice: netUnitPrice(line),
           // Sin esto la factura reenviada salia sin IVA.
           taxPercent: Number(line.taxPercent ?? 0),
           taxAmount: Number(line.taxAmount ?? 0),
           lineTotal: Number(line.total),
         })),
+        payments: source.payments,
+        dueDate: source.dueDate,
+        withholdings: source.withholdings,
       });
       await this.invoiceRepo.applyThirdPartySubmissionResult(invoice.id, result);
       return;

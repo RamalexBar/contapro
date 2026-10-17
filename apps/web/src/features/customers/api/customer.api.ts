@@ -22,6 +22,10 @@ export interface CreateCustomerInput {
   creditLimit?: number;
   priceListId?: string;
   municipalityCode?: string;
+  /** Factura electronica: "01" responsable de IVA, "ZZ" no aplica. */
+  dianTaxRegimeId?: string;
+  /** Factura electronica: responsabilidades fiscales separadas por coma, ej. "O-13,O-23". */
+  dianTaxLevelId?: string;
 }
 
 export function listCustomers(search?: string): Promise<{ data: CustomerRecord[] }> {

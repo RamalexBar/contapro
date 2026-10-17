@@ -15,8 +15,18 @@ import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { createCustomer, listCustomers, updateCustomerPriceList } from "../api/customer.api";
 import { listPriceLists } from "../../inventory/api/price-list.api";
 
+// Responsabilidades fiscales del comprador que van en la factura electronica (RUT, casilla 53).
+const RESPONSIBILITIES = [
+  { code: "O-13", label: "Gran contribuyente" },
+  { code: "O-15", label: "Autorretenedor" },
+  { code: "O-23", label: "Agente de retención de IVA" },
+  { code: "O-47", label: "Régimen simple" },
+];
+
 const EMPTY_FORM = {
   documentType: "CC",
+  ivaResponsible: false,
+  responsibilities: [] as string[],
   documentNumber: "",
   name: "",
   email: "",
@@ -50,6 +60,8 @@ export function CustomerListPage() {
         creditLimit: form.creditLimit ? Number(form.creditLimit) : undefined,
         priceListId: form.priceListId || undefined,
         municipalityCode: form.municipalityCode || undefined,
+        dianTaxRegimeId: form.ivaResponsible ? "01" : "ZZ",
+        dianTaxLevelId: form.responsibilities.length > 0 ? form.responsibilities.join(",") : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -76,14 +88,14 @@ export function CustomerListPage() {
               createMutation.mutate();
             }}
           >
+            <Select value={form.documentType} onChange={(e) => setForm({ ...form, documentType: e.target.value })}>
+              <option value="CC">Cédula de ciudadanía</option>
+              <option value="NIT">NIT</option>
+              <option value="CE">Cédula de extranjería</option>
+              <option value="PASSPORT">Pasaporte</option>
+            </Select>
             <Input
-              placeholder="Tipo de documento"
-              value={form.documentType}
-              onChange={(e) => setForm({ ...form, documentType: e.target.value })}
-              required
-            />
-            <Input
-              placeholder="Numero de documento"
+              placeholder={form.documentType === "NIT" ? "NIT (con o sin dígito de verificación)" : "Número de documento"}
               value={form.documentNumber}
               onChange={(e) => setForm({ ...form, documentNumber: e.target.value })}
               required
@@ -108,7 +120,7 @@ export function CustomerListPage() {
               onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
             />
             <Input
-              placeholder="Codigo DANE municipio (opcional)"
+              placeholder="Código DANE del municipio (para factura electrónica)"
               value={form.municipalityCode}
               onChange={(e) => setForm({ ...form, municipalityCode: e.target.value })}
             />
@@ -120,6 +132,39 @@ export function CustomerListPage() {
                 </option>
               ))}
             </Select>
+            <div className="col-span-2 rounded-lg border border-slate-200 p-3 sm:col-span-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Datos tributarios para la factura electrónica (según el RUT del cliente)</p>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300"
+                  checked={form.ivaResponsible}
+                  onChange={(e) => setForm({ ...form, ivaResponsible: e.target.checked })}
+                />
+                Responsable de IVA
+              </label>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {RESPONSIBILITIES.map((r) => (
+                  <label key={r.code} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300"
+                      checked={form.responsibilities.includes(r.code)}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          responsibilities: e.target.checked
+                            ? [...form.responsibilities, r.code]
+                            : form.responsibilities.filter((c) => c !== r.code),
+                        })
+                      }
+                    />
+                    {r.label} ({r.code})
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Si no aplica ninguna, se informa "No responsable" (R-99-PN).</p>
+            </div>
             <Button type="submit" loading={createMutation.isPending}>
               Crear
             </Button>

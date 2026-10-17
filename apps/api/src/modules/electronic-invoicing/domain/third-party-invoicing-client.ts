@@ -8,6 +8,20 @@ export interface ThirdPartyInvoiceLineInput {
   taxType?: string;
   taxAmount: number;
   lineTotal: number;
+  /** Descuento de la linea en %, sobre quantity x unitPrice (unitPrice es antes del descuento). */
+  discountPercent?: number;
+}
+
+/** Un pago de la venta, con el mismo metodo que SalePayment (CASH, CARD, TRANSFER, CREDIT, MIXED). */
+export interface ThirdPartyPaymentInput {
+  method: string;
+  amount: number;
+}
+
+/** Retencion que le practican al vendedor; ratePercent sobre la base (ReteIVA: sobre el IVA). */
+export interface ThirdPartyWithholdingInput {
+  type: "RETEFUENTE" | "RETEICA" | "RETEIVA";
+  ratePercent: number;
 }
 
 export interface ThirdPartyInvoiceCustomerInput {
@@ -22,7 +36,9 @@ export interface ThirdPartyInvoiceCustomerInput {
   cityId: string | null;
   identityDocumentId: string | null;
   typeOrganizationId: string | null;
+  /** Tributo del comprador: "01" responsable de IVA, "ZZ" no aplica (Customer.dianTaxRegimeId). */
   taxRegimeId: string | null;
+  /** Responsabilidades fiscales separadas por coma, ej. "O-13,O-23" (Customer.dianTaxLevelId). */
   taxLevelId: string | null;
 }
 
@@ -36,6 +52,11 @@ export interface ThirdPartyInvoiceInput {
   total: number;
   customer: ThirdPartyInvoiceCustomerInput;
   lines: ThirdPartyInvoiceLineInput[];
+  /** Sin pagos (factura manual, API publica) se informa un solo pago de contado. */
+  payments?: ThirdPartyPaymentInput[];
+  /** Vencimiento de la parte a credito. */
+  dueDate?: Date | null;
+  withholdings?: ThirdPartyWithholdingInput[];
 }
 
 export interface ThirdPartyInvoiceResult {

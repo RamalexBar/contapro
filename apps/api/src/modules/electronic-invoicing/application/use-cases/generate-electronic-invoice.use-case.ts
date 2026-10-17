@@ -22,6 +22,8 @@ export interface GenerateElectronicInvoiceItemInput {
   taxType?: string;
   taxAmount: number;
   total: number;
+  /** % de descuento de la linea; unitPrice es antes del descuento. */
+  discountPercent?: number;
 }
 
 export interface GenerateElectronicInvoiceWithholdingInput {
@@ -43,6 +45,10 @@ export interface GenerateElectronicInvoiceInput {
   withholdingTaxes: GenerateElectronicInvoiceWithholdingInput[];
   // Multi-moneda informativa (item 33 de docs/ALCANCE.md) -- ver ubl-invoice-xml-builder.ts.
   currency?: string;
+  /** Pagos de la venta (forma y medio de pago de la factura). Sin ellos, se informa contado. */
+  payments?: { method: string; amount: number }[];
+  /** Vencimiento de la parte a credito (AccountReceivable.dueDate). */
+  dueDate?: Date | null;
 }
 
 export class GenerateElectronicInvoiceUseCase {
@@ -232,7 +238,11 @@ export class GenerateElectronicInvoiceUseCase {
           taxType: item.taxType,
           taxAmount: item.taxAmount,
           lineTotal: item.total,
+          discountPercent: item.discountPercent,
         })),
+        payments: input.payments,
+        dueDate: input.dueDate,
+        withholdings: input.withholdingTaxes.map((w) => ({ type: w.type, ratePercent: w.ratePercent })),
       });
 
       await this.invoiceRepo.applyThirdPartySubmissionResult(invoice.id, result);

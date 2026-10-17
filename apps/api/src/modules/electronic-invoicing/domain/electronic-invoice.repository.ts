@@ -36,6 +36,13 @@ export interface ElectronicInvoiceRecord {
   createdAt: Date;
 }
 
+export interface SourceBillingInfo {
+  customerId: string | null;
+  payments: { method: string; amount: number }[];
+  dueDate: Date | null;
+  withholdings: { type: "RETEFUENTE" | "RETEICA" | "RETEIVA"; ratePercent: number }[];
+}
+
 export interface ElectronicInvoiceWithXml extends ElectronicInvoiceRecord {
   xmlContent: string;
   signedXmlContent: string | null;
@@ -73,8 +80,9 @@ export interface IElectronicInvoiceRepository extends IElectronicDocumentSubmiss
   /** Analogo a findBySaleId para facturas manuales (modules/manual-invoicing). */
   findByManualInvoiceId(manualInvoiceId: string): Promise<ElectronicInvoiceWithXml | null>;
 
-  /** Cliente de la venta o factura manual de origen (null si fue a consumidor final). */
-  findBuyerCustomerId(invoice: { saleId: string | null; manualInvoiceId: string | null }): Promise<string | null>;
+  /** Datos de la venta o factura manual de origen que el XML local no guarda, para reenviar al
+   * proveedor: cliente (null = consumidor final), pagos, vencimiento del credito y retenciones. */
+  findSourceBillingInfo(invoice: { saleId: string | null; manualInvoiceId: string | null }): Promise<SourceBillingInfo>;
 
   /**
    * Aplica el resultado de un proveedor tecnologico (IThirdPartyInvoicingClient), ver README del

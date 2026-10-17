@@ -118,6 +118,7 @@ export class AuthorizeDiscountUseCase {
               taxPercent: saleItem.taxPercent,
               taxAmount: saleItem.taxAmount,
               total: saleItem.total,
+              discountPercent: saleItem.discountPercent,
             };
           })
         );
@@ -132,6 +133,8 @@ export class AuthorizeDiscountUseCase {
           total: updatedSale.total,
           currency: updatedSale.currency,
           items,
+          payments: updatedSale.payments.map((p) => ({ method: p.method, amount: p.amount })),
+          dueDate: receivable?.dueDate ?? null,
           withholdingTaxes: updatedSale.withholdings.map((w) => ({
             type: w.type,
             base: w.base,

@@ -228,10 +228,24 @@ como unico proveedor tecnologico.
       recibiendo un solo `apiToken: string`) solo para este proveedor. Nunca un token/credencial
       global en `env`, porque cada empresa cliente de Contapro necesita su propia cuenta Factus
       bajo su propio NIT.
-    - Catalogos DIAN fijados a mano (Customer no tiene hoy un regimen/responsabilidad DIAN real
-      por venta): `document: "01"`, `operation_type: "10"`, `payment_form: "1"` +
-      `payment_method_code: "42"` (tomado del ejemplo oficial de Factus, sin verificar contra
-      otros codigos), `tribute_code: "ZZ"`, `responsibilities: ["R-99-PN"]`.
+    - Datos por venta (2026-10-17, probados de punta a punta contra el sandbox con ventas reales de
+      Contapro): `payment_details` sale de los pagos de la venta (efectivo `10`, tarjeta `48`,
+      transferencia `47`, credito con forma `2`, medio `1` y el vencimiento de la cuenta por
+      cobrar). Factus exige que sumen el total **antes** de retenciones: el vuelto se quita del
+      efectivo y lo retenido se suma al ultimo pago (`buildPaymentDetails`). Descuento por linea en
+      `discount_rate`; retenciones de la venta en `withholding_taxes` de cada linea (ReteIVA solo en
+      lineas con IVA; si la base de una retencion no es el subtotal completo, el valor que calcula
+      Factus puede diferir del de Contapro). Comprador con NIT: `dv` (escrito o calculado),
+      `company`, persona juridica, y tributo/responsabilidades de `Customer.dianTaxRegimeId`
+      (`"01"` IVA / `"ZZ"`) y `Customer.dianTaxLevelId` (`"O-13,O-23"`), por defecto `"ZZ"` y
+      `["R-99-PN"]`. Fijos: `document: "01"`, `operation_type: "10"`. Facturas sin pagos (manuales,
+      API publica) siguen saliendo de contado, medio `42`.
+    - El PDF de una factura de Factus toma del XML firmado el numero legal, el ambiente
+      (`ProfileExecutionID`), el QR de la DIAN y la resolucion (`sts:InvoiceControl`). El reenvio
+      (`ResubmitElectronicInvoiceUseCase`) vuelve a leer cliente, pagos, vencimiento y retenciones
+      de la venta (`findSourceBillingInfo`), y usa el precio neto de cada linea del XML local.
+    - Limite conocido: la API de ventas falla ("El comprobante no cuadra") si el pago en efectivo
+      supera el total; el POS web no lo sufre porque envia el total y calcula el vuelto en pantalla.
     - Notas credito/debito, documento soporte, nomina electronica y eventos RADIAN **no** usan
       Factus todavia — solo se implemento y probo `POST /v2/bills/validate` + descarga de XML, el
       resto de su API (mucho mas amplia que la del proveedor anterior evaluado, MATIAS) queda

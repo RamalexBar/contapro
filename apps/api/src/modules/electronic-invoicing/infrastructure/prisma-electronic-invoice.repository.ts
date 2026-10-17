@@ -7,6 +7,7 @@ import type {
   ElectronicInvoiceWithXml,
   GenerateElectronicInvoiceData,
   IElectronicInvoiceRepository,
+  SourceBillingInfo,
 } from "../domain/electronic-invoice.repository";
 import type {
   ElectronicDocumentAwaitingStatus,
@@ -129,16 +130,29 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
     };
   }
 
-  async findBuyerCustomerId(invoice: { saleId: string | null; manualInvoiceId: string | null }): Promise<string | null> {
+  async findSourceBillingInfo(invoice: { saleId: string | null; manualInvoiceId: string | null }): Promise<SourceBillingInfo> {
     if (invoice.saleId) {
-      const sale = await prisma.sale.findFirst({ where: { id: invoice.saleId }, select: { customerId: true } });
-      return sale?.customerId ?? null;
+      const sale = await prisma.sale.findFirst({
+        where: { id: invoice.saleId },
+        select: {
+          customerId: true,
+          payments: { select: { method: true, amount: true } },
+          withholdings: { select: { ratePercent: true, withholdingConcept: { select: { type: true } } } },
+        },
+      });
+      const receivable = await prisma.accountReceivable.findFirst({ where: { saleId: invoice.saleId }, select: { dueDate: true } });
+      return {
+        customerId: sale?.customerId ?? null,
+        payments: (sale?.payments ?? []).map((p) => ({ method: p.method, amount: Number(p.amount) })),
+        dueDate: receivable?.dueDate ?? null,
+        withholdings: (sale?.withholdings ?? []).map((w) => ({ type: w.withholdingConcept.type, ratePercent: Number(w.ratePercent) })),
+      };
     }
     if (invoice.manualInvoiceId) {
       const manual = await prisma.manualInvoice.findFirst({ where: { id: invoice.manualInvoiceId }, select: { customerId: true } });
-      return manual?.customerId ?? null;
+      return { customerId: manual?.customerId ?? null, payments: [], dueDate: null, withholdings: [] };
     }
-    return null;
+    return { customerId: null, payments: [], dueDate: null, withholdings: [] };
   }
 
   async findByManualInvoiceId(manualInvoiceId: string): Promise<ElectronicInvoiceWithXml | null> {
