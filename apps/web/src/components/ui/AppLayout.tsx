@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
+  BookMarked,
   BookOpen,
   Building2,
   CalendarDays,
@@ -43,6 +44,8 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   permissions?: string[];
+  /** Archivo estatico (ej. el manual en PDF): se abre en una pestana nueva, no es una ruta de la app. */
+  external?: boolean;
 }
 
 interface NavSection {
@@ -120,6 +123,8 @@ const NAV_SECTIONS: NavSection[] = [
       { to: "/rbac", label: "Roles y permisos", icon: ShieldCheck, permissions: ["rbac.manage"] },
       { to: "/audit", label: "Auditoría", icon: History, permissions: ["audit.read"] },
       { to: "/billing", label: "Mi suscripción", icon: CreditCard, permissions: ["billing.manage"] },
+      // Manual de uso para todos los usuarios (apps/api/scripts/user-manual genera el PDF).
+      { to: "/manual-contapro.pdf", label: "Ver manual", icon: BookMarked, external: true },
     ],
   },
 ];
@@ -172,7 +177,20 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <div key={section.label}>
             <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{section.label}</p>
             <div className="space-y-0.5">
-              {visibleItems.map((item) => (
+              {visibleItems.map((item) =>
+                item.external ? (
+                  <a
+                    key={item.to}
+                    href={item.to}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={onNavigate}
+                    className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                  >
+                    <item.icon size={17} strokeWidth={2} />
+                    {item.label}
+                  </a>
+                ) : (
                 <NavLink
                   key={item.to}
                   to={item.to}
@@ -187,7 +205,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   <item.icon size={17} strokeWidth={2} />
                   {item.label}
                 </NavLink>
-              ))}
+                )
+              )}
             </div>
           </div>
         );
