@@ -18,7 +18,7 @@ import {
 import { formatCOP } from "@erp/shared-utils";
 import { Button } from "../../../components/ui/Button";
 import { Logo } from "../../../components/ui/Logo";
-import { FloatingWhatsAppButton, WhatsAppLink, hasWhatsApp } from "../components/WhatsAppButton";
+import { WhatsAppLink, hasWhatsApp } from "../components/WhatsAppButton";
 
 const FEATURES = [
   { icon: ShoppingCart, title: "POS y ventas", desc: "Punto de venta rápido, cotizaciones, notas crédito/débito y devoluciones." },
@@ -396,8 +396,10 @@ export function LandingPage() {
       <footer className="border-t border-slate-100 py-8 text-center text-xs text-slate-400">
         <Logo heightClassName="h-6" className="mb-2" />
         <p>Contapro — sistema para pequeños y medianos negocios en Colombia.</p>
+        <Link to="/privacidad" className="mt-2 inline-block hover:text-slate-600 hover:underline">
+          Política de privacidad y tratamiento de datos
+        </Link>
       </footer>
-      <FloatingWhatsAppButton />
     </div>
   );
 }

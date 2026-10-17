@@ -1,4 +1,3 @@
-import { MessageCircle } from "lucide-react";
 import { trackEvent } from "../../../lib/analytics";
 
 // Numero en formato internacional sin "+" ni espacios (ej. 573001234567). Sin numero configurado
@@ -35,18 +34,5 @@ export function WhatsAppLink({
     >
       {children}
     </a>
-  );
-}
-
-/** Boton flotante abajo a la derecha, visible en toda la pagina publica. */
-export function FloatingWhatsAppButton() {
-  return (
-    <WhatsAppLink
-      placement="floating"
-      className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105"
-    >
-      <MessageCircle size={20} />
-      <span className="hidden sm:inline">¿Dudas? Escríbenos</span>
-    </WhatsAppLink>
   );
 }

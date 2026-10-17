@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Mail, MessageCircle, X } from "lucide-react";
+import { trackEvent } from "../../lib/analytics";
 
 const WHATSAPP_NUMBER = "573008453690"; // 57 = Colombia, sin espacios/guiones para el link wa.me
 const EMAIL = "contaprocontabilidad@gmail.com";
@@ -32,6 +33,7 @@ export function ContactWidget() {
             href={`https://wa.me/${WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackEvent("contact_whatsapp", { placement: "widget" })}
             className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success-50 text-success-600">

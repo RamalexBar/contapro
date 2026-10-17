@@ -34,6 +34,8 @@ export function RegisterPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Ley 1581: autorizacion previa, expresa e informada para tratar los datos del registro.
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
 
   function update<K extends keyof FormState>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -125,8 +127,24 @@ export function RegisterPage() {
             onChange={(e) => update("adminPassword", e.target.value)}
             required
           />
+          <label className="flex items-start gap-2 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
+              checked={acceptedPrivacy}
+              onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+              required
+            />
+            <span>
+              Autorizo el tratamiento de mis datos personales según la{" "}
+              <Link to="/privacidad" target="_blank" className="font-medium text-brand-700 hover:underline">
+                política de privacidad
+              </Link>
+              .
+            </span>
+          </label>
           {error && <Alert tone="danger">{error}</Alert>}
-          <Button type="submit" className="w-full" loading={loading}>
+          <Button type="submit" className="w-full" loading={loading} disabled={!acceptedPrivacy}>
             {loading ? "Creando cuenta..." : "Crear cuenta gratis"}
           </Button>
         </form>
