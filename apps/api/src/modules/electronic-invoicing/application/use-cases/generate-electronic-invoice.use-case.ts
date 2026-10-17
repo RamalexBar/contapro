@@ -214,7 +214,8 @@ export class GenerateElectronicInvoiceUseCase {
           address: customer?.address ?? null,
           postalCode: customer?.dianPostalCode ?? null,
           countryId: customer?.dianCountryId ?? null,
-          cityId: customer?.dianCityId ?? null,
+          // Factus exige el municipio del comprador; el formulario de clientes pide el codigo DANE.
+          cityId: customer?.dianCityId ?? customer?.municipalityCode ?? null,
           identityDocumentId: customer?.dianIdentityDocumentId ?? null,
           typeOrganizationId: customer?.dianTypeOrganizationId ?? null,
           taxRegimeId: customer?.dianTaxRegimeId ?? null,

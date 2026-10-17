@@ -47,7 +47,9 @@ interface FactusBillResponse {
     number?: string;
     cufe?: string;
     is_validated?: boolean;
+    reference_code?: string;
     errors?: Record<string, string>;
+    totals?: { total?: string };
   };
   errors?: Record<string, string[]>;
 }
@@ -87,21 +89,34 @@ function dateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Factus no crea un documento nuevo si el reference_code ya existe: devuelve el anterior como
+ * validado. Prefijo+numero solo puede repetirse (resolucion nueva que reinicia la numeracion, o el
+ * sandbox compartido, donde otros usuarios ya usaron "SETP18"), asi que se le suma la fecha de
+ * emision. Es estable para la misma factura, y un reenvio sigue devolviendo el mismo documento.
+ */
+export function factusReferenceCode(input: Pick<ThirdPartyInvoiceInput, "prefix" | "documentNumber" | "issueDate">): string {
+  return `${input.prefix}${input.documentNumber}-${input.issueDate.getTime().toString(36)}`;
+}
+
 export function buildBillPayload(input: ThirdPartyInvoiceInput, numberingRangeId: number): Record<string, unknown> {
   const customer = input.customer;
+  const referenceCode = factusReferenceCode(input);
 
   return {
-    reference_code: `${input.prefix}${input.documentNumber}`,
+    reference_code: referenceCode,
     document: DOCUMENT_TYPE_INVOICE,
     numbering_range_id: numberingRangeId,
     operation_type: OPERATION_TYPE_STANDARD,
-    send_email: false, // el envio al cliente lo maneja Contapro (email/WhatsApp), no Factus
+    // Factus le envia al comprador el XML y el PDF por correo (lo que exige la DIAN); Contapro no
+    // envia la factura por correo, solo por WhatsApp.
+    send_email: Boolean(customer.email),
     cash_rounding_amount: "0.00",
     payment_details: [
       {
         payment_form: PAYMENT_FORM_CASH,
         payment_method_code: PAYMENT_METHOD_FROM_OFFICIAL_EXAMPLE,
-        reference_code: `${input.prefix}${input.documentNumber}-pago`,
+        reference_code: `${referenceCode}-pago`,
         amount: money(input.total),
         due_date: dateOnly(input.issueDate),
       },
@@ -186,12 +201,21 @@ export class FactusInvoicingClient implements IThirdPartyInvoicingClient {
     }
 
     if (res.status === 201 && parsed.data?.is_validated && parsed.data.cufe && parsed.data.number) {
+      // Si devolvio otro documento (mismo reference_code de antes), su CUFE no es el de esta venta.
+      const returnedTotal = Number(parsed.data.totals?.total);
+      if (parsed.data.totals?.total !== undefined && Math.abs(returnedTotal - input.total) > 1) {
+        throw new Error(
+          `Factus devolvio otro documento (${parsed.data.number}, total ${returnedTotal}) en vez de crear esta factura (total ${input.total})`
+        );
+      }
       return { status: "ACCEPTED", cufe: parsed.data.cufe, signedXmlContent: "", rawResponse };
     }
 
+    // El detalle por campo viene en data.errors o errors; "Error de validacion" solo no dice que corregir.
+    const fieldErrors = parsed.data?.errors ?? parsed.errors;
+    const details = fieldErrors ? Object.values(fieldErrors).flat().join(" ") : "";
     const rejectionReason =
-      parsed.message ??
-      (parsed.errors ? JSON.stringify(parsed.errors) : `Respuesta inesperada de Factus (status ${res.status})`);
+      [parsed.message, details].filter(Boolean).join(": ") || `Respuesta inesperada de Factus (status ${res.status})`;
 
     return { status: "REJECTED", cufe: parsed.data?.cufe ?? "", signedXmlContent: "", rejectionReason, rawResponse };
   }
