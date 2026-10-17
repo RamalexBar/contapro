@@ -24,7 +24,19 @@ export interface ExtractedLine {
   description: string;
   quantity?: string;
   unitPrice?: string;
+  taxPercent?: string;
+  taxAmount?: string;
   total: string;
+}
+
+/** Resolucion de numeracion que viene dentro del XML firmado (sts:InvoiceControl). */
+export interface ExtractedResolution {
+  resolutionNumber: string;
+  prefix: string;
+  rangeFrom: number;
+  rangeTo: number;
+  validFrom: Date;
+  validUntil: Date;
 }
 
 export interface ExtractedParty {
@@ -63,11 +75,28 @@ function extractParty(root: AnyNode, partyElement: "AccountingSupplierParty" | "
   };
 }
 
-/** "(habilitacion)" en el ProfileID lo escribimos nosotros mismos (ver ubl-*-xml-builder.ts /
- * dian-payroll-xml-builder.ts) -- no es un dato de la DIAN, es un parseo seguro de nuestro propio
- * formato. */
-function environmentFromProfileId(profileId: string | undefined): "HABILITACION" | "PRODUCCION" {
-  return profileId?.toLowerCase().includes("habilitacion") ? "HABILITACION" : "PRODUCCION";
+/** ProfileExecutionID es el dato DIAN (1 = produccion, 2 = pruebas) y lo trae el XML firmado de
+ * Factus. Los XML propios no lo tienen: ahi "(habilitacion)" en el ProfileID lo escribimos nosotros
+ * (ver ubl-*-xml-builder.ts / dian-payroll-xml-builder.ts). */
+function environmentOf(root: AnyNode): "HABILITACION" | "PRODUCCION" {
+  const executionId = directChild(root, "ProfileExecutionID")?.textContent?.trim();
+  if (executionId === "1") return "PRODUCCION";
+  if (executionId === "2") return "HABILITACION";
+  return textOf(root, "ProfileID")?.toLowerCase().includes("habilitacion") ? "HABILITACION" : "PRODUCCION";
+}
+
+function extractResolution(root: AnyNode): ExtractedResolution | undefined {
+  const control = xpath.select1(".//*[local-name()='InvoiceControl']", root) as AnyNode;
+  if (!control) return undefined;
+  const resolutionNumber = textOf(control, "InvoiceAuthorization");
+  const prefix = textOf(control, "Prefix");
+  const rangeFrom = Number(textOf(control, "From"));
+  const rangeTo = Number(textOf(control, "To"));
+  const validFrom = new Date(`${textOf(control, "StartDate")}T00:00:00Z`);
+  const validUntil = new Date(`${textOf(control, "EndDate")}T00:00:00Z`);
+  if (!resolutionNumber || prefix === undefined || !rangeFrom || !rangeTo) return undefined;
+  if (Number.isNaN(validFrom.getTime()) || Number.isNaN(validUntil.getTime())) return undefined;
+  return { resolutionNumber, prefix, rangeFrom, rangeTo, validFrom, validUntil };
 }
 
 export interface ExtractedUblDocument {
@@ -78,6 +107,11 @@ export interface ExtractedUblDocument {
   total?: string;
   environment: "HABILITACION" | "PRODUCCION";
   lines: ExtractedLine[];
+  /** cbc:ID del documento: en el XML firmado por Factus es el numero legal que asigno el proveedor. */
+  documentNumber?: string;
+  /** sts:QRCode del XML firmado (enlace de consulta de la DIAN), si lo trae. */
+  qrCode?: string;
+  resolution?: ExtractedResolution;
 }
 
 /** Factura, notas credito/debito, y documento soporte comparten forma UBL "Invoice"-like (ver
@@ -101,11 +135,16 @@ export function extractUblDocument(xmlContent: string): ExtractedUblDocument {
     subtotal: textOf(legalMonetaryTotal, "LineExtensionAmount"),
     taxAmount: textOf(taxTotal, "TaxAmount"),
     total: textOf(legalMonetaryTotal, "PayableAmount"),
-    environment: environmentFromProfileId(textOf(root, "ProfileID")),
+    environment: environmentOf(root),
+    documentNumber: directChild(root, "ID")?.textContent?.trim() || undefined,
+    qrCode: textOf(root, "QRCode")?.trim() || undefined,
+    resolution: extractResolution(root),
     lines: lineNodes.map((node) => ({
       description: textOf(node, "Description") ?? "",
       quantity: textOf(node, "InvoicedQuantity") ?? textOf(node, "CreditedQuantity") ?? textOf(node, "DebitedQuantity"),
       unitPrice: textOf(node, "PriceAmount"),
+      taxPercent: textOf(node, "Percent"),
+      taxAmount: textOf(directChild(node, "TaxTotal"), "TaxAmount"),
       total: textOf(node, "LineExtensionAmount") ?? "0",
     })),
   };
@@ -181,6 +220,6 @@ export function extractPayrollDocument(xmlContent: string): ExtractedPayrollDocu
     grossTotal: textOf(comprobante, "TotalDevengado"),
     totalDeductions: textOf(comprobante, "TotalDeducciones"),
     netPay: textOf(comprobante, "ComprobanteNeto"),
-    environment: environmentFromProfileId(textOf(root, "ProfileID")),
+    environment: environmentOf(root),
   };
 }

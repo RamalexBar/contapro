@@ -92,7 +92,8 @@ const resubmitUseCase = new ResubmitElectronicInvoiceUseCase(
   xmlSigner,
   auditService,
   companyReader,
-  factusInvoicingClient
+  factusInvoicingClient,
+  customerRepo
 );
 const getCreditNoteUseCase = new GetElectronicCreditNoteUseCase(electronicCreditNoteRepo);
 const resubmitCreditNoteUseCase = new ResubmitElectronicCreditNoteUseCase(

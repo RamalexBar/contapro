@@ -73,6 +73,9 @@ export interface IElectronicInvoiceRepository extends IElectronicDocumentSubmiss
   /** Analogo a findBySaleId para facturas manuales (modules/manual-invoicing). */
   findByManualInvoiceId(manualInvoiceId: string): Promise<ElectronicInvoiceWithXml | null>;
 
+  /** Cliente de la venta o factura manual de origen (null si fue a consumidor final). */
+  findBuyerCustomerId(invoice: { saleId: string | null; manualInvoiceId: string | null }): Promise<string | null>;
+
   /**
    * Aplica el resultado de un proveedor tecnologico (IThirdPartyInvoicingClient), ver README del
    * modulo. A diferencia de markAccepted/markRejected (heredados de

@@ -43,6 +43,9 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
     });
     doc.restore();
     doc.opacity(1).fillColor("black");
+    // save/restore no devuelve el cursor: sin esto el encabezado arranca debajo de la marca de agua.
+    doc.x = PAGE_MARGIN;
+    doc.y = PAGE_MARGIN;
   }
 
   doc.fontSize(16).font("Helvetica-Bold").text(data.issuer.legalName || "(razon social no disponible)");

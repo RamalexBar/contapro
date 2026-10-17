@@ -129,6 +129,18 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
     };
   }
 
+  async findBuyerCustomerId(invoice: { saleId: string | null; manualInvoiceId: string | null }): Promise<string | null> {
+    if (invoice.saleId) {
+      const sale = await prisma.sale.findFirst({ where: { id: invoice.saleId }, select: { customerId: true } });
+      return sale?.customerId ?? null;
+    }
+    if (invoice.manualInvoiceId) {
+      const manual = await prisma.manualInvoice.findFirst({ where: { id: invoice.manualInvoiceId }, select: { customerId: true } });
+      return manual?.customerId ?? null;
+    }
+    return null;
+  }
+
   async findByManualInvoiceId(manualInvoiceId: string): Promise<ElectronicInvoiceWithXml | null> {
     const row = await prisma.electronicInvoice.findFirst({ where: { manualInvoiceId }, include: { numberingResolution: true } });
     if (!row) return null;
@@ -189,6 +201,8 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
           xmlContent: result.signedXmlContent,
           signedXmlContent: result.signedXmlContent,
           dianResponseXml: result.rawResponse,
+          // Un reenvio aceptado no debe seguir mostrando el motivo del rechazo anterior.
+          rejectionReason: null,
           submittedAt: now,
           respondedAt: now,
         },

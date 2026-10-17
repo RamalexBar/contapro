@@ -3,6 +3,7 @@ import { ConflictError, NotFoundError, ValidationError } from "../../../../share
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { decryptCredential } from "../../../../shared/crypto/credential-cipher";
 import type { AuditService } from "../../../audit/application/audit.service";
+import type { ICustomerRepository } from "../../../customers/domain/customer.repository";
 import type { ICertificateLoader } from "../../domain/certificate-loader";
 import type { ICompanyReader } from "../../domain/company-reader.repository";
 import type { IElectronicInvoiceRepository } from "../../domain/electronic-invoice.repository";
@@ -26,7 +27,8 @@ export class ResubmitElectronicInvoiceUseCase {
     private readonly xmlSigner: IXmlSigner,
     private readonly audit: AuditService,
     private readonly companyReader: ICompanyReader,
-    private readonly factusClient: IThirdPartyInvoicingClient
+    private readonly factusClient: IThirdPartyInvoicingClient,
+    private readonly customerRepo: ICustomerRepository
   ) {}
 
   async execute(query: { type: "sale"; id: string } | { type: "manual"; id: string }): Promise<void> {
@@ -47,13 +49,12 @@ export class ResubmitElectronicInvoiceUseCase {
       if (!company.factusCredentialsEncrypted) {
         throw new ValidationError("Esta empresa usa el proveedor FACTUS pero no tiene credenciales cargadas");
       }
-      // ElectronicInvoice no guarda customerId ni las lineas por separado (ver README, punto 13:
-      // "el XML es la unica fuente disponible") -- se reconstruyen del xmlContent local ya
-      // guardado (mismo extractor que usa el RIDE). Limitacion real: los catalogos DIAN del
-      // proveedor (regimen IVA, ciudad, etc., ver domain/third-party-invoicing-client.ts) no
-      // quedan en el XML local -- si el rechazo original fue por falta de esos datos, corregir el
-      // Customer y reintentar aqui NO alcanza, hay que generar la factura de nuevo desde la venta.
+      // Las lineas y totales salen del xmlContent local (no se guardan aparte). Los datos de contacto
+      // y municipio del comprador se leen del cliente actual de la venta: si Factus rechazo por un
+      // dato del cliente, se corrige el cliente y se reenvia desde aqui.
       const extracted = extractUblDocument(invoice.xmlContent);
+      const customerId = await this.invoiceRepo.findBuyerCustomerId(invoice);
+      const customer = customerId ? await this.customerRepo.findByIdOrThrow(customerId) : null;
       const token = decryptCredential(company.factusCredentialsEncrypted, env.CREDENTIALS_ENCRYPTION_KEY);
       const result = await this.factusClient.submitInvoice(token, {
         resolutionNumber: invoice.resolutionNumber,
@@ -67,24 +68,25 @@ export class ResubmitElectronicInvoiceUseCase {
           documentType: extracted.customer.documentType ?? "",
           documentNumber: extracted.customer.documentNumber,
           name: extracted.customer.name,
-          email: null,
-          phone: null,
-          address: null,
-          postalCode: null,
-          countryId: null,
-          cityId: null,
-          identityDocumentId: null,
-          typeOrganizationId: null,
-          taxRegimeId: null,
-          taxLevelId: null,
+          email: customer?.email ?? null,
+          phone: customer?.phone ?? null,
+          address: customer?.address ?? null,
+          postalCode: customer?.dianPostalCode ?? null,
+          countryId: customer?.dianCountryId ?? null,
+          cityId: customer?.dianCityId ?? customer?.municipalityCode ?? null,
+          identityDocumentId: customer?.dianIdentityDocumentId ?? null,
+          typeOrganizationId: customer?.dianTypeOrganizationId ?? null,
+          taxRegimeId: customer?.dianTaxRegimeId ?? null,
+          taxLevelId: customer?.dianTaxLevelId ?? null,
         },
         lines: extracted.lines.map((line) => ({
           description: line.description,
           code: "ITEM",
           quantity: Number(line.quantity ?? 1),
           unitPrice: Number(line.unitPrice ?? 0),
-          taxPercent: 0,
-          taxAmount: 0,
+          // Sin esto la factura reenviada salia sin IVA.
+          taxPercent: Number(line.taxPercent ?? 0),
+          taxAmount: Number(line.taxAmount ?? 0),
           lineTotal: Number(line.total),
         })),
       });

@@ -81,6 +81,9 @@ class FakeInvoiceRepository implements IElectronicInvoiceRepository {
   async findBySaleId(): Promise<ElectronicInvoiceWithXml | null> {
     throw new Error("not implemented");
   }
+  async findBuyerCustomerId(): Promise<string | null> {
+    return null;
+  }
   async findByManualInvoiceId(): Promise<ElectronicInvoiceWithXml | null> {
     throw new Error("not implemented");
   }

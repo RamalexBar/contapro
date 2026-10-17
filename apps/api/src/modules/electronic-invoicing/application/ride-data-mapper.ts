@@ -186,9 +186,12 @@ export function mapSaleToReceiptData(
 export function mapInvoiceToRideData(doc: ElectronicInvoiceWithXml, company: RideCompanyInfo, resolution: RideResolutionInfo | null): RideDocumentData {
   const parsed = extractUblDocument(doc.xmlContent);
   const total = parsed.total ?? "0.00";
+  // Con Factus, el XML guardado es el firmado por el proveedor: su numero, QR y resolucion son los
+  // legales (el fullNumber local solo fue la referencia que Contapro le envio).
+  const fullNumber = parsed.documentNumber ?? doc.fullNumber;
   return {
     documentTypeLabel: "FACTURA ELECTRONICA DE VENTA",
-    fullNumber: doc.fullNumber,
+    fullNumber,
     uniqueCodeLabel: "CUFE",
     uniqueCode: doc.cufe,
     issueDate: doc.issueDate,
@@ -202,8 +205,8 @@ export function mapInvoiceToRideData(doc: ElectronicInvoiceWithXml, company: Rid
     subtotal: parsed.subtotal,
     taxTotal: parsed.taxAmount,
     total,
-    qrPayload: buildQrPayload(doc.fullNumber, doc.issueDate, parsed.supplier.documentNumber, total, doc.cufe),
-    resolution,
+    qrPayload: parsed.qrCode ?? buildQrPayload(fullNumber, doc.issueDate, parsed.supplier.documentNumber, total, doc.cufe),
+    resolution: parsed.resolution ?? resolution,
   };
 }
 
