@@ -10,14 +10,15 @@ import {
   Smartphone,
   Check,
   ArrowRight,
-  ChevronDown,
   FileCheck2,
+  MessageCircle,
   Plug,
   ShieldCheck,
 } from "lucide-react";
 import { formatCOP } from "@erp/shared-utils";
 import { Button } from "../../../components/ui/Button";
 import { Logo } from "../../../components/ui/Logo";
+import { FloatingWhatsAppButton, WhatsAppLink, hasWhatsApp } from "../components/WhatsAppButton";
 
 const FEATURES = [
   { icon: ShoppingCart, title: "POS y ventas", desc: "Punto de venta rápido, cotizaciones, notas crédito/débito y devoluciones." },
@@ -34,7 +35,6 @@ const COMPETITORS = [
   { name: "World Office", price: "Desde $170.000", note: "nómina solo en el plan tope" },
 ];
 
-type AccountingStandard = "PUC" | "NIIF";
 type BillingCycle = "MONTHLY" | "ANNUAL";
 type CertificateChoice = "NEW" | "HAVE";
 
@@ -67,7 +67,7 @@ const PLANS: {
 
 const SHARED_FEATURES = [
   "Facturación electrónica DIAN (factura, notas crédito/débito, documento soporte)",
-  "Contabilidad completa (PUC o NIIF, según tu elección)",
+  "Contabilidad completa con PUC",
   "POS e inventario con costeo real (FIFO/kardex)",
   "Nómina electrónica Colombia",
   "Reportes fiscales (exógena, retenciones)",
@@ -75,92 +75,22 @@ const SHARED_FEATURES = [
 ];
 
 const CERTIFICATE_PRICE = 130000;
+const STARTING_PRICE = Math.min(...PLANS.map((p) => p.priceMonthly));
 
 function annualSavingsPercent(priceMonthly: number, priceYearly: number): number {
   const fullYear = priceMonthly * 12;
   return Math.round(((fullYear - priceYearly) / fullYear) * 100);
 }
 
-function AccountingStandardSelector({
-  value,
-  onChange,
-}: {
-  value: AccountingStandard | null;
-  onChange: (v: AccountingStandard) => void;
-}) {
-  const [showHelp, setShowHelp] = useState(false);
-
-  return (
-    <div className="mx-auto max-w-3xl">
-      <p className="text-center text-sm font-semibold uppercase tracking-wide text-brand-600">Paso 1 de 2</p>
-      <h2 className="mt-1 text-center text-2xl font-bold text-slate-900">¿Bajo qué normativa contable trabaja tu empresa?</h2>
-      <p className="mx-auto mt-2 max-w-xl text-center text-sm text-slate-500">
-        Esto define la plantilla del plan de cuentas con la que arranca tu empresa en Contapro.
-        Podés cambiarla después desde Configuración de la cuenta.
-      </p>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {(
-          [
-            { id: "PUC" as const, title: "PUC", subtitle: "Plan Único de Cuentas", desc: "Normativa contable tradicional colombiana. La elección de la mayoría de las pymes." },
-            { id: "NIIF" as const, title: "NIIF", subtitle: "Normas Internacionales de Información Financiera", desc: "Estándar internacional. Para empresas que reportan bajo IFRS o que la Ley 1314 clasifica como grandes/medianas." },
-          ]
-        ).map((opt) => {
-          const selected = value === opt.id;
-          return (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => onChange(opt.id)}
-              aria-pressed={selected}
-              className={`rounded-2xl border-2 p-6 text-left transition-colors ${
-                selected ? "border-brand-600 bg-brand-50" : "border-slate-200 bg-white hover:border-slate-300"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xl font-bold text-slate-900">{opt.title}</span>
-                {selected && <Check size={20} className="text-brand-600" />}
-              </div>
-              <p className="mt-0.5 text-sm font-medium text-slate-600">{opt.subtitle}</p>
-              <p className="mt-2 text-sm text-slate-500">{opt.desc}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-4 text-center">
-        <button
-          type="button"
-          onClick={() => setShowHelp((v) => !v)}
-          className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline"
-        >
-          ¿No sabés cuál usar? Más información
-          <ChevronDown size={14} className={`transition-transform ${showHelp ? "rotate-180" : ""}`} />
-        </button>
-        {showHelp && (
-          <p className="mx-auto mt-2 max-w-xl rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
-            La mayoría de pymes en Colombia usan <strong>PUC</strong>. Si tu empresa reporta bajo
-            estándares internacionales o es una empresa grande/mediana según la clasificación de la
-            Ley 1314, probablemente necesitás <strong>NIIF</strong>.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function LandingPage() {
   const navigate = useNavigate();
-  const [accountingStandard, setAccountingStandard] = useState<AccountingStandard | null>(null);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY");
   const [certificateChoice, setCertificateChoice] = useState<CertificateChoice | null>(null);
 
   function handleSelectPlan(planCode: string) {
-    if (!accountingStandard) return; // boton ya queda disabled, doble resguardo
     const params = new URLSearchParams({
       plan: planCode,
       cycle: billingCycle.toLowerCase(),
-      normativa: accountingStandard.toLowerCase(),
       ...(certificateChoice ? { certificado: certificateChoice.toLowerCase() } : {}),
     });
     navigate(`/register?${params.toString()}`);
@@ -190,25 +120,38 @@ export function LandingPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-4 py-16 text-center sm:py-24">
+        <p className="mx-auto mb-4 inline-block rounded-full bg-brand-50 px-4 py-1.5 text-sm font-semibold text-brand-700">
+          Todo incluido desde {formatCOP(STARTING_PRICE)} al mes
+        </p>
         <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-          El sistema todo-en-uno para tu negocio, a un precio que sí es de pyme
+          Deja de pagar por partes tu software contable
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
-          Facturación electrónica DIAN, punto de venta, inventario, contabilidad y nómina — en un
-          solo sistema, con un solo precio. Sin módulos separados, sin sorpresas.
+          Otros te cobran la contabilidad, el punto de venta y la nómina por separado. En Contapro
+          tienes contabilidad, punto de venta, inventario, caja y nómina en un solo sistema, con un
+          solo precio y sin sorpresas.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link to="/register">
             <Button size="md" className="px-6 py-3 text-base">
-              Empezar gratis 14 días
+              Pruébalo gratis 14 días
               <ArrowRight size={16} />
             </Button>
           </Link>
-          <a href="#precios">
-            <Button variant="secondary" size="md" className="px-6 py-3 text-base">
-              Ver precios
-            </Button>
-          </a>
+          {hasWhatsApp ? (
+            <WhatsAppLink placement="hero" message="Hola, quiero una demostración de Contapro.">
+              <Button variant="secondary" size="md" className="px-6 py-3 text-base">
+                <MessageCircle size={16} />
+                Quiero una demostración
+              </Button>
+            </WhatsAppLink>
+          ) : (
+            <a href="#precios">
+              <Button variant="secondary" size="md" className="px-6 py-3 text-base">
+                Ver precios
+              </Button>
+            </a>
+          )}
         </div>
         <p className="mt-4 text-xs text-slate-400">Sin tarjeta de crédito para empezar.</p>
       </section>
@@ -256,18 +199,13 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Normativa contable (paso previo a los planes) */}
-      <section id="precios" className="border-t border-slate-100 px-4 py-16">
-        <AccountingStandardSelector value={accountingStandard} onChange={setAccountingStandard} />
-      </section>
-
       {/* Planes */}
-      <section className="border-t border-slate-100 bg-slate-50 px-4 py-16">
+      <section id="precios" className="border-t border-slate-100 bg-slate-50 px-4 py-16">
         <div className="mx-auto max-w-6xl">
           <h2 className="text-center text-2xl font-bold text-slate-900">Planes simples, todo el sistema incluido</h2>
           <p className="mx-auto mt-2 max-w-xl text-center text-slate-600">
             La diferencia entre planes es cuánto creces (sucursales y usuarios), no qué módulos
-            podés usar. Todos incluyen POS, inventario, contabilidad, nómina y facturación DIAN.
+            puedes usar. Todos incluyen POS, inventario, contabilidad, nómina y facturación DIAN.
           </p>
 
           <div className="mt-6 flex items-center justify-center gap-3">
@@ -291,15 +229,7 @@ export function LandingPage() {
           </div>
 
           <div className="relative mt-10">
-            {!accountingStandard && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/70 backdrop-blur-[1px]">
-                <p className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm">
-                  Elegí PUC o NIIF arriba para ver el detalle completo de los planes
-                </p>
-              </div>
-            )}
-
-            <div className={`grid grid-cols-1 gap-6 sm:grid-cols-3 ${!accountingStandard ? "pointer-events-none select-none opacity-40" : ""}`}>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
               {PLANS.map((plan) => {
                 const price = billingCycle === "MONTHLY" ? plan.priceMonthly : plan.priceYearly;
                 const period = billingCycle === "MONTHLY" ? "/mes" : "/año";
@@ -324,7 +254,7 @@ export function LandingPage() {
                     </p>
                     {billingCycle === "ANNUAL" && (
                       <div className="mt-1 space-y-0.5">
-                        <p className="text-xs font-medium text-success-600">Ahorrás {savings}% vs. pagar mes a mes</p>
+                        <p className="text-xs font-medium text-success-600">Ahorras {savings}% vs. pagar mes a mes</p>
                         <p className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700">
                           <ShieldCheck size={13} /> + Certificado digital ({formatCOP(CERTIFICATE_PRICE)}) incluido gratis
                         </p>
@@ -348,7 +278,6 @@ export function LandingPage() {
                     <Button
                       variant={plan.highlight ? "primary" : "secondary"}
                       className="mt-6 w-full"
-                      disabled={!accountingStandard}
                       onClick={() => handleSelectPlan(plan.code)}
                     >
                       Elegir {plan.name}
@@ -396,7 +325,7 @@ export function LandingPage() {
               <p className="mt-1 text-xs text-slate-500">
                 {billingCycle === "ANNUAL"
                   ? "Pagando mes a mes, este valor se cobra por separado."
-                  : "Este valor se cobra por separado y no está incluido en la suscripción mensual. Cambiá a pago anual para que quede incluido."}
+                  : "Este valor se cobra por separado y no está incluido en la suscripción mensual. Cambia a pago anual para que quede incluido."}
               </p>
 
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -436,13 +365,13 @@ export function LandingPage() {
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50">
             <Plug size={22} className="text-brand-600" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900">Conectá Contapro con tus sistemas</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Conecta Contapro con tus sistemas</h3>
           <p className="max-w-xl text-sm text-slate-600">
             Contapro se integra vía API con sistemas externos para generar facturación electrónica
-            automáticamente — por ejemplo, un POS de restaurante que ya usás como producto
+            automáticamente — por ejemplo, un POS de restaurante que ya usas como producto
             independiente puede conectarse a Contapro para facturar cada venta sin doble digitación.
           </p>
-          <p className="text-sm font-medium text-slate-700">¿Tenés un POS o sistema propio? Conectalo con Contapro</p>
+          <p className="text-sm font-medium text-slate-700">¿Tienes un POS o sistema propio? Conéctalo con Contapro</p>
           <a href="#">
             <Button variant="secondary">Ver documentación de la API</Button>
           </a>
@@ -459,12 +388,16 @@ export function LandingPage() {
             <ArrowRight size={16} />
           </Button>
         </Link>
+        <WhatsAppLink placement="final" className="mt-3 block text-sm font-medium text-brand-700 hover:underline">
+          ¿Prefieres que te lo mostremos? Escríbenos por WhatsApp
+        </WhatsAppLink>
       </section>
 
       <footer className="border-t border-slate-100 py-8 text-center text-xs text-slate-400">
         <Logo heightClassName="h-6" className="mb-2" />
         <p>Contapro — sistema para pequeños y medianos negocios en Colombia.</p>
       </footer>
+      <FloatingWhatsAppButton />
     </div>
   );
 }

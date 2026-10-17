@@ -8,12 +8,13 @@ import { Logo } from "../../../components/ui/Logo";
 import { login, registerCompany } from "../api/auth.api";
 import { useAuthStore } from "../hooks/useAuthStore";
 import { ApiError } from "../../../lib/api-client";
+import { trackEvent } from "../../../lib/analytics";
 
+// Solo 5 campos: la razon social arranca igual al nombre del negocio y el correo de la empresa
+// igual al del usuario; ambos se corrigen despues en la configuracion de la empresa.
 interface FormState {
   companyName: string;
-  legalName: string;
   nit: string;
-  companyEmail: string;
   adminFullName: string;
   adminEmail: string;
   adminPassword: string;
@@ -21,9 +22,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   companyName: "",
-  legalName: "",
   nit: "",
-  companyEmail: "",
   adminFullName: "",
   adminEmail: "",
   adminPassword: "",
@@ -49,7 +48,15 @@ export function RegisterPage() {
       // branchName no se pide en el formulario (menos campos = mas facil de llenar) -- el
       // backend igual lo exige explicito porque RegisterCompanyInput se infiere del schema zod
       // con .default() aplicado, que zod resuelve en el output pero no hace opcional el tipo.
-      companyId = (await registerCompany({ ...form, branchName: "Sucursal principal" })).companyId;
+      companyId = (
+        await registerCompany({
+          ...form,
+          legalName: form.companyName,
+          companyEmail: form.adminEmail,
+          branchName: "Sucursal principal",
+        })
+      ).companyId;
+      trackEvent("sign_up", { method: "email" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Error de conexion");
       setLoading(false);
@@ -80,32 +87,22 @@ export function RegisterPage() {
         </div>
         <Card>
         <h1 className="mb-1 text-lg font-semibold text-slate-900">Crear tu cuenta</h1>
-        <p className="mb-6 text-sm text-slate-500">14 dias de prueba gratis, sin tarjeta de credito.</p>
+        <p className="mb-6 text-sm text-slate-500">14 días de prueba gratis, sin tarjeta de crédito. Toma menos de un minuto.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Nombre comercial"
-            placeholder="Minimarket La Esquina"
+            label="Nombre de tu negocio"
+            placeholder="Muebles La Esquina"
             value={form.companyName}
             onChange={(e) => update("companyName", e.target.value)}
             required
           />
           <Input
-            label="Razon social"
-            placeholder="Minimarket La Esquina S.A.S."
-            value={form.legalName}
-            onChange={(e) => update("legalName", e.target.value)}
+            label="NIT o cédula"
+            placeholder="900123456-7"
+            value={form.nit}
+            onChange={(e) => update("nit", e.target.value)}
             required
           />
-          <Input label="NIT" placeholder="900123456-7" value={form.nit} onChange={(e) => update("nit", e.target.value)} required />
-          <Input
-            label="Correo de la empresa"
-            type="email"
-            placeholder="contacto@tuempresa.com"
-            value={form.companyEmail}
-            onChange={(e) => update("companyEmail", e.target.value)}
-            required
-          />
-          <hr className="border-slate-200" />
           <Input
             label="Tu nombre completo"
             value={form.adminFullName}
@@ -113,7 +110,7 @@ export function RegisterPage() {
             required
           />
           <Input
-            label="Tu correo (sera tu usuario)"
+            label="Tu correo (será tu usuario)"
             type="email"
             value={form.adminEmail}
             onChange={(e) => update("adminEmail", e.target.value)}
@@ -123,7 +120,7 @@ export function RegisterPage() {
             label="Contraseña"
             type="password"
             minLength={8}
-            hint="Minimo 8 caracteres"
+            hint="Mínimo 8 caracteres"
             value={form.adminPassword}
             onChange={(e) => update("adminPassword", e.target.value)}
             required
@@ -134,9 +131,9 @@ export function RegisterPage() {
           </Button>
         </form>
         <p className="mt-4 text-center text-xs text-slate-500">
-          Ya tenes cuenta?{" "}
+          ¿Ya tienes cuenta?{" "}
           <Link to="/login" className="font-medium text-brand-700 hover:underline">
-            Ingresa aqui
+            Ingresa aquí
           </Link>
         </p>
         </Card>

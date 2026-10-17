@@ -141,6 +141,10 @@ services:
         sync: false
       - key: VITE_WOMPI_ENVIRONMENT
         value: production
+      # Numero de WhatsApp de ventas, formato internacional sin "+" (ej. 573001234567). Sin valor,
+      # la pagina de inicio no muestra los botones de WhatsApp. Cambiarlo exige rebuild.
+      - key: VITE_WHATSAPP_NUMBER
+        sync: false
     routes:
       # SPA: cualquier ruta que no sea un archivo estatico real cae a index.html -- sin esto,
       # refrescar el navegador en /pos o /accounting da 404 (React Router nunca llega a manejarlo).
