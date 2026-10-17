@@ -1,8 +1,6 @@
-export interface InvoiceFileInput {
-  /** Base64 sin el prefijo "data:...;base64,". */
-  base64: string;
-  mediaType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
-}
+import type { DocumentFileInput } from "../../../shared/ai/document-file";
+
+export type InvoiceFileInput = DocumentFileInput;
 
 /** Renglon de producto de la factura, tal como lo trae el proveedor. */
 export interface ExtractedInvoiceLine {

@@ -11,6 +11,8 @@ import { CreateExpenseUseCase } from "./application/use-cases/create-expense.use
 import { CancelExpenseUseCase } from "./application/use-cases/cancel-expense.use-case";
 import { ListExpensesUseCase } from "./application/use-cases/list-expenses.use-case";
 import { ExpensesController } from "./interfaces/expenses.controller";
+import { ExtractExpenseReceiptUseCase } from "./application/use-cases/extract-expense-receipt.use-case";
+import { ClaudeReceiptExtractionService } from "./infrastructure/claude-receipt-extraction.service";
 
 const categoryRepo = new PrismaExpenseCategoryRepository();
 const expenseRepo = new PrismaExpenseRepository();
@@ -37,5 +39,6 @@ export const expensesController = new ExpensesController(
   new CancelExpenseUseCase(expenseRepo, voidJournalEntryUseCase, auditService),
   new ListExpensesUseCase(expenseRepo),
   expenseRepo,
-  categoryRepo
+  categoryRepo,
+  new ExtractExpenseReceiptUseCase(new ClaudeReceiptExtractionService(), categoryRepo)
 );

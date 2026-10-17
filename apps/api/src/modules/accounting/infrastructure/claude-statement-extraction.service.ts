@@ -7,6 +7,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { env } from "../../../config/env";
 import { ValidationError } from "../../../shared/errors/app-error";
+import { toFriendlyAiError } from "../../../shared/ai/document-file";
 import type { ExtractedBankStatement, IStatementExtractionService, StatementFileInput } from "../domain/statement-extraction.port";
 
 const MAX_TRANSACTIONS = 200;
@@ -61,17 +62,21 @@ export class ClaudeStatementExtractionService implements IStatementExtractionSer
 
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
-    const response = await client.messages.parse({
-      model: "claude-opus-5",
-      max_tokens: 8192,
-      output_config: { effort: "medium", format: zodOutputFormat(extractionSchema) },
-      messages: [
-        {
-          role: "user",
-          content: [toContentBlock(file) as never, { type: "text", text: EXTRACTION_PROMPT }],
-        },
-      ],
-    });
+    const response = await client.messages
+      .parse({
+        model: "claude-opus-5",
+        max_tokens: 8192,
+        output_config: { effort: "medium", format: zodOutputFormat(extractionSchema) },
+        messages: [
+          {
+            role: "user",
+            content: [toContentBlock(file) as never, { type: "text", text: EXTRACTION_PROMPT }],
+          },
+        ],
+      })
+      .catch((err: unknown) => {
+        throw toFriendlyAiError(err);
+      });
 
     if (!response.parsed_output) {
       throw new ValidationError("No se pudo leer el extracto -- intenta con una foto mas clara o el PDF original");

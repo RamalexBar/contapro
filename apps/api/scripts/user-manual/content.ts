@@ -446,7 +446,7 @@ export const SECTIONS: ManualSection[] = [
   {
     group: "Compras",
     title: "Gastos",
-    intro: "Registra los gastos del negocio que no son mercancía: arriendo, servicios públicos, transporte, papelería, etc.",
+    intro: "Registra los gastos del negocio que no son mercancía: arriendo, servicios públicos, transporte, papelería, etc. Puedes registrarlos con una foto del recibo o la factura.",
     how: [
       {
         title: "Crear las categorías (una sola vez)",
@@ -455,16 +455,30 @@ export const SECTIONS: ManualSection[] = [
         ],
       },
       {
-        title: "Registrar un gasto",
+        title: "Registrar un gasto con foto o PDF del soporte",
+        steps: [
+          "Pestaña Gastos: en \"Leer soporte automáticamente\" pulsa \"Leer soporte (foto/PDF)\" y elige la foto (JPG, PNG o WEBP) o el PDF del recibo o la factura. Desde el celular puedes tomar la foto en ese momento.",
+          "Espera unos segundos: ContaPro lee a quién se le pagó, el NIT, el número del documento, la fecha, qué se pagó, el subtotal y el IVA, y llena el formulario \"Registrar gasto\".",
+          "ContaPro sugiere la categoría entre las que creaste (por ejemplo, un recibo de energía → Servicios públicos). Si no puede sugerir ninguna, elígela tú.",
+          "Compara el \"Total del soporte\" con el total del formulario. Si no coinciden, aparece un aviso: revisa el subtotal y el IVA %.",
+          "Elige cómo se pagó (Efectivo, Tarjeta o Transferencia), revisa todos los datos y pulsa \"Registrar\".",
+        ],
+      },
+      {
+        title: "Registrar un gasto a mano",
         steps: [
           "Pestaña Gastos: elige la categoría, escribe a quién se le pagó (\"Pagado a\"), la descripción, el subtotal sin IVA y el IVA %.",
           "Elige cómo se pagó: Efectivo, Tarjeta o Transferencia. Si usas centros de costo, elígelo.",
-          "Pulsa \"Registrar gasto\". Con \"Imprimir\" sacas el comprobante.",
+          "Pulsa el botón \"Registrar\", que muestra el total. Con \"Imprimir\" sacas el comprobante.",
         ],
       },
     ],
     accounting: ["Comprobante \"Gasto: (pagado a)\": se registra en la cuenta de la categoría y sale el dinero de Caja o Bancos."],
-    tips: ["Los gastos se registran a mano: esta pantalla no lee fotos. Guarda el soporte físico o digital del gasto. Si el gasto es una factura de proveedor a crédito, regístrala mejor en Registrar compra."],
+    tips: [
+      "La lectura con foto usa inteligencia artificial: siempre revisa antes de registrar. Una foto derecha, con buena luz y completa (que se vean el total y la fecha) se lee mejor.",
+      "La foto no queda guardada en ContaPro: conserva el soporte físico o digital del gasto.",
+      "Si el gasto es una factura de proveedor a crédito, regístrala mejor en Registrar compra.",
+    ],
   },
 
   // ---------------------------------------------------------------- COBRANZA

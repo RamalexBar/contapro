@@ -94,3 +94,20 @@ recibe 403 en `GET /expenses` (no tiene `expense.read` por defecto).
    arriba, no un pendiente por descuido.
 2. Reportes especificos de gastos por categoria/periodo (hoy solo se pueden inferir del libro
    mayor filtrando por cuenta, `GET /reports/ledger/:accountId`, modulo `accounting`).
+
+## Lectura del soporte con foto o PDF (2026-10-17)
+
+`POST /expenses/extract` (permiso `expense.manage`) recibe la foto o el PDF del recibo o factura
+del gasto y devuelve un borrador para el formulario "Registrar gasto": a quien se le pago, NIT,
+numero, fecha, descripcion, subtotal, IVA (y el % calculado) y la categoria sugerida. No registra
+nada: el usuario revisa y registra con `POST /expenses`.
+
+- `ExtractExpenseReceiptUseCase` le pasa al lector las categorias activas de la empresa y solo
+  acepta un codigo que sea de una de ellas.
+- `ClaudeReceiptExtractionService` usa Claude Sonnet (vision + salida estructurada), mismo patron
+  que la lectura de facturas de compra (`suppliers`), con el helper compartido
+  `shared/ai/document-file.ts`. Si la API de Claude falla (sin saldo, caida), responde 503 con un
+  mensaje claro (`toFriendlyAiError`), igual que compras y extractos bancarios.
+- **Sin probar con soportes reales**: la cuenta de la API de Anthropic estaba sin saldo al
+  construirlo. Tampoco se guarda la foto como adjunto del gasto (pendiente de decidir donde se
+  almacenan los archivos).

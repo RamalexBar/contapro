@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { calculateTax, formatCOP, round2 } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
@@ -17,11 +17,25 @@ import {
   createExpense,
   createExpenseCategory,
   deactivateExpenseCategory,
+  extractExpenseReceipt,
   listExpenseCategories,
   listExpenses,
   printExpensePdf,
   updateExpenseCategory,
 } from "../api/expense.api";
+import type { ExtractExpenseReceiptResult } from "../api/expense.api";
+
+const ACCEPTED_RECEIPT_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    // readAsDataURL da "data:<mime>;base64,<datos>" -- la API solo quiere <datos>.
+    reader.onload = () => resolve((reader.result as string).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
+}
 
 const EXPENSE_STATUS_LABEL: Record<string, string> = { REGISTERED: "Registrado", CANCELLED: "Anulado" };
 
@@ -184,6 +198,46 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
   const taxTotal = round2(calculateTax(subtotal, Number(form.taxPercent) || 0));
   const total = round2(subtotal + taxTotal);
 
+  // Lectura del soporte (foto/PDF): llena el formulario para revisar, no registra nada.
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const [receiptResult, setReceiptResult] = useState<ExtractExpenseReceiptResult | null>(null);
+  const [receiptTypeError, setReceiptTypeError] = useState(false);
+  const extractMutation = useMutation({
+    mutationFn: async (file: File) => extractExpenseReceipt(await fileToBase64(file), file.type),
+    onSuccess: (result) => {
+      setReceiptResult(result);
+      const { extracted, suggestedCategory, taxRatePercent } = result;
+      const details = [
+        extracted.description,
+        extracted.documentNumber ? `Doc. ${extracted.documentNumber}` : null,
+        extracted.payeeNit ? `NIT ${extracted.payeeNit}` : null,
+      ].filter(Boolean);
+      setForm((prev) => ({
+        ...prev,
+        expenseCategoryId: suggestedCategory?.id ?? prev.expenseCategoryId,
+        payeeName: extracted.payeeName ?? prev.payeeName,
+        description: details.length > 0 ? details.join(" · ") : prev.description,
+        date: extracted.issueDate && /^d{4}-d{2}-d{2}$/.test(extracted.issueDate) ? extracted.issueDate : prev.date,
+        subtotal: extracted.subtotal != null ? String(extracted.subtotal) : prev.subtotal,
+        taxPercent: taxRatePercent != null ? String(taxRatePercent) : prev.taxPercent,
+      }));
+    },
+  });
+  function handleReceiptSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    if (!ACCEPTED_RECEIPT_TYPES.includes(file.type)) {
+      setReceiptTypeError(true);
+      return;
+    }
+    setReceiptTypeError(false);
+    setReceiptResult(null);
+    extractMutation.mutate(file);
+  }
+  const receiptTotal = receiptResult?.extracted.total ?? null;
+  const totalMismatch = receiptTotal != null && Math.abs(receiptTotal - total) > 1;
+
   const createMutation = useMutation({
     mutationFn: () =>
       createExpense({
@@ -200,6 +254,7 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      setReceiptResult(null);
       setForm({
         expenseCategoryId: "",
         payeeName: "",
@@ -230,6 +285,57 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
 
   return (
     <div className="space-y-6">
+      <Card title="Leer soporte automáticamente">
+        <p className="mb-3 text-sm text-slate-500">
+          Sube una foto o el PDF del recibo o la factura del gasto (servicios públicos, arriendo, transporte, papelería...): se
+          llenan el formulario de abajo y la categoría sugerida. Siempre revisa los datos antes de registrar.
+        </p>
+        <input ref={receiptInputRef} type="file" accept={ACCEPTED_RECEIPT_TYPES.join(",")} className="hidden" onChange={handleReceiptSelected} />
+        <Button type="button" loading={extractMutation.isPending} onClick={() => receiptInputRef.current?.click()}>
+          Leer soporte (foto/PDF)
+        </Button>
+        {receiptTypeError && (
+          <Alert tone="danger" className="mt-3">
+            Ese tipo de archivo no se puede leer. Sube una foto (JPG/PNG/WEBP) o un PDF.
+          </Alert>
+        )}
+        {extractMutation.isError && (
+          <Alert tone="danger" className="mt-3">
+            {(extractMutation.error as Error).message}
+          </Alert>
+        )}
+        {receiptResult && (
+          <div className="mt-3 space-y-2">
+            {receiptResult.suggestedCategory ? (
+              <Alert tone="success">
+                Categoría sugerida: {receiptResult.suggestedCategory.name}. Revisa el resto de los datos abajo.
+              </Alert>
+            ) : (
+              <Alert tone="warning">No se pudo sugerir una categoría -- elígela a mano abajo.</Alert>
+            )}
+            {receiptTotal != null && (
+              <p className="text-sm text-slate-600">
+                Total del soporte: <span className="font-semibold">{formatCOP(receiptTotal)}</span>
+              </p>
+            )}
+            {totalMismatch && (
+              <Alert tone="warning">
+                El total del formulario ({formatCOP(total)}) no coincide con el del soporte. Revisa el subtotal y el IVA %.
+              </Alert>
+            )}
+            {receiptResult.extracted.warnings.length > 0 && (
+              <Alert tone="warning">
+                <ul className="list-disc pl-4">
+                  {receiptResult.extracted.warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </Alert>
+            )}
+          </div>
+        )}
+      </Card>
+
       <Card title="Registrar gasto">
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-4"

@@ -11,6 +11,8 @@ import type { ListExpenseCategoriesUseCase } from "../application/use-cases/list
 import type { CreateExpenseUseCase } from "../application/use-cases/create-expense.use-case";
 import type { CancelExpenseUseCase } from "../application/use-cases/cancel-expense.use-case";
 import type { ListExpensesUseCase } from "../application/use-cases/list-expenses.use-case";
+import type { ExtractExpenseReceiptUseCase } from "../application/use-cases/extract-expense-receipt.use-case";
+import { documentFileSchema } from "../../../shared/ai/document-file";
 import type { IExpenseRepository } from "../domain/expense.repository";
 import type { IExpenseCategoryRepository } from "../domain/expense-category.repository";
 import { createExpenseCategorySchema, createExpenseSchema, updateExpenseCategorySchema } from "./expenses.validators";
@@ -25,8 +27,19 @@ export class ExpensesController {
     private readonly cancelExpenseUseCase: CancelExpenseUseCase,
     private readonly listExpensesUseCase: ListExpensesUseCase,
     private readonly expenseRepo: IExpenseRepository,
-    private readonly categoryRepo: IExpenseCategoryRepository
+    private readonly categoryRepo: IExpenseCategoryRepository,
+    private readonly extractReceiptUseCase: ExtractExpenseReceiptUseCase
   ) {}
+
+  /** Lee la foto o PDF del soporte de un gasto y devuelve un borrador (no registra nada). */
+  extractReceipt = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = documentFileSchema.parse(req.body);
+      res.json(await this.extractReceiptUseCase.execute({ base64: body.fileBase64, mediaType: body.mediaType }));
+    } catch (err) {
+      next(err);
+    }
+  };
 
   listCategories = async (_req: Request, res: Response, next: NextFunction) => {
     try {

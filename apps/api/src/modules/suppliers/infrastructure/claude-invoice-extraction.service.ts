@@ -7,6 +7,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { env } from "../../../config/env";
 import { ValidationError } from "../../../shared/errors/app-error";
+import { toDocumentContentBlock, toFriendlyAiError } from "../../../shared/ai/document-file";
 import type { ExtractedPurchaseInvoice, IInvoiceExtractionService, InvoiceFileInput } from "../domain/invoice-extraction.port";
 
 const extractionSchema = z.object({
@@ -37,17 +38,6 @@ const extractionSchema = z.object({
 
 const EXTRACTION_PROMPT = `Estas leyendo la foto o el PDF de una factura de compra colombiana para precargar un formulario de registro de compra. Extrae unicamente lo que dice el documento -- si un dato no aparece o no se puede leer con confianza, devuelve null en ese campo en vez de adivinar. Si subtotal + impuestos no cuadra con el total, o si hay retenciones/descuentos que no encajan en este esquema, dejalo anotado en "warnings" en vez de forzar el numero. No inventes NIT ni numero de factura. En "items" copia cada renglon de producto: si el valor unitario impreso incluye IVA, calcula el valor antes de IVA y anotalo en "warnings"; no incluyas renglones de fletes, descuentos globales ni totales.`;
 
-type FileContentBlock =
-  | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } }
-  | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png" | "image/webp"; data: string } };
-
-function toContentBlock(file: InvoiceFileInput): FileContentBlock {
-  if (file.mediaType === "application/pdf") {
-    return { type: "document", source: { type: "base64", media_type: "application/pdf", data: file.base64 } };
-  }
-  return { type: "image", source: { type: "base64", media_type: file.mediaType, data: file.base64 } };
-}
-
 /**
  * Lectura automatica de facturas via Claude API (vision + salida estructurada validada con Zod,
  * `client.messages.parse` + `zodOutputFormat`). NO PROBADO contra facturas reales variadas en
@@ -64,18 +54,22 @@ export class ClaudeInvoiceExtractionService implements IInvoiceExtractionService
 
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
-    const response = await client.messages.parse({
-      model: "claude-opus-5",
-      // Una factura con muchos renglones devuelve bastante JSON.
-      max_tokens: 16000,
-      output_config: { effort: "medium", format: zodOutputFormat(extractionSchema) },
-      messages: [
-        {
-          role: "user",
-          content: [toContentBlock(file) as never, { type: "text", text: EXTRACTION_PROMPT }],
-        },
-      ],
-    });
+    const response = await client.messages
+      .parse({
+        model: "claude-opus-5",
+        // Una factura con muchos renglones devuelve bastante JSON.
+        max_tokens: 16000,
+        output_config: { effort: "medium", format: zodOutputFormat(extractionSchema) },
+        messages: [
+          {
+            role: "user",
+            content: [toDocumentContentBlock(file) as never, { type: "text", text: EXTRACTION_PROMPT }],
+          },
+        ],
+      })
+      .catch((err: unknown) => {
+        throw toFriendlyAiError(err);
+      });
 
     if (!response.parsed_output) {
       throw new ValidationError("No se pudo leer la factura -- intenta con una foto mas clara o el PDF original");
