@@ -57,6 +57,12 @@ describe("extractUblDocument con el XML firmado de Factus", () => {
     expect(parsed.lines[0]).toMatchObject({ taxPercent: "19.00", taxAmount: "62700.00", unitPrice: "11000.00" });
   });
 
+  it("reads a NIT buyer with its check digit from schemeName/schemeID", () => {
+    const xml = FACTUS_SIGNED_XML.replace('<cbc:CompanyID schemeName="13">067198594</cbc:CompanyID>', '<cbc:CompanyID schemeID="5" schemeName="31">999200301</cbc:CompanyID>');
+    expect(extractUblDocument(xml).customer).toMatchObject({ documentType: "NIT", documentNumber: "999200301-5" });
+    expect(extractUblDocument(FACTUS_SIGNED_XML).customer).toMatchObject({ documentType: "CC", documentNumber: "067198594" });
+  });
+
   it("treats ProfileExecutionID 1 as production", () => {
     const parsed = extractUblDocument(FACTUS_SIGNED_XML.replace("<cbc:ProfileExecutionID>2<", "<cbc:ProfileExecutionID>1<"));
     expect(parsed.environment).toBe("PRODUCCION");

@@ -66,13 +66,24 @@ function attrOf(node: AnyNode, localName: string, attrName: string): string | un
   return typeof found?.getAttribute === "function" ? (found.getAttribute(attrName) ?? undefined) : undefined;
 }
 
+/** Codigos DIAN de tipo de documento que usa el XML firmado (schemeName). */
+const DIAN_DOCUMENT_TYPE: Record<string, string> = { "13": "CC", "22": "CE", "31": "NIT", "41": "PASSPORT" };
+
 function extractParty(root: AnyNode, partyElement: "AccountingSupplierParty" | "AccountingCustomerParty"): ExtractedParty {
   const partyNode = directChild(root, partyElement);
-  return {
-    documentType: attrOf(partyNode, "CompanyID", "schemeID"),
-    documentNumber: textOf(partyNode, "CompanyID") ?? "",
-    name: textOf(partyNode, "RegistrationName") ?? "",
-  };
+  const documentNumber = textOf(partyNode, "CompanyID") ?? "";
+  const schemeId = attrOf(partyNode, "CompanyID", "schemeID");
+  const dianType = DIAN_DOCUMENT_TYPE[attrOf(partyNode, "CompanyID", "schemeName") ?? ""];
+  // XML propio: schemeID es el tipo ("CC", "NIT"). XML DIAN/Factus: schemeName es el codigo del
+  // tipo y, si es NIT, schemeID es el digito de verificacion.
+  if (dianType) {
+    return {
+      documentType: dianType,
+      documentNumber: dianType === "NIT" && schemeId ? `${documentNumber}-${schemeId}` : documentNumber,
+      name: textOf(partyNode, "RegistrationName") ?? "",
+    };
+  }
+  return { documentType: schemeId, documentNumber, name: textOf(partyNode, "RegistrationName") ?? "" };
 }
 
 /** ProfileExecutionID es el dato DIAN (1 = produccion, 2 = pruebas) y lo trae el XML firmado de
