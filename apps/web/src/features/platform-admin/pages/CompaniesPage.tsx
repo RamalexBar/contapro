@@ -139,16 +139,58 @@ function FactusActivationForm({ company, onSuccess, onCancel }: FactusActivation
   );
 }
 
+/** Pago (plan distinto de la prueba gratis, suscripcion vigente) y todavia sin Factus. */
+function needsInvoicingActivation(c: CompanyWithSubscriptionRecord): boolean {
+  const paid = Boolean(c.planCode) && c.planCode !== "TRIAL";
+  const current = c.subscriptionStatus === "ACTIVE" || c.subscriptionStatus === "GRACE_PERIOD";
+  return paid && current && c.electronicInvoicingProvider !== "FACTUS";
+}
+
 export function CompaniesPage() {
   const { data, isLoading } = useQuery({ queryKey: ["saas-admin", "companies"], queryFn: listCompanies });
   const [activationCompanyId, setActivationCompanyId] = useState<string | null>(null);
   const [justSentFor, setJustSentFor] = useState<string | null>(null);
 
   const activationCompany = data?.data.find((c) => c.companyId === activationCompanyId) ?? null;
+  const pending = data?.data.filter(needsInvoicingActivation) ?? [];
+  const openActivation = (companyId: string) => {
+    setJustSentFor(null);
+    setActivationCompanyId(companyId);
+  };
 
   return (
     <PlatformAdminLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Empresas</h1>
+
+      {pending.length > 0 && (
+        <Card className="mb-4 border-warning-200 bg-warning-50">
+          <h2 className="font-semibold text-slate-900">Pendientes por activar facturación electrónica ({pending.length})</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Ya pagaron y todavía no facturan con Factus. Pídeles el RUT, el certificado de existencia y representación
+            legal (si es empresa), la cédula del representante legal y el logo, y envíalos a Factus.
+          </p>
+          <ul className="mt-3 divide-y divide-warning-200">
+            {pending.map((c) => (
+              <li key={c.companyId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <div className="text-sm">
+                  <p className="font-medium text-slate-900">
+                    {c.companyName} <span className="font-normal text-slate-500">· NIT {c.nit} · {c.planName}</span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {c.factusActivationRequestedAt
+                      ? `Documentos enviados a Factus el ${c.factusActivationRequestedAt.slice(0, 10)}: esperando sus credenciales para cargarlas en Integraciones.`
+                      : "Documentos sin enviar a Factus."}
+                  </p>
+                </div>
+                <Button size="sm" variant={c.factusActivationRequestedAt ? "secondary" : "primary"} onClick={() => openActivation(c.companyId)}>
+                  {c.factusActivationRequestedAt ? "Reenviar documentos" : "Enviar documentos a Factus"}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card noPadding>
         {isLoading ? (
           <Spinner />
@@ -161,6 +203,7 @@ export function CompaniesPage() {
                 <Th>Activa</Th>
                 <Th>Suscripcion</Th>
                 <Th>Plan</Th>
+                <Th>Facturación</Th>
                 <Th>Registrada</Th>
                 <Th>Vence</Th>
                 <Th></Th>
@@ -176,16 +219,22 @@ export function CompaniesPage() {
                   </Td>
                   <Td>{c.subscriptionStatus ?? "-"}</Td>
                   <Td>{c.planName ?? "-"}</Td>
+                  <Td>
+                    {c.electronicInvoicingProvider === "FACTUS" ? (
+                      <Badge tone="success">Factus activo</Badge>
+                    ) : needsInvoicingActivation(c) ? (
+                      <Badge tone="warning">Por activar</Badge>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </Td>
                   <Td>{c.registeredAt.slice(0, 10)}</Td>
                   <Td>{c.currentPeriodEnd ? c.currentPeriodEnd.slice(0, 10) : "-"}</Td>
                   <Td>
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => {
-                        setJustSentFor(null);
-                        setActivationCompanyId(c.companyId);
-                      }}
+                      onClick={() => openActivation(c.companyId)}
                     >
                       Solicitar activación Factus
                     </Button>

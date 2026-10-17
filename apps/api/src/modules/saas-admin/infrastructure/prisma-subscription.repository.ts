@@ -17,6 +17,7 @@ import {
   type SubscriptionStatus,
   type SubscriptionWithDetails,
 } from "../domain/subscription.repository";
+import type { IPaymentNotificationInfoReader, PaymentNotificationInfo } from "../domain/platform-notifier";
 
 type SubscriptionRow = {
   id: string;
@@ -80,7 +81,7 @@ const LIFECYCLE_STATUSES: SubscriptionStatus[] = ["TRIALING", "ACTIVE", "GRACE_P
 
 /** basePrisma en todo el archivo: este panel corre transversal a todas las empresas, sin
  * AsyncLocalStorage/tenant context (ver README del modulo). */
-export class PrismaSubscriptionRepository implements ISubscriptionRepository {
+export class PrismaSubscriptionRepository implements ISubscriptionRepository, IPaymentNotificationInfoReader {
   async create(data: CreateSubscriptionData): Promise<SubscriptionRecord> {
     const row = await basePrisma.subscription.create({
       data: {
@@ -248,13 +249,21 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
         subscriptions: {
           orderBy: { createdAt: "desc" },
           take: 1,
-          include: { plan: { select: { name: true } } },
+          include: { plan: { select: { name: true, code: true } } },
         },
       },
       // Mas recientes primero -- para "quien se acaba de inscribir" importa mas el orden
       // cronologico que el alfabetico (antes: name asc).
       orderBy: { createdAt: "desc" },
     });
+
+    const activationRequests = await basePrisma.auditLog.findMany({
+      where: { action: "FACTUS_ACTIVATION_REQUEST_SENT", entityType: "Company" },
+      select: { entityId: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+    const lastActivationRequest = new Map<string, Date>();
+    for (const r of activationRequests) if (!lastActivationRequest.has(r.entityId)) lastActivationRequest.set(r.entityId, r.createdAt);
 
     return companies.map((company) => {
       const subscription = company.subscriptions[0];
@@ -268,8 +277,27 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository {
         currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
         graceEndsAt: subscription?.graceEndsAt ?? null,
         registeredAt: company.createdAt,
+        planCode: subscription?.plan.code ?? null,
+        electronicInvoicingProvider: company.electronicInvoicingProvider,
+        factusActivationRequestedAt: lastActivationRequest.get(company.id) ?? null,
       };
     });
+  }
+
+  async findPaymentNotificationInfo(subscriptionId: string): Promise<PaymentNotificationInfo | null> {
+    const subscription = await basePrisma.subscription.findUnique({
+      where: { id: subscriptionId },
+      include: { plan: { select: { name: true } }, company: { select: { name: true, nit: true, email: true, electronicInvoicingProvider: true } } },
+    });
+    if (!subscription) return null;
+    return {
+      companyName: subscription.company.name,
+      nit: subscription.company.nit,
+      companyEmail: subscription.company.email,
+      planName: subscription.plan.name,
+      billingCycle: subscription.billingCycle,
+      electronicInvoicingProvider: subscription.company.electronicInvoicingProvider,
+    };
   }
 
   async getDashboardStats(): Promise<SaasDashboardStats> {

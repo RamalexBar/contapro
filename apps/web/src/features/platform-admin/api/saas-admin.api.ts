@@ -104,6 +104,9 @@ export interface CompanyWithSubscriptionRecord {
   currentPeriodEnd: string | null;
   graceEndsAt: string | null;
   registeredAt: string;
+  planCode: string | null;
+  electronicInvoicingProvider: string;
+  factusActivationRequestedAt: string | null;
 }
 
 export function listCompanies(): Promise<{ data: CompanyWithSubscriptionRecord[] }> {

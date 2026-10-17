@@ -2,6 +2,7 @@ import { calculateNextPeriodEnd } from "@erp/shared-utils";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IPaymentGateway, WompiWebhookEvent } from "../../domain/payment-gateway";
 import type { ISubscriptionRepository } from "../../domain/subscription.repository";
+import type { IPaymentNotificationInfoReader, IPlatformNotifier } from "../../domain/platform-notifier";
 
 const APPROVED_STATUS = "APPROVED";
 const FAILED_STATUSES = new Set(["DECLINED", "ERROR", "VOIDED"]);
@@ -23,7 +24,8 @@ export class ConfirmWompiPaymentUseCase {
   constructor(
     private readonly subscriptionRepo: ISubscriptionRepository,
     private readonly paymentGateway: IPaymentGateway,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly notifications?: { reader: IPaymentNotificationInfoReader; notifier: IPlatformNotifier }
   ) {}
 
   async execute(event: WompiWebhookEvent): Promise<void> {
@@ -48,8 +50,26 @@ export class ConfirmWompiPaymentUseCase {
         description: `Pago Wompi confirmado: ${payment.amount}. Nuevo vencimiento: ${newPeriodEnd.toISOString().slice(0, 10)}`,
         metadata: { reference, wompiTransactionId: event.data.transaction.id },
       });
+      await this.notifyTeam(subscription.id, Number(payment.amount), newPeriodEnd);
     } else if (FAILED_STATUSES.has(status)) {
       await this.subscriptionRepo.failPayment(payment.id);
+    }
+  }
+
+  /** Aviso al equipo de Contapro; si falla, el pago ya quedo aplicado y no se revierte nada. */
+  private async notifyTeam(subscriptionId: string, amount: number, newPeriodEnd: Date): Promise<void> {
+    if (!this.notifications) return;
+    try {
+      const info = await this.notifications.reader.findPaymentNotificationInfo(subscriptionId);
+      if (!info) return;
+      await this.notifications.notifier.paymentApproved({
+        ...info,
+        amount,
+        newPeriodEnd,
+        invoicingPending: info.electronicInvoicingProvider !== "FACTUS",
+      });
+    } catch (err) {
+      console.error("No se pudo enviar el aviso de pago al equipo:", err);
     }
   }
 }

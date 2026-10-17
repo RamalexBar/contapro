@@ -114,6 +114,9 @@ const COMPANY: CompanyWithSubscriptionRecord = {
   currentPeriodEnd: new Date("2027-01-01"),
   graceEndsAt: null,
   registeredAt: new Date("2026-01-01"),
+  planCode: "PYME",
+  electronicInvoicingProvider: "DIRECT",
+  factusActivationRequestedAt: null,
 };
 
 describe("SendFactusActivationRequestUseCase", () => {

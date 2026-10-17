@@ -24,6 +24,7 @@ import type {
   SubscriptionWithDetails,
 } from "../../domain/subscription.repository";
 import { ConfirmWompiPaymentUseCase } from "./confirm-wompi-payment.use-case";
+import type { PaymentApprovedNotification } from "../../domain/platform-notifier";
 
 function makeSubscription(overrides: Partial<SubscriptionRecord> = {}): SubscriptionRecord {
   return {
@@ -260,5 +261,52 @@ describe("ConfirmWompiPaymentUseCase", () => {
 
     expect(subscriptionRepo.confirmed).toHaveLength(0);
     expect(subscriptionRepo.failed).toHaveLength(0);
+  });
+});
+
+describe("ConfirmWompiPaymentUseCase -- aviso al equipo de Contapro", () => {
+  const approved = () =>
+    makeEvent({ data: { transaction: { id: "tx-1", status: "APPROVED", reference: "sub-1-1234-abcd1234", amount_in_cents: 7990000 } } });
+  const info = (provider: string) => ({
+    findPaymentNotificationInfo: async () => ({
+      companyName: "Muebles El Roble", nit: "900123456", companyEmail: "a@b.co", planName: "Plan Pyme",
+      billingCycle: "MONTHLY", electronicInvoicingProvider: provider,
+    }),
+  });
+
+  it("avisa el pago y marca la facturacion como pendiente si la empresa no esta en Factus", async () => {
+    const sent: PaymentApprovedNotification[] = [];
+    const subscriptionRepo = new FakeSubscriptionRepository();
+    subscriptionRepo.subscription = makeSubscription();
+    subscriptionRepo.payment = makePayment();
+    const useCase = new ConfirmWompiPaymentUseCase(subscriptionRepo, new FakePaymentGateway(), new AuditService(new FakeAuditLogRepository()), {
+      reader: info("DIRECT"),
+      notifier: { paymentApproved: async (n) => void sent.push(n) },
+    });
+
+    await useCase.execute(approved());
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ companyName: "Muebles El Roble", planName: "Plan Pyme", invoicingPending: true });
+  });
+
+  it("no marca pendiente si ya factura con Factus, y un error del correo no deshace el pago", async () => {
+    const subscriptionRepo = new FakeSubscriptionRepository();
+    subscriptionRepo.subscription = makeSubscription();
+    subscriptionRepo.payment = makePayment();
+    let pending: boolean | null = null;
+    const useCase = new ConfirmWompiPaymentUseCase(subscriptionRepo, new FakePaymentGateway(), new AuditService(new FakeAuditLogRepository()), {
+      reader: info("FACTUS"),
+      notifier: {
+        paymentApproved: async (n) => {
+          pending = n.invoicingPending;
+          throw new Error("Resend caido");
+        },
+      },
+    });
+
+    await expect(useCase.execute(approved())).resolves.toBeUndefined();
+    expect(pending).toBe(false);
+    expect(subscriptionRepo.confirmed).toHaveLength(1);
   });
 });

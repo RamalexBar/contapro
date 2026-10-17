@@ -25,6 +25,7 @@ import { RunSubscriptionAutoChargesUseCase } from "./application/use-cases/run-s
 import { SendFactusActivationRequestUseCase } from "./application/use-cases/send-factus-activation-request.use-case";
 import { whatsAppSender } from "../whatsapp/whatsapp.container";
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
+import { ResendPlatformNotifier } from "./infrastructure/resend-platform-notifier";
 
 const platformAdminRepo = new PrismaPlatformAdminRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
@@ -55,7 +56,10 @@ export const saasAdminController = new SaasAdminController(
   new ListCompaniesUseCase(subscriptionRepo),
   new GetSaasDashboardUseCase(subscriptionRepo),
   createSubscriptionCheckoutUseCase,
-  new ConfirmWompiPaymentUseCase(subscriptionRepo, paymentGateway, auditService),
+  new ConfirmWompiPaymentUseCase(subscriptionRepo, paymentGateway, auditService, {
+    reader: subscriptionRepo,
+    notifier: new ResendPlatformNotifier(),
+  }),
   new SendFactusActivationRequestUseCase(subscriptionRepo, new ResendFactusActivationNotifier(), auditService)
 );
 

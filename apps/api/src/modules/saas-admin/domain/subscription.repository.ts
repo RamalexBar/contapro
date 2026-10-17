@@ -110,6 +110,12 @@ export interface CompanyWithSubscriptionRecord {
   /** Fecha de registro (Company.createdAt) -- para que el panel de plataforma pueda mostrar quien
    * se inscribio y cuando, sin tener que ir a buscarlo en la base de datos. */
   registeredAt: Date;
+  /** Codigo del plan (TRIAL, BASICO, PYME, PRO): distingue prueba gratis de plan pagado. */
+  planCode: string | null;
+  /** DIRECT o FACTUS. Una empresa que pago y no esta en FACTUS tiene la facturacion por activar. */
+  electronicInvoicingProvider: string;
+  /** Ultima vez que se enviaron sus documentos a Factus desde el panel (auditoria), si alguna. */
+  factusActivationRequestedAt: Date | null;
 }
 
 export interface SaasDashboardStats {
