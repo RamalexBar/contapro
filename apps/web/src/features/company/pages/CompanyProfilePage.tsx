@@ -21,6 +21,8 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 interface FormState {
+  legalName: string;
+  nit: string;
   phone: string;
   documentType: string;
   dv: string;
@@ -33,6 +35,8 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
+  legalName: "",
+  nit: "",
   phone: "",
   documentType: "NIT",
   dv: "",
@@ -56,6 +60,8 @@ export function CompanyProfilePage() {
   useEffect(() => {
     if (!data) return;
     setForm({
+      legalName: data.legalName,
+      nit: data.nit,
       phone: data.phone ?? "",
       documentType: data.documentType ?? "NIT",
       dv: data.dv ?? "",
@@ -71,6 +77,8 @@ export function CompanyProfilePage() {
   const saveMutation = useMutation({
     mutationFn: () =>
       updateCompanyProfile({
+        legalName: form.legalName,
+        nit: form.nit,
         phone: form.phone || null,
         documentType: form.documentType || null,
         dv: form.dv || null,
@@ -126,8 +134,19 @@ export function CompanyProfilePage() {
               }}
             >
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Input label="Razón social" value={data?.legalName ?? ""} disabled />
-                <Input label="NIT" value={data?.nit ?? ""} disabled />
+                <Input
+                  label="Nombre o razón social"
+                  value={form.legalName}
+                  onChange={(e) => set("legalName", e.target.value)}
+                  required
+                />
+                <Input
+                  label="NIT o cédula (sin DV)"
+                  hint="Solo números. Si ya emitiste facturas electrónicas, no se puede cambiar."
+                  value={form.nit}
+                  onChange={(e) => set("nit", e.target.value)}
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

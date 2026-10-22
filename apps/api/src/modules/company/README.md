@@ -21,6 +21,10 @@ registrar la cuenta.
    completo antes de la primera factura manual (ver su README) — exportado como
    `companyProfileRepo` desde `company.container.ts` para que ese modulo lo importe sin ciclos.
 
+4. `legalName` y `nit` tambien se editan con `PUT /company/profile` (para corregir un error al
+   registrarse): el NIT debe ser unico en la plataforma y no se puede cambiar si la empresa ya tiene
+   facturas electronicas (llevan el NIT anterior en su XML firmado).
+
 ## Limitaciones conocidas
 
 - **No se envian a Factus**: la identidad del emisor vive en la cuenta autenticada de Factus

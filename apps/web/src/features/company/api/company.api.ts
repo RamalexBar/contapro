@@ -20,6 +20,8 @@ export interface CompanyProfile {
 }
 
 export interface UpdateCompanyProfileInput {
+  legalName?: string;
+  nit?: string;
   phone?: string | null;
   documentType?: string | null;
   dv?: string | null;

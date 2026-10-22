@@ -20,6 +20,8 @@ export interface CompanyProfileRecord {
 }
 
 export interface UpdateCompanyProfileData {
+  legalName?: string;
+  nit?: string;
   phone?: string | null;
   documentType?: string | null;
   dv?: string | null;
@@ -34,4 +36,8 @@ export interface UpdateCompanyProfileData {
 export interface ICompanyProfileRepository {
   findByIdOrThrow(id: string): Promise<CompanyProfileRecord>;
   update(id: string, data: UpdateCompanyProfileData): Promise<CompanyProfileRecord>;
+  /** true si OTRA empresa ya usa ese NIT (Company.nit es unico en toda la plataforma). */
+  isNitTakenByAnotherCompany(nit: string, companyId: string): Promise<boolean>;
+  /** Cuantas facturas electronicas tiene la empresa (cualquier estado). */
+  countElectronicInvoices(companyId: string): Promise<number>;
 }

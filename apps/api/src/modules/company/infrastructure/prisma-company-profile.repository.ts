@@ -16,6 +16,14 @@ export class PrismaCompanyProfileRepository implements ICompanyProfileRepository
     const row = await basePrisma.company.update({ where: { id }, data });
     return toRecord(row);
   }
+
+  async isNitTakenByAnotherCompany(nit: string, companyId: string): Promise<boolean> {
+    return (await basePrisma.company.count({ where: { nit, id: { not: companyId } } })) > 0;
+  }
+
+  async countElectronicInvoices(companyId: string): Promise<number> {
+    return basePrisma.electronicInvoice.count({ where: { companyId } });
+  }
 }
 
 function toRecord(row: {
