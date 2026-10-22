@@ -27,8 +27,6 @@ export interface QuoteRecord {
 
 export interface QuoteItemDetail {
   productName: string;
-  /** Ubicacion del producto en la estanteria (Product.location), para alistar el pedido. */
-  productLocation: string | null;
   quantity: number;
   unitPrice: number;
   discountPercent: number;

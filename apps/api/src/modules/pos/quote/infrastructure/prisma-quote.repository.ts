@@ -66,7 +66,7 @@ export class PrismaQuoteRepository implements IQuoteRepository {
 
     const [customer, products] = await Promise.all([
       row.customerId ? prisma.customer.findFirst({ where: { id: row.customerId }, select: { name: true } }) : null,
-      prisma.product.findMany({ where: { id: { in: row.items.map((i) => i.productId) } }, select: { id: true, name: true, location: true } }),
+      prisma.product.findMany({ where: { id: { in: row.items.map((i) => i.productId) } }, select: { id: true, name: true } }),
     ]);
     const productName = (productId: string) => products.find((p) => p.id === productId)?.name ?? "(producto no encontrado)";
 
@@ -81,7 +81,6 @@ export class PrismaQuoteRepository implements IQuoteRepository {
       customerName: customer?.name ?? null,
       items: row.items.map((item) => ({
         productName: productName(item.productId),
-        productLocation: products.find((p) => p.id === item.productId)?.location ?? null,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
         discountPercent: Number(item.discountPercent),
