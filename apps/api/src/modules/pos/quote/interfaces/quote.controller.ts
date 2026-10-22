@@ -48,7 +48,7 @@ export class QuoteController {
           { label: "Valida hasta", value: quote.validUntil.toISOString().slice(0, 10) },
         ],
         items: quote.items.map((item) => ({
-          description: item.productName,
+          description: item.productLocation ? `${item.productName}\nUbicación: ${item.productLocation}` : item.productName,
           quantity: String(item.quantity),
           unitPrice: formatCOP(item.unitPrice),
           amount: formatCOP(item.total),

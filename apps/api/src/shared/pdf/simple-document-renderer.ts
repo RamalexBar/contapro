@@ -88,11 +88,14 @@ export async function renderSimpleDocumentPdf(data: SimpleDocumentPdfData): Prom
     for (const item of data.items) {
       const rowY = doc.y;
       doc.text(item.description, colDesc, rowY, { width: colQty - colDesc });
+      // Una descripcion de varias lineas (nombre largo, ubicacion) empuja la fila siguiente.
+      const descriptionBottom = doc.y;
       if (hasQuantityColumn) {
         doc.text(item.quantity ?? "-", colQty, rowY, { width: colPrice - colQty, align: "right" });
         doc.text(item.unitPrice ?? "-", colPrice, rowY, { width: colAmount - colPrice, align: "right" });
       }
       doc.text(item.amount, colAmount, rowY, { width: colAmountWidth, align: "right" });
+      doc.y = Math.max(doc.y, descriptionBottom);
       doc.moveDown(0.5);
     }
     doc.moveDown(0.3);

@@ -79,6 +79,7 @@ const RETURNABLE_SALE_STATUSES = new Set(["COMPLETED", "RETURNED_PARTIAL"]);
 interface QuoteLine {
   productId: string;
   name: string;
+  location: string | null;
   quantity: number;
 }
 
@@ -100,10 +101,10 @@ function QuoteSection() {
   const [validUntil, setValidUntil] = useState("");
   const [lines, setLines] = useState<QuoteLine[]>([]);
 
-  function addLine(product: { id: string; name: string }) {
+  function addLine(product: { id: string; name: string; location: string | null }) {
     setLines((prev) => {
       if (prev.some((l) => l.productId === product.id)) return prev;
-      return [...prev, { productId: product.id, name: product.name, quantity: 1 }];
+      return [...prev, { productId: product.id, name: product.name, location: product.location, quantity: 1 }];
     });
   }
 
@@ -148,6 +149,7 @@ function QuoteSection() {
                 className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:border-brand-200 hover:bg-brand-50"
               >
                 + {p.name}
+                {p.location && <span className="ml-1 text-slate-400">📍 {p.location}</span>}
               </button>
             ))}
           </div>
@@ -156,7 +158,10 @@ function QuoteSection() {
             <div className="space-y-1">
               {lines.map((line) => (
                 <div key={line.productId} className="flex items-center gap-2 text-sm">
-                  <span className="flex-1 text-slate-800">{line.name}</span>
+                  <span className="flex flex-1 flex-col">
+                    <span className="text-slate-800">{line.name}</span>
+                    {line.location && <span className="text-xs text-slate-500">📍 {line.location}</span>}
+                  </span>
                   <Input
                     type="number"
                     min={1}
