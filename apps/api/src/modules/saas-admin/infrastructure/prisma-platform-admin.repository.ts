@@ -34,4 +34,9 @@ export class PrismaPlatformAdminRepository implements IPlatformAdminRepository {
     await this.findByIdOrThrow(id);
     return basePrisma.platformAdmin.update({ where: { id }, data: { isActive }, select: summarySelect });
   }
+
+  async setPasswordHash(id: string, passwordHash: string): Promise<void> {
+    await this.findByIdOrThrow(id);
+    await basePrisma.platformAdmin.update({ where: { id }, data: { passwordHash } });
+  }
 }

@@ -26,6 +26,7 @@ import { SendFactusActivationRequestUseCase } from "./application/use-cases/send
 import { ListPlatformAdminsUseCase } from "./application/use-cases/list-platform-admins.use-case";
 import { CreatePlatformAdminUseCase } from "./application/use-cases/create-platform-admin.use-case";
 import { SetPlatformAdminActiveUseCase } from "./application/use-cases/set-platform-admin-active.use-case";
+import { SetPlatformAdminPasswordUseCase } from "./application/use-cases/set-platform-admin-password.use-case";
 import { whatsAppSender } from "../whatsapp/whatsapp.container";
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
 import { ResendPlatformNotifier } from "./infrastructure/resend-platform-notifier";
@@ -66,7 +67,8 @@ export const saasAdminController = new SaasAdminController(
   new SendFactusActivationRequestUseCase(subscriptionRepo, new ResendFactusActivationNotifier(), auditService),
   new ListPlatformAdminsUseCase(platformAdminRepo),
   new CreatePlatformAdminUseCase(platformAdminRepo),
-  new SetPlatformAdminActiveUseCase(platformAdminRepo)
+  new SetPlatformAdminActiveUseCase(platformAdminRepo),
+  new SetPlatformAdminPasswordUseCase(platformAdminRepo)
 );
 
 /** Usado por server.ts para arrancar el poller de recordatorios/vencimientos/suspension. */

@@ -15,6 +15,7 @@ import type { SendFactusActivationRequestUseCase } from "../application/use-case
 import type { ListPlatformAdminsUseCase } from "../application/use-cases/list-platform-admins.use-case";
 import type { CreatePlatformAdminUseCase } from "../application/use-cases/create-platform-admin.use-case";
 import type { SetPlatformAdminActiveUseCase } from "../application/use-cases/set-platform-admin-active.use-case";
+import type { SetPlatformAdminPasswordUseCase } from "../application/use-cases/set-platform-admin-password.use-case";
 import type { SubscriptionStatus } from "../domain/subscription.repository";
 import {
   createPlanSchema,
@@ -25,6 +26,7 @@ import {
   registerSubscriptionPaymentSchema,
   sendFactusActivationRequestSchema,
   setPlatformAdminActiveSchema,
+  setPlatformAdminPasswordSchema,
   updatePlanSchema,
   wompiWebhookSchema,
 } from "./saas-admin.validators";
@@ -46,7 +48,8 @@ export class SaasAdminController {
     private readonly sendFactusActivationRequestUseCase: SendFactusActivationRequestUseCase,
     private readonly listPlatformAdminsUseCase: ListPlatformAdminsUseCase,
     private readonly createPlatformAdminUseCase: CreatePlatformAdminUseCase,
-    private readonly setPlatformAdminActiveUseCase: SetPlatformAdminActiveUseCase
+    private readonly setPlatformAdminActiveUseCase: SetPlatformAdminActiveUseCase,
+    private readonly setPlatformAdminPasswordUseCase: SetPlatformAdminPasswordUseCase
   ) {}
 
   login = async (req: Request, res: Response, next: NextFunction) => {
@@ -206,6 +209,16 @@ export class SaasAdminController {
           requestedBy: res.locals.platformAdminId,
         })
       );
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setPlatformAdminPassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = setPlatformAdminPasswordSchema.parse(req.body);
+      await this.setPlatformAdminPasswordUseCase.execute(req.params.id, body.password);
+      res.status(204).send();
     } catch (err) {
       next(err);
     }

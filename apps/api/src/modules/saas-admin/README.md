@@ -37,7 +37,8 @@ El panel es transversal a todas las empresas: no usa `tenantContextMiddleware` (
 - `GET/POST /admin/platform-admins` y `PATCH /admin/platform-admins/:id` (`{ isActive }`): crear
   y activar/desactivar otros operadores desde el propio panel (pagina **Administradores**,
   `/admin/admins`), sin pasar por la Shell de Render. Todos tienen acceso total (no hay roles);
-  nadie puede desactivarse a si mismo. `prisma/create-platform-admin.ts` sigue sirviendo para
+  nadie puede desactivarse a si mismo. `PUT /admin/platform-admins/:id/password` pone una
+  contraseña nueva (boton "Cambiar contraseña"), para recuperar el acceso de quien la olvido. `prisma/create-platform-admin.ts` sigue sirviendo para
   crear el primero o recuperar una clave.
 
 ## Implementado

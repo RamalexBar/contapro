@@ -21,4 +21,5 @@ export interface IPlatformAdminRepository {
   list(): Promise<PlatformAdminSummary[]>;
   create(input: { email: string; passwordHash: string; fullName: string }): Promise<PlatformAdminSummary>;
   setActive(id: string, isActive: boolean): Promise<PlatformAdminSummary>;
+  setPasswordHash(id: string, passwordHash: string): Promise<void>;
 }

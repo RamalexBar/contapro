@@ -3,6 +3,7 @@ import { verifySecret } from "../../../auth/infrastructure/password-hasher.servi
 import type { IPlatformAdminRepository, PlatformAdminRecord, PlatformAdminSummary } from "../../domain/platform-admin.repository";
 import { CreatePlatformAdminUseCase } from "./create-platform-admin.use-case";
 import { SetPlatformAdminActiveUseCase } from "./set-platform-admin-active.use-case";
+import { SetPlatformAdminPasswordUseCase } from "./set-platform-admin-password.use-case";
 
 type Row = PlatformAdminRecord & { createdAt: Date };
 
@@ -32,6 +33,9 @@ class FakePlatformAdminRepo implements IPlatformAdminRepository {
     const row = await this.findByIdOrThrow(id);
     row.isActive = isActive;
     return this.summary(row);
+  }
+  async setPasswordHash(id: string, passwordHash: string) {
+    (await this.findByIdOrThrow(id)).passwordHash = passwordHash;
   }
 }
 
@@ -68,5 +72,16 @@ describe("SetPlatformAdminActiveUseCase", () => {
     await expect(useCase.execute({ id: me.id, isActive: false, requestedBy: me.id })).rejects.toThrow(/propio acceso/);
     expect((await useCase.execute({ id: other.id, isActive: false, requestedBy: me.id })).isActive).toBe(false);
     expect((await useCase.execute({ id: other.id, isActive: true, requestedBy: me.id })).isActive).toBe(true);
+  });
+});
+
+describe("SetPlatformAdminPasswordUseCase", () => {
+  it("replaces the password so only the new one works", async () => {
+    const repo = new FakePlatformAdminRepo();
+    const admin = await new CreatePlatformAdminUseCase(repo).execute({ email: "h@b.com", password: "Olvidada123", fullName: "H" });
+    await new SetPlatformAdminPasswordUseCase(repo).execute(admin.id, "NuevaClave456");
+
+    expect(await verifySecret("NuevaClave456", repo.rows[0].passwordHash)).toBe(true);
+    expect(await verifySecret("Olvidada123", repo.rows[0].passwordHash)).toBe(false);
   });
 });

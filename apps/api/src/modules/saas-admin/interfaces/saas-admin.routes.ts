@@ -12,6 +12,7 @@ saasAdminRouter.post("/admin/auth/login", saasAdminController.login);
 saasAdminRouter.get("/admin/platform-admins", requirePlatformAdmin, saasAdminController.listPlatformAdmins);
 saasAdminRouter.post("/admin/platform-admins", requirePlatformAdmin, saasAdminController.createPlatformAdmin);
 saasAdminRouter.patch("/admin/platform-admins/:id", requirePlatformAdmin, saasAdminController.setPlatformAdminActive);
+saasAdminRouter.put("/admin/platform-admins/:id/password", requirePlatformAdmin, saasAdminController.setPlatformAdminPassword);
 
 saasAdminRouter.post("/admin/plans", requirePlatformAdmin, saasAdminController.createPlan);
 saasAdminRouter.get("/admin/plans", requirePlatformAdmin, saasAdminController.listPlans);

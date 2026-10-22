@@ -163,3 +163,7 @@ export function createPlatformAdmin(input: { email: string; password: string; fu
 export function setPlatformAdminActive(id: string, isActive: boolean): Promise<PlatformAdminRecord> {
   return platformApiFetch(`/admin/platform-admins/${id}`, { method: "PATCH", body: { isActive } });
 }
+
+export function setPlatformAdminPassword(id: string, password: string): Promise<void> {
+  return platformApiFetch(`/admin/platform-admins/${id}/password`, { method: "PUT", body: { password } });
+}

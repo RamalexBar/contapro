@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
@@ -9,7 +9,7 @@ import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { PlatformAdminLayout } from "../components/PlatformAdminLayout";
 import { usePlatformAuthStore } from "../hooks/usePlatformAuthStore";
-import { createPlatformAdmin, listPlatformAdmins, setPlatformAdminActive } from "../api/saas-admin.api";
+import { createPlatformAdmin, listPlatformAdmins, setPlatformAdminActive, setPlatformAdminPassword } from "../api/saas-admin.api";
 
 const EMPTY_FORM = { fullName: "", email: "", password: "" };
 
@@ -20,6 +20,10 @@ export function PlatformAdminsPage() {
   const { data, isLoading } = useQuery({ queryKey: ["saas-admin", "platform-admins"], queryFn: listPlatformAdmins });
   const [form, setForm] = useState(EMPTY_FORM);
   const [created, setCreated] = useState<string | null>(null);
+  // Fila en la que se esta cambiando la contraseña (una a la vez).
+  const [passwordFor, setPasswordFor] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordSaved, setPasswordSaved] = useState<string | null>(null);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["saas-admin", "platform-admins"] });
 
@@ -36,6 +40,22 @@ export function PlatformAdminsPage() {
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => setPlatformAdminActive(id, isActive),
     onSuccess: refresh,
   });
+
+  const passwordMutation = useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) => setPlatformAdminPassword(id, password),
+    onSuccess: (_data, { id }) => {
+      setPasswordSaved(data?.data.find((a) => a.id === id)?.email ?? null);
+      setPasswordFor(null);
+      setNewPassword("");
+    },
+  });
+
+  function openPasswordForm(id: string) {
+    setPasswordFor(id);
+    setNewPassword("");
+    setPasswordSaved(null);
+    passwordMutation.reset();
+  }
 
   return (
     <PlatformAdminLayout>
@@ -101,12 +121,13 @@ export function PlatformAdminsPage() {
                 <Th>Nombre</Th>
                 <Th>Correo</Th>
                 <Th>Estado</Th>
-                <Th>Acción</Th>
+                <Th>Acciones</Th>
               </tr>
             </TableHead>
             <TableBody>
               {data?.data.map((a) => (
-                <TableRow key={a.id}>
+                <Fragment key={a.id}>
+                <TableRow>
                   <Td>
                     {a.fullName}
                     {a.id === myId && <span className="ml-2 text-xs text-slate-500">(tú)</span>}
@@ -116,6 +137,10 @@ export function PlatformAdminsPage() {
                     <Badge tone={a.isActive ? "success" : "neutral"}>{a.isActive ? "Activo" : "Desactivado"}</Badge>
                   </Td>
                   <Td>
+                    <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => openPasswordForm(a.id)}>
+                      Cambiar contraseña
+                    </Button>
                     {a.id !== myId && (
                       <Button
                         variant="secondary"
@@ -126,11 +151,53 @@ export function PlatformAdminsPage() {
                         {a.isActive ? "Desactivar" : "Activar"}
                       </Button>
                     )}
+                    </div>
                   </Td>
                 </TableRow>
+                {passwordFor === a.id && (
+                  <TableRow>
+                    <Td colSpan={4}>
+                      <form
+                        className="flex flex-wrap items-end gap-3"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          passwordMutation.mutate({ id: a.id, password: newPassword });
+                        }}
+                      >
+                        <Input
+                          label={"Nueva contraseña para " + a.email}
+                          type="password"
+                          hint="Mínimo 8 caracteres"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          minLength={8}
+                          required
+                          autoFocus
+                        />
+                        <Button type="submit" size="sm" loading={passwordMutation.isPending}>
+                          Guardar contraseña
+                        </Button>
+                        <Button type="button" variant="secondary" size="sm" onClick={() => setPasswordFor(null)}>
+                          Cancelar
+                        </Button>
+                      </form>
+                      {passwordMutation.isError && (
+                        <Alert tone="danger" className="mt-2">
+                          {(passwordMutation.error as Error).message}
+                        </Alert>
+                      )}
+                    </Td>
+                  </TableRow>
+                )}
+                </Fragment>
               ))}
             </TableBody>
           </Table>
+        )}
+        {passwordSaved && (
+          <Alert tone="success" className="m-3">
+            Contraseña cambiada: {passwordSaved} ya puede entrar con la contraseña nueva.
+          </Alert>
         )}
         {toggleMutation.isError && (
           <Alert tone="danger" className="m-3">
