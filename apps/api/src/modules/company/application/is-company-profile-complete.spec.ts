@@ -17,6 +17,7 @@ const COMPLETE: CompanyProfileRecord = {
   municipality: "Manizales",
   department: "Caldas",
   municipalityCode: null,
+  economicActivity: null, whatsapp: null, website: null, instagram: null, receiptHeader: null, receiptFooter: null, logoUrl: null,
 };
 
 describe("isCompanyProfileComplete", () => {

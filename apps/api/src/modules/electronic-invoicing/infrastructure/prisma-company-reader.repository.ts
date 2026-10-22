@@ -26,6 +26,12 @@ export class PrismaCompanyReaderRepository implements ICompanyReader {
       fiscalResponsibilities: row.fiscalResponsibilities,
       phone: row.phone,
       email: row.email,
+      economicActivity: row.economicActivity,
+      whatsapp: row.whatsapp,
+      website: row.website,
+      instagram: row.instagram,
+      receiptHeader: row.receiptHeader,
+      receiptFooter: row.receiptFooter,
     };
   }
 

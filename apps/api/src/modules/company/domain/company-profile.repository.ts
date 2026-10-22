@@ -17,9 +17,26 @@ export interface CompanyProfileRecord {
   municipality: string | null;
   department: string | null;
   municipalityCode: string | null;
+  economicActivity: string | null;
+  whatsapp: string | null;
+  website: string | null;
+  instagram: string | null;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
+  /** Logo como data URL ("data:image/png;base64,..."), guardado en la BD. */
+  logoUrl: string | null;
 }
 
 export interface UpdateCompanyProfileData {
+  name?: string;
+  email?: string;
+  economicActivity?: string | null;
+  whatsapp?: string | null;
+  website?: string | null;
+  instagram?: string | null;
+  receiptHeader?: string | null;
+  receiptFooter?: string | null;
+  logoUrl?: string | null;
   legalName?: string;
   nit?: string;
   phone?: string | null;

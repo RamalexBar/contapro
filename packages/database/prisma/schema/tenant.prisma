@@ -56,6 +56,16 @@ model Company {
   municipality            String? // nombre, complementa municipalityCode (codigo DANE) de arriba
   department              String?
 
+  // ---- Datos del negocio para el tiquete y los comprobantes (Configuracion -> Datos de la empresa).
+  // El logo vive en logoUrl (arriba) como data URL "data:image/png;base64,...": se guarda en la BD a
+  // proposito (sin servicio de archivos), reducido en el navegador a <= ~300KB.
+  economicActivity String? // codigo CIIU, ej. "4711"
+  whatsapp         String?
+  website          String?
+  instagram        String?
+  receiptHeader    String? // sale debajo de los datos del negocio en el tiquete
+  receiptFooter    String? // reemplaza el "GRACIAS POR SU COMPRA" del tiquete
+
   branches      Branch[]
   users         User[]
   roles         Role[]

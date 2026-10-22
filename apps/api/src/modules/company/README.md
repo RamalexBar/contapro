@@ -24,6 +24,16 @@ registrar la cuenta.
 4. `legalName` y `nit` tambien se editan con `PUT /company/profile` (para corregir un error al
    registrarse): el NIT debe ser unico en la plataforma y no se puede cambiar si la empresa ya tiene
    facturas electronicas (llevan el NIT anterior en su XML firmado).
+5. Datos del negocio (2026-10-22): nombre comercial (`name`), correo, actividad economica (CIIU),
+   WhatsApp, pagina web, Instagram y textos del tiquete (`receiptHeader`/`receiptFooter`) tambien
+   por `PUT /company/profile`. Salen en la tirilla termica y en el encabezado del RIDE A4.
+6. **Logo guardado en la BD**: `Company.logoUrl` guarda un data URL (`data:image/png|jpeg;base64,...`,
+   max ~400KB, el navegador lo reduce a 400px antes de enviarlo). Sin servicio de archivos a
+   proposito. `decodeLogoDataUrl` (ride-data-mapper.ts) lo convierte en Buffer para pdfkit; una URL
+   http vieja se ignora (el render nunca hace I/O de red). Factus tambien lo recibe al activar el
+   proveedor (`uploadLogo` hace `fetch` del data URL).
+7. La pagina web (`CompanyProfilePage.tsx`, "Datos del negocio") tambien edita las sedes
+   (`PATCH /branches/:id`: nombre, direccion, telefono).
 
 ## Limitaciones conocidas
 

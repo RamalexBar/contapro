@@ -10,6 +10,7 @@ class FakeCompanyProfileRepository implements ICompanyProfileRepository {
     id: "company-1", name: "Muebles", legalName: "Nombre Mal Escrito", nit: "1001", email: "a@b.com", phone: null,
     documentType: "CC", dv: null, taxRegime: null, fiscalResponsibilities: null, address: null, municipality: null,
     department: null, municipalityCode: null,
+    economicActivity: null, whatsapp: null, website: null, instagram: null, receiptHeader: null, receiptFooter: null, logoUrl: null,
   };
   otherCompanyNits = ["900123456"];
   electronicInvoices = 0;

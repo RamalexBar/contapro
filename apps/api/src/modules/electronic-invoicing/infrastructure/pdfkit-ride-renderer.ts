@@ -7,8 +7,8 @@ import type { RideDocumentData } from "../application/ride-data-mapper";
  * -- mismo patron "motor generico + adaptador por tipo" que ya usan
  * signAndQueueElectronicDocument/PollDianSubmissionsUseCase. Generado con `pdfkit` (Node puro, sin
  * navegador headless) en vez de HTML->PDF, consistente con el resto del modulo (sobre SOAP armado
- * a mano en vez del paquete `soap`). Sin logo de empresa en esta version (evita I/O de red durante
- * el render). Es una representacion NO OFICIAL: el formato del QR y el layout en si no estan
+ * a mano en vez del paquete `soap`). El logo llega ya decodificado en `issuer.logo` (se guarda en
+ * la BD como data URL), asi que el render nunca hace I/O de red. Es una representacion NO OFICIAL: el formato del QR y el layout en si no estan
  * validados contra el Anexo Tecnico DIAN vigente -- ver README del modulo.
  */
 
@@ -21,6 +21,30 @@ function formatMoney(value: string | number | undefined): string {
 
 function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+/** Dibuja el logo si es una imagen valida; un logo corrupto no debe tumbar el PDF entero. */
+function drawLogo(doc: PDFKit.PDFDocument, logo: Buffer | undefined, x: number, y: number, box: [number, number]): boolean {
+  if (!logo) return false;
+  try {
+    doc.image(logo, x, y, { fit: box, align: "center", valign: "center" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Telefono, WhatsApp, correo, web e Instagram del negocio en una sola linea. */
+function contactLine(issuer: RideDocumentData["issuer"]): string {
+  return [
+    issuer.phone && `Tel. ${issuer.phone}`,
+    issuer.whatsapp && `WhatsApp ${issuer.whatsapp}`,
+    issuer.email,
+    issuer.website,
+    issuer.instagram,
+  ]
+    .filter(Boolean)
+    .join(" -- ");
 }
 
 export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
@@ -48,14 +72,23 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
     doc.y = PAGE_MARGIN;
   }
 
-  doc.fontSize(16).font("Helvetica-Bold").text(data.issuer.legalName || "(razon social no disponible)");
+  // Logo arriba a la derecha (el bloque de texto del emisor ocupa el 65% izquierdo).
+  drawLogo(doc, data.issuer.logo, PAGE_MARGIN + pageWidth - 140, PAGE_MARGIN, [140, 60]);
+  doc.x = PAGE_MARGIN;
+  doc.y = PAGE_MARGIN;
+
+  doc.fontSize(16).font("Helvetica-Bold").text(data.issuer.legalName || "(razon social no disponible)", { width: pageWidth * 0.65 });
+  if (data.issuer.tradeName) doc.fontSize(10).font("Helvetica").text(data.issuer.tradeName, { width: pageWidth * 0.65 });
   doc.fontSize(10).font("Helvetica").text(`NIT: ${data.issuer.nit || "-"}`);
+  if (data.issuer.economicActivity) doc.fontSize(9).font("Helvetica").text(`Actividad economica (CIIU): ${data.issuer.economicActivity}`);
   const addressLine = [data.issuer.address, data.issuer.municipality, data.issuer.department].filter(Boolean).join(", ");
   if (addressLine) doc.fontSize(9).font("Helvetica").text(addressLine, { width: pageWidth * 0.65 });
   const regimeLine = [data.issuer.taxRegime, data.issuer.fiscalResponsibilities].filter(Boolean).join(" -- ");
   if (regimeLine) doc.fontSize(9).font("Helvetica").text(regimeLine, { width: pageWidth * 0.65 });
-  const contactLine = [data.issuer.phone, data.issuer.email].filter(Boolean).join(" -- ");
-  if (contactLine) doc.fontSize(9).font("Helvetica").text(contactLine, { width: pageWidth * 0.65 });
+  const contact = contactLine(data.issuer);
+  if (contact) doc.fontSize(9).font("Helvetica").text(contact, { width: pageWidth * 0.65 });
+  // Si el logo es mas alto que el bloque de texto, el resto arranca debajo del logo.
+  if (data.issuer.logo) doc.y = Math.max(doc.y, PAGE_MARGIN + 64);
   doc.moveDown(0.5);
   doc.fontSize(14).font("Helvetica-Bold").text(data.documentTypeLabel);
   doc.moveDown(0.5);
@@ -85,6 +118,8 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
   doc.text(data.counterparty.name || "-");
   doc.text(`${data.counterparty.documentType ?? "Doc."}: ${data.counterparty.documentNumber || "-"}`);
   doc.moveDown(1);
+  // La tabla siempre arranca debajo del QR (140pt), aunque el bloque de la izquierda sea corto.
+  doc.y = Math.max(doc.y, infoTop + 150);
 
   if (data.lines.length > 0) {
     const colDescription = PAGE_MARGIN;
@@ -147,6 +182,7 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
 const THERMAL_WIDTH = 226.77; // 80mm en puntos (72pt = 1 pulgada)
 const THERMAL_MARGIN = 12;
 const THERMAL_QR_SIZE = 100;
+const THERMAL_LOGO_HEIGHT = 50;
 
 function estimateThermalHeight(data: RideDocumentData): number {
   const headerHeight = 120;
@@ -155,9 +191,19 @@ function estimateThermalHeight(data: RideDocumentData): number {
   const qrBlockHeight = data.qrPayload ? THERMAL_QR_SIZE + 45 : 0;
   const footerHeight = 40;
   const habilitacionBanner = data.environment === "HABILITACION" ? 18 : 0;
+  // Logo + datos del negocio + textos propios del tiquete (~38 caracteres por renglon a 7pt).
+  const textLines = (text?: string) => (text ? Math.ceil(text.length / 38) : 0);
+  const issuer = data.issuer;
+  const businessHeight =
+    (issuer.logo ? THERMAL_LOGO_HEIGHT + 6 : 0) +
+    9 * (textLines(issuer.tradeName ? issuer.legalName : undefined) +
+      textLines([issuer.address, issuer.municipality].filter(Boolean).join(", ")) +
+      textLines(contactLine(issuer)) +
+      textLines(issuer.receiptHeader) +
+      textLines(issuer.receiptFooter));
   // +15% de colchon: mejor que sobre un poco de papel en blanco a que el contenido se corte o
   // pdfkit agregue una segunda pagina (ver test "single-page" en pdfkit-ride-renderer.spec.ts).
-  const raw = headerHeight + data.lines.length * perLineHeight + totalsHeight + qrBlockHeight + footerHeight + habilitacionBanner;
+  const raw = headerHeight + businessHeight + data.lines.length * perLineHeight + totalsHeight + qrBlockHeight + footerHeight + habilitacionBanner;
   return Math.round(raw * 1.15);
 }
 
@@ -194,8 +240,24 @@ export async function renderThermalReceiptPdf(data: RideDocumentData): Promise<B
     doc.moveDown(0.3);
   }
 
-  doc.fontSize(11).font("Helvetica-Bold").text(data.issuer.legalName || "(razon social no disponible)", { width: pageWidth, align: "center" });
-  doc.fontSize(8).font("Helvetica").text(`NIT: ${data.issuer.nit || "-"}`, { width: pageWidth, align: "center" });
+  const issuer = data.issuer;
+  if (drawLogo(doc, issuer.logo, THERMAL_MARGIN, doc.y, [pageWidth, THERMAL_LOGO_HEIGHT])) {
+    doc.x = THERMAL_MARGIN;
+    doc.y += THERMAL_LOGO_HEIGHT + 6;
+  }
+  // Nombre comercial (el que ve el cliente) arriba; la razon social debajo, como en el RUT.
+  doc.fontSize(11).font("Helvetica-Bold").text(issuer.tradeName || issuer.legalName || "(razon social no disponible)", { width: pageWidth, align: "center" });
+  if (issuer.tradeName) doc.fontSize(7).font("Helvetica").text(issuer.legalName, { width: pageWidth, align: "center" });
+  doc.fontSize(8).font("Helvetica").text(`NIT: ${issuer.nit || "-"}`, { width: pageWidth, align: "center" });
+  doc.fontSize(7).font("Helvetica");
+  const address = [issuer.address, issuer.municipality].filter(Boolean).join(", ");
+  if (address) doc.text(address, { width: pageWidth, align: "center" });
+  const contact = contactLine(issuer);
+  if (contact) doc.text(contact, { width: pageWidth, align: "center" });
+  if (issuer.receiptHeader) {
+    doc.moveDown(0.2);
+    doc.text(issuer.receiptHeader, { width: pageWidth, align: "center" });
+  }
   doc.moveDown(0.3);
   doc.fontSize(9).font("Helvetica-Bold").text(data.documentTypeLabel, { width: pageWidth, align: "center" });
   doc.fontSize(8).font("Helvetica").text(`No. ${data.fullNumber}`, { width: pageWidth, align: "center" });
@@ -236,7 +298,7 @@ export async function renderThermalReceiptPdf(data: RideDocumentData): Promise<B
     data.footerNote ?? "Representacion grafica no oficial, sin validar contra el Anexo Tecnico DIAN.",
     { width: pageWidth, align: "center" }
   );
-  doc.fillColor("black").fontSize(8).font("Helvetica-Bold").text("GRACIAS POR SU COMPRA", { width: pageWidth, align: "center" });
+  doc.fillColor("black").fontSize(8).font("Helvetica-Bold").text(issuer.receiptFooter || "GRACIAS POR SU COMPRA", { width: pageWidth, align: "center" });
 
   doc.end();
   return done;

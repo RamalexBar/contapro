@@ -23,6 +23,7 @@ const COMPLETE_PROFILE: CompanyProfileRecord = {
   municipality: "Manizales",
   department: "Caldas",
   municipalityCode: null,
+  economicActivity: null, whatsapp: null, website: null, instagram: null, receiptHeader: null, receiptFooter: null, logoUrl: null,
 };
 
 class FakeCompanyProfileRepository implements Partial<ICompanyProfileRepository> {

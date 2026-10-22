@@ -41,6 +41,13 @@ function toRecord(row: {
   municipality: string | null;
   department: string | null;
   municipalityCode: string | null;
+  economicActivity: string | null;
+  whatsapp: string | null;
+  website: string | null;
+  instagram: string | null;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
+  logoUrl: string | null;
 }): CompanyProfileRecord {
   return {
     id: row.id,
@@ -57,5 +64,12 @@ function toRecord(row: {
     municipality: row.municipality,
     department: row.department,
     municipalityCode: row.municipalityCode,
+    economicActivity: row.economicActivity,
+    whatsapp: row.whatsapp,
+    website: row.website,
+    instagram: row.instagram,
+    receiptHeader: row.receiptHeader,
+    receiptFooter: row.receiptFooter,
+    logoUrl: row.logoUrl,
   };
 }

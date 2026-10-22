@@ -53,6 +53,16 @@ export interface RideIssuer {
   fiscalResponsibilities?: string;
   phone?: string;
   email?: string;
+  /** Datos del negocio (Configuracion -> Datos de la empresa), agregados 2026-10-22. */
+  tradeName?: string;
+  economicActivity?: string;
+  whatsapp?: string;
+  website?: string;
+  instagram?: string;
+  receiptHeader?: string;
+  receiptFooter?: string;
+  /** Logo ya decodificado (PNG/JPG) desde el data URL de Company.logoUrl. */
+  logo?: Buffer;
 }
 
 /** Datos de la resolucion DIAN vigente para el tipo de documento, para el bloque "Resolucion DIAN
@@ -78,6 +88,23 @@ export interface RideCompanyInfo {
   fiscalResponsibilities: string | null;
   phone: string | null;
   email: string | null;
+  // Opcionales: no todos los call-sites/specs los traen.
+  name?: string | null;
+  economicActivity?: string | null;
+  whatsapp?: string | null;
+  website?: string | null;
+  instagram?: string | null;
+  receiptHeader?: string | null;
+  receiptFooter?: string | null;
+  /** Data URL "data:image/png;base64,..." guardado en la BD (ver modules/company). */
+  logoUrl?: string | null;
+}
+
+/** Decodifica el logo guardado como data URL; cualquier otra cosa (URL http vieja, basura) se
+ * ignora: el PDF nunca hace I/O de red durante el render. */
+export function decodeLogoDataUrl(logoUrl: string | null | undefined): Buffer | undefined {
+  const match = logoUrl?.match(/^data:image\/(png|jpeg);base64,(.+)$/);
+  return match ? Buffer.from(match[2], "base64") : undefined;
 }
 
 function withCompanyInfo(issuer: { nit: string; legalName: string }, company: RideCompanyInfo): RideIssuer {
@@ -91,6 +118,14 @@ function withCompanyInfo(issuer: { nit: string; legalName: string }, company: Ri
     fiscalResponsibilities: company.fiscalResponsibilities ?? undefined,
     phone: company.phone ?? undefined,
     email: company.email ?? undefined,
+    tradeName: company.name && company.name !== issuer.legalName ? company.name : undefined,
+    economicActivity: company.economicActivity ?? undefined,
+    whatsapp: company.whatsapp ?? undefined,
+    website: company.website ?? undefined,
+    instagram: company.instagram ?? undefined,
+    receiptHeader: company.receiptHeader ?? undefined,
+    receiptFooter: company.receiptFooter ?? undefined,
+    logo: decodeLogoDataUrl(company.logoUrl),
   };
 }
 

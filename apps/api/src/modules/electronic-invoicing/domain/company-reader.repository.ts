@@ -18,6 +18,12 @@ export interface CompanyRecord {
   fiscalResponsibilities: string | null;
   phone: string | null;
   email: string;
+  economicActivity: string | null;
+  whatsapp: string | null;
+  website: string | null;
+  instagram: string | null;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
 }
 
 /**

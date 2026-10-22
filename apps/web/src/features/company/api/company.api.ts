@@ -15,11 +15,28 @@ export interface CompanyProfile {
   municipality: string | null;
   department: string | null;
   municipalityCode: string | null;
+  economicActivity: string | null;
+  whatsapp: string | null;
+  website: string | null;
+  instagram: string | null;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
+  /** Data URL del logo ("data:image/png;base64,..."). */
+  logoUrl: string | null;
   complete: boolean;
   missingFields: string[];
 }
 
 export interface UpdateCompanyProfileInput {
+  name?: string;
+  email?: string;
+  economicActivity?: string | null;
+  whatsapp?: string | null;
+  website?: string | null;
+  instagram?: string | null;
+  receiptHeader?: string | null;
+  receiptFooter?: string | null;
+  logoUrl?: string | null;
   legalName?: string;
   nit?: string;
   phone?: string | null;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import QRCode from "qrcode";
 import { buildUblInvoiceXml } from "../application/ubl-invoice-xml-builder";
 import { mapInvoiceToRideData, mapSaleToReceiptData } from "../application/ride-data-mapper";
 import { renderRidePdf, renderThermalReceiptPdf } from "./pdfkit-ride-renderer";
@@ -125,5 +126,53 @@ describe("renderThermalReceiptPdf — comprobante de venta sin factura electroni
     expect((pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
     // Sin QR: ninguna imagen embebida.
     expect(pdf.toString("latin1")).not.toContain("/Subtype /Image");
+  });
+});
+
+describe("renderThermalReceiptPdf — datos del negocio y logo", () => {
+  it("embeds the logo and still fits long business texts on a single page", async () => {
+    // Cualquier PNG valido sirve como logo de prueba.
+    const logoPng = await QRCode.toBuffer("logo", { width: 200 });
+    const data = mapSaleToReceiptData(
+      {
+        number: 7,
+        createdAt: new Date("2026-10-22T15:00:00Z"),
+        subtotal: 10000,
+        discountTotal: 0,
+        taxTotal: 0,
+        total: 10000,
+        items: [{ productName: "Almuerzo ejecutivo", quantity: 1, unitPrice: 10000, total: 10000 }],
+        payments: [{ method: "CASH", amount: 10000 }],
+        customer: null,
+      },
+      { nit: "1001292780", legalName: "Alexander Barrios" },
+      {
+        ...testCompany,
+        name: "Restaurante El Roble",
+        whatsapp: "3008453690",
+        website: "www.elroble.com",
+        instagram: "@elroble",
+        receiptHeader: "Abierto de lunes a sabado de 11:00 a.m. a 3:00 p.m. Domicilios sin costo en el centro de la ciudad.",
+        receiptFooter: "Gracias por preferirnos. Vuelve pronto y recomiendanos con tus amigos.",
+        logoUrl: "data:image/png;base64," + logoPng.toString("base64"),
+      }
+    );
+
+    expect(data.issuer.tradeName).toBe("Restaurante El Roble");
+    expect(data.issuer.logo?.equals(logoPng)).toBe(true);
+
+    const pdf = await renderThermalReceiptPdf(data);
+    expect((pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
+    expect(pdf.toString("latin1")).toContain("/Subtype /Image");
+  });
+
+  it("ignores a logo that is not a stored data URL instead of failing", async () => {
+    const data = mapSaleToReceiptData(
+      { number: 8, createdAt: new Date(), subtotal: 1, discountTotal: 0, taxTotal: 0, total: 1, items: [], payments: [], customer: null },
+      { nit: "1", legalName: "X" },
+      { ...testCompany, logoUrl: "https://ejemplo.com/logo.png" }
+    );
+    expect(data.issuer.logo).toBeUndefined();
+    expect((await renderThermalReceiptPdf(data)).subarray(0, 5).toString("ascii")).toBe("%PDF-");
   });
 });
