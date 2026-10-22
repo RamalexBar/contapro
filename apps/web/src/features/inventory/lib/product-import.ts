@@ -22,7 +22,8 @@ export type ImportField =
   | "category"
   | "initialStock"
   | "minStock"
-  | "unit";
+  | "unit"
+  | "location";
 
 export const IMPORT_FIELDS: { field: ImportField; label: string; required?: boolean; numeric?: boolean }[] = [
   { field: "name", label: "Nombre", required: true },
@@ -35,6 +36,7 @@ export const IMPORT_FIELDS: { field: ImportField; label: string; required?: bool
   { field: "initialStock", label: "Stock inicial", numeric: true },
   { field: "minStock", label: "Stock minimo", numeric: true },
   { field: "unit", label: "Unidad" },
+  { field: "location", label: "Ubicacion" },
 ];
 
 /**
@@ -53,6 +55,7 @@ const ALIASES: Record<ImportField, string[]> = {
   initialStock: ["stock inicial", "stock", "cantidad", "cantidad inicial", "existencias", "inventario", "saldo", "cantidad disponible"],
   minStock: ["stock minimo", "minimo", "cantidad minima", "inventario minimo"],
   unit: ["unidad", "unidad de medida", "und", "um"],
+  location: ["ubicacion", "posicion", "estante", "estanteria", "pasillo", "bodega"],
 };
 
 const matcher = createColumnMatcher(
@@ -115,6 +118,7 @@ export function buildImportRows(sheet: ParsedSheet, mapping: ColumnMapping) {
       taxRate: parseTaxRate(cell(cells, "taxRate")),
       initialStock: parseNumber(cell(cells, "initialStock")),
       minStock: parseNumber(cell(cells, "minStock")),
+      location: parseText(cell(cells, "location")),
     };
     return row;
   });
@@ -126,10 +130,10 @@ export function downloadTemplate() {
     "plantilla-productos-contapro.xlsx",
     "Productos",
     [
-      ["Nombre", "Referencia", "Codigo de barras", "Precio de venta", "Costo", "IVA", "Categoria", "Stock inicial", "Stock minimo", "Unidad"],
-      ["Gaseosa 400 ml", "GAS-400", "7702004003508", 3000, 1800, 19, "Bebidas", 24, 6, "UN"],
-      ["Pan tajado", "", "", 5500, 3900, 5, "Panaderia", 10, 2, "UN"],
+      ["Nombre", "Referencia", "Codigo de barras", "Precio de venta", "Costo", "IVA", "Categoria", "Stock inicial", "Stock minimo", "Unidad", "Ubicacion"],
+      ["Gaseosa 400 ml", "GAS-400", "7702004003508", 3000, 1800, 19, "Bebidas", 24, 6, "UN", "Pasillo 1 - Nevera"],
+      ["Pan tajado", "", "", 5500, 3900, 5, "Panaderia", 10, 2, "UN", "Estante B"],
     ],
-    [28, 14, 18, 16, 12, 8, 16, 14, 14, 10]
+    [28, 14, 18, 16, 12, 8, 16, 14, 14, 10, 20]
   );
 }

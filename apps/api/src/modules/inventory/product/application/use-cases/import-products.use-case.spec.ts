@@ -20,7 +20,7 @@ class FakeProductRepository implements IProductRepository {
       companyId: "company-1",
       sku: data.sku,
       name: data.name,
-      description: null,
+      description: null, location: null,
       categoryId: data.categoryId ?? null,
       brandId: null,
       unit: data.unit ?? "UN",

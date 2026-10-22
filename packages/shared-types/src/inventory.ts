@@ -15,6 +15,8 @@ export const createProductSchema = z.object({
   sku: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
+  /** Ubicacion en la estanteria (ej. "Pasillo 3 - Estante B"). */
+  location: z.string().trim().max(60).optional(),
   categoryId: z.string().uuid().optional(),
   brandId: z.string().uuid().optional(),
   unit: z.string().default("UN"),
@@ -44,6 +46,7 @@ export const importProductRowSchema = z.object({
   taxRate: z.number({ invalid_type_error: "IVA invalido" }).min(0, "IVA fuera de rango (0-100)").max(100, "IVA fuera de rango (0-100)").optional(),
   initialStock: z.number({ invalid_type_error: "Stock invalido" }).nonnegative("El stock no puede ser negativo").optional(),
   minStock: z.number({ invalid_type_error: "Stock minimo invalido" }).nonnegative("El stock minimo no puede ser negativo").optional(),
+  location: z.string().trim().min(1).max(60, "Ubicacion muy larga (maximo 60 caracteres)").optional(),
 });
 export type ImportProductRow = z.infer<typeof importProductRowSchema>;
 
@@ -80,6 +83,7 @@ export interface ImportProductsResult {
 export const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  location: z.string().trim().max(60).nullable().optional(),
   categoryId: z.string().uuid().nullable().optional(),
   brandId: z.string().uuid().nullable().optional(),
   unit: z.string().optional(),

@@ -5,6 +5,8 @@ export interface ProductListItem {
   id: string;
   sku: string;
   name: string;
+  /** Ubicacion en la estanteria, ej. "Pasillo 3 - Estante B". */
+  location: string | null;
   categoryId: string | null;
   brandId: string | null;
   currentPrice: number;
@@ -21,6 +23,7 @@ export interface ProductDetail {
   sku: string;
   name: string;
   description: string | null;
+  location: string | null;
   categoryId: string | null;
   brandId: string | null;
   unit: string;

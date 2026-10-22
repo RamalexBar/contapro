@@ -11,6 +11,7 @@ export class CreateProductUseCase {
       sku: input.sku,
       name: input.name,
       description: input.description,
+      location: input.location,
       categoryId: input.categoryId,
       brandId: input.brandId,
       unit: input.unit,

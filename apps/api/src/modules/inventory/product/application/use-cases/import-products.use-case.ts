@@ -127,6 +127,7 @@ export class ImportProductsUseCase {
             initialStock: data.initialStock ?? 0,
             minStock: data.minStock ?? 0,
             maxStock: 0,
+            location: data.location,
           },
           branchId
         );

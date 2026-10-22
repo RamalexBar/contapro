@@ -22,7 +22,7 @@ const PRODUCT = Product.fromPersistence({
   companyId: "company-1",
   sku: "SKU-1",
   name: "Mantenimiento mensual",
-  description: null,
+  description: null, location: null,
   categoryId: null,
   brandId: null,
   unit: "UN",

@@ -269,7 +269,10 @@ export function POSPage() {
                 onClick={() => addToCart(p)}
                 className="flex w-full items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-left text-sm transition-colors hover:border-brand-200 hover:bg-brand-50"
               >
-                <span className="text-slate-800">{p.name}</span>
+                <span className="flex flex-col">
+                  <span className="text-slate-800">{p.name}</span>
+                  {p.location && <span className="text-xs text-slate-500">📍 {p.location}</span>}
+                </span>
                 <span className="font-medium text-slate-500">{formatCOP(resolvePrice(p.id, p.currentPrice))}</span>
               </button>
             ))}
@@ -287,7 +290,10 @@ export function POSPage() {
               const unitPrice = resolvePrice(line.productId, product?.currentPrice ?? 0);
               return (
                 <div key={line.productId} className="flex items-center gap-2 text-sm">
-                  <span className="flex-1 text-slate-800">{product?.name ?? line.productId}</span>
+                  <span className="flex flex-1 flex-col">
+                    <span className="text-slate-800">{product?.name ?? line.productId}</span>
+                    {product?.location && <span className="text-xs text-slate-500">📍 {product.location}</span>}
+                  </span>
                   <Input
                     type="number"
                     min={1}

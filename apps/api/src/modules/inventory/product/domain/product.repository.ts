@@ -4,6 +4,7 @@ export interface CreateProductData {
   sku: string;
   name: string;
   description?: string;
+  location?: string;
   categoryId?: string;
   brandId?: string;
   unit?: string;
@@ -21,6 +22,7 @@ export interface ProductListItem {
   id: string;
   sku: string;
   name: string;
+  location: string | null;
   categoryId: string | null;
   brandId: string | null;
   currentPrice: number;
@@ -36,7 +38,7 @@ export interface IProductRepository {
   findByIdOrThrow(id: string): Promise<Product>;
   findByBarcode(code: string): Promise<Product | null>;
   list(search?: string): Promise<ProductListItem[]>;
-  updateBasicInfo(id: string, data: { name?: string; description?: string; categoryId?: string | null; brandId?: string | null; unit?: string }): Promise<Product>;
+  updateBasicInfo(id: string, data: { name?: string; description?: string; location?: string | null; categoryId?: string | null; brandId?: string | null; unit?: string }): Promise<Product>;
   savePriceAndCost(product: Product): Promise<Product>;
   updateBarcode(id: string, code: string, type?: string): Promise<void>;
   softDelete(id: string): Promise<void>;

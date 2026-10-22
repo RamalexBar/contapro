@@ -42,7 +42,7 @@ function ProductsSection() {
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: listCategories });
   const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: listBrands });
 
-  const [form, setForm] = useState({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "", categoryId: "", brandId: "" });
+  const [form, setForm] = useState({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "", categoryId: "", brandId: "", location: "" });
   const createMutation = useMutation({
     mutationFn: () =>
       createProduct({
@@ -51,6 +51,7 @@ function ProductsSection() {
         currentPrice: Number(form.currentPrice),
         currentCost: Number(form.currentCost),
         barcode: form.barcode || undefined,
+        location: form.location || undefined,
         categoryId: form.categoryId || undefined,
         brandId: form.brandId || undefined,
         unit: "UN",
@@ -61,7 +62,7 @@ function ProductsSection() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      setForm({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "", categoryId: "", brandId: "" });
+      setForm({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "", categoryId: "", brandId: "", location: "" });
     },
   });
 
@@ -71,8 +72,8 @@ function ProductsSection() {
   });
 
   const categoryBrandMutation = useMutation({
-    mutationFn: ({ id, categoryId, brandId }: { id: string; categoryId?: string | null; brandId?: string | null }) =>
-      updateProduct(id, { categoryId, brandId }),
+    mutationFn: ({ id, categoryId, brandId, location }: { id: string; categoryId?: string | null; brandId?: string | null; location?: string | null }) =>
+      updateProduct(id, { categoryId, brandId, location }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });
 
@@ -127,6 +128,13 @@ function ProductsSection() {
               required
             />
             <Input placeholder="Codigo de barras" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
+            <Input
+              placeholder="Ubicacion (ej. Pasillo 3 - Estante B)"
+              title="Donde esta el producto en la tienda o bodega; el vendedor la ve al facturar"
+              maxLength={60}
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
             <Select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
               <option value="">Sin categoria</option>
               {categories?.data.map((c) => (
@@ -159,6 +167,7 @@ function ProductsSection() {
               <tr>
                 <Th>SKU</Th>
                 <Th>Nombre</Th>
+                <Th>Ubicacion</Th>
                 <Th>Precio</Th>
                 <Th>Costo</Th>
                 <Th>Categoria</Th>
@@ -172,6 +181,23 @@ function ProductsSection() {
                 <TableRow key={p.id}>
                   <Td className="font-medium text-slate-900">{p.sku}</Td>
                   <Td>{p.name}</Td>
+                  <Td>
+                    {canUpdate ? (
+                      <Input
+                        placeholder="Sin ubicacion"
+                        className="w-36"
+                        maxLength={60}
+                        defaultValue={p.location ?? ""}
+                        key={p.location}
+                        onBlur={(e) => {
+                          const location = e.target.value.trim() || null;
+                          if (location !== p.location) categoryBrandMutation.mutate({ id: p.id, location });
+                        }}
+                      />
+                    ) : (
+                      p.location ?? "-"
+                    )}
+                  </Td>
                   <Td>
                     {canManagePrice ? (
                       <Input

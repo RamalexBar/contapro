@@ -43,6 +43,8 @@ model Product {
   sku           String
   name          String
   description   String?
+  // Donde esta en la tienda/bodega (ej. "Pasillo 3 - Estante B"), para encontrarlo al vender.
+  location      String?
   categoryId    String?
   category      Category?  @relation(fields: [categoryId], references: [id])
   brandId       String?

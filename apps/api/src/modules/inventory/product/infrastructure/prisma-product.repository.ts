@@ -12,6 +12,7 @@ type ProductRow = {
   sku: string;
   name: string;
   description: string | null;
+  location: string | null;
   categoryId: string | null;
   brandId: string | null;
   unit: string;
@@ -28,6 +29,7 @@ function toEntity(row: ProductRow): Product {
     sku: row.sku,
     name: row.name,
     description: row.description,
+    location: row.location,
     categoryId: row.categoryId,
     brandId: row.brandId,
     unit: row.unit,
@@ -49,6 +51,7 @@ export class PrismaProductRepository implements IProductRepository {
             sku: data.sku,
             name: data.name,
             description: data.description,
+            location: data.location || null,
             categoryId: data.categoryId,
             brandId: data.brandId,
             unit: data.unit ?? "UN",
@@ -132,6 +135,7 @@ export class PrismaProductRepository implements IProductRepository {
       id: row.id,
       sku: row.sku,
       name: row.name,
+      location: row.location,
       categoryId: row.categoryId,
       brandId: row.brandId,
       currentPrice: Number(row.currentPrice),
@@ -144,7 +148,7 @@ export class PrismaProductRepository implements IProductRepository {
 
   async updateBasicInfo(
     id: string,
-    data: { name?: string; description?: string; categoryId?: string | null; brandId?: string | null; unit?: string }
+    data: { name?: string; description?: string; location?: string | null; categoryId?: string | null; brandId?: string | null; unit?: string }
   ): Promise<Product> {
     await this.assertBelongsToCompany(id);
     const row = await prisma.product.update({ where: { id }, data });

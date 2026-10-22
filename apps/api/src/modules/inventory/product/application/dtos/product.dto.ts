@@ -3,6 +3,7 @@ export interface ProductResponseDto {
   sku: string;
   name: string;
   description: string | null;
+  location: string | null;
   categoryId: string | null;
   brandId: string | null;
   unit: string;

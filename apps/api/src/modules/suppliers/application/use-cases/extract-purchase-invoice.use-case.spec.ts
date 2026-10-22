@@ -52,7 +52,7 @@ class FakeProductRepo {
     const needle = (search ?? "").toLowerCase();
     return this.products
       .filter((p) => p.name.toLowerCase().includes(needle))
-      .map((p) => ({ ...p, categoryId: null, brandId: null, currentPrice: 0, currentCost: 0, taxRate: 19, isActive: true }));
+      .map((p) => ({ ...p, location: null, categoryId: null, brandId: null, currentPrice: 0, currentCost: 0, taxRate: 19, isActive: true }));
   }
 }
 
