@@ -9,13 +9,14 @@ const NAV_ITEMS = [
   { to: "/admin/plans", label: "Planes" },
   { to: "/admin/subscriptions", label: "Suscripciones" },
   { to: "/admin/companies", label: "Empresas" },
+  { to: "/admin/admins", label: "Administradores" },
 ];
 
 /** Layout separado de AppLayout (modules/auth) -- este panel no comparte autenticacion ni marca
  * visual con el resto de la app (ver README de saas-admin: PlatformAdmin no es un User). Se queda
  * con su propia barra superior oscura (deliberadamente distinta al sidebar del tenant, para que
  * un operador de plataforma nunca confunda en qué panel está) en vez de forzar un sidebar para
- * solo 4 links. */
+ * solo 5 links. */
 export function PlatformAdminLayout({ children }: PropsWithChildren) {
   const navigate = useNavigate();
   const platformAdmin = usePlatformAuthStore((s) => s.platformAdmin);

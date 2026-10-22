@@ -9,6 +9,10 @@ export const saasAdminRouter = Router();
 
 saasAdminRouter.post("/admin/auth/login", saasAdminController.login);
 
+saasAdminRouter.get("/admin/platform-admins", requirePlatformAdmin, saasAdminController.listPlatformAdmins);
+saasAdminRouter.post("/admin/platform-admins", requirePlatformAdmin, saasAdminController.createPlatformAdmin);
+saasAdminRouter.patch("/admin/platform-admins/:id", requirePlatformAdmin, saasAdminController.setPlatformAdminActive);
+
 saasAdminRouter.post("/admin/plans", requirePlatformAdmin, saasAdminController.createPlan);
 saasAdminRouter.get("/admin/plans", requirePlatformAdmin, saasAdminController.listPlans);
 saasAdminRouter.patch("/admin/plans/:id", requirePlatformAdmin, saasAdminController.updatePlan);

@@ -5,6 +5,16 @@ export const loginPlatformAdminSchema = z.object({
   password: z.string().min(1),
 });
 
+export const createPlatformAdminSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  fullName: z.string().trim().min(1),
+});
+
+export const setPlatformAdminActiveSchema = z.object({
+  isActive: z.boolean(),
+});
+
 export const createPlanSchema = z.object({
   code: z.string().min(1),
   name: z.string().min(1),

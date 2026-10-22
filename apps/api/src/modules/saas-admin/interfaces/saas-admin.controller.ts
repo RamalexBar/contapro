@@ -12,14 +12,19 @@ import type { GetSaasDashboardUseCase } from "../application/use-cases/get-saas-
 import type { CreateSubscriptionCheckoutUseCase } from "../application/use-cases/create-subscription-checkout.use-case";
 import type { ConfirmWompiPaymentUseCase } from "../application/use-cases/confirm-wompi-payment.use-case";
 import type { SendFactusActivationRequestUseCase } from "../application/use-cases/send-factus-activation-request.use-case";
+import type { ListPlatformAdminsUseCase } from "../application/use-cases/list-platform-admins.use-case";
+import type { CreatePlatformAdminUseCase } from "../application/use-cases/create-platform-admin.use-case";
+import type { SetPlatformAdminActiveUseCase } from "../application/use-cases/set-platform-admin-active.use-case";
 import type { SubscriptionStatus } from "../domain/subscription.repository";
 import {
   createPlanSchema,
+  createPlatformAdminSchema,
   createSubscriptionCheckoutSchema,
   createSubscriptionSchema,
   loginPlatformAdminSchema,
   registerSubscriptionPaymentSchema,
   sendFactusActivationRequestSchema,
+  setPlatformAdminActiveSchema,
   updatePlanSchema,
   wompiWebhookSchema,
 } from "./saas-admin.validators";
@@ -38,7 +43,10 @@ export class SaasAdminController {
     private readonly getSaasDashboardUseCase: GetSaasDashboardUseCase,
     private readonly createSubscriptionCheckoutUseCase: CreateSubscriptionCheckoutUseCase,
     private readonly confirmWompiPaymentUseCase: ConfirmWompiPaymentUseCase,
-    private readonly sendFactusActivationRequestUseCase: SendFactusActivationRequestUseCase
+    private readonly sendFactusActivationRequestUseCase: SendFactusActivationRequestUseCase,
+    private readonly listPlatformAdminsUseCase: ListPlatformAdminsUseCase,
+    private readonly createPlatformAdminUseCase: CreatePlatformAdminUseCase,
+    private readonly setPlatformAdminActiveUseCase: SetPlatformAdminActiveUseCase
   ) {}
 
   login = async (req: Request, res: Response, next: NextFunction) => {
@@ -166,6 +174,38 @@ export class SaasAdminController {
         ...body,
       });
       res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listPlatformAdmins = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await this.listPlatformAdminsUseCase.execute() });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createPlatformAdmin = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = createPlatformAdminSchema.parse(req.body);
+      res.status(201).json(await this.createPlatformAdminUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setPlatformAdminActive = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = setPlatformAdminActiveSchema.parse(req.body);
+      res.json(
+        await this.setPlatformAdminActiveUseCase.execute({
+          id: req.params.id,
+          isActive: body.isActive,
+          requestedBy: res.locals.platformAdminId,
+        })
+      );
     } catch (err) {
       next(err);
     }

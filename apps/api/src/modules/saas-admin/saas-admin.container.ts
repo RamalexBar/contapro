@@ -23,6 +23,9 @@ import { SavePaymentSourceUseCase } from "./application/use-cases/save-payment-s
 import { DisableAutoRenewUseCase } from "./application/use-cases/disable-auto-renew.use-case";
 import { RunSubscriptionAutoChargesUseCase } from "./application/use-cases/run-subscription-auto-charges.use-case";
 import { SendFactusActivationRequestUseCase } from "./application/use-cases/send-factus-activation-request.use-case";
+import { ListPlatformAdminsUseCase } from "./application/use-cases/list-platform-admins.use-case";
+import { CreatePlatformAdminUseCase } from "./application/use-cases/create-platform-admin.use-case";
+import { SetPlatformAdminActiveUseCase } from "./application/use-cases/set-platform-admin-active.use-case";
 import { whatsAppSender } from "../whatsapp/whatsapp.container";
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
 import { ResendPlatformNotifier } from "./infrastructure/resend-platform-notifier";
@@ -60,7 +63,10 @@ export const saasAdminController = new SaasAdminController(
     reader: subscriptionRepo,
     notifier: new ResendPlatformNotifier(),
   }),
-  new SendFactusActivationRequestUseCase(subscriptionRepo, new ResendFactusActivationNotifier(), auditService)
+  new SendFactusActivationRequestUseCase(subscriptionRepo, new ResendFactusActivationNotifier(), auditService),
+  new ListPlatformAdminsUseCase(platformAdminRepo),
+  new CreatePlatformAdminUseCase(platformAdminRepo),
+  new SetPlatformAdminActiveUseCase(platformAdminRepo)
 );
 
 /** Usado por server.ts para arrancar el poller de recordatorios/vencimientos/suspension. */

@@ -143,3 +143,23 @@ export interface SendFactusActivationRequestInput {
 export function sendFactusActivationRequest(companyId: string, input: SendFactusActivationRequestInput): Promise<void> {
   return platformApiFetch(`/admin/companies/${companyId}/factus-activation-request`, { method: "POST", body: input });
 }
+
+export interface PlatformAdminRecord {
+  id: string;
+  email: string;
+  fullName: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export function listPlatformAdmins(): Promise<{ data: PlatformAdminRecord[] }> {
+  return platformApiFetch("/admin/platform-admins");
+}
+
+export function createPlatformAdmin(input: { email: string; password: string; fullName: string }): Promise<PlatformAdminRecord> {
+  return platformApiFetch("/admin/platform-admins", { method: "POST", body: input });
+}
+
+export function setPlatformAdminActive(id: string, isActive: boolean): Promise<PlatformAdminRecord> {
+  return platformApiFetch(`/admin/platform-admins/${id}`, { method: "PATCH", body: { isActive } });
+}

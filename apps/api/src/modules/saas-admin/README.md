@@ -34,6 +34,11 @@ El panel es transversal a todas las empresas: no usa `tenantContextMiddleware` (
   caso de rutas genuinamente publicas/no-tenant montadas en esta cadena — de ahi que este orden
   importe (bug real encontrado y corregido durante este trabajo).
 - Seed: `platform@demo.com` / `Demo1234!` (`packages/database/prisma/seed.ts`).
+- `GET/POST /admin/platform-admins` y `PATCH /admin/platform-admins/:id` (`{ isActive }`): crear
+  y activar/desactivar otros operadores desde el propio panel (pagina **Administradores**,
+  `/admin/admins`), sin pasar por la Shell de Render. Todos tienen acceso total (no hay roles);
+  nadie puede desactivarse a si mismo. `prisma/create-platform-admin.ts` sigue sirviendo para
+  crear el primero o recuperar una clave.
 
 ## Implementado
 
