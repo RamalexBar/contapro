@@ -88,6 +88,11 @@ services:
       # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
       - key: CREDENTIALS_ENCRYPTION_KEY
         sync: false
+      # Combo Cajapro + Contapro (modules/partner-api): llave secreta compartida con el servidor de
+      # Cajapro (alla se llama CONTAPRO_PARTNER_KEY, con el MISMO valor). Vacia = Cajapro no puede crear
+      # empresas (503 claro). Generar con el mismo comando de arriba (64 caracteres).
+      - key: CAJAPRO_PARTNER_KEY
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       # onboarding@resend.dev: remitente de pruebas de Resend, funciona sin verificar un dominio

@@ -158,6 +158,11 @@ model Subscription {
   cardLastFour         String?
   cardBrand            String?
 
+  // "CAJAPRO" = el paquete lo cobra el aliado (combo Cajapro + Contapro, ver PartnerAccount):
+  // Contapro no le cobra ni le manda recordatorios de pago; el aliado solo corre currentPeriodEnd
+  // en cada renovacion. null = la cobra Contapro (lo normal).
+  billedBy             String?
+
   payments  SubscriptionPayment[]
   reminders SubscriptionReminderLog[]
 

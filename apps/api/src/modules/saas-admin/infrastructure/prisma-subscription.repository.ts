@@ -229,6 +229,7 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository, IP
       companyEmail: row.company.email,
       companyPhone: row.company.phone,
       planName: row.plan.name,
+      billedBy: row.billedBy,
     }));
   }
 

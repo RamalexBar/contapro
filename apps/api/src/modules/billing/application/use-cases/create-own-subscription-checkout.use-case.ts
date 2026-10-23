@@ -32,6 +32,13 @@ export class CreateOwnSubscriptionCheckoutUseCase {
     const subscription = await this.subscriptionRepo.findLatestByCompanyId(companyId);
     if (!subscription) throw new NotFoundError("Subscription");
 
+    // El combo lo cobra Cajapro: un link de pago de Contapro le cobraria dos veces lo mismo. Solo si
+    // ya quedo suspendida (Cajapro dejo de pagarlo) puede elegir y pagar un plan propio de Contapro.
+    const currentPlan = await this.planRepo.findByIdOrThrow(subscription.planId);
+    if (currentPlan.code === "COMBO_CAJAPRO" && subscription.status !== "SUSPENDED") {
+      throw new ValidationError("Su plan de Contapro viene en el combo de Cajapro: se paga desde Cajapro");
+    }
+
     if (input.planId && input.planId !== subscription.planId) {
       const newPlan = await this.planRepo.findByIdOrThrow(input.planId);
       if (newPlan.code === "TRIAL") {

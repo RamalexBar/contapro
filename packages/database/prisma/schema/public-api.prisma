@@ -73,3 +73,20 @@ model ExternalApiRequest {
   @@index([companyId, createdAt])
   @@map("external_api_requests")
 }
+
+// Empresas que crea un aliado que vende Contapro dentro de su propio paquete (hoy solo Cajapro, plan
+// "Anual con Contapro"). El aliado cobra el paquete completo; Contapro solo guarda hasta cuando esta
+// pagado (Subscription.billedBy) -- ver modules/partner-api/README.md.
+model PartnerAccount {
+  id         String   @id @default(uuid())
+  partner    String // "CAJAPRO"
+  externalId String // id del negocio en el sistema del aliado
+  companyId  String   @unique
+  // La API key que se le entrego al aliado (se revoca y se reemplaza si el aliado pide otra)
+  apiKeyId   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([partner, externalId])
+  @@map("partner_accounts")
+}

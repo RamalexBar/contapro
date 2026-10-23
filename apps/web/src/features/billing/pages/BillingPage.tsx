@@ -204,6 +204,8 @@ export function BillingPage() {
     }
   }
 
+  const isCombo = data?.plan.code === "COMBO_CAJAPRO";
+
   return (
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Mi suscripcion</h1>
@@ -234,12 +236,20 @@ export function BillingPage() {
               <div>
                 <dt className="text-slate-500">Precio</dt>
                 <dd className="font-medium">
-                  {formatCOP(data.subscription.billingCycle === "YEARLY" ? data.plan.priceYearly : data.plan.priceMonthly)}
+                  {isCombo
+                    ? "Incluido en Cajapro"
+                    : formatCOP(data.subscription.billingCycle === "YEARLY" ? data.plan.priceYearly : data.plan.priceMonthly)}
                 </dd>
               </div>
             </dl>
 
-            {data.plan.code !== "TRIAL" && (
+            {isCombo && (
+              <Alert tone="info" className="mt-4">
+                Su plan de Contapro viene en el combo de Cajapro: se paga y se renueva desde Cajapro. Cada vez que lo renueve alla, la fecha de vencimiento se corre aqui sola.
+              </Alert>
+            )}
+
+            {data.plan.code !== "TRIAL" && !isCombo && (
               <div className="mt-4">
                 <Button loading={payingPlanId === "current"} disabled={payingPlanId !== null} onClick={() => pay()}>
                   Pagar ahora
@@ -253,7 +263,7 @@ export function BillingPage() {
             )}
           </Card>
 
-          {data.plan.code !== "TRIAL" && <AutoRenewCard subscription={data.subscription} customerEmail={user?.email} />}
+          {data.plan.code !== "TRIAL" && !isCombo && <AutoRenewCard subscription={data.subscription} customerEmail={user?.email} />}
 
           {/* Mientras la suscripcion siga en TRIALING se puede elegir/cambiar de plan libremente,
               sin importar cual quedo asignado de un intento anterior -- antes esto se gateaba por

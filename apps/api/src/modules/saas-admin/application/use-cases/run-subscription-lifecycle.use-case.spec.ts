@@ -24,6 +24,7 @@ function makeSubscription(overrides: Partial<SubscriptionForLifecycleCheck> = {}
     companyName: "Minimarket Demo",
     companyEmail: "demo@example.com",
     companyPhone: null,
+    billedBy: null,
     planId: "plan-1",
     planName: "Plan Basico",
     status: "ACTIVE",
@@ -167,6 +168,21 @@ describe("RunSubscriptionLifecycleUseCase", () => {
     expect(repo.reminderLogs.has("sub-1:0")).toBe(true);
     expect(repo.channelsUsed).toEqual(["EMAIL"]);
     expect(auditRepo.entries.some((e) => e.action === "SUBSCRIPTION_REMINDER_SENT")).toBe(true);
+  });
+
+  it("sends no payment reminder when Cajapro bills the package, but still expires it", async () => {
+    const repo = new FakeSubscriptionRepository();
+    const yesterday = new Date(Date.now() - 86_400_000);
+    repo.subscriptions.push(makeSubscription({ currentPeriodEnd: new Date(), billedBy: "CAJAPRO" }));
+    repo.subscriptions.push(makeSubscription({ id: "sub-2", currentPeriodEnd: yesterday, billedBy: "CAJAPRO" }));
+    const notifier = new FakeReminderNotifier();
+    const useCase = new RunSubscriptionLifecycleUseCase(repo, notifier, new FakeWhatsAppSender(), new AuditService(new FakeAuditLogRepository()));
+
+    await useCase.execute();
+
+    expect(notifier.sent).toHaveLength(0);
+    expect(repo.reminderLogs.size).toBe(0);
+    expect(repo.subscriptions.find((x) => x.id === "sub-2")?.status).toBe("GRACE_PERIOD");
   });
 
   it("prefers WhatsApp over email when the company has a phone and WhatsApp succeeds", async () => {

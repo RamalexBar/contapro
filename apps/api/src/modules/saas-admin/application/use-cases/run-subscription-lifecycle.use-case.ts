@@ -46,7 +46,9 @@ export class RunSubscriptionLifecycleUseCase {
     for (const subscription of subscriptions) {
       const daysUntilDue = daysBetween(now, subscription.currentPeriodEnd);
 
-      if (REMINDER_DAYS.includes(daysUntilDue)) {
+      // Combo Cajapro: el paquete lo cobra Cajapro, un "renueva en tu panel" de Contapro confundiria
+      // al cliente. Si Cajapro deja de correr la fecha, igual pasa a gracia y a suspendida (abajo).
+      if (REMINDER_DAYS.includes(daysUntilDue) && !subscription.billedBy) {
         const alreadySent = await this.repo.hasReminderLog(subscription.id, daysUntilDue);
         if (!alreadySent) {
           try {

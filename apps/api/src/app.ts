@@ -45,6 +45,7 @@ import { fixedAssetsRouter } from "./modules/fixed-assets/interfaces/fixed-asset
 import { apiKeyRouter } from "./modules/public-api/interfaces/api-key.routes";
 import { publicApiRouter } from "./modules/public-api/interfaces/public-api.routes";
 import { webhooksRouter } from "./modules/webhooks/interfaces/webhooks.routes";
+import { partnerApiRouter } from "./modules/partner-api/interfaces/partner-api.routes";
 
 import { saasAdminRouter } from "./modules/saas-admin/interfaces/saas-admin.routes";
 
@@ -78,6 +79,8 @@ app.use("/api", collectionsWebhookRouter);
 // JWT (tenantContextMiddleware) -- tiene que montarse antes de que un router tenant-scoped la
 // intercepte.
 app.use("/api", publicApiRouter);
+// Mismo motivo: el alta de empresas desde Cajapro (combo) se autentica con la llave del aliado.
+app.use("/api", partnerApiRouter);
 app.use("/api", rbacRouter);
 app.use("/api", branchesRouter);
 app.use("/api", categoryRouter);

@@ -61,6 +61,8 @@ export interface SubscriptionForLifecycleCheck extends SubscriptionRecord {
   // empresa no registro telefono.
   companyPhone: string | null;
   planName: string;
+  /** "CAJAPRO" = el paquete lo cobra el aliado: no se le mandan recordatorios de pago de Contapro. */
+  billedBy: string | null;
 }
 
 export interface SubscriptionPaymentRecord {

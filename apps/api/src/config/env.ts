@@ -94,6 +94,15 @@ const envSchema = z.object({
   // NO es requerido al arrancar porque romperia el boot de cualquier entorno existente que todavia
   // no usa proveedores externos.
   CREDENTIALS_ENCRYPTION_KEY: z.string().default(""),
+
+  // ---- Combo Cajapro + Contapro (ver modules/partner-api/README.md) ----
+  // Llave secreta que comparten los servidores de Cajapro y Contapro (la misma en los dos .env).
+  // Vacia por defecto = Cajapro no puede crear empresas (503 con mensaje claro), igual que el resto
+  // de integraciones opcionales de arriba.
+  CAJAPRO_PARTNER_KEY: z
+    .string()
+    .default("")
+    .refine((v) => v === "" || v.length >= 32, "CAJAPRO_PARTNER_KEY debe tener al menos 32 caracteres"),
 });
 
 const parsed = envSchema.safeParse(process.env);

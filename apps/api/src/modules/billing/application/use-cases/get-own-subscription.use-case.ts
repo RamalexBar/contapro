@@ -35,7 +35,8 @@ export class GetOwnSubscriptionUseCase {
     return {
       subscription,
       plan,
-      availablePlans: allPlans.filter((p) => p.code !== "TRIAL" && p.isActive),
+      // COMBO_CAJAPRO tampoco: solo lo asigna Cajapro al cobrar su paquete (modules/partner-api).
+      availablePlans: allPlans.filter((p) => p.code !== "TRIAL" && p.code !== "COMBO_CAJAPRO" && p.isActive),
     };
   }
 }
