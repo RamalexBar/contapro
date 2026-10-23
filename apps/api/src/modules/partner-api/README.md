@@ -4,6 +4,14 @@ Entrada privada para que un aliado que vende Contapro dentro de su paquete cree 
 de sus clientes sin intervención manual. Hoy el único aliado es **Cajapro** (plan "Anual con Contapro",
 $1.290.000/año, ver `docs/paso-24-combo-contapro.md` en el repo de Cajapro).
 
+## Cada programa con lo suyo
+
+Cajapro vende y emite la factura electrónica (Factus directo, con los datos del NIT de cada cliente).
+Contapro lleva la **contabilidad**: recibe por la API pública un comprobante por cierre de turno, compra y
+pago a proveedor. Las facturas de Factus no llegan a Contapro como comprobante (las ventas ya entran con el
+cierre de turno), así nada se cuenta dos veces. Por eso el tope de 150 documentos DIAN del plan combo casi
+no se usa: la bolsa de facturas la controla el plan de Cajapro.
+
 ## Autenticación
 
 `Authorization: Bearer <CAJAPRO_PARTNER_KEY>` — llave secreta compartida entre los dos servidores
