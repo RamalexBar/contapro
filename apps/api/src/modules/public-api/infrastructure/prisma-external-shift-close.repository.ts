@@ -44,6 +44,7 @@ export class PrismaExternalShiftCloseRepository implements IExternalShiftCloseRe
         journalEntryIds: data.journalEntryIds,
         journalEntryNumbers: data.journalEntryNumbers,
         errorMessage: data.errorMessage ?? null,
+        taxSummary: data.taxSummary ?? undefined,
       },
     });
     return toRecord(row);
@@ -62,6 +63,7 @@ export class PrismaExternalShiftCloseRepository implements IExternalShiftCloseRe
         journalEntryIds: data.journalEntryIds,
         journalEntryNumbers: data.journalEntryNumbers,
         errorMessage: data.errorMessage ?? null,
+        taxSummary: data.taxSummary ?? undefined,
       },
     });
     return toRecord(row);

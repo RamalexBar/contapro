@@ -14,6 +14,7 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { AccountCombobox } from "../components/AccountCombobox";
 import { ChartOfAccountsImportCard } from "../components/ChartOfAccountsImportCard";
+import { VatSummaryReport } from "../components/VatSummaryReport";
 import {
   type AccountType,
   type WithholdingType,
@@ -67,7 +68,14 @@ const WITHHOLDING_TYPES: { value: WithholdingType; label: string }[] = [
 ];
 
 type Section = "accounts" | "entries" | "reports" | "periods" | "withholding" | "cost-centers";
-type ReportTab = "balance" | "income" | "cashflow" | "ledger";
+type ReportTab = "balance" | "income" | "cashflow" | "ledger" | "vat";
+const REPORT_TAB_LABELS: Record<ReportTab, string> = {
+  balance: "Balance General",
+  income: "Estado de Resultados",
+  cashflow: "Flujo de caja",
+  ledger: "Libro mayor",
+  vat: "Resumen de IVA",
+};
 
 function formatLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -864,9 +872,9 @@ function ReportsSection() {
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          {(["balance", "income", "cashflow", "ledger"] as ReportTab[]).map((tab) => (
+          {(["balance", "income", "cashflow", "ledger", "vat"] as ReportTab[]).map((tab) => (
             <Button key={tab} size="sm" variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
-              {tab === "balance" ? "Balance General" : tab === "income" ? "Estado de Resultados" : tab === "cashflow" ? "Flujo de caja" : "Libro mayor"}
+              {REPORT_TAB_LABELS[tab]}
             </Button>
           ))}
         </div>
@@ -1021,6 +1029,8 @@ function ReportsSection() {
           )}
         </Card>
       )}
+
+      {reportTab === "vat" && <VatSummaryReport branchId={branchFilter} />}
 
       {reportTab === "ledger" && (
         <Card>

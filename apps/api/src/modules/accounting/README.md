@@ -391,3 +391,22 @@ compras y centros de costo, todo implementado.**
    comprobantes, o viceversa) — soportarlo requeriria que `BankReconciliationItem` deje de ser un
    par 1:1, tocando tambien `AddBankReconciliationMatchData`/el endpoint de match, no solo el
    sugeridor.
+
+## Resumen de IVA (formulario 300) — 2026-10-24
+
+`GET /reports/vat-summary?from=AAAA-MM-DD&to=AAAA-MM-DD[&branchId=]` (permiso `accounting.read`), pestaña
+**Resumen de IVA** en Contabilidad, con selector bimestral/cuatrimestral, año y periodo.
+
+- **Totales** (`GetVatSummaryUseCase`): salen del libro mayor de la cuenta **2408** exacta (lo mismo que el
+  Balance): créditos = IVA cobrado, débitos = IVA descontable de compras/gastos y reverso por devoluciones.
+  Saldo positivo = a pagar; negativo = saldo a favor. Agrupados por origen (`JournalEntry.sourceType`).
+- **Ventas por tarifa** (`PrismaVatActivityReader`): como el comprobante consolida todas las tarifas en una
+  sola línea de 2408, las bases se reconstruyen desde los documentos: ventas del POS de Contapro
+  (`SaleItem.taxPercent`, menos devoluciones) y cierres de turno de un POS externo
+  (`ExternalShiftClose.taxSummary`, guardado desde el 2026-10-24; los cierres anteriores solo cuentan en los
+  totales y el reporte avisa cuántos son).
+- **Impuesto al consumo** (cuenta 240810) se muestra aparte: se declara en el formulario 310, no en el 300.
+- **No incluye**: retenciones de IVA practicadas por clientes (reteIVA), ni las facturas manuales (que hoy no
+  generan comprobante contable). Es una guía para el contador, no la declaración.
+- Verificado en vivo (local) con una compra de Cajapro con IVA 19 % y un cierre con ventas al 19 %, 5 % y
+  excluidas más una devolución: IVA cobrado 19.430, descontable 19.000, saldo 430, bases por tarifa correctas.

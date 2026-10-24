@@ -34,8 +34,13 @@ export class RegisterShiftCloseUseCase {
       const entry = await this.postShiftCloseJournalEntry.execute(id, input);
       const journalEntryIds = entry ? [entry.id] : [];
       const journalEntryNumbers = entry ? [entry.number] : [];
+      const taxSummary = {
+        date: input.date.toISOString(),
+        sales: input.salesTaxBreakdown,
+        returns: input.returns.map((r) => ({ taxType: r.taxType, taxableAmount: r.taxableAmount, taxAmount: r.taxAmount })),
+      };
       const record = existing
-        ? await this.repo.update(id, { status: "POSTED", journalEntryIds, journalEntryNumbers })
+        ? await this.repo.update(id, { status: "POSTED", journalEntryIds, journalEntryNumbers, taxSummary })
         : await this.repo.create({
             id,
             branchId: input.branchId,
@@ -43,6 +48,7 @@ export class RegisterShiftCloseUseCase {
             status: "POSTED",
             journalEntryIds,
             journalEntryNumbers,
+            taxSummary,
           });
 
       await this.audit.record({

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { tenantContextMiddleware } from "../../../shared/middlewares/tenant-context.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
-import { accountingController } from "../accounting.container";
+import { accountingController, vatSummaryController } from "../accounting.container";
 
 export const accountingRouter = Router();
 accountingRouter.use(tenantContextMiddleware);
@@ -81,6 +81,8 @@ accountingRouter.get(
   requirePermission("accounting.read"),
   accountingController.getCashFlow
 );
+// Resumen de IVA para el formulario 300 (2026-10-24)
+accountingRouter.get("/reports/vat-summary", requirePermission("accounting.read"), vatSummaryController.get);
 
 accountingRouter.post("/bank-accounts", requirePermission("accounting.manage"), accountingController.createBankAccount);
 accountingRouter.get("/bank-accounts", requirePermission("accounting.read"), accountingController.listBankAccounts);

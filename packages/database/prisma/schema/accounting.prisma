@@ -224,6 +224,10 @@ model ExternalShiftClose {
   // el POS externo pueda mostrarlo sin resolver el id contra otro endpoint.
   journalEntryNumbers Int[]
   errorMessage      String?
+  // Ventas y devoluciones del turno por tarifa ({ sales: [{taxType, taxRate, taxableBase, taxAmount}],
+  // returns: [{taxType, taxableAmount, taxAmount}] }) -- el comprobante consolida el IVA en una sola
+  // linea de 2408, asi que el Resumen de IVA saca de aqui las bases por tarifa (2026-10-24).
+  taxSummary        Json?
   createdAt         DateTime @default(now())
 
   @@unique([companyId, externalReference])

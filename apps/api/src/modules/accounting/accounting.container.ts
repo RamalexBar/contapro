@@ -15,6 +15,9 @@ import { PrismaWithholdingConceptRepository } from "./infrastructure/prisma-with
 import { PrismaCostCenterRepository } from "./infrastructure/prisma-cost-center.repository";
 import { PrismaCompanyReaderRepository } from "./infrastructure/prisma-company-reader.repository";
 import { AccountingReportsService } from "./application/accounting-reports.service";
+import { GetVatSummaryUseCase } from "./application/use-cases/get-vat-summary.use-case";
+import { PrismaVatActivityReader } from "./infrastructure/prisma-vat-activity.reader";
+import { VatSummaryController } from "./interfaces/vat-summary.controller";
 import { PrismaThirdPartyResolver } from "./infrastructure/prisma-third-party-resolver";
 import { CreateAccountUseCase } from "./application/use-cases/create-account.use-case";
 import { UpdateAccountUseCase } from "./application/use-cases/update-account.use-case";
@@ -73,6 +76,8 @@ const auditService = new AuditService(new PrismaAuditLogRepository());
 const thirdPartyResolver = new PrismaThirdPartyResolver();
 const statementExtractionService = new ClaudeStatementExtractionService();
 const reports = new AccountingReportsService(journalRepo, accountRepo, cashSessionRepo, bankTransactionRepo, thirdPartyResolver);
+
+export const vatSummaryController = new VatSummaryController(new GetVatSummaryUseCase(journalRepo, accountRepo, new PrismaVatActivityReader()));
 
 const createAccountUseCase = new CreateAccountUseCase(accountRepo, auditService);
 const updateAccountUseCase = new UpdateAccountUseCase(accountRepo, auditService);

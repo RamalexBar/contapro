@@ -24,6 +24,7 @@ export interface CreateExternalShiftCloseData {
   journalEntryIds: string[];
   journalEntryNumbers: number[];
   errorMessage?: string | null;
+  taxSummary?: ShiftCloseTaxSummary | null;
 }
 
 /**
@@ -36,6 +37,15 @@ export interface UpdateExternalShiftCloseData {
   journalEntryIds: string[];
   journalEntryNumbers: number[];
   errorMessage?: string | null;
+  taxSummary?: ShiftCloseTaxSummary | null;
+}
+
+/** Bases e impuestos del turno por tarifa, para el Resumen de IVA (modules/accounting). */
+export interface ShiftCloseTaxSummary {
+  /** Fecha del comprobante (la del turno), ISO. */
+  date: string;
+  sales: { taxType: string; taxRate: number; taxableBase: number; taxAmount: number }[];
+  returns: { taxType: string; taxableAmount: number; taxAmount: number }[];
 }
 
 export interface IExternalShiftCloseRepository {

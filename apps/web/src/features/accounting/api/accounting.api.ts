@@ -309,3 +309,22 @@ export function updateCostCenter(id: string, input: UpdateCostCenterInput): Prom
 export function deactivateCostCenter(id: string): Promise<CostCenterRecord> {
   return apiFetch(`/cost-centers/${id}/deactivate`, { method: "POST" });
 }
+
+export interface VatSummary {
+  from: string;
+  to: string;
+  generated: number;
+  deductible: number;
+  balance: number;
+  byOrigin: { origin: string; label: string; generated: number; deductible: number }[];
+  byRate: { taxType: string; taxRate: number; salesBase: number; salesTax: number; returnsBase: number; returnsTax: number }[];
+  shiftClosesWithoutDetail: number;
+  consumptionTax: number;
+}
+
+/** Resumen de IVA del periodo (formulario 300). */
+export function getVatSummary(from: string, to: string, branchId?: string): Promise<VatSummary> {
+  const params = new URLSearchParams({ from, to });
+  if (branchId) params.set("branchId", branchId);
+  return apiFetch(`/reports/vat-summary?${params.toString()}`);
+}
