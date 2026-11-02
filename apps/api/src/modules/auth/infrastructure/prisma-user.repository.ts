@@ -23,6 +23,7 @@ export class PrismaUserRepository implements IUserRepository {
         branches: { where: { isDefault: true }, take: 1 },
         roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
         permissions: { include: { permission: true } },
+        company: { select: { isActive: true } },
       },
     });
     if (!user) return null;
@@ -31,7 +32,8 @@ export class PrismaUserRepository implements IUserRepository {
 
   async findCompaniesByEmail(email: string): Promise<CompanyMatch[]> {
     const users = await basePrisma.user.findMany({
-      where: { email },
+      // Las empresas archivadas no salen en el selector de "¿a cual empresa entras?"
+      where: { email, company: { isActive: true } },
       select: { companyId: true, company: { select: { name: true } } },
     });
     return users.map((u) => ({ companyId: u.companyId, companyName: u.company.name }));
@@ -44,6 +46,7 @@ export class PrismaUserRepository implements IUserRepository {
         branches: { where: { isDefault: true }, take: 1 },
         roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
         permissions: { include: { permission: true } },
+        company: { select: { isActive: true } },
       },
     });
     if (!user) return null;
@@ -63,6 +66,7 @@ export class PrismaUserRepository implements IUserRepository {
     branches: { branchId: string }[];
     roles: { role: { name: string; permissions: { permission: { code: string } }[] } }[];
     permissions: { granted: boolean; permission: { code: string } }[];
+    company: { isActive: boolean };
   }): UserWithAccess {
     const rolePermissionCodes = new Set<string>();
     const roleNames: string[] = [];
@@ -88,6 +92,7 @@ export class PrismaUserRepository implements IUserRepository {
       failedLoginAttempts: user.failedLoginAttempts,
       lockedUntil: user.lockedUntil,
       defaultBranchId: user.branches[0]?.branchId ?? null,
+      companyIsActive: user.company.isActive,
       roles: roleNames,
       permissions: Array.from(rolePermissionCodes),
     };

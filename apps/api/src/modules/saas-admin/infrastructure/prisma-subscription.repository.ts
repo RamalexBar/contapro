@@ -220,7 +220,7 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository, IP
 
   async listForLifecycleCheck(): Promise<SubscriptionForLifecycleCheck[]> {
     const rows = await basePrisma.subscription.findMany({
-      where: { status: { in: LIFECYCLE_STATUSES } },
+      where: { status: { in: LIFECYCLE_STATUSES }, company: { isActive: true } },
       include: { company: { select: { name: true, email: true, phone: true } }, plan: { select: { name: true } } },
     });
     return rows.map((row) => ({
@@ -316,7 +316,7 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository, IP
     const in8Days = new Date(now);
     in8Days.setDate(in8Days.getDate() + 8);
     const upcomingRenewals = await basePrisma.subscription.count({
-      where: { status: { in: LIFECYCLE_STATUSES }, currentPeriodEnd: { gte: now, lte: in8Days } },
+      where: { status: { in: LIFECYCLE_STATUSES }, currentPeriodEnd: { gte: now, lte: in8Days }, company: { isActive: true } },
     });
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -354,7 +354,7 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository, IP
 
   async listDueForAutoCharge(asOf: Date): Promise<SubscriptionDueForAutoCharge[]> {
     const rows = await basePrisma.subscription.findMany({
-      where: { autoRenew: true, status: { in: ["ACTIVE", "GRACE_PERIOD"] }, currentPeriodEnd: { lte: asOf } },
+      where: { autoRenew: true, status: { in: ["ACTIVE", "GRACE_PERIOD"] }, currentPeriodEnd: { lte: asOf }, company: { isActive: true } },
       include: { company: { select: { email: true } }, plan: { select: { priceMonthly: true, priceYearly: true } } },
     });
     return rows.map((row) => ({

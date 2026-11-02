@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { UnauthorizedError } from "../../../shared/errors/app-error";
 import type { AuditService } from "../../audit/application/audit.service";
 import type { IUserRepository, UserWithAccess } from "../domain/user.repository";
 import { signAccessToken, signRefreshToken } from "../infrastructure/jwt.service";
@@ -30,6 +31,7 @@ export async function issueSession(
   meta: { ipAddress?: string; userAgent?: string },
   description: string
 ): Promise<IssuedSession> {
+  if (!user.companyIsActive) throw new UnauthorizedError("Esta empresa esta archivada. Comuniquese con Contapro para reactivarla.");
   await userRepo.resetFailedLogins(user.id);
   await userRepo.updateLastLogin(user.id);
 

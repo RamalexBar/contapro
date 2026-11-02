@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requirePlatformAdmin } from "../../../shared/middlewares/require-platform-admin.middleware";
-import { saasAdminController } from "../saas-admin.container";
+import { companyAdminController, saasAdminController } from "../saas-admin.container";
 
 // NOTA: este router NO usa tenantContextMiddleware -- el panel de administrador SaaS es
 // transversal a todas las empresas, protegido por requirePlatformAdmin (JWT con secreto propio,
@@ -36,6 +36,9 @@ saasAdminRouter.post(
 saasAdminRouter.post("/admin/subscriptions/webhooks/wompi", saasAdminController.wompiWebhook);
 
 saasAdminRouter.get("/admin/companies", requirePlatformAdmin, saasAdminController.listCompanies);
+// Archivar / reactivar (body { archived }) y borrar definitivamente (solo archivadas, body { confirmName })
+saasAdminRouter.patch("/admin/companies/:id/archived", requirePlatformAdmin, companyAdminController.setArchived);
+saasAdminRouter.delete("/admin/companies/:id", requirePlatformAdmin, companyAdminController.delete);
 saasAdminRouter.get("/admin/dashboard", requirePlatformAdmin, saasAdminController.getDashboard);
 
 saasAdminRouter.post(

@@ -1,4 +1,9 @@
 import { operationalAlerts } from "../../shared/alerts/operational-alerts";
+import { DeleteCompanyUseCase, SetCompanyArchivedUseCase } from "./application/use-cases/company-admin.use-cases";
+import { PrismaCompanyAdminRepository } from "./infrastructure/prisma-company-admin.repository";
+import { CompanyAdminController } from "./interfaces/company-admin.controller";
+
+const companyAdminRepo = new PrismaCompanyAdminRepository();
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
 import { PrismaPlatformAdminRepository } from "./infrastructure/prisma-platform-admin.repository";
@@ -83,3 +88,9 @@ export const runSubscriptionLifecycleUseCase = new RunSubscriptionLifecycleUseCa
 /** Usado por server.ts para arrancar el poller de renovacion automatica (item nuevo: cobro
  * recurrente real via payment_source de Wompi, ver run-subscription-auto-charges.use-case.ts). */
 export const runSubscriptionAutoChargesUseCase = new RunSubscriptionAutoChargesUseCase(subscriptionRepo, paymentGateway, auditService, operationalAlerts);
+
+// Archivar / borrar empresas (panel de plataforma → Empresas)
+export const companyAdminController = new CompanyAdminController(
+  new SetCompanyArchivedUseCase(companyAdminRepo, auditService),
+  new DeleteCompanyUseCase(companyAdminRepo, operationalAlerts)
+);

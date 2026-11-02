@@ -18,6 +18,7 @@ const ana: UserWithAccess = {
   defaultBranchId: "br-1",
   roles: ["ADMINISTRADOR"],
   permissions: ["sale.create"],
+  companyIsActive: true,
 };
 
 function setup(user: UserWithAccess = ana) {
@@ -85,5 +86,11 @@ describe("enlace de entrada de un solo uso (boton Entrar a Contapro)", () => {
   it("no se crea para un correo que no es de esa empresa, ni para un usuario inactivo", async () => {
     await expect(setup().create.execute({ companyId: "co-2", email: "ana@correo.com", source: "CAJAPRO" })).rejects.toThrow();
     await expect(setup({ ...ana, isActive: false }).create.execute({ companyId: "co-1", email: "ana@correo.com", source: "CAJAPRO" })).rejects.toThrow();
+  });
+
+  it("una empresa archivada no entra, ni con el enlace", async () => {
+    const { create, login } = setup({ ...ana, companyIsActive: false });
+    const { token } = await create.execute({ companyId: "co-1", email: "ana@correo.com", source: "CAJAPRO" });
+    await expect(login.execute({ token })).rejects.toThrow(/archivada/);
   });
 });

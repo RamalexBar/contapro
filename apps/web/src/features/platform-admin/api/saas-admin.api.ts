@@ -113,6 +113,16 @@ export function listCompanies(): Promise<{ data: CompanyWithSubscriptionRecord[]
   return platformApiFetch("/admin/companies");
 }
 
+/** Archivar (nadie entra, no se cobra; no se borra nada) o reactivar una empresa. */
+export function setCompanyArchived(companyId: string, archived: boolean): Promise<void> {
+  return platformApiFetch(`/admin/companies/${companyId}/archived`, { method: "PATCH", body: { archived } });
+}
+
+/** Borrar definitivamente una empresa archivada (hay que escribir su nombre exacto). */
+export function deleteCompany(companyId: string, confirmName: string): Promise<{ deleted: number }> {
+  return platformApiFetch(`/admin/companies/${companyId}`, { method: "DELETE", body: { confirmName } });
+}
+
 export interface SaasDashboardStats {
   companiesByStatus: Record<SubscriptionStatus, number>;
   upcomingRenewals: number;

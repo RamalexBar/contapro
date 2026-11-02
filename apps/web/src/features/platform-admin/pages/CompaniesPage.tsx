@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ChangeEvent } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "../../../components/ui/Card";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
 import { Badge } from "../../../components/ui/Badge";
@@ -9,7 +9,7 @@ import { Select } from "../../../components/ui/Select";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { PlatformAdminLayout } from "../components/PlatformAdminLayout";
-import { listCompanies, sendFactusActivationRequest } from "../api/saas-admin.api";
+import { deleteCompany, listCompanies, sendFactusActivationRequest, setCompanyArchived } from "../api/saas-admin.api";
 import type { CompanyWithSubscriptionRecord, FactusActivationAttachmentInput, FactusActivationMediaType } from "../api/saas-admin.api";
 
 const ACCEPTED_MEDIA_TYPES: Record<string, FactusActivationMediaType> = {
@@ -143,13 +143,65 @@ function FactusActivationForm({ company, onSuccess, onCancel }: FactusActivation
 function needsInvoicingActivation(c: CompanyWithSubscriptionRecord): boolean {
   const paid = Boolean(c.planCode) && c.planCode !== "TRIAL";
   const current = c.subscriptionStatus === "ACTIVE" || c.subscriptionStatus === "GRACE_PERIOD";
-  return paid && current && c.electronicInvoicingProvider !== "FACTUS";
+  return c.isActive && paid && current && c.electronicInvoicingProvider !== "FACTUS";
+}
+
+/** Borrar definitivamente una empresa archivada: hay que escribir su nombre exacto. */
+function DeleteCompanyCard({ company, onDone, onCancel }: { company: CompanyWithSubscriptionRecord; onDone: () => void; onCancel: () => void }) {
+  const [confirmName, setConfirmName] = useState("");
+  const mutation = useMutation({ mutationFn: () => deleteCompany(company.companyId, confirmName), onSuccess: onDone });
+  const matches = confirmName.trim() === company.companyName.trim();
+  return (
+    <Card className="mt-4 border-danger-200">
+      <h2 className="font-semibold text-danger-700">Borrar definitivamente — {company.companyName}</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Se borra todo: contabilidad, ventas, inventario, clientes, usuarios, nómina y su auditoría. <b>No se puede deshacer.</b> Si vino del combo de
+        Cajapro y allá se renueva, Cajapro la vuelve a crear vacía.
+      </p>
+      <label className="mt-3 block text-sm text-slate-700">
+        Para confirmar, escriba el nombre: <b>{company.companyName}</b>
+        <input
+          value={confirmName}
+          onChange={(e) => setConfirmName(e.target.value)}
+          autoComplete="off"
+          className="mt-1 block w-full max-w-md rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        />
+      </label>
+      {mutation.error && (
+        <Alert tone="danger" className="mt-3">
+          {(mutation.error as Error).message}
+        </Alert>
+      )}
+      <div className="mt-3 flex gap-2">
+        <Button variant="danger" disabled={!matches} loading={mutation.isPending} onClick={() => mutation.mutate()}>
+          Borrar definitivamente
+        </Button>
+        <Button variant="secondary" onClick={onCancel} disabled={mutation.isPending}>
+          Cancelar
+        </Button>
+      </div>
+    </Card>
+  );
 }
 
 export function CompaniesPage() {
   const { data, isLoading } = useQuery({ queryKey: ["saas-admin", "companies"], queryFn: listCompanies });
   const [activationCompanyId, setActivationCompanyId] = useState<string | null>(null);
   const [justSentFor, setJustSentFor] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
+  // Las archivadas no salen en la lista, salvo que se pidan
+  const [showArchived, setShowArchived] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setCompanyArchived(id, archived),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["saas-admin", "companies"] }),
+    onError: (err: Error) => setActionError(err.message),
+  });
+  const archivedCount = data?.data.filter((c) => !c.isActive).length ?? 0;
+  const rows = data?.data.filter((c) => showArchived || c.isActive) ?? [];
+  const deletingCompany = data?.data.find((c) => c.companyId === deletingId) ?? null;
 
   const activationCompany = data?.data.find((c) => c.companyId === activationCompanyId) ?? null;
   const pending = data?.data.filter(needsInvoicingActivation) ?? [];
@@ -191,6 +243,19 @@ export function CompaniesPage() {
         </Card>
       )}
 
+      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+        <label className="flex items-center gap-2 text-slate-600">
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+          Ver archivadas ({archivedCount})
+        </label>
+        <p className="text-xs text-slate-500">Archivar: nadie entra, no se cobra ni se mandan recordatorios. No se borra nada y se puede reactivar.</p>
+      </div>
+      {actionError && (
+        <Alert tone="danger" className="mb-2">
+          {actionError}
+        </Alert>
+      )}
+
       <Card noPadding>
         {isLoading ? (
           <Spinner />
@@ -210,12 +275,12 @@ export function CompaniesPage() {
               </tr>
             </TableHead>
             <TableBody>
-              {data?.data.map((c) => (
+              {rows.map((c) => (
                 <TableRow key={c.companyId}>
                   <Td>{c.companyName}</Td>
                   <Td>{c.nit}</Td>
                   <Td>
-                    <Badge tone={c.isActive ? "success" : "neutral"}>{c.isActive ? "Si" : "No"}</Badge>
+                    <Badge tone={c.isActive ? "success" : "neutral"}>{c.isActive ? "Si" : "Archivada"}</Badge>
                   </Td>
                   <Td>{c.subscriptionStatus ?? "-"}</Td>
                   <Td>{c.planName ?? "-"}</Td>
@@ -231,13 +296,43 @@ export function CompaniesPage() {
                   <Td>{c.registeredAt.slice(0, 10)}</Td>
                   <Td>{c.currentPeriodEnd ? c.currentPeriodEnd.slice(0, 10) : "-"}</Td>
                   <Td>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => openActivation(c.companyId)}
-                    >
-                      Solicitar activación Factus
-                    </Button>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {c.isActive ? (
+                        <>
+                          <Button size="sm" variant="secondary" onClick={() => openActivation(c.companyId)}>
+                            Solicitar activación Factus
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            loading={archiveMutation.isPending && archiveMutation.variables?.id === c.companyId}
+                            onClick={() => {
+                              setActionError(null);
+                              archiveMutation.mutate({ id: c.companyId, archived: true });
+                            }}
+                          >
+                            Archivar
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            loading={archiveMutation.isPending && archiveMutation.variables?.id === c.companyId}
+                            onClick={() => {
+                              setActionError(null);
+                              archiveMutation.mutate({ id: c.companyId, archived: false });
+                            }}
+                          >
+                            Reactivar
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => setDeletingId(c.companyId)}>
+                            Borrar…
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </Td>
                 </TableRow>
               ))}
@@ -245,6 +340,17 @@ export function CompaniesPage() {
           </Table>
         )}
       </Card>
+
+      {deletingCompany && (
+        <DeleteCompanyCard
+          company={deletingCompany}
+          onDone={() => {
+            setDeletingId(null);
+            queryClient.invalidateQueries({ queryKey: ["saas-admin", "companies"] });
+          }}
+          onCancel={() => setDeletingId(null)}
+        />
+      )}
 
       {justSentFor && (
         <Alert tone="success" className="mt-4">

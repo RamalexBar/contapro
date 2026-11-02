@@ -21,7 +21,7 @@ export class RefreshTokenUseCase {
     }
 
     const user = await this.userRepo.findByIdWithAccess(payload.sub);
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || !user.companyIsActive) {
       throw new UnauthorizedError("Usuario inactivo o inexistente");
     }
 

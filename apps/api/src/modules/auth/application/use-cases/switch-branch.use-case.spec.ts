@@ -41,6 +41,7 @@ class FakeUserRepository {
       defaultBranchId: this.defaults.get(userId) ?? null,
       roles: ["CAJERO"],
       permissions: ["sale.create"],
+      companyIsActive: true,
     };
   }
 }

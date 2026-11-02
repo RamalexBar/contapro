@@ -64,6 +64,9 @@ export class PrismaApiKeyRepository implements IApiKeyRepository {
   async findByHashCrossTenant(keyHash: string): Promise<ApiKeyWithCompany | null> {
     const row = await basePrisma.apiKey.findUnique({ where: { keyHash } });
     if (!row) return null;
+    // Empresa archivada: sus integraciones (ej. Cajapro) dejan de entrar, como sus usuarios
+    const company = await basePrisma.company.findUnique({ where: { id: row.companyId }, select: { isActive: true } });
+    if (!company?.isActive) return null;
     return { ...toRecord(row), companyId: row.companyId };
   }
 

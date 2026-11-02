@@ -11,6 +11,8 @@ export interface UserWithAccess {
   defaultBranchId: string | null;
   roles: string[];
   permissions: string[]; // union resuelta: permisos por rol + overrides individuales
+  /** false = empresa archivada desde el panel de plataforma: nadie entra (ver issueSession) */
+  companyIsActive: boolean;
 }
 
 export interface CreateCompanyWithAdminInput {
