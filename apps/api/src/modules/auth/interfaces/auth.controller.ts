@@ -6,6 +6,8 @@ import type { LogoutUseCase } from "../application/use-cases/logout.use-case";
 import type { RequestPasswordResetUseCase } from "../application/use-cases/request-password-reset.use-case";
 import type { ResetPasswordUseCase } from "../application/use-cases/reset-password.use-case";
 import type { SwitchBranchUseCase } from "../application/use-cases/switch-branch.use-case";
+import type { LoginWithLinkUseCase } from "../application/use-cases/login-links.use-case";
+import { z } from "zod";
 import { switchBranchSchema } from "@erp/shared-types";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { forgotPasswordSchema, loginSchema, refreshTokenSchema, registerCompanySchema, resetPasswordSchema } from "./auth.validators";
@@ -18,8 +20,19 @@ export class AuthController {
     private readonly logoutUseCase: LogoutUseCase,
     private readonly requestPasswordResetUseCase: RequestPasswordResetUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
-    private readonly switchBranchUseCase: SwitchBranchUseCase
+    private readonly switchBranchUseCase: SwitchBranchUseCase,
+    private readonly loginWithLinkUseCase: LoginWithLinkUseCase
   ) {}
+
+  /** Entrar con un enlace de un solo uso (boton «Entrar a Contapro» de Cajapro). */
+  loginWithLink = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token } = z.object({ token: z.string().min(20).max(200) }).parse(req.body);
+      res.json(await this.loginWithLinkUseCase.execute({ token, ipAddress: req.ip, userAgent: req.headers["user-agent"] }));
+    } catch (err) {
+      next(err);
+    }
+  };
 
   listMyBranches = async (_req: Request, res: Response, next: NextFunction) => {
     try {

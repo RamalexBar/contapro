@@ -71,6 +71,17 @@ aprobarse cada pago del combo:
 Respuesta: `{ companyId, created, adminEmail, temporaryPassword | null, apiKey | null, branches[], paidUntil }`.
 La clave temporal y la API key solo viajan una vez.
 
+## Entrar sin clave: `POST /api/partner/v1/cajapro/accounts/:externalId/login-link` (2026-11-02)
+
+Boton «Entrar a Contapro» en Cajapro (Su plan): para que el cliente del combo no tenga que escribir la clave
+temporal larga. Con la llave del aliado y `{ email }` del dueño, Contapro crea un **enlace de un solo uso que vence
+en 5 minutos** (`CreateLoginLinkUseCase`, modulo auth, tabla `login_links` con solo el hash del token) y responde
+`{ url: "<CORS_ORIGIN>/entrar#t=<token>", expiresAt }`. El token va en la parte `#`: el navegador no la manda a
+ningun servidor y la pagina `/entrar` la borra al leerla. `POST /api/auth/link-login { token }`
+(`LoginWithLinkUseCase`) lo gasta de forma atomica (dos clics no abren dos sesiones) y abre la misma sesion que el
+login con clave (`application/issue-session.ts`, compartido con `LoginUseCase`). Auditoria: LOGIN_SUCCESS
+«Entro desde Cajapro (enlace de un solo uso)». La clave temporal sigue sirviendo para entrar directo.
+
 ## El cobro es del aliado
 
 - `Subscription.billedBy = "CAJAPRO"`: `RunSubscriptionLifecycleUseCase` no manda recordatorios de pago

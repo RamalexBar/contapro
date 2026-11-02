@@ -22,6 +22,7 @@ model User {
   permissions         UserPermission[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  loginLinks          LoginLink[]
   discountLimit       CashierDiscountLimit?
   employee            Employee?
 
@@ -128,6 +129,22 @@ model PasswordResetToken {
   @@index([userId])
   @@index([tokenHash])
   @@map("password_reset_tokens")
+}
+
+/// Enlace de entrada de un solo uso (boton "Entrar a Contapro" desde Cajapro): vence en minutos.
+model LoginLink {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
+  /// Quien lo pidio, ej. "CAJAPRO"
+  source    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("login_links")
 }
 
 /// Registro de auditoria INMUTABLE: el repositorio solo expone create()/lecturas.

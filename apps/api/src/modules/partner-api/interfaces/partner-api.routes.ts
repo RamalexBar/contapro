@@ -7,3 +7,4 @@ import { partnerApiController } from "../partner-api.container";
 export const partnerApiRouter = Router();
 
 partnerApiRouter.post("/partner/v1/cajapro/accounts", requirePartnerKey("CAJAPRO"), partnerApiController.provisionCajaproAccount);
+partnerApiRouter.post("/partner/v1/cajapro/accounts/:externalId/login-link", requirePartnerKey("CAJAPRO"), partnerApiController.createCajaproLoginLink);

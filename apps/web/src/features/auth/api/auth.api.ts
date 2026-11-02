@@ -5,6 +5,11 @@ export function login(input: LoginInput): Promise<AuthTokensResponse> {
   return apiFetch<AuthTokensResponse>("/auth/login", { method: "POST", body: input });
 }
 
+/** «Entrar a Contapro» desde Cajapro: cambia el token de un solo uso por una sesión. */
+export function loginWithLink(token: string): Promise<AuthTokensResponse> {
+  return apiFetch<AuthTokensResponse>("/auth/link-login", { method: "POST", body: { token }, retry: false });
+}
+
 export function registerCompany(input: RegisterCompanyInput): Promise<{ companyId: string }> {
   return apiFetch("/auth/register-company", { method: "POST", body: input });
 }

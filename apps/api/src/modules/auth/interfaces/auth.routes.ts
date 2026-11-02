@@ -7,6 +7,7 @@ export const authRouter = Router();
 
 authRouter.post("/auth/register-company", authRateLimiter, authController.registerCompany);
 authRouter.post("/auth/login", authRateLimiter, authController.login);
+authRouter.post("/auth/link-login", authRateLimiter, authController.loginWithLink);
 authRouter.post("/auth/refresh", authRateLimiter, authController.refresh);
 authRouter.post("/auth/logout", tenantContextMiddleware, authController.logout);
 authRouter.get("/auth/branches", tenantContextMiddleware, authController.listMyBranches);

@@ -17,6 +17,8 @@ import { LogoutUseCase } from "./application/use-cases/logout.use-case";
 import { RequestPasswordResetUseCase } from "./application/use-cases/request-password-reset.use-case";
 import { ResetPasswordUseCase } from "./application/use-cases/reset-password.use-case";
 import { SwitchBranchUseCase } from "./application/use-cases/switch-branch.use-case";
+import { CreateLoginLinkUseCase, LoginWithLinkUseCase } from "./application/use-cases/login-links.use-case";
+import { PrismaLoginLinkRepository } from "./infrastructure/prisma-login-link.repository";
 import { AuthController } from "./interfaces/auth.controller";
 
 const userRepo = new PrismaUserRepository();
@@ -26,6 +28,10 @@ const auditService = new AuditService(new PrismaAuditLogRepository());
 const passwordResetTokenRepo = new PrismaPasswordResetTokenRepository();
 const passwordResetNotifier = new ResendPasswordResetNotifier();
 const newCompanyNotifier = new ResendNewCompanyNotifier();
+const loginLinkRepo = new PrismaLoginLinkRepository();
+
+/** Lo usa partner-api (boton «Entrar a Contapro» de Cajapro): se exporta la instancia, no se duplica. */
+export const createLoginLinkUseCase = new CreateLoginLinkUseCase(userRepo, loginLinkRepo);
 
 export const authController = new AuthController(
   new LoginUseCase(userRepo, auditService),
@@ -34,5 +40,6 @@ export const authController = new AuthController(
   new LogoutUseCase(userRepo, auditService),
   new RequestPasswordResetUseCase(userRepo, passwordResetTokenRepo, passwordResetNotifier),
   new ResetPasswordUseCase(userRepo, passwordResetTokenRepo),
-  new SwitchBranchUseCase(userRepo, auditService)
+  new SwitchBranchUseCase(userRepo, auditService),
+  new LoginWithLinkUseCase(userRepo, loginLinkRepo, auditService)
 );
