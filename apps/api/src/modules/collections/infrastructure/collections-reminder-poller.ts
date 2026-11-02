@@ -1,6 +1,7 @@
 import { basePrisma } from "@erp/database";
 import { tenantStorage } from "../../../shared/context/request-context";
 import type { RunCollectionsRemindersUseCase } from "../application/use-cases/run-collections-reminders.use-case";
+import { describeError, operationalAlerts } from "../../../shared/alerts/operational-alerts";
 
 /**
  * Poller en proceso (setInterval), mismo patron que dian-submission-poller.ts: AccountReceivable
@@ -17,7 +18,7 @@ async function runTickForAllCompanies(useCase: RunCollectionsRemindersUseCase): 
       try {
         await useCase.execute();
       } catch (err) {
-        console.error(`[collections-reminder-poller] tanda fallida para empresa ${companyId}:`, err);
+        operationalAlerts.send(`collections:${companyId}`, "Recordatorios de cobranza: falló una empresa", `Empresa ${companyId}\n${describeError(err)}`);
       }
     });
   }
@@ -28,7 +29,7 @@ async function runTickForAllCompanies(useCase: RunCollectionsRemindersUseCase): 
 export function startCollectionsReminderPoller(useCase: RunCollectionsRemindersUseCase, intervalMs = 3_600_000): () => void {
   const timer = setInterval(() => {
     runTickForAllCompanies(useCase).catch((err) => {
-      console.error("[collections-reminder-poller] tick fallido:", err);
+      operationalAlerts.send("collections:tick", "Recordatorios de cobranza: el proceso falló", describeError(err));
     });
   }, intervalMs);
   timer.unref();

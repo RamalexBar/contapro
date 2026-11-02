@@ -277,6 +277,20 @@ Verificado en vivo (empresa demo): suspendida → crear cliente 402 con el mensa
 publica con API key 402 al escribir y 200 al consultar, `/subscription/checkout` y `/auth/*` pasan, login
 200; franja roja y amarilla vistas en el navegador; el formulario de clientes muestra el mensaje.
 
+## Avisos de fallas al equipo (2026-11-02)
+
+`shared/alerts/operational-alerts.ts`: correo por Resend a `INTERNAL_NOTIFICATIONS_EMAIL` (el mismo del aviso de
+pagos) cuando algo falla sin que nadie lo vea. Antes solo quedaba en el log. Se avisa:
+
+- un error interno (500) en cualquier ruta (`error-handler.middleware.ts`; los 4xx no);
+- un cobro automatico con tarjeta rechazado (`RunSubscriptionAutoChargesUseCase`, uno por suscripcion);
+- un proceso de fondo caido o una empresa que falla en el: envio a la DIAN, recordatorios de cobranza,
+  facturas recurrentes, vencimientos de suscripciones y cobros automaticos.
+
+El mismo problema (misma `key`: ruta + mensaje, o proceso + empresa) se avisa una vez cada 6 horas, y nunca
+mas de 20 correos por hora. Si el correo falla, queda en el log y no frena nada. Sin las variables no envia
+nada. Probar desde la Shell de contapro-api: `node apps/api/scripts/probar-aviso.cjs`.
+
 ## Que falta implementar
 
 1. Verificacion end-to-end de WhatsApp contra la API real de Meta — ver

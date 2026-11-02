@@ -1,3 +1,4 @@
+import { operationalAlerts } from "../../shared/alerts/operational-alerts";
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
 import { PrismaPlatformAdminRepository } from "./infrastructure/prisma-platform-admin.repository";
@@ -81,4 +82,4 @@ export const runSubscriptionLifecycleUseCase = new RunSubscriptionLifecycleUseCa
 
 /** Usado por server.ts para arrancar el poller de renovacion automatica (item nuevo: cobro
  * recurrente real via payment_source de Wompi, ver run-subscription-auto-charges.use-case.ts). */
-export const runSubscriptionAutoChargesUseCase = new RunSubscriptionAutoChargesUseCase(subscriptionRepo, paymentGateway, auditService);
+export const runSubscriptionAutoChargesUseCase = new RunSubscriptionAutoChargesUseCase(subscriptionRepo, paymentGateway, auditService, operationalAlerts);

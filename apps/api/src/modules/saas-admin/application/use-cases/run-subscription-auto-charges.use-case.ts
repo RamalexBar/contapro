@@ -1,3 +1,4 @@
+import type { IOperationalAlerts } from "../../../../shared/alerts/operational-alerts";
 import crypto from "node:crypto";
 import type { AuditService } from "../../../audit/application/audit.service";
 import { AUTO_CHARGE_METHOD, type ISubscriptionRepository } from "../../domain/subscription.repository";
@@ -19,7 +20,8 @@ export class RunSubscriptionAutoChargesUseCase {
   constructor(
     private readonly repo: ISubscriptionRepository,
     private readonly paymentGateway: IPaymentGateway,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly alerts?: IOperationalAlerts
   ) {}
 
   async execute(): Promise<void> {
@@ -61,6 +63,11 @@ export class RunSubscriptionAutoChargesUseCase {
           entityId: subscription.id,
           description: `Cobro automatico fallo: ${err instanceof Error ? err.message : String(err)}`,
         });
+        this.alerts?.send(
+          `auto-charge:${subscription.id}`,
+          "Cobro automático rechazado",
+          `Empresa ${subscription.companyId}, suscripción ${subscription.id}: ${err instanceof Error ? err.message : String(err)}. La suscripción sigue su curso normal hacia gracia y suspensión si no paga.`
+        );
       }
     }
   }

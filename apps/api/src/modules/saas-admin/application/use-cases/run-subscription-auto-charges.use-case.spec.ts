@@ -170,8 +170,11 @@ function makeUseCase() {
   const subscriptionRepo = new FakeSubscriptionRepository();
   const paymentGateway = new FakePaymentGateway();
   const auditRepo = new FakeAuditLogRepository();
-  const useCase = new RunSubscriptionAutoChargesUseCase(subscriptionRepo, paymentGateway, new AuditService(auditRepo));
-  return { useCase, subscriptionRepo, paymentGateway, auditRepo };
+  const alerts: { key: string; subject: string; detail: string }[] = [];
+  const useCase = new RunSubscriptionAutoChargesUseCase(subscriptionRepo, paymentGateway, new AuditService(auditRepo), {
+    send: (key, subject, detail) => alerts.push({ key, subject, detail }),
+  });
+  return { useCase, subscriptionRepo, paymentGateway, auditRepo, alerts };
 }
 
 describe("RunSubscriptionAutoChargesUseCase", () => {
@@ -234,5 +237,17 @@ describe("RunSubscriptionAutoChargesUseCase", () => {
     const failures = auditRepo.entries.filter((e) => e.action === "SUBSCRIPTION_AUTO_CHARGE_FAILED");
     expect(failures).toHaveLength(2);
     expect(failures[0].description).toContain("tarjeta rechazada");
+  });
+
+  it("le avisa al equipo de Contapro cada cobro rechazado (uno por suscripcion)", async () => {
+    const { useCase, subscriptionRepo, paymentGateway, alerts } = makeUseCase();
+    subscriptionRepo.due = [makeDue({ id: "sub-1" }), makeDue({ id: "sub-2", companyId: "company-2" })];
+    paymentGateway.shouldThrow = "tarjeta rechazada";
+
+    await useCase.execute();
+
+    expect(alerts.map((a) => a.key)).toEqual(["auto-charge:sub-1", "auto-charge:sub-2"]);
+    expect(alerts[1].detail).toContain("company-2");
+    expect(alerts[1].detail).toContain("tarjeta rechazada");
   });
 });

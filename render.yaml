@@ -101,6 +101,10 @@ services:
       # verificado en Resend (ej. no-reply@tudominio.com) para poder enviar a cualquier destinatario.
       - key: RESEND_FROM_EMAIL
         value: onboarding@resend.dev
+      # A donde llegan los avisos internos: cada pago aprobado y las fallas (shared/alerts/operational-alerts.ts).
+      # Probar con: node apps/api/scripts/probar-aviso.cjs (Shell de contapro-api).
+      - key: INTERNAL_NOTIFICATIONS_EMAIL
+        sync: false
       # Sin esta llave, POST /purchases/extract (lectura automatica de facturas de compra,
       # modules/suppliers/README.md) responde con un mensaje claro en vez de fallar en silencio --
       # mismo criterio que RESEND_API_KEY/DIAN_* de arriba. Completar a mano en el dashboard.

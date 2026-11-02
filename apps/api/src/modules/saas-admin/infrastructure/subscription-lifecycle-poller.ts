@@ -1,4 +1,5 @@
 import type { RunSubscriptionLifecycleUseCase } from "../application/use-cases/run-subscription-lifecycle.use-case";
+import { describeError, operationalAlerts } from "../../../shared/alerts/operational-alerts";
 
 /**
  * Poller en proceso (setInterval), mismo patron que
@@ -17,7 +18,7 @@ import type { RunSubscriptionLifecycleUseCase } from "../application/use-cases/r
 export function startSubscriptionLifecyclePoller(useCase: RunSubscriptionLifecycleUseCase, intervalMs = 3_600_000): () => void {
   const timer = setInterval(() => {
     useCase.execute().catch((err) => {
-      console.error("[subscription-lifecycle-poller] tick fallido:", err);
+      operationalAlerts.send("lifecycle:tick", "Vencimientos de suscripciones: el proceso falló", describeError(err));
     });
   }, intervalMs);
   timer.unref();

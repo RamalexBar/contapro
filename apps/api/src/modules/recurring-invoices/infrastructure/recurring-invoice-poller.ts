@@ -1,6 +1,7 @@
 import { basePrisma } from "@erp/database";
 import { tenantStorage } from "../../../shared/context/request-context";
 import type { RunRecurringInvoicesUseCase } from "../application/use-cases/run-recurring-invoices.use-case";
+import { describeError, operationalAlerts } from "../../../shared/alerts/operational-alerts";
 
 /**
  * Poller en proceso (setInterval), mismo patron que collections-reminder-poller.ts:
@@ -16,7 +17,7 @@ async function runTickForAllCompanies(useCase: RunRecurringInvoicesUseCase): Pro
       try {
         await useCase.execute();
       } catch (err) {
-        console.error(`[recurring-invoice-poller] tanda fallida para empresa ${companyId}:`, err);
+        operationalAlerts.send(`recurring:${companyId}`, "Facturas recurrentes: falló una empresa", `Empresa ${companyId}\n${describeError(err)}`);
       }
     });
   }
@@ -28,7 +29,7 @@ async function runTickForAllCompanies(useCase: RunRecurringInvoicesUseCase): Pro
 export function startRecurringInvoicePoller(useCase: RunRecurringInvoicesUseCase, intervalMs = 3_600_000): () => void {
   const timer = setInterval(() => {
     runTickForAllCompanies(useCase).catch((err) => {
-      console.error("[recurring-invoice-poller] tick fallido:", err);
+      operationalAlerts.send("recurring:tick", "Facturas recurrentes: el proceso falló", describeError(err));
     });
   }, intervalMs);
   timer.unref();

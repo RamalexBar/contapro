@@ -1,4 +1,5 @@
 import type { RunSubscriptionAutoChargesUseCase } from "../application/use-cases/run-subscription-auto-charges.use-case";
+import { describeError, operationalAlerts } from "../../../shared/alerts/operational-alerts";
 
 /**
  * Poller en proceso (setInterval), mismo patron y mismas limitaciones conocidas que
@@ -10,7 +11,7 @@ import type { RunSubscriptionAutoChargesUseCase } from "../application/use-cases
 export function startSubscriptionAutoChargePoller(useCase: RunSubscriptionAutoChargesUseCase, intervalMs = 3_600_000): () => void {
   const timer = setInterval(() => {
     useCase.execute().catch((err) => {
-      console.error("[subscription-auto-charge-poller] tick fallido:", err);
+      operationalAlerts.send("auto-charge:tick", "Cobros automáticos: el proceso falló", describeError(err));
     });
   }, intervalMs);
   timer.unref();

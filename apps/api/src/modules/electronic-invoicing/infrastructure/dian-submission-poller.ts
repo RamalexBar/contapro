@@ -1,6 +1,7 @@
 import { basePrisma } from "@erp/database";
 import { tenantStorage } from "../../../shared/context/request-context";
 import type { PollDianSubmissionsUseCase } from "../application/use-cases/poll-dian-submissions.use-case";
+import { describeError, operationalAlerts } from "../../../shared/alerts/operational-alerts";
 
 /**
  * Poller en proceso (setInterval), sin infraestructura nueva -- este repo no tiene cola/cron
@@ -32,7 +33,7 @@ async function runTickForAllCompanies(useCases: PollDianSubmissionsUseCase[]): P
         try {
           await useCase.execute();
         } catch (err) {
-          console.error(`[dian-poller] tanda fallida para empresa ${companyId}:`, err);
+          operationalAlerts.send(`dian:${companyId}`, "Facturación electrónica: falló el envío de una empresa", `Empresa ${companyId}\n${describeError(err)}`);
         }
       }
     });
@@ -44,7 +45,7 @@ async function runTickForAllCompanies(useCases: PollDianSubmissionsUseCase[]): P
 export function startDianSubmissionPoller(useCases: PollDianSubmissionsUseCase[], intervalMs = 30_000): () => void {
   const timer = setInterval(() => {
     runTickForAllCompanies(useCases).catch((err) => {
-      console.error("[dian-poller] tick fallido:", err);
+      operationalAlerts.send("dian:tick", "Facturación electrónica: el proceso de envío falló", describeError(err));
     });
   }, intervalMs);
   timer.unref();
