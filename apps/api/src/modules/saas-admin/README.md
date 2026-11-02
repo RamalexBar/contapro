@@ -253,6 +253,30 @@ patron de `ResendEmailNotifier` (`fetch` directo a la API de Resend, sin SDK).
   real (sin `RESEND_API_KEY`, `send` lanza `ValidationError` con mensaje claro, 422, verificado en
   vivo). Auditado como `FACTUS_ACTIVATION_REQUEST_SENT` solo si el correo se mando con exito.
 
+## Solo lectura para las suscripciones suspendidas (2026-11-02)
+
+Antes, `SUSPENDED`/`CANCELLED` solo cambiaban el estado: nada impedia seguir usando el sistema (una prueba de
+14 dias servia para siempre). Ahora, igual que el `read_only` de Cajapro:
+
+- `shared/middlewares/subscription-access.middleware.ts` (`enforceSubscriptionWriteAccess`), llamado desde
+  `tenantContextMiddleware` (usuarios) y `apiKeyAuthMiddleware` (integraciones, incluida la conexion de Cajapro):
+  si la suscripcion mas reciente esta `SUSPENDED` o `CANCELLED`, todo lo que no sea `GET` responde **402**
+  `SUBSCRIPTION_SUSPENDED` con un mensaje para el usuario (el del combo dice que se renueva en Cajapro).
+  Siguen funcionando: consultar todo, entrar/salir/cambiar de sucursal (`/api/auth/*`) y pagar
+  (`/api/subscription*`). `TRIALING`, `ACTIVE` y `GRACE_PERIOD` (los 2 dias de gracia) no se bloquean.
+- El estado lo da `GetSubscriptionAccessUseCase` (modulo billing, que se lo registra al middleware con
+  `registerSubscriptionAccessChecker` -- shared no depende de ningun modulo), guardado 30 s por empresa: al
+  pagar, el bloqueo se levanta a mas tardar en ese tiempo. Si la consulta falla, se deja pasar.
+- `GET /api/subscription/access` (cualquier usuario de la empresa, sin permiso) alimenta la franja de
+  `AppLayout.tsx`: amarilla en gracia ("tiene hasta el ... para pagar") y roja en solo lectura, para todos
+  los usuarios; el aviso de "vence en N dias" sigue siendo solo para quien paga (`billing.manage`).
+- Sin probar en la app movil: un `sync push` de ventas hechas sin conexion recibe 402 mientras la empresa
+  este suspendida y se queda en la cola del telefono hasta que pague.
+
+Verificado en vivo (empresa demo): suspendida → crear cliente 402 con el mensaje, consultar 200, la API
+publica con API key 402 al escribir y 200 al consultar, `/subscription/checkout` y `/auth/*` pasan, login
+200; franja roja y amarilla vistas en el navegador; el formulario de clientes muestra el mensaje.
+
 ## Que falta implementar
 
 1. Verificacion end-to-end de WhatsApp contra la API real de Meta — ver

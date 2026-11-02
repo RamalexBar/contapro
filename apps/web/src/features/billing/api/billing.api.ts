@@ -44,6 +44,21 @@ export function getOwnSubscription(): Promise<OwnSubscriptionResponse> {
   return apiFetch("/subscription");
 }
 
+/** Para el aviso de la app (cualquier usuario): vencida, en gracia o en solo lectura. */
+export interface SubscriptionAccess {
+  status: "TRIALING" | "ACTIVE" | "GRACE_PERIOD" | "SUSPENDED" | "CANCELLED";
+  currentPeriodEnd: string;
+  graceEndsAt: string | null;
+  /** Suspendida o cancelada: puede consultar y pagar, pero no registrar ni cambiar nada. */
+  readOnly: boolean;
+  /** El combo de Cajapro: se renueva en Cajapro. */
+  billedByCajapro: boolean;
+}
+
+export function getSubscriptionAccess(): Promise<SubscriptionAccess | null> {
+  return apiFetch("/subscription/access");
+}
+
 export function createOwnCheckout(input: CreateCheckoutInput): Promise<CreateCheckoutResponse> {
   return apiFetch("/subscription/checkout", { method: "POST", body: input });
 }

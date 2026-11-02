@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../../features/auth/hooks/useAuthStore";
 import { BranchSwitcher } from "./BranchSwitcher";
-import { getOwnSubscription } from "../../features/billing/api/billing.api";
+import { getSubscriptionAccess } from "../../features/billing/api/billing.api";
 import { Button } from "./Button";
 import { Logo } from "./Logo";
 
@@ -130,37 +130,56 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 
-/** Aviso corto dentro de la app cuando la suscripcion esta por vencer -- antes el unico
- * recordatorio era por correo (8/5/3/1/0 dias, ver saas-admin/README.md), asi que si el cliente
- * no revisaba el correo nunca se enteraba usando el sistema mismo. Solo lo ve quien administra la
- * suscripcion (`billing.manage`, mismo permiso que el link "Mi suscripcion" del sidebar) para no
- * alarmar a cajeros/empleados que no pueden hacer nada al respecto. */
+const shortDate = (iso: string) => new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long" }).format(new Date(iso));
+
+/** Aviso dentro de la app sobre la suscripcion -- antes el unico recordatorio era por correo
+ * (8/5/3/1/0 dias, ver saas-admin/README.md), asi que si el cliente no revisaba el correo nunca se
+ * enteraba usando el sistema mismo.
+ *  - Por vencer (3 dias o menos): solo quien paga (`billing.manage`), para no alarmar a cajeros.
+ *  - Vencida (gracia de 2 dias) y en solo lectura (suspendida): todos, porque a todos les afecta --
+ *    en solo lectura el servidor rechaza cualquier registro (enforceSubscriptionWriteAccess).
+ * El combo de Cajapro se renueva en Cajapro: no se manda a "Mi suscripcion". */
 function SubscriptionBanner() {
   const canManageBilling = useAuthStore((s) => s.hasPermission("billing.manage"));
   const { data } = useQuery({
-    queryKey: ["own-subscription"],
-    queryFn: getOwnSubscription,
-    enabled: canManageBilling,
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["subscription-access"],
+    queryFn: getSubscriptionAccess,
+    staleTime: 60 * 1000,
   });
 
   if (!data) return null;
-  if (data.subscription.status !== "TRIALING" && data.subscription.status !== "ACTIVE") return null;
 
-  const daysRemaining = Math.ceil((new Date(data.subscription.currentPeriodEnd).getTime() - Date.now()) / 86_400_000);
-  if (daysRemaining > 3 || daysRemaining < 0) return null;
+  const action = data.billedByCajapro ? (
+    <span>Renueve el plan «Anual con Contapro» en Cajapro.</span>
+  ) : canManageBilling ? (
+    <NavLink to="/billing" className="underline hover:no-underline">
+      Pagar ahora
+    </NavLink>
+  ) : (
+    <span>Pídale a quien administra la cuenta que pague el plan.</span>
+  );
 
-  const label =
-    daysRemaining === 0
-      ? "Tu suscripcion vence hoy"
-      : `Tu suscripcion vence en ${daysRemaining} dia${daysRemaining === 1 ? "" : "s"}`;
+  let tone = "bg-warning-600";
+  let label: string;
+  if (data.readOnly) {
+    tone = "bg-danger-600";
+    label = "Su suscripción está suspendida: puede consultar su información, pero no registrar ni cambiar nada.";
+  } else if (data.status === "GRACE_PERIOD") {
+    label = data.graceEndsAt
+      ? `Su plan venció. Tiene hasta el ${shortDate(data.graceEndsAt)} para pagar; después Contapro queda solo para consultar.`
+      : "Su plan venció. Pague pronto: después Contapro queda solo para consultar.";
+  } else {
+    if (!canManageBilling) return null;
+    const daysRemaining = Math.ceil((new Date(data.currentPeriodEnd).getTime() - Date.now()) / 86_400_000);
+    if (daysRemaining > 3 || daysRemaining < 0) return null;
+    if (daysRemaining <= 1) tone = "bg-danger-600";
+    label = daysRemaining === 0 ? "Su suscripción vence hoy." : `Su suscripción vence en ${daysRemaining} día${daysRemaining === 1 ? "" : "s"}.`;
+  }
 
   return (
-    <div className={`flex items-center justify-center gap-3 px-4 py-2 text-sm font-medium text-white ${daysRemaining <= 1 ? "bg-danger-600" : "bg-warning-600"}`}>
-      <span>{label}.</span>
-      <NavLink to="/billing" className="underline hover:no-underline">
-        Renovar ahora
-      </NavLink>
+    <div className={`no-print flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-2 text-center text-sm font-medium text-white ${tone}`}>
+      <span>{label}</span>
+      {action}
     </div>
   );
 }

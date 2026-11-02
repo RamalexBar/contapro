@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { PrismaApiKeyRepository } from "../../modules/public-api/infrastructure/prisma-api-key.repository";
 import { tenantStorage } from "../context/request-context";
+import { enforceSubscriptionWriteAccess } from "./subscription-access.middleware";
 
 // Instancia propia (sin estado, seguro instanciarla aparte del container del modulo dueño),
 // mismo criterio ya documentado en suppliers.container.ts.
@@ -41,6 +42,7 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
       ipAddress: req.ip,
       userAgent: req.headers["user-agent"],
     },
-    () => next()
+    // Suscripcion suspendida: la integracion (ej. Cajapro) solo puede consultar
+    () => void enforceSubscriptionWriteAccess(req, res, apiKey.companyId, next)
   );
 }
