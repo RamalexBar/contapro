@@ -9,6 +9,7 @@ import type {
   Partner,
   PartnerAccountRecord,
   PartnerPlanDefinition,
+  PartnerSubscriptionData,
 } from "../../domain/partner-account.repository";
 import { CAJAPRO_API_KEY_SCOPES, ProvisionPartnerAccountUseCase, type ProvisionPartnerAccountInput } from "./provision-partner-account.use-case";
 
@@ -16,7 +17,7 @@ class FakePartnerRepo implements IPartnerAccountRepository {
   accounts: PartnerAccountRecord[] = [];
   companies: (NewPartnerCompanyData & { id: string; users: { id: string; email: string }[] })[] = [];
   plans: (PartnerPlanDefinition & { id: string })[] = [];
-  subscriptions: { companyId: string; planId: string; currentPeriodEnd: Date; billedBy: Partner }[] = [];
+  subscriptions: (Omit<PartnerSubscriptionData, "status"> & { status: string; planCode?: string })[] = [];
   apiKeys: (IssuePartnerApiKeyData & { id: string; isActive: boolean })[] = [];
 
   async findByExternalId(partner: Partner, externalId: string) {
@@ -50,7 +51,12 @@ class FakePartnerRepo implements IPartnerAccountRepository {
     if (!row) this.plans.push((row = { ...plan, id: `plan-${plan.code}` }));
     return row.id;
   }
-  async upsertPartnerSubscription(data: { companyId: string; planId: string; currentPeriodEnd: Date; billedBy: Partner }) {
+  async findLatestSubscription(companyId: string) {
+    const s = this.subscriptions.find((x) => x.companyId === companyId);
+    if (!s) return null;
+    return { status: s.status, planCode: s.planCode ?? this.plans.find((p) => p.id === s.planId)?.code ?? "" };
+  }
+  async upsertPartnerSubscription(data: PartnerSubscriptionData) {
     this.subscriptions = this.subscriptions.filter((s) => s.companyId !== data.companyId);
     this.subscriptions.push(data);
   }
@@ -92,7 +98,7 @@ describe("ProvisionPartnerAccountUseCase", () => {
 
     expect(repo.plans[0]).toMatchObject({ code: "COMBO_CAJAPRO", maxBranches: 1, maxUsers: 3, maxElectronicDocumentsPerMonth: 150 });
     expect(repo.subscriptions).toEqual([
-      { companyId: result.companyId, planId: "plan-COMBO_CAJAPRO", currentPeriodEnd: new Date("2027-10-23T00:00:00Z"), billedBy: "CAJAPRO" },
+      { companyId: result.companyId, planId: "plan-COMBO_CAJAPRO", currentPeriodEnd: new Date("2027-10-23T00:00:00Z"), billedBy: "CAJAPRO", status: "ACTIVE" },
     ]);
 
     expect(result.apiKey).toMatch(/^pk_live_/);
@@ -144,4 +150,29 @@ describe("ProvisionPartnerAccountUseCase", () => {
     expect(repo.accounts).toHaveLength(0);
     expect(repo.apiKeys).toHaveLength(0);
   });
+
+  it("connects a free trial of the combo: TRIALING until the end of the Cajapro trial, then paying makes it ACTIVE", async () => {
+    const repo = new FakePartnerRepo();
+    const useCase = new ProvisionPartnerAccountUseCase(repo, audit);
+    const trial = await useCase.execute(input({ trial: true, paidUntil: new Date("2026-11-09T00:00:00Z") }));
+
+    expect(trial.apiKey).toMatch(/^pk_live_/);
+    expect(repo.subscriptions[0]).toMatchObject({ status: "TRIALING", currentPeriodEnd: new Date("2026-11-09T00:00:00Z"), billedBy: "CAJAPRO" });
+
+    await useCase.execute(input());
+    expect(repo.subscriptions[0]).toMatchObject({ status: "ACTIVE", currentPeriodEnd: new Date("2027-10-23T00:00:00Z") });
+  });
+
+  it("a trial never overwrites a plan the company already pays for", async () => {
+    const repo = new FakePartnerRepo();
+    const { companyId } = await repo.createCompany({ ...input().company, companyName: "El Roble", companyEmail: "roble@correo.com", municipality: null, address: null, phone: null, dv: "7", adminFullName: "Ana", adminEmail: "ana@correo.com", adminPasswordHash: "h" });
+    const ownPlan = { companyId, planId: "plan-PYME", planCode: "PYME", currentPeriodEnd: new Date("2027-05-01T00:00:00Z"), billedBy: "CAJAPRO" as Partner, status: "ACTIVE" };
+    repo.subscriptions.push(ownPlan);
+
+    const result = await new ProvisionPartnerAccountUseCase(repo, audit).execute(input({ trial: true, paidUntil: new Date("2026-11-09T00:00:00Z") }));
+
+    expect(result.apiKey).toMatch(/^pk_live_/);
+    expect(repo.subscriptions).toEqual([ownPlan]);
+  });
+
 });

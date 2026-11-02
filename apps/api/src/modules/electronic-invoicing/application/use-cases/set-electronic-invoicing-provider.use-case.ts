@@ -99,7 +99,8 @@ export class SetElectronicInvoicingProviderUseCase {
       throw new ValidationError("Esta empresa no tiene una suscripcion activa -- no se puede activar Factus");
     }
     const plan = await this.planRepo.findByIdOrThrow(subscription.planId);
-    if (plan.code === "TRIAL") {
+    // TRIALING tambien: la prueba del combo de Cajapro, o quien escogio un plan y aun no lo paga
+    if (plan.code === "TRIAL" || subscription.status === "TRIALING") {
       throw new ValidationError(
         "El plan de prueba gratuita no puede usar Factus -- elegi un plan pago para activar la facturacion electronica via proveedor tecnologico"
       );

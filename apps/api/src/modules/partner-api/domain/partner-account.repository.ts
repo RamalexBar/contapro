@@ -1,6 +1,15 @@
 /** Aliados que venden Contapro dentro de su propio paquete. Hoy solo Cajapro (plan "Anual con Contapro"). */
 export type Partner = "CAJAPRO";
 
+/** ACTIVE = pagado en el aliado; TRIALING = prueba gratis del paquete (vence sola si no paga). */
+export interface PartnerSubscriptionData {
+  companyId: string;
+  planId: string;
+  currentPeriodEnd: Date;
+  billedBy: Partner;
+  status: "ACTIVE" | "TRIALING";
+}
+
 export interface PartnerAccountRecord {
   id: string;
   partner: Partner;
@@ -63,7 +72,9 @@ export interface IPartnerAccountRepository {
   ensurePlan(plan: PartnerPlanDefinition): Promise<string>;
   /** Deja la suscripcion mas reciente de la empresa (o una nueva) en ese plan, ACTIVA hasta
    * `currentPeriodEnd`, cobrada por el aliado y sin cobro automatico propio de Contapro. */
-  upsertPartnerSubscription(data: { companyId: string; planId: string; currentPeriodEnd: Date; billedBy: Partner }): Promise<void>;
+  upsertPartnerSubscription(data: PartnerSubscriptionData): Promise<void>;
+  /** La suscripcion mas reciente de la empresa (con el codigo de su plan), o null. */
+  findLatestSubscription(companyId: string): Promise<{ status: string; planCode: string } | null>;
   issueApiKey(data: IssuePartnerApiKeyData): Promise<string>;
   listBranches(companyId: string): Promise<{ id: string; name: string }[]>;
 }

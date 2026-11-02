@@ -25,4 +25,6 @@ export const provisionPartnerAccountSchema = z.object({
   }),
   paidUntil: z.coerce.date(),
   issueApiKey: z.boolean().default(false),
+  // Prueba gratis del combo: Contapro conectado mientras dura la prueba de Cajapro
+  trial: z.boolean().default(false),
 });

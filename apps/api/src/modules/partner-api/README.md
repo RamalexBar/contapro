@@ -31,6 +31,7 @@ aprobarse cada pago del combo:
                "email": "...", "phone": "...", "address": "...", "city": "Pereira" },
   "owner": { "fullName": "...", "email": "..." },
   "paidUntil": "2027-10-23T00:00:00Z",
+  "trial": false,
   "issueApiKey": false
 }
 ```
@@ -44,6 +45,14 @@ aprobarse cada pago del combo:
   ajena conociendo su NIT).
 - **Renovación** (mismo `externalId`): solo corre `currentPeriodEnd` a `paidUntil`. Sin clave ni API key
   nuevas, salvo `issueApiKey: true` (revoca la anterior). Responde 200.
+
+- **Prueba del combo** (`trial: true`, 2026-11-02): un negocio en prueba gratis de Cajapro conecta Contapro para
+  probar los dos juntos. Todo igual que arriba (empresa, clave temporal, API key), pero la suscripción queda
+  `TRIALING` hasta `paidUntil` (= el fin de la prueba de Cajapro) y vence sola por el ciclo de vida normal. Si
+  la empresa ya paga un plan (el propio de Contapro, o el combo), la prueba **no toca su suscripción**: solo
+  conecta. Cuando paga el combo, Cajapro vuelve a llamar sin `trial` y queda `ACTIVE` — misma empresa, misma
+  API key, con todo lo que hizo en la prueba. Una suscripción `TRIALING` no puede activar Factus
+  (`SetElectronicInvoicingProviderUseCase`), igual que el plan `TRIAL`.
 
 Respuesta: `{ companyId, created, adminEmail, temporaryPassword | null, apiKey | null, branches[], paidUntil }`.
 La clave temporal y la API key solo viajan una vez.

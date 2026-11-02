@@ -7,6 +7,7 @@ import type {
   Partner,
   PartnerAccountRecord,
   PartnerPlanDefinition,
+  PartnerSubscriptionData,
 } from "../domain/partner-account.repository";
 
 const toRecord = (row: { id: string; partner: string; externalId: string; companyId: string; apiKeyId: string | null }): PartnerAccountRecord => ({
@@ -108,7 +109,16 @@ export class PrismaPartnerAccountRepository implements IPartnerAccountRepository
     return row.id;
   }
 
-  async upsertPartnerSubscription(data: { companyId: string; planId: string; currentPeriodEnd: Date; billedBy: Partner }) {
+  async findLatestSubscription(companyId: string) {
+    const row = await basePrisma.subscription.findFirst({
+      where: { companyId },
+      orderBy: { createdAt: "desc" },
+      select: { status: true, plan: { select: { code: true } } },
+    });
+    return row ? { status: row.status, planCode: row.plan.code } : null;
+  }
+
+  async upsertPartnerSubscription(data: PartnerSubscriptionData) {
     const latest = await basePrisma.subscription.findFirst({
       where: { companyId: data.companyId },
       orderBy: { createdAt: "desc" },
@@ -116,7 +126,7 @@ export class PrismaPartnerAccountRepository implements IPartnerAccountRepository
     });
     const fields = {
       planId: data.planId,
-      status: "ACTIVE" as const,
+      status: data.status,
       billingCycle: "YEARLY",
       currentPeriodEnd: data.currentPeriodEnd,
       graceEndsAt: null,

@@ -35,8 +35,10 @@ export interface ProvisionPartnerAccountInput {
     city?: string | null;
   };
   owner: { fullName: string; email: string };
-  /** Hasta cuando esta pagado el paquete en el sistema del aliado. */
+  /** Hasta cuando esta pagado el paquete en el sistema del aliado (o hasta cuando va su prueba gratis). */
   paidUntil: Date;
+  /** Prueba gratis del paquete: la empresa queda en TRIALING hasta `paidUntil` y vence sola si no paga. */
+  trial?: boolean;
   /** Pedir una API key nueva (la anterior se revoca). Una cuenta nueva siempre recibe una. */
   issueApiKey: boolean;
 }
@@ -112,12 +114,18 @@ export class ProvisionPartnerAccountUseCase {
     }
 
     const planId = await this.repo.ensurePlan(CAJAPRO_COMBO_PLAN);
-    await this.repo.upsertPartnerSubscription({
-      companyId: account.companyId,
-      planId,
-      currentPeriodEnd: input.paidUntil,
-      billedBy: input.partner,
-    });
+    // Una prueba nunca pisa un plan pagado (el propio de Contapro o el combo ya pagado): solo conecta.
+    const latest = input.trial ? await this.repo.findLatestSubscription(account.companyId) : null;
+    const paying = !!latest && ["ACTIVE", "GRACE_PERIOD"].includes(latest.status) && latest.planCode !== "TRIAL";
+    if (!paying) {
+      await this.repo.upsertPartnerSubscription({
+        companyId: account.companyId,
+        planId,
+        currentPeriodEnd: input.paidUntil,
+        billedBy: input.partner,
+        status: input.trial ? "TRIALING" : "ACTIVE",
+      });
+    }
 
     let apiKey: string | null = null;
     if (input.issueApiKey || !account.apiKeyId) {
@@ -140,7 +148,7 @@ export class ProvisionPartnerAccountUseCase {
       action: "PARTNER_ACCOUNT_PROVISIONED",
       entityType: "PartnerAccount",
       entityId: account.id,
-      description: `${input.partner} ${created ? "creo la empresa" : "renovo el paquete"}: pagado hasta ${input.paidUntil.toISOString().slice(0, 10)}${apiKey ? ", API key nueva" : ""}`,
+      description: `${input.partner} ${created ? "creo la empresa" : input.trial ? "conecto la prueba" : "renovo el paquete"}: ${input.trial ? "prueba gratis" : "pagado"} hasta ${input.paidUntil.toISOString().slice(0, 10)}${paying ? " (sin tocar su plan pagado)" : ""}${apiKey ? ", API key nueva" : ""}`,
     });
 
     return {
