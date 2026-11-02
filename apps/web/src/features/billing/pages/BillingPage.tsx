@@ -206,7 +206,7 @@ export function BillingPage() {
     }
   }
 
-  const isCombo = data?.plan.code === "COMBO_CAJAPRO";
+  const isCombo = data?.plan.code.startsWith("COMBO_CAJAPRO") ?? false;
   // Mismo criterio que Panel → Empresas «Pendientes por activar facturación electrónica». El combo factura por Cajapro.
   const paidAndCurrent =
     !!data && data.plan.code !== "TRIAL" && !isCombo && (data.subscription.status === "ACTIVE" || data.subscription.status === "GRACE_PERIOD");

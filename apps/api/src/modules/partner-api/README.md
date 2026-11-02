@@ -32,6 +32,7 @@ aprobarse cada pago del combo:
   "owner": { "fullName": "...", "email": "..." },
   "paidUntil": "2027-10-23T00:00:00Z",
   "trial": false,
+  "tier": "EMPRENDEDOR",
   "issueApiKey": false
 }
 ```
@@ -53,6 +54,19 @@ aprobarse cada pago del combo:
   conecta. Cuando paga el combo, Cajapro vuelve a llamar sin `trial` y queda `ACTIVE` — misma empresa, misma
   API key, con todo lo que hizo en la prueba. Una suscripción `TRIALING` no puede activar Factus
   (`SetElectronicInvoicingProviderUseCase`), igual que el plan `TRIAL`.
+
+- **Tamaño del Contapro** (`tier`, 2026-11-02): cada plan de Cajapro dice qué Contapro trae su combo (Cajapro →
+  Planes → «Contapro que trae el combo»). Mismos límites que los planes propios, sin precio:
+
+  | `tier` | Plan en Contapro | Sucursales | Usuarios | Documentos DIAN/mes |
+  |---|---|---|---|---|
+  | `EMPRENDEDOR` (por defecto) | `COMBO_CAJAPRO` «Combo Cajapro Emprendedor» | 1 | 3 | 150 |
+  | `PYME` | `COMBO_CAJAPRO_PYME` «Combo Cajapro Pyme» | 3 | 10 | 350 |
+  | `PLUS` | `COMBO_CAJAPRO_PLUS` «Combo Cajapro Plus» | 10 | 50 | 650 |
+
+  El Emprendedor conserva el código `COMBO_CAJAPRO` que ya tenían las empresas creadas. Si el proveedor cambia
+  el plan del negocio (o el tamaño del plan), Cajapro vuelve a llamar y la suscripción cambia de plan. Todo lo que
+  revisa "es combo" usa `isCajaproComboPlan` (código que empieza por `COMBO_CAJAPRO`).
 
 Respuesta: `{ companyId, created, adminEmail, temporaryPassword | null, apiKey | null, branches[], paidUntil }`.
 La clave temporal y la API key solo viajan una vez.

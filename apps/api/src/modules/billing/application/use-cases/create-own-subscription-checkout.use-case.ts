@@ -1,4 +1,5 @@
 import { getTenantContext } from "../../../../shared/context/request-context";
+import { isCajaproComboPlan } from "../../../partner-api/application/use-cases/provision-partner-account.use-case";
 import { NotFoundError, ValidationError } from "../../../../shared/errors/app-error";
 import type { CreateSubscriptionCheckoutUseCase } from "../../../saas-admin/application/use-cases/create-subscription-checkout.use-case";
 import type { IPlanRepository } from "../../../saas-admin/domain/plan.repository";
@@ -35,7 +36,7 @@ export class CreateOwnSubscriptionCheckoutUseCase {
     // El combo lo cobra Cajapro: un link de pago de Contapro le cobraria dos veces lo mismo. Solo si
     // ya quedo suspendida (Cajapro dejo de pagarlo) puede elegir y pagar un plan propio de Contapro.
     const currentPlan = await this.planRepo.findByIdOrThrow(subscription.planId);
-    if (currentPlan.code === "COMBO_CAJAPRO" && subscription.status !== "SUSPENDED") {
+    if (isCajaproComboPlan(currentPlan.code) && subscription.status !== "SUSPENDED") {
       throw new ValidationError("Su plan de Contapro viene en el combo de Cajapro: se paga desde Cajapro");
     }
 

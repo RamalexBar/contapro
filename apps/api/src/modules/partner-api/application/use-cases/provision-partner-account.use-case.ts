@@ -4,15 +4,20 @@ import { hashSecret } from "../../../auth/infrastructure/password-hasher.service
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IPartnerAccountRepository, Partner, PartnerPlanDefinition } from "../../domain/partner-account.repository";
 
-/** El plan de Contapro que trae el combo de Cajapro: lo mismo que el Plan Emprendedor (1 sede,
- * 3 usuarios, 150 documentos DIAN al mes), pero sin precio propio -- lo cobra Cajapro. */
-export const CAJAPRO_COMBO_PLAN: PartnerPlanDefinition = {
-  code: "COMBO_CAJAPRO",
-  name: "Combo Cajapro",
-  maxBranches: 1,
-  maxUsers: 3,
-  maxElectronicDocumentsPerMonth: 150,
+/** Tamaño del Contapro que trae cada plan de Cajapro (lo escoge el proveedor en Cajapro → Planes). */
+export type CajaproComboTier = "EMPRENDEDOR" | "PYME" | "PLUS";
+
+/** Los planes de Contapro que trae el combo de Cajapro: los mismos limites de los planes propios
+ * (Emprendedor, Pyme, Plus), pero sin precio -- los cobra Cajapro. El codigo de todos empieza por
+ * `COMBO_CAJAPRO` (el Emprendedor conserva el codigo original, que ya tienen las empresas creadas). */
+export const CAJAPRO_COMBO_PLANS: Record<CajaproComboTier, PartnerPlanDefinition> = {
+  EMPRENDEDOR: { code: "COMBO_CAJAPRO", name: "Combo Cajapro Emprendedor", maxBranches: 1, maxUsers: 3, maxElectronicDocumentsPerMonth: 150 },
+  PYME: { code: "COMBO_CAJAPRO_PYME", name: "Combo Cajapro Pyme", maxBranches: 3, maxUsers: 10, maxElectronicDocumentsPerMonth: 350 },
+  PLUS: { code: "COMBO_CAJAPRO_PLUS", name: "Combo Cajapro Plus", maxBranches: 10, maxUsers: 50, maxElectronicDocumentsPerMonth: 650 },
 };
+
+/** Todos los planes del combo empiezan asi: se cobran en Cajapro, nunca en Contapro. */
+export const isCajaproComboPlan = (code: string) => code.startsWith("COMBO_CAJAPRO");
 
 /** Lo que Cajapro usa de la API publica: facturas, cierres de turno, compras, pagos a proveedores
  * y gastos (ver modules/public-api/README.md, "Conexion con Cajapro"). */
@@ -39,6 +44,8 @@ export interface ProvisionPartnerAccountInput {
   paidUntil: Date;
   /** Prueba gratis del paquete: la empresa queda en TRIALING hasta `paidUntil` y vence sola si no paga. */
   trial?: boolean;
+  /** Tamaño del Contapro segun el plan de Cajapro (por defecto Emprendedor). */
+  tier?: CajaproComboTier;
   /** Pedir una API key nueva (la anterior se revoca). Una cuenta nueva siempre recibe una. */
   issueApiKey: boolean;
 }
@@ -113,7 +120,7 @@ export class ProvisionPartnerAccountUseCase {
       account = await this.repo.create({ partner: input.partner, externalId: input.externalId, companyId });
     }
 
-    const planId = await this.repo.ensurePlan(CAJAPRO_COMBO_PLAN);
+    const planId = await this.repo.ensurePlan(CAJAPRO_COMBO_PLANS[input.tier ?? "EMPRENDEDOR"]);
     // Una prueba nunca pisa un plan pagado (el propio de Contapro o el combo ya pagado): solo conecta.
     const latest = input.trial ? await this.repo.findLatestSubscription(account.companyId) : null;
     const paying = !!latest && ["ACTIVE", "GRACE_PERIOD"].includes(latest.status) && latest.planCode !== "TRIAL";
@@ -148,7 +155,7 @@ export class ProvisionPartnerAccountUseCase {
       action: "PARTNER_ACCOUNT_PROVISIONED",
       entityType: "PartnerAccount",
       entityId: account.id,
-      description: `${input.partner} ${created ? "creo la empresa" : input.trial ? "conecto la prueba" : "renovo el paquete"}: ${input.trial ? "prueba gratis" : "pagado"} hasta ${input.paidUntil.toISOString().slice(0, 10)}${paying ? " (sin tocar su plan pagado)" : ""}${apiKey ? ", API key nueva" : ""}`,
+      description: `${input.partner} ${created ? "creo la empresa" : input.trial ? "conecto la prueba" : "renovo el paquete"}: ${input.trial ? "prueba gratis" : "pagado"} hasta ${input.paidUntil.toISOString().slice(0, 10)}, ${CAJAPRO_COMBO_PLANS[input.tier ?? "EMPRENDEDOR"].name}${paying ? " (sin tocar su plan pagado)" : ""}${apiKey ? ", API key nueva" : ""}`,
     });
 
     return {

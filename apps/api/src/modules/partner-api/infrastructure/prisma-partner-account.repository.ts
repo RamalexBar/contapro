@@ -103,7 +103,7 @@ export class PrismaPartnerAccountRepository implements IPartnerAccountRepository
         maxElectronicDocumentsPerMonth: plan.maxElectronicDocumentsPerMonth,
         features: { billedBy: "CAJAPRO" },
       },
-      update: {},
+      update: { name: plan.name },
       select: { id: true },
     });
     return row.id;

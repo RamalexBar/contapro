@@ -27,4 +27,6 @@ export const provisionPartnerAccountSchema = z.object({
   issueApiKey: z.boolean().default(false),
   // Prueba gratis del combo: Contapro conectado mientras dura la prueba de Cajapro
   trial: z.boolean().default(false),
+  // Tamaño del Contapro que trae el plan de Cajapro
+  tier: z.enum(["EMPRENDEDOR", "PYME", "PLUS"]).default("EMPRENDEDOR"),
 });

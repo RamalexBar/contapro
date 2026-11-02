@@ -11,7 +11,7 @@ import type {
   PartnerPlanDefinition,
   PartnerSubscriptionData,
 } from "../../domain/partner-account.repository";
-import { CAJAPRO_API_KEY_SCOPES, ProvisionPartnerAccountUseCase, type ProvisionPartnerAccountInput } from "./provision-partner-account.use-case";
+import { CAJAPRO_API_KEY_SCOPES, isCajaproComboPlan, ProvisionPartnerAccountUseCase, type ProvisionPartnerAccountInput } from "./provision-partner-account.use-case";
 
 class FakePartnerRepo implements IPartnerAccountRepository {
   accounts: PartnerAccountRecord[] = [];
@@ -173,6 +173,22 @@ describe("ProvisionPartnerAccountUseCase", () => {
 
     expect(result.apiKey).toMatch(/^pk_live_/);
     expect(repo.subscriptions).toEqual([ownPlan]);
+  });
+
+
+  it("gives the Contapro size that comes with the Cajapro plan, and moves it when the plan changes", async () => {
+    const repo = new FakePartnerRepo();
+    const useCase = new ProvisionPartnerAccountUseCase(repo, audit);
+
+    await useCase.execute(input({ tier: "PYME" }));
+    expect(repo.plans.map((p) => p.code)).toEqual(["COMBO_CAJAPRO_PYME"]);
+    expect(repo.plans[0]).toMatchObject({ maxBranches: 3, maxUsers: 10, maxElectronicDocumentsPerMonth: 350 });
+    expect(repo.subscriptions[0].planId).toBe("plan-COMBO_CAJAPRO_PYME");
+
+    await useCase.execute(input({ tier: "PLUS" }));
+    expect(repo.subscriptions[0].planId).toBe("plan-COMBO_CAJAPRO_PLUS");
+    expect(repo.plans.find((p) => p.code === "COMBO_CAJAPRO_PLUS")).toMatchObject({ maxBranches: 10, maxUsers: 50, maxElectronicDocumentsPerMonth: 650 });
+    expect(isCajaproComboPlan("COMBO_CAJAPRO_PLUS") && isCajaproComboPlan("COMBO_CAJAPRO") && !isCajaproComboPlan("PYME")).toBe(true);
   });
 
 });

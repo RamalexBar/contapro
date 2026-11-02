@@ -1,4 +1,5 @@
 import { getTenantContext } from "../../../../shared/context/request-context";
+import { isCajaproComboPlan } from "../../../partner-api/application/use-cases/provision-partner-account.use-case";
 import { NotFoundError } from "../../../../shared/errors/app-error";
 import type { IPlanRepository, PlanRecord } from "../../../saas-admin/domain/plan.repository";
 import type { ISubscriptionRepository, SubscriptionRecord } from "../../../saas-admin/domain/subscription.repository";
@@ -35,8 +36,8 @@ export class GetOwnSubscriptionUseCase {
     return {
       subscription,
       plan,
-      // COMBO_CAJAPRO tampoco: solo lo asigna Cajapro al cobrar su paquete (modules/partner-api).
-      availablePlans: allPlans.filter((p) => p.code !== "TRIAL" && p.code !== "COMBO_CAJAPRO" && p.isActive),
+      // Los COMBO_CAJAPRO* tampoco: solo lo asigna Cajapro al cobrar su paquete (modules/partner-api).
+      availablePlans: allPlans.filter((p) => p.code !== "TRIAL" && !isCajaproComboPlan(p.code) && p.isActive),
     };
   }
 }
