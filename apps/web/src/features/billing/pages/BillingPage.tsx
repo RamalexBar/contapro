@@ -18,6 +18,8 @@ import {
   type PlanRecord,
 } from "../api/billing.api";
 import { fetchAcceptanceToken, isWompiConfigured, tokenizeCard, WompiError } from "../lib/wompi";
+import { getDianProviderSettings } from "../../integrations/api/integrations.api";
+import { EinvoiceActivationCard } from "../components/EinvoiceActivationCard";
 
 const STATUS_LABELS: Record<string, string> = {
   TRIALING: "Periodo de prueba",
@@ -205,6 +207,16 @@ export function BillingPage() {
   }
 
   const isCombo = data?.plan.code === "COMBO_CAJAPRO";
+  // Mismo criterio que Panel → Empresas «Pendientes por activar facturación electrónica». El combo factura por Cajapro.
+  const paidAndCurrent =
+    !!data && data.plan.code !== "TRIAL" && !isCombo && (data.subscription.status === "ACTIVE" || data.subscription.status === "GRACE_PERIOD");
+  const { data: dianProvider } = useQuery({
+    queryKey: ["dian-provider-settings"],
+    queryFn: getDianProviderSettings,
+    enabled: paidAndCurrent,
+    retry: false,
+  });
+  const needsEinvoiceActivation = paidAndCurrent && !!dianProvider && dianProvider.provider !== "FACTUS";
 
   return (
     <AppLayout>
@@ -214,6 +226,8 @@ export function BillingPage() {
 
       {data && (
         <>
+          {needsEinvoiceActivation && <EinvoiceActivationCard />}
+
           <Card className="mb-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>

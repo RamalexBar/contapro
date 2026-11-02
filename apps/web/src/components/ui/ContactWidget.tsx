@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Mail, MessageCircle, X } from "lucide-react";
 import { trackEvent } from "../../lib/analytics";
 
-const WHATSAPP_NUMBER = "573008453690"; // 57 = Colombia, sin espacios/guiones para el link wa.me
+export const WHATSAPP_NUMBER = "573008453690"; // 57 = Colombia, sin espacios/guiones para el link wa.me
 const EMAIL = "contaprocontabilidad@gmail.com";
 const INSTAGRAM_HANDLE = "contaprocontabilidad";
 
