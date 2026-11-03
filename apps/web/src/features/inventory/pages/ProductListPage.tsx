@@ -28,6 +28,7 @@ import { BrandsSection } from "../components/BrandsSection";
 import { BranchStockSection } from "../components/BranchStockSection";
 import { StockMovementsSection } from "../components/StockMovementsSection";
 import { KardexSection } from "../components/KardexSection";
+import { ProductPhotoCell } from "../components/ProductPhoto";
 import { ProductImportCard } from "../components/ProductImportCard";
 
 function ProductsSection() {
@@ -165,6 +166,7 @@ function ProductsSection() {
           <Table>
             <TableHead>
               <tr>
+                <Th>Foto</Th>
                 <Th>SKU</Th>
                 <Th>Nombre</Th>
                 <Th>Ubicacion</Th>
@@ -179,6 +181,9 @@ function ProductsSection() {
             <TableBody>
               {data?.data.map((p) => (
                 <TableRow key={p.id}>
+                  <Td>
+                    <ProductPhotoCell productId={p.id} name={p.name} photoPath={p.photoPath} canEdit={canUpdate} />
+                  </Td>
                   <Td className="font-medium text-slate-900">{p.sku}</Td>
                   <Td>{p.name}</Td>
                   <Td>

@@ -61,6 +61,7 @@ model Product {
   updatedAt     DateTime   @updatedAt
 
   images         ProductImage[]
+  photo          ProductPhoto?
   barcodes       Barcode[]
   presentations  ProductPresentation[]
   branchStocks   ProductBranchStock[]
@@ -81,6 +82,21 @@ model ProductImage {
   order     Int     @default(0)
 
   @@map("product_images")
+}
+
+/// La foto del producto (una por producto), guardada en la base: pesa ~30-40 KB porque el navegador la achica
+/// antes de subirla. Tabla aparte para que la lista de productos no cargue los bytes: la foto se pide por su
+/// direccion firmada (ver modules/inventory/product/README.md, "Foto del producto").
+model ProductPhoto {
+  productId String   @id
+  product   Product  @relation(fields: [productId], references: [id])
+  companyId String
+  mimeType  String
+  data      Bytes
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("product_photos")
 }
 
 model Barcode {

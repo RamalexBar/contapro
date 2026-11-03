@@ -30,6 +30,8 @@ export interface ProductListItem {
   taxRate: number;
   isActive: boolean;
   barcodes: string[];
+  /** Fecha de la foto (null = sin foto); ListProductsUseCase la vuelve la direccion firmada. */
+  photoUpdatedAt: Date | null;
 }
 
 export interface IProductRepository {

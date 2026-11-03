@@ -127,7 +127,8 @@ export class PrismaProductRepository implements IProductRepository {
         isActive: true,
         ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
       },
-      include: { barcodes: true },
+      // De la foto solo la fecha: los bytes se piden aparte, por su direccion firmada
+      include: { barcodes: true, photo: { select: { updatedAt: true } } },
       orderBy: { name: "asc" },
       take: 100,
     });
@@ -143,6 +144,7 @@ export class PrismaProductRepository implements IProductRepository {
       taxRate: Number(row.taxRate),
       isActive: row.isActive,
       barcodes: row.barcodes.map((b) => b.code),
+      photoUpdatedAt: row.photo?.updatedAt ?? null,
     }));
   }
 

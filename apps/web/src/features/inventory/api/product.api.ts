@@ -1,5 +1,5 @@
 import type { CreateProductInput, ImportProductsResult, UpdateProductInput } from "@erp/shared-types";
-import { apiFetch } from "../../../lib/api-client";
+import { apiFetch, BASE_URL } from "../../../lib/api-client";
 
 export interface ProductListItem {
   id: string;
@@ -14,6 +14,8 @@ export interface ProductListItem {
   taxRate: number;
   isActive: boolean;
   barcodes: string[];
+  /** Direccion firmada de la foto (relativa a la API), o null si no tiene. Ver productPhotoUrl. */
+  photoPath: string | null;
 }
 
 // No extiende ProductListItem: GET /products/:id (ProductResponseDto en el backend) nunca
@@ -31,6 +33,19 @@ export interface ProductDetail {
   currentPrice: number;
   taxRate: number;
   isActive: boolean;
+}
+
+/** La foto se pide a la API (otro dominio que la web) por su direccion firmada: sirve directo en un <img>. */
+export function productPhotoUrl(photoPath: string): string {
+  return `${BASE_URL}${photoPath}`;
+}
+
+export function setProductPhoto(id: string, dataUrl: string): Promise<{ photoPath: string }> {
+  return apiFetch(`/products/${id}/photo`, { method: "PUT", body: { dataUrl } });
+}
+
+export function removeProductPhoto(id: string): Promise<void> {
+  return apiFetch(`/products/${id}/photo`, { method: "DELETE" });
 }
 
 export function listProducts(search?: string): Promise<{ data: ProductListItem[] }> {

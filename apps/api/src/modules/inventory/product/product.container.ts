@@ -10,10 +10,17 @@ import { ImportProductsUseCase } from "./application/use-cases/import-products.u
 import { PrismaCategoryRepository } from "../category/infrastructure/prisma-category.repository";
 import { ListProductsUseCase } from "./application/use-cases/list-products.use-case";
 import { ProductController } from "./interfaces/product.controller";
+import { env } from "../../../config/env";
+import { PhotoUrlSigner } from "./application/photo-url-signer";
+import { RemoveProductPhotoUseCase, ServeProductPhotoUseCase, SetProductPhotoUseCase } from "./application/use-cases/product-photo.use-cases";
+import { PrismaProductPhotoRepository } from "./infrastructure/prisma-product-photo.repository";
+import { ProductPhotoController } from "./interfaces/product-photo.controller";
 
 const productRepo = new PrismaProductRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 const createProductUseCase = new CreateProductUseCase(productRepo, auditService);
+const photoRepo = new PrismaProductPhotoRepository();
+const photoSigner = new PhotoUrlSigner(env.JWT_ACCESS_SECRET);
 
 export const productController = new ProductController(
   productRepo,
@@ -22,8 +29,15 @@ export const productController = new ProductController(
   new UpdateProductPriceUseCase(productRepo, auditService),
   new UpdateProductBarcodeUseCase(productRepo, auditService),
   new DeleteProductUseCase(productRepo, auditService),
-  new ListProductsUseCase(productRepo),
+  new ListProductsUseCase(productRepo, photoSigner),
   new ImportProductsUseCase(productRepo, new PrismaCategoryRepository(), createProductUseCase)
+);
+
+/** Foto del producto: subir/quitar (con sesion) y servir por su direccion firmada (sin sesion). */
+export const productPhotoController = new ProductPhotoController(
+  new SetProductPhotoUseCase(productRepo, photoRepo, photoSigner),
+  new RemoveProductPhotoUseCase(productRepo, photoRepo),
+  new ServeProductPhotoUseCase(photoRepo, photoSigner)
 );
 
 // createProductUseCase se exporta para Registrar compra (suppliers): crea los productos nuevos que trae la factura.

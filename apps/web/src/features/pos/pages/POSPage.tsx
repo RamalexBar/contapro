@@ -9,6 +9,7 @@ import { Select } from "../../../components/ui/Select";
 import { Alert } from "../../../components/ui/Alert";
 import { ApiError } from "../../../lib/api-client";
 import { listProducts } from "../../inventory/api/product.api";
+import { ProductThumb } from "../../inventory/components/ProductPhoto";
 import { getActiveSession, listCashRegisters } from "../../cash/api/cash.api";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { authorizeDiscount, createSale, listSaleWhatsAppDeliveries, printThermalReceipt, resendSaleWhatsApp, type SaleResponse } from "../api/sale.api";
@@ -269,9 +270,12 @@ export function POSPage() {
                 onClick={() => addToCart(p)}
                 className="flex w-full items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-left text-sm transition-colors hover:border-brand-200 hover:bg-brand-50"
               >
-                <span className="flex flex-col">
-                  <span className="text-slate-800">{p.name}</span>
-                  {p.location && <span className="text-xs text-slate-500">📍 {p.location}</span>}
+                <span className="flex items-center gap-2">
+                  {p.photoPath && <ProductThumb photoPath={p.photoPath} name={p.name} size={36} />}
+                  <span className="flex flex-col">
+                    <span className="text-slate-800">{p.name}</span>
+                    {p.location && <span className="text-xs text-slate-500">📍 {p.location}</span>}
+                  </span>
                 </span>
                 <span className="font-medium text-slate-500">{formatCOP(resolvePrice(p.id, p.currentPrice))}</span>
               </button>

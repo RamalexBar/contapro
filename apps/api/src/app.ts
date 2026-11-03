@@ -11,7 +11,7 @@ import { rbacRouter } from "./modules/rbac/interfaces/rbac.routes";
 import { branchesRouter } from "./modules/branches/interfaces/branches.routes";
 import { categoryRouter } from "./modules/inventory/category/interfaces/category.routes";
 import { brandRouter } from "./modules/inventory/brand/interfaces/brand.routes";
-import { productRouter } from "./modules/inventory/product/interfaces/product.routes";
+import { productPhotoPublicRouter, productRouter } from "./modules/inventory/product/interfaces/product.routes";
 import { priceListRouter } from "./modules/inventory/price-list/interfaces/price-list.routes";
 import { stockRouter } from "./modules/inventory/stock/interfaces/stock.routes";
 import { saleRouter } from "./modules/pos/sale/interfaces/sale.routes";
@@ -81,6 +81,8 @@ app.use("/api", collectionsWebhookRouter);
 app.use("/api", publicApiRouter);
 // Mismo motivo: el alta de empresas desde Cajapro (combo) se autentica con la llave del aliado.
 app.use("/api", partnerApiRouter);
+// Fotos de productos: sin sesion (direccion firmada), antes de los routers que exigen sesion.
+app.use("/api", productPhotoPublicRouter);
 app.use("/api", rbacRouter);
 app.use("/api", branchesRouter);
 app.use("/api", categoryRouter);
