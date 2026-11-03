@@ -15,7 +15,11 @@ subirla (`apps/web/src/features/inventory/components/ProductPhoto.tsx`): queda e
   cambia cuando cambia la foto, se sirve con `Cache-Control: public, max-age=31536000, immutable`. La web esta en otro
   dominio que la API, por eso `Cross-Origin-Resource-Policy: cross-origin`.
 - Se ve en Inventario → Productos (columna Foto: clic para poner o cambiar, «Quitar») y en el punto de venta.
-- Pendiente: la app movil y las cotizaciones en PDF todavia no la muestran. Si algun dia pesa demasiado en la base,
+- **Cotizacion en PDF** (2026-11-03): cada renglon lleva la miniatura de la foto a la izquierda del nombre
+  (`shared/pdf/simple-document-renderer.ts`, `image` opcional por renglon; solo JPG/PNG, otro formato se omite). La
+  cotizacion pide las fotos de sus productos de una vez (`IProductPhotoRepository.findMany`, exportado como
+  `productPhotoRepo`). Una fila con foto no se parte entre dos hojas.
+- Pendiente: la app movil todavia no la muestra. Si algun dia pesa demasiado en la base,
   se puede pasar a un servicio de archivos cambiando solo `PrismaProductPhotoRepository` y la ruta que la sirve.
 
 Verificado en vivo (local): una imagen de 900×600 subida desde la lista quedo de 400×267 y 7 KB, se ve en la lista

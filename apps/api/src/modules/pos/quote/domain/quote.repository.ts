@@ -26,6 +26,7 @@ export interface QuoteRecord {
 }
 
 export interface QuoteItemDetail {
+  productId: string;
   productName: string;
   quantity: number;
   unitPrice: number;

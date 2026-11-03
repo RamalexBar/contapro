@@ -80,6 +80,7 @@ export class PrismaQuoteRepository implements IQuoteRepository {
       priceListId: row.priceListId,
       customerName: customer?.name ?? null,
       items: row.items.map((item) => ({
+        productId: item.productId,
         productName: productName(item.productId),
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),

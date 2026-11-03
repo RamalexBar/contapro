@@ -20,6 +20,8 @@ const productRepo = new PrismaProductRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 const createProductUseCase = new CreateProductUseCase(productRepo, auditService);
 const photoRepo = new PrismaProductPhotoRepository();
+/** Lo usa la cotizacion (pos/quote) para poner la foto de cada producto en su PDF. */
+export const productPhotoRepo = photoRepo;
 const photoSigner = new PhotoUrlSigner(env.JWT_ACCESS_SECRET);
 
 export const productController = new ProductController(

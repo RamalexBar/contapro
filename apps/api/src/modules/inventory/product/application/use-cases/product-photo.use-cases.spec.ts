@@ -25,6 +25,8 @@ function photoRepo() {
     },
     remove: async (productId) => void store.delete(productId),
     findForServing: async (productId) => store.get(productId) ?? null,
+    findMany: async (companyId, ids) =>
+      new Map([...store].filter(([id, p]) => p.companyId === companyId && ids.includes(id)).map(([id, p]) => [id, p.data])),
   };
   return { repo, store };
 }

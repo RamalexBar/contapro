@@ -21,6 +21,12 @@ export class PrismaProductPhotoRepository implements IProductPhotoRepository {
     await basePrisma.productPhoto.deleteMany({ where: { productId } });
   }
 
+  async findMany(companyId: string, productIds: string[]): Promise<Map<string, Buffer>> {
+    if (!productIds.length) return new Map();
+    const rows = await basePrisma.productPhoto.findMany({ where: { companyId, productId: { in: productIds } }, select: { productId: true, data: true } });
+    return new Map(rows.map((r) => [r.productId, Buffer.from(r.data)]));
+  }
+
   async findForServing(productId: string) {
     const row = await basePrisma.productPhoto.findUnique({ where: { productId } });
     return row ? { mimeType: row.mimeType, data: Buffer.from(row.data), updatedAt: row.updatedAt } : null;

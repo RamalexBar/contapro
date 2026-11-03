@@ -8,12 +8,14 @@ import { renderSimpleDocumentPdf } from "../../../../shared/pdf/simple-document-
 import type { CreateQuoteUseCase } from "../application/use-cases/create-quote.use-case";
 import type { ListQuotesUseCase } from "../application/use-cases/list-quotes.use-case";
 import type { IQuoteRepository } from "../domain/quote.repository";
+import type { IProductPhotoRepository } from "../../../inventory/product/domain/product-photo.repository";
 
 export class QuoteController {
   constructor(
     private readonly createUseCase: CreateQuoteUseCase,
     private readonly listUseCase: ListQuotesUseCase,
-    private readonly quoteRepo: IQuoteRepository
+    private readonly quoteRepo: IQuoteRepository,
+    private readonly photoRepo: IProductPhotoRepository
   ) {}
 
   create = async (req: Request, res: Response, next: NextFunction) => {
@@ -39,6 +41,9 @@ export class QuoteController {
       const company = await basePrisma.company.findFirst({ where: { id: getTenantContext().companyId } });
       if (!company) throw new NotFoundError("Company", getTenantContext().companyId);
 
+      // La foto de cada producto, si tiene (se la muestra al cliente junto al nombre)
+      const photos = await this.photoRepo.findMany(company.id, quote.items.map((i) => i.productId));
+
       const pdf = await renderSimpleDocumentPdf({
         company: { name: company.name, nit: company.nit },
         title: "Cotizacion",
@@ -48,6 +53,7 @@ export class QuoteController {
           { label: "Valida hasta", value: quote.validUntil.toISOString().slice(0, 10) },
         ],
         items: quote.items.map((item) => ({
+          image: photos.get(item.productId),
           description: item.productName,
           quantity: String(item.quantity),
           unitPrice: formatCOP(item.unitPrice),

@@ -12,6 +12,13 @@ import PDFDocument from "pdfkit";
  */
 
 const PAGE_MARGIN = 50;
+const THUMB = 40;
+const THUMB_GAP = 8;
+
+/** pdfkit solo dibuja JPG y PNG: una foto en otro formato (ej. WEBP) se omite en vez de romper el PDF. */
+function isJpegOrPng(buf: Buffer) {
+  return (buf[0] === 0xff && buf[1] === 0xd8) || (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47);
+}
 
 export interface SimpleDocumentPdfField {
   label: string;
@@ -19,6 +26,8 @@ export interface SimpleDocumentPdfField {
 }
 
 export interface SimpleDocumentPdfItem {
+  /** Miniatura opcional (JPG o PNG) a la izquierda de la descripcion, ej. la foto del producto en una cotizacion. */
+  image?: Buffer;
   description: string;
   quantity?: string;
   unitPrice?: string;
@@ -66,6 +75,9 @@ export async function renderSimpleDocumentPdf(data: SimpleDocumentPdfData): Prom
 
   if (data.items && data.items.length > 0) {
     const hasQuantityColumn = data.items.some((i) => i.quantity !== undefined);
+    // Con fotos, todas las descripciones se corren a la derecha de la miniatura (alineadas aunque alguna no tenga)
+    const withImages = data.items.some((i) => i.image && isJpegOrPng(i.image));
+    const textOffset = withImages ? THUMB + THUMB_GAP : 0;
     const colDesc = PAGE_MARGIN;
     const colQty = PAGE_MARGIN + pageWidth * (hasQuantityColumn ? 0.5 : 1);
     const colPrice = PAGE_MARGIN + pageWidth * (hasQuantityColumn ? 0.65 : 1);
@@ -86,10 +98,15 @@ export async function renderSimpleDocumentPdf(data: SimpleDocumentPdfData): Prom
 
     doc.font("Helvetica").fontSize(9);
     for (const item of data.items) {
+      // Una fila con foto no se parte entre dos hojas
+      if (withImages && doc.y + THUMB > doc.page.height - doc.page.margins.bottom) doc.addPage();
       const rowY = doc.y;
-      doc.text(item.description, colDesc, rowY, { width: colQty - colDesc });
-      // Una descripcion de varias lineas (nombre largo, ubicacion) empuja la fila siguiente.
-      const descriptionBottom = doc.y;
+      if (item.image && isJpegOrPng(item.image)) {
+        doc.image(item.image, colDesc, rowY, { fit: [THUMB, THUMB], align: "center" });
+      }
+      doc.text(item.description, colDesc + textOffset, rowY, { width: colQty - colDesc - textOffset });
+      // Una descripcion de varias lineas (nombre largo) o la foto empujan la fila siguiente.
+      const descriptionBottom = Math.max(doc.y, withImages ? rowY + THUMB : 0);
       if (hasQuantityColumn) {
         doc.text(item.quantity ?? "-", colQty, rowY, { width: colPrice - colQty, align: "right" });
         doc.text(item.unitPrice ?? "-", colPrice, rowY, { width: colAmount - colPrice, align: "right" });
