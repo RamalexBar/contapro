@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: "/admin/plans", label: "Planes" },
   { to: "/admin/subscriptions", label: "Suscripciones" },
   { to: "/admin/companies", label: "Empresas" },
+  { to: "/admin/messages", label: "Mensajes" },
   { to: "/admin/admins", label: "Administradores" },
 ];
 

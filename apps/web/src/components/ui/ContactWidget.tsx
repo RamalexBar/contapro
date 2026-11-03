@@ -3,7 +3,7 @@ import { Mail, MessageCircle, X } from "lucide-react";
 import { trackEvent } from "../../lib/analytics";
 
 export const WHATSAPP_NUMBER = "573008453690"; // 57 = Colombia, sin espacios/guiones para el link wa.me
-const EMAIL = "contaprocontabilidad@gmail.com";
+export const EMAIL = "contaprocontabilidad@gmail.com";
 const INSTAGRAM_HANDLE = "contaprocontabilidad";
 
 function InstagramIcon({ size }: { size: number }) {

@@ -36,6 +36,7 @@ import { manualInvoicingRouter } from "./modules/manual-invoicing/interfaces/man
 import { syncRouter } from "./modules/sync/interfaces/sync.routes";
 import { billingRouter } from "./modules/billing/interfaces/billing.routes";
 import { collectionsRouter } from "./modules/collections/interfaces/collections.routes";
+import { contactRouter } from "./modules/contact/interfaces/contact.routes";
 import { collectionsWebhookRouter } from "./modules/collections/interfaces/collections-webhook.routes";
 import { opportunityRouter } from "./modules/crm/opportunity/interfaces/opportunity.routes";
 import { recurringInvoiceRouter } from "./modules/recurring-invoices/interfaces/recurring-invoice.routes";
@@ -72,6 +73,8 @@ app.use("/api", authRouter);
 // shared/middlewares/require-platform-admin.middleware.ts), tiene que montarse antes de que un
 // router tenant-scoped tenga la oportunidad de interceptarlo.
 app.use("/api", saasAdminRouter);
+// Formulario de contacto (publico) y su listado del panel: sin sesion de empresa, antes de los routers con sesion.
+app.use("/api", contactRouter);
 // Mismo motivo que saasAdminRouter arriba: el webhook de Wompi para cobranza (item 31) no lleva
 // JWT/tenant context, tiene que montarse antes de que un router tenant-scoped lo intercepte.
 app.use("/api", collectionsWebhookRouter);

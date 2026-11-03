@@ -109,6 +109,27 @@ export interface CompanyWithSubscriptionRecord {
   factusActivationRequestedAt: string | null;
 }
 
+/** Mensajes del formulario de contacto de contapro.com.co. */
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  message: string;
+  source: string;
+  createdAt: string;
+  handledAt: string | null;
+}
+
+export function listContactMessages(): Promise<{ data: ContactMessage[] }> {
+  return platformApiFetch("/admin/contact-messages");
+}
+
+export function setContactMessageHandled(id: string, handled: boolean): Promise<void> {
+  return platformApiFetch(`/admin/contact-messages/${id}/handled`, { method: "PATCH", body: { handled } });
+}
+
 export function listCompanies(): Promise<{ data: CompanyWithSubscriptionRecord[] }> {
   return platformApiFetch("/admin/companies");
 }

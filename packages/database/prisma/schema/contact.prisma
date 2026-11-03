@@ -1,0 +1,20 @@
+/// Mensajes del formulario de contacto de contapro.com.co (personas interesadas, no clientes todavia): no
+/// pertenecen a ninguna empresa. Llegan por correo al equipo y quedan en el panel de plataforma.
+model ContactMessage {
+  id        String    @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  company   String?
+  message   String
+  /// Desde donde se envio, ej. "landing"
+  source    String    @default("landing")
+  ipAddress String?
+  createdAt DateTime  @default(now())
+  /// Cuando alguien del equipo lo marco como atendido (y quien)
+  handledAt DateTime?
+  handledBy String?
+
+  @@index([createdAt])
+  @@map("contact_messages")
+}

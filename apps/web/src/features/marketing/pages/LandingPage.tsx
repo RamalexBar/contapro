@@ -19,6 +19,7 @@ import { formatCOP } from "@erp/shared-utils";
 import { Button } from "../../../components/ui/Button";
 import { Logo } from "../../../components/ui/Logo";
 import { WhatsAppLink, hasWhatsApp } from "../components/WhatsAppButton";
+import { ContactForm } from "../components/ContactForm";
 
 const FEATURES = [
   { icon: ShoppingCart, title: "POS y ventas", desc: "Punto de venta rápido, cotizaciones, notas crédito/débito y devoluciones." },
@@ -392,6 +393,8 @@ export function LandingPage() {
           ¿Prefieres que te lo mostremos? Escríbenos por WhatsApp
         </WhatsAppLink>
       </section>
+
+      <ContactForm />
 
       <footer className="border-t border-slate-100 py-8 text-center text-xs text-slate-400">
         <Logo heightClassName="h-6" className="mb-2" />
