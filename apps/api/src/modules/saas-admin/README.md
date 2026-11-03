@@ -291,6 +291,29 @@ El mismo problema (misma `key`: ruta + mensaje, o proceso + empresa) se avisa un
 mas de 20 correos por hora. Si el correo falla, queda en el log y no frena nada. Sin las variables no envia
 nada. Probar desde la Shell de contapro-api: `node apps/api/scripts/probar-aviso.cjs`.
 
+## Archivar y borrar empresas (2026-11-02)
+
+Panel → Empresas (`PATCH /admin/companies/:id/archived { archived }`, `DELETE /admin/companies/:id { confirmName }`,
+`interfaces/company-admin.controller.ts`, `application/use-cases/company-admin.use-cases.ts`).
+
+- **Archivar** = `Company.isActive = false`. Nadie entra: `issueSession` (login con clave y enlace de Cajapro) y
+  `RefreshTokenUseCase` revisan `companyIsActive`; las API keys de esa empresa dejan de valer
+  (`findByHashCrossTenant`); no sale en el selector de empresas del login. El ciclo de vida, los recordatorios y el
+  cobro automatico ignoran empresas inactivas. **No se toca la suscripcion**: reactivar la deja exactamente como
+  estaba. Auditoria: `COMPANY_ARCHIVED` / `COMPANY_REACTIVATED`. La lista oculta las archivadas («Ver archivadas»).
+- **Borrar definitivamente**: solo archivadas y con el nombre exacto. `PrismaCompanyAdminRepository.deleteCompletely`
+  parte de TODAS las tablas con columna `companyId` (63 de 67 no tienen llave foranea hacia `companies`: el
+  aislamiento es por columna) y sigue las llaves foraneas hacia abajo, mas dos enlaces sin llave declarados en
+  `IMPLICIT_FKS` (`account_receivable_reminder_logs`, `sync_conflict_logs`). Seguro: si una fila marcada tiene
+  `companyId` de otra empresa, no borra nada. Borra de abajo hacia arriba con savepoints. La auditoria de la empresa
+  se va con ella, asi que el registro del borrado (quien, cuantas filas) llega al correo de avisos
+  (`operationalAlerts`). Si la empresa venia del combo de Cajapro y alla se renueva, Cajapro la vuelve a crear.
+- Si se agrega una tabla con una columna que apunta a otra **sin** llave foranea y sin `companyId`, hay que
+  sumarla a `IMPLICIT_FKS` o quedaria suelta al borrar.
+
+Verificado en vivo: ensayo con rollback sobre la empresa demo (988 filas, 0 con su `companyId` despues, 0 sueltas)
+y archivar → login 401 «archivada» → borrar con nombre exacto en el navegador.
+
 ## Que falta implementar
 
 1. Verificacion end-to-end de WhatsApp contra la API real de Meta — ver
