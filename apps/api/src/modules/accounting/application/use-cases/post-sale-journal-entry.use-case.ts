@@ -30,6 +30,9 @@ const STANDARD_ACCOUNTS = {
   inventario: { code: "1435", name: "Inventarios - mercancias no fabricadas por la empresa", type: "ASSET" as const },
 };
 
+/** Donde queda la retencion de IVA que un cliente le practica a la empresa (la lee el Resumen de IVA). */
+export const VAT_WITHHELD_FROM_US_ACCOUNT_CODE = STANDARD_ACCOUNTS.anticipoReteiva.code;
+
 const WITHHOLDING_ACCOUNT_KEY: Record<WithholdingType, "anticipoRetefuente" | "anticipoReteica" | "anticipoReteiva"> = {
   RETEFUENTE: "anticipoRetefuente",
   RETEICA: "anticipoReteica",

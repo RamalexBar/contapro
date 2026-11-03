@@ -99,11 +99,24 @@ export function VatSummaryReport({ branchId }: { branchId?: string }) {
               <p className="text-sm text-slate-500">IVA descontable y devoluciones</p>
               <p className="text-lg font-semibold text-slate-900">{formatCOP(data.deductible)}</p>
             </div>
-            <div className={`rounded-lg p-3 ${data.balance > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
-              <p className="text-sm text-slate-600">{data.balance >= 0 ? "IVA a pagar a la DIAN" : "Saldo a favor"}</p>
-              <p className="text-lg font-semibold text-slate-900">{formatCOP(Math.abs(data.balance))}</p>
+            <div className={`rounded-lg p-3 ${data.toPay > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
+              <p className="text-sm text-slate-600">{data.toPay >= 0 ? "IVA a pagar a la DIAN" : "Saldo a favor"}</p>
+              <p className="text-lg font-semibold text-slate-900">{formatCOP(Math.abs(data.toPay))}</p>
+              {data.withheldFromUs !== 0 && (
+                <p className="text-xs text-slate-500">
+                  Ya descuenta {formatCOP(data.withheldFromUs)} de retención de IVA que le practicaron sus clientes.
+                </p>
+              )}
             </div>
           </div>
+
+          {data.withheldFromUs !== 0 && (
+            <p className="text-sm text-slate-600">
+              Saldo del IVA del periodo {formatCOP(data.balance)} − retenciones de IVA que le practicaron {formatCOP(data.withheldFromUs)} ={" "}
+              <b>{formatCOP(data.toPay)}</b>
+              {data.toPay < 0 ? " a favor" : " a pagar"}.
+            </p>
+          )}
 
           <div>
             <h3 className="mb-2 text-sm font-semibold text-slate-900">De dónde sale</h3>
@@ -165,6 +178,13 @@ export function VatSummaryReport({ branchId }: { branchId?: string }) {
             </div>
           )}
 
+          {data.withheldByUs !== 0 && (
+            <Alert tone="info">
+              Retención de IVA que usted les practicó a sus proveedores en el periodo: <b>{formatCOP(data.withheldByUs)}</b>. No entra aquí: se
+              declara y paga en el formulario 350 (retenciones en la fuente), cada mes.
+            </Alert>
+          )}
+
           {data.consumptionTax !== 0 && (
             <Alert tone="info">
               Impuesto al consumo del periodo: <b>{formatCOP(data.consumptionTax)}</b>. No es IVA: se declara aparte, en el formulario 310.
@@ -172,8 +192,8 @@ export function VatSummaryReport({ branchId }: { branchId?: string }) {
           )}
 
           <p className="text-xs text-slate-500">
-            Los totales salen de la cuenta 2408 de la contabilidad (lo mismo que muestra el Balance). Es una guía para llenar el formulario 300:
-            su contador debe revisarla, sobre todo las retenciones de IVA que le hayan practicado, que no aparecen aquí.
+            Los totales salen de la cuenta 2408 de la contabilidad (lo mismo que muestra el Balance) y las retenciones de IVA, de sus cuentas
+            de anticipo y por pagar. Es una guía para llenar el formulario 300: su contador debe revisarla antes de presentar la declaración.
           </p>
         </div>
       )}

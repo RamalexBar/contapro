@@ -41,10 +41,12 @@ export interface UblInvoiceInput {
  * sin credenciales de habilitacion no hay forma de confirmarlos contra el servicio real de la
  * DIAN. Ver README del modulo.
  */
+// Tabla de tributos de la DIAN: 05 ReteIVA, 06 ReteRenta, 07 ReteICA (los mismos que usa factus-invoicing-client.ts).
+// Antes decia 07/08 para ReteIVA/ReteICA (2026-11-03: corregido; 07 es ReteICA y 08 es otro tributo).
 const WITHHOLDING_TAX_SCHEME_ID: Record<UblWithholdingTax["type"], string> = {
   RETEFUENTE: "06",
-  RETEIVA: "07",
-  RETEICA: "08",
+  RETEIVA: "05",
+  RETEICA: "07",
 };
 
 const WITHHOLDING_TAX_SCHEME_NAME: Record<UblWithholdingTax["type"], string> = {

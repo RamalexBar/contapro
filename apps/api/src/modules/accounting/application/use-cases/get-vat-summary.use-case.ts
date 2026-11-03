@@ -2,6 +2,8 @@ import { round2 } from "@erp/shared-utils";
 import type { IChartOfAccountsRepository } from "../../domain/chart-of-accounts.repository";
 import type { IJournalEntryRepository } from "../../domain/journal-entry.repository";
 import type { IVatActivityReader, TaxRateRow } from "../../domain/vat-activity.reader";
+import { VAT_WITHHELD_BY_US_ACCOUNT_CODE } from "./post-purchase-journal-entry.use-case";
+import { VAT_WITHHELD_FROM_US_ACCOUNT_CODE } from "./post-sale-journal-entry.use-case";
 
 /** Cuenta donde todo el sistema netea el IVA generado (credito) y el descontable (debito). */
 export const VAT_ACCOUNT_CODE = "2408";
@@ -40,8 +42,14 @@ export interface VatSummary {
   to: string;
   generated: number;
   deductible: number;
-  /** generated - deductible: positivo = a pagar a la DIAN, negativo = saldo a favor. */
+  /** generated - deductible: el saldo del IVA del periodo, antes de las retenciones. */
   balance: number;
+  /** Retenciones de IVA que le practicaron los clientes (anticipo): restan del IVA a pagar en el formulario 300. */
+  withheldFromUs: number;
+  /** balance - withheldFromUs: positivo = a pagar a la DIAN, negativo = saldo a favor. */
+  toPay: number;
+  /** Retencion de IVA que la empresa le practico a sus proveedores: se declara en el formulario 350, no en el 300. */
+  withheldByUs: number;
   byOrigin: VatOriginRow[];
   byRate: VatRateRow[];
   shiftClosesWithoutDetail: number;
@@ -89,6 +97,17 @@ export class GetVatSummaryUseCase {
       }
     }
 
+    // Retenciones de IVA: las que le practicaron (activo: debitos) y las que practico (pasivo: creditos)
+    const net = async (code: string, sign: 1 | -1) => {
+      const account = accounts.find((a) => a.code === code);
+      if (!account) return 0;
+      let total = 0;
+      for (const line of await this.journalRepo.listPostedLines({ from, to, accountId: account.id, branchId })) total += sign * (line.debit - line.credit);
+      return round2(total);
+    };
+    const withheldFromUs = await net(VAT_WITHHELD_FROM_US_ACCOUNT_CODE, 1);
+    const withheldByUs = await net(VAT_WITHHELD_BY_US_ACCOUNT_CODE, -1);
+
     const activity = await this.activityReader.getTaxableActivity(from, to, branchId);
     const byRate = new Map<string, VatRateRow>();
     const rowFor = (r: TaxRateRow) => {
@@ -118,6 +137,9 @@ export class GetVatSummaryUseCase {
       generated,
       deductible,
       balance: round2(generated - deductible),
+      withheldFromUs,
+      toPay: round2(generated - deductible - withheldFromUs),
+      withheldByUs,
       byOrigin: origins.sort((a, b) => b.generated - a.generated || b.deductible - a.deductible),
       byRate: rates,
       shiftClosesWithoutDetail: activity.shiftClosesWithoutDetail,

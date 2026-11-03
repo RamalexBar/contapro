@@ -32,12 +32,10 @@ describe("buildUblInvoiceXml", () => {
     });
 
     expect(xml.match(/<cac:WithholdingTaxTotal>/g)).toHaveLength(3);
-    expect(xml).toContain("<cbc:ID>06</cbc:ID>");
-    expect(xml).toContain("<cbc:Name>ReteRenta</cbc:Name>");
-    expect(xml).toContain("<cbc:ID>08</cbc:ID>");
-    expect(xml).toContain("<cbc:Name>ReteICA</cbc:Name>");
-    expect(xml).toContain("<cbc:ID>07</cbc:ID>");
-    expect(xml).toContain("<cbc:Name>ReteIVA</cbc:Name>");
+    // Codigos de la tabla de tributos DIAN: 05 ReteIVA, 06 ReteRenta, 07 ReteICA
+    expect(xml).toMatch(/<cbc:ID>06<\/cbc:ID>\s*<cbc:Name>ReteRenta<\/cbc:Name>/);
+    expect(xml).toMatch(/<cbc:ID>05<\/cbc:ID>\s*<cbc:Name>ReteIVA<\/cbc:Name>/);
+    expect(xml).toMatch(/<cbc:ID>07<\/cbc:ID>\s*<cbc:Name>ReteICA<\/cbc:Name>/);
     expect(xml).toContain("2500.00");
     expect(xml).toContain("1000.00");
     expect(xml).toContain("2850.00");

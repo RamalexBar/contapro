@@ -406,7 +406,12 @@ compras y centros de costo, todo implementado.**
   (`ExternalShiftClose.taxSummary`, guardado desde el 2026-10-24; los cierres anteriores solo cuentan en los
   totales y el reporte avisa cuántos son).
 - **Impuesto al consumo** (cuenta 240810) se muestra aparte: se declara en el formulario 310, no en el 300.
-- **No incluye**: retenciones de IVA practicadas por clientes (reteIVA), ni las facturas manuales (que hoy no
-  generan comprobante contable). Es una guía para el contador, no la declaración.
+- **Retenciones de IVA** (2026-11-03): las que le practicaron los clientes (débitos a `VAT_WITHHELD_FROM_US_ACCOUNT_CODE`,
+  la cuenta de anticipo que usa `PostSaleJournalEntryUseCase`) **restan** del IVA a pagar: `toPay = balance - withheldFromUs`
+  (renglón «retenciones por IVA que le practicaron» del 300). Las que la empresa le practicó a sus proveedores (créditos a
+  `VAT_WITHHELD_BY_US_ACCOUNT_CODE`, la de `PostPurchaseJournalEntryUseCase`) se muestran aparte, informativas: se declaran
+  en el formulario 350, no en el 300.
+- **No incluye**: las facturas manuales (que hoy no generan comprobante contable). Es una guía para el contador, no la
+  declaración.
 - Verificado en vivo (local) con una compra de Cajapro con IVA 19 % y un cierre con ventas al 19 %, 5 % y
   excluidas más una devolución: IVA cobrado 19.430, descontable 19.000, saldo 430, bases por tarifa correctas.

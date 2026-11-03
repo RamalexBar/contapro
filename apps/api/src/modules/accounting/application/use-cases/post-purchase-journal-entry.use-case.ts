@@ -20,6 +20,9 @@ const STANDARD_ACCOUNTS = {
   reteivaPorPagar: { code: "236705", name: "Retencion de IVA por pagar", type: "LIABILITY" as const },
 };
 
+/** Donde queda la retencion de IVA que la empresa le practica a un proveedor (la lee el Resumen de IVA). */
+export const VAT_WITHHELD_BY_US_ACCOUNT_CODE = STANDARD_ACCOUNTS.reteivaPorPagar.code;
+
 const WITHHOLDING_ACCOUNT_KEY: Record<WithholdingType, "retefuentePorPagar" | "reteicaPorPagar" | "reteivaPorPagar"> = {
   RETEFUENTE: "retefuentePorPagar",
   RETEICA: "reteicaPorPagar",

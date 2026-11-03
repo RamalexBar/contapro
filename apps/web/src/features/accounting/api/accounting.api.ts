@@ -316,6 +316,12 @@ export interface VatSummary {
   generated: number;
   deductible: number;
   balance: number;
+  /** Retenciones de IVA que le practicaron (restan del IVA a pagar). */
+  withheldFromUs: number;
+  /** balance - withheldFromUs: positivo = a pagar, negativo = a favor. */
+  toPay: number;
+  /** Retencion de IVA que la empresa practico (formulario 350, informativo). */
+  withheldByUs: number;
   byOrigin: { origin: string; label: string; generated: number; deductible: number }[];
   byRate: { taxType: string; taxRate: number; salesBase: number; salesTax: number; returnsBase: number; returnsTax: number }[];
   shiftClosesWithoutDetail: number;

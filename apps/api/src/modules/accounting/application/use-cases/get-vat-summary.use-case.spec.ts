@@ -30,7 +30,7 @@ const line = (accountId: string, sourceType: string | null, debit: number, credi
 });
 
 function makeUseCase(lines: PostedLineAggregate[], activity: TaxableActivity) {
-  const accounts = [account("iva", "2408"), account("inc", "240810"), account("caja", "1105")];
+  const accounts = [account("iva", "2408"), account("inc", "240810"), account("caja", "1105"), account("reteivaAnticipo", "135518"), account("reteivaPorPagar", "236705")];
   const accountRepo = { list: async () => accounts } as unknown as IChartOfAccountsRepository;
   const journalRepo = {
     listPostedLines: async (filter: { accountId?: string }) => lines.filter((l) => !filter.accountId || l.accountId === filter.accountId),
@@ -94,12 +94,31 @@ describe("GetVatSummaryUseCase", () => {
     expect(summary.shiftClosesWithoutDetail).toBe(2);
   });
 
+  it("subtracts the VAT withheld by customers from what is paid, and reports the VAT the company withheld apart (form 350)", async () => {
+    const summary = await makeUseCase(
+      [
+        line("iva", "Sale", 0, 19_000),
+        line("iva", "Purchase", 5_000, 0),
+        // Un cliente gran contribuyente le retuvo el 15 % del IVA de una venta
+        line("reteivaAnticipo", "Sale", 2_850, 0),
+        // La empresa le retuvo IVA a un proveedor
+        line("reteivaPorPagar", "Purchase", 0, 750),
+      ],
+      { sales: [], returns: [], shiftClosesWithoutDetail: 0 }
+    ).execute(...period);
+
+    expect(summary.balance).toBe(14_000);
+    expect(summary.withheldFromUs).toBe(2_850);
+    expect(summary.toPay).toBe(11_150);
+    expect(summary.withheldByUs).toBe(750);
+  });
+
   it("returns zeros for a company without the 2408 account", async () => {
     const useCase = new GetVatSummaryUseCase(
       { listPostedLines: async () => [] } as unknown as IJournalEntryRepository,
       { list: async () => [] } as unknown as IChartOfAccountsRepository,
       { getTaxableActivity: async () => ({ sales: [], returns: [], shiftClosesWithoutDetail: 0 }) }
     );
-    expect(await useCase.execute(...period)).toMatchObject({ generated: 0, deductible: 0, balance: 0, byOrigin: [], byRate: [] });
+    expect(await useCase.execute(...period)).toMatchObject({ generated: 0, deductible: 0, balance: 0, withheldFromUs: 0, toPay: 0, withheldByUs: 0, byOrigin: [], byRate: [] });
   });
 });
