@@ -329,6 +329,36 @@ export interface VatSummary {
 }
 
 /** Resumen de IVA del periodo (formulario 300). */
+/** Estados financieros NIIF (Situacion Financiera + Resultados por funcion), con los mismos saldos. */
+export interface NiifLine {
+  line: string;
+  amount: number;
+  accounts: { code: string; name: string; amount: number }[];
+}
+export interface NiifStatements {
+  financialPosition: {
+    asOf: string;
+    sections: { key: string; title: string; lines: NiifLine[]; total: number }[];
+    totalAssets: number;
+    totalLiabilities: number;
+    totalEquity: number;
+    balanced: boolean;
+  };
+  profitOrLoss: {
+    lines: Record<"revenue" | "costOfSales" | "otherIncome" | "adminExpenses" | "sellingExpenses" | "otherExpenses" | "financeIncome" | "financeCosts" | "incomeTax", NiifLine>;
+    grossProfit: number;
+    operatingProfit: number;
+    profitBeforeTax: number;
+    profitForPeriod: number;
+  };
+}
+
+export function getNiifStatements(asOf: string, from: string, branchId?: string): Promise<NiifStatements> {
+  const params = new URLSearchParams({ asOf, from });
+  if (branchId) params.set("branchId", branchId);
+  return apiFetch(`/reports/niif?${params.toString()}`);
+}
+
 export function getVatSummary(from: string, to: string, branchId?: string): Promise<VatSummary> {
   const params = new URLSearchParams({ from, to });
   if (branchId) params.set("branchId", branchId);

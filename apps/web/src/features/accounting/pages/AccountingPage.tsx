@@ -15,6 +15,7 @@ import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { AccountCombobox } from "../components/AccountCombobox";
 import { ChartOfAccountsImportCard } from "../components/ChartOfAccountsImportCard";
 import { VatSummaryReport } from "../components/VatSummaryReport";
+import { NiifStatementsReport } from "../components/NiifStatementsReport";
 import {
   type AccountType,
   type WithholdingType,
@@ -68,13 +69,14 @@ const WITHHOLDING_TYPES: { value: WithholdingType; label: string }[] = [
 ];
 
 type Section = "accounts" | "entries" | "reports" | "periods" | "withholding" | "cost-centers";
-type ReportTab = "balance" | "income" | "cashflow" | "ledger" | "vat";
+type ReportTab = "balance" | "income" | "cashflow" | "ledger" | "vat" | "niif";
 const REPORT_TAB_LABELS: Record<ReportTab, string> = {
   balance: "Balance General",
   income: "Estado de Resultados",
   cashflow: "Flujo de caja",
   ledger: "Libro mayor",
   vat: "Resumen de IVA",
+  niif: "Estados NIIF",
 };
 
 function formatLocalDate(d: Date): string {
@@ -872,7 +874,7 @@ function ReportsSection() {
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          {(["balance", "income", "cashflow", "ledger", "vat"] as ReportTab[]).map((tab) => (
+          {(["balance", "income", "cashflow", "ledger", "vat", "niif"] as ReportTab[]).map((tab) => (
             <Button key={tab} size="sm" variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
               {REPORT_TAB_LABELS[tab]}
             </Button>
@@ -1031,6 +1033,7 @@ function ReportsSection() {
       )}
 
       {reportTab === "vat" && <VatSummaryReport branchId={branchFilter} />}
+      {reportTab === "niif" && <NiifStatementsReport branchId={branchFilter} />}
 
       {reportTab === "ledger" && (
         <Card>

@@ -415,3 +415,25 @@ compras y centros de costo, todo implementado.**
   declaración.
 - Verificado en vivo (local) con una compra de Cajapro con IVA 19 % y un cierre con ventas al 19 %, 5 % y
   excluidas más una devolución: IVA cobrado 19.430, descontable 19.000, saldo 430, bases por tarifa correctas.
+
+## Estados financieros NIIF — 2026-11-03
+
+`GET /reports/niif?asOf=AAAA-MM-DD&from=AAAA-MM-DD[&branchId=]` (permiso `accounting.read`), pestaña **Estados NIIF** en
+Contabilidad → Reportes. Se sigue registrando con el PUC; esto es la **presentación** de NIIF para PYMES (Grupo 2):
+
+- **Estado de Situación Financiera** al corte (Sección 4): activo y pasivo corriente / no corriente y patrimonio.
+- **Estado de Resultados por función** del periodo (Sección 5): ingresos de actividades ordinarias, costo de ventas,
+  ganancia bruta, otros ingresos, gastos de administración y de ventas, otros gastos, ganancia operacional, ingresos y
+  costos financieros, ganancia antes de impuestos, impuesto de renta y ganancia del periodo.
+- Mismos saldos que `getBalanceSheet` / `getIncomeStatement`. `application/niif-statements.ts` ubica cada cuenta en su
+  renglón NIIF por el **prefijo PUC más largo** (ej. 11 efectivo, 1355 activos por impuestos corrientes, 15 PPE no
+  corriente, 2365/2367/2368 y 24 pasivos por impuestos corrientes, 25 beneficios a los empleados, 4210 ingresos
+  financieros, 5305 costos financieros, 54 impuesto de renta). Una regla solo aplica si coincide con el tipo de la
+  cuenta; lo que no encaja queda «sin clasificar» y nada se pierde: los totales cuadran con el Balance General
+  (verificado en la demo local: activo, pasivo, patrimonio y utilidad idénticos).
+- Es una clasificación **propuesta**: corriente / no corriente depende del plazo (ej. una obligación financiera a
+  más de un año o una inversión permanente son no corrientes) y lo revisa el contador. Valorizaciones (19, 38) se
+  muestran marcadas porque NIIF no las reconoce.
+- «Resultados acumulados sin cerrar» = ingresos − gastos aún no cerrados (como el Balance General).
+- Pendiente: estado de cambios en el patrimonio, flujo de efectivo NIIF (método indirecto), comparativo con el año
+  anterior y notas.

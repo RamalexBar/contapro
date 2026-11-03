@@ -1,3 +1,4 @@
+import { buildNiifFinancialPosition, buildNiifProfitOrLoss } from "../application/niif-statements";
 import type { NextFunction, Request, Response } from "express";
 import { endOfDayInBogota, startOfDayInBogota } from "@erp/shared-utils";
 import type { AccountingReportsService } from "../application/accounting-reports.service";
@@ -236,6 +237,22 @@ export class AccountingController {
       const asOf = typeof req.query.asOf === "string" ? endOfDayInBogota(req.query.asOf) : new Date();
       const byThirdParty = req.query.byThirdParty === "true";
       res.json(await this.reports.getBalanceSheet(asOf, { byThirdParty, branchId: queryBranchId(req) }));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** Estados financieros NIIF (Situacion Financiera al corte + Resultados del periodo), con los mismos saldos. */
+  getNiifStatements = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const to = typeof req.query.asOf === "string" ? endOfDayInBogota(req.query.asOf) : new Date();
+      const from = typeof req.query.from === "string" ? startOfDayInBogota(req.query.from) : new Date(0);
+      const branchId = queryBranchId(req);
+      const [balanceSheet, incomeStatement] = await Promise.all([
+        this.reports.getBalanceSheet(to, { branchId }),
+        this.reports.getIncomeStatement(from, to, undefined, branchId),
+      ]);
+      res.json({ financialPosition: buildNiifFinancialPosition(balanceSheet), profitOrLoss: buildNiifProfitOrLoss(incomeStatement) });
     } catch (err) {
       next(err);
     }
