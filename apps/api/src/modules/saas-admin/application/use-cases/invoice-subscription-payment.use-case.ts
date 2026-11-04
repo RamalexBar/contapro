@@ -3,7 +3,7 @@ import type { AuditService } from "../../../audit/application/audit.service";
 import type { ISubscriptionInvoiceIssuer, ISubscriptionInvoiceRepository, SubscriptionInvoiceBuyer } from "../../domain/subscription-invoicing";
 
 export type SubscriptionInvoiceOutcome =
-  | { status: "INVOICED"; manualInvoiceId: string; electronicStatus: string | null; electronicNumber: string | null }
+  | { status: "INVOICED"; manualInvoiceId: string; electronicStatus: string | null; electronicNumber: string | null; journalError: string | null }
   | { status: "NOT_CONFIGURED" }
   | { status: "SKIPPED"; reason: string }
   | { status: "FAILED"; error: string };
@@ -47,7 +47,13 @@ export class InvoiceSubscriptionPaymentUseCase {
     const description = `Suscripción Contapro - ${data.planName} (${cycle}), vigente hasta el ${formatDate(data.coveredUntil)}`;
 
     try {
-      const issued = await this.issuer.issue(this.issuerCompanyId, data.buyer, { description, amount: data.amount });
+      const issued = await this.issuer.issue(this.issuerCompanyId, data.buyer, {
+        description,
+        amount: data.amount,
+        paymentMethod: data.method,
+        paidAt: data.paidAt ?? new Date(),
+        paymentId,
+      });
       await this.repo.markPaymentInvoiced(paymentId, issued.manualInvoiceId);
       await this.audit.recordWithoutContext(data.buyer.companyId, null, {
         action: "SUBSCRIPTION_PAYMENT_INVOICED",
@@ -61,6 +67,13 @@ export class InvoiceSubscriptionPaymentUseCase {
           `subscription-invoice:${paymentId}`,
           "Factura de suscripción sin aceptar en la DIAN",
           `${data.buyer.name} (NIT ${data.buyer.documentNumber}): la factura quedó creada pero su estado es ${issued.electronicStatus ?? "sin generar"}. Revísela y reenvíela desde Facturación electrónica en la empresa de Contapro.`
+        );
+      }
+      if (issued.journalError) {
+        this.alerts?.send(
+          `subscription-journal:${paymentId}`,
+          "Factura de suscripción sin contabilizar",
+          `${data.buyer.name}: la factura quedó emitida pero no se pudo registrar el asiento del ingreso: ${issued.journalError}. Regístrelo a mano en la empresa de Contapro.`
         );
       }
       return { status: "INVOICED", ...issued };

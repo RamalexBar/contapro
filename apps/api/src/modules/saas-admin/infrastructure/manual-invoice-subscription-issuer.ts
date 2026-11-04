@@ -1,6 +1,7 @@
 import { basePrisma } from "@erp/database";
 import { tenantStorage } from "../../../shared/context/request-context";
 import type { CreateManualInvoiceUseCase } from "../../manual-invoicing/application/use-cases/create-manual-invoice.use-case";
+import type { PostServiceIncomeJournalEntryUseCase } from "../../accounting/application/use-cases/post-service-income-journal-entry.use-case";
 import type {
   ISubscriptionInvoiceIssuer,
   IssuedSubscriptionInvoice,
@@ -15,7 +16,10 @@ import type {
  * electronica con el proveedor de esa empresa (Factus) y se la envia por correo al comprador.
  */
 export class ManualInvoiceSubscriptionIssuer implements ISubscriptionInvoiceIssuer {
-  constructor(private readonly loadCreateManualInvoice: () => Promise<CreateManualInvoiceUseCase>) {}
+  constructor(
+    private readonly loadCreateManualInvoice: () => Promise<CreateManualInvoiceUseCase>,
+    private readonly loadPostServiceIncome: () => Promise<PostServiceIncomeJournalEntryUseCase>
+  ) {}
 
   async issue(issuerCompanyId: string, buyer: SubscriptionInvoiceBuyer, line: SubscriptionInvoiceLine): Promise<IssuedSubscriptionInvoice> {
     const issuer = await basePrisma.company.findUnique({ where: { id: issuerCompanyId }, select: { id: true } });
@@ -28,10 +32,10 @@ export class ManualInvoiceSubscriptionIssuer implements ISubscriptionInvoiceIssu
 
     const customerId = await this.findOrCreateCustomer(issuerCompanyId, buyer);
     const createManualInvoice = await this.loadCreateManualInvoice();
+    const postServiceIncome = await this.loadPostServiceIncome();
+    const ctx = { companyId: issuerCompanyId, branchId: branch.id, userId: "system", roles: [], permissions: new Set<string>() };
 
-    const invoice = await tenantStorage.run(
-      { companyId: issuerCompanyId, branchId: branch.id, userId: "system", roles: [], permissions: new Set() },
-      () =>
+    const invoice = await tenantStorage.run(ctx, () =>
         createManualInvoice.execute({
           branchId: branch.id,
           customerId,
@@ -40,11 +44,35 @@ export class ManualInvoiceSubscriptionIssuer implements ISubscriptionInvoiceIssu
         })
     );
 
+    // La factura manual no contabiliza: el ingreso cobrado se registra aparte (Bancos/Caja contra
+    // Ingresos por servicios). Si falla, la factura ya existe: se informa y se registra a mano.
+    let journalError: string | null = null;
+    try {
+      await tenantStorage.run(ctx, () =>
+        postServiceIncome.execute({
+          branchId: branch.id,
+          date: line.paidAt,
+          description: `${line.description} - ${buyer.name}`,
+          amount: line.amount,
+          paymentMethod: line.paymentMethod,
+          sourceType: "ManualInvoice",
+          sourceId: invoice.id,
+        })
+      );
+    } catch (err) {
+      journalError = err instanceof Error ? err.message : String(err);
+    }
+
     const electronic = await basePrisma.electronicInvoice.findFirst({
       where: { manualInvoiceId: invoice.id },
       select: { status: true, fullNumber: true },
     });
-    return { manualInvoiceId: invoice.id, electronicStatus: electronic?.status ?? null, electronicNumber: electronic?.fullNumber ?? null };
+    return {
+      manualInvoiceId: invoice.id,
+      electronicStatus: electronic?.status ?? null,
+      electronicNumber: electronic?.fullNumber ?? null,
+      journalError,
+    };
   }
 
   /** El cliente se identifica por su documento dentro de la empresa de Contapro; si ya existe se

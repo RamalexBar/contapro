@@ -17,6 +17,8 @@ function paymentData(overrides: Partial<SubscriptionPaymentInvoiceData> = {}): S
     paymentId: "pay-1",
     status: "CONFIRMED",
     amount: 129_900,
+    method: "WOMPI",
+    paidAt: new Date("2026-11-04T15:00:00Z"),
     manualInvoiceId: null,
     billedBy: null,
     planName: "Plan Pyme",
@@ -54,7 +56,7 @@ class FakeRepo implements ISubscriptionInvoiceRepository {
 
 class FakeIssuer implements ISubscriptionInvoiceIssuer {
   calls: { issuerCompanyId: string; buyer: SubscriptionInvoiceBuyer; line: SubscriptionInvoiceLine }[] = [];
-  constructor(private result: IssuedSubscriptionInvoice | Error = { manualInvoiceId: "mi-1", electronicStatus: "ACCEPTED", electronicNumber: "CP1" }) {}
+  constructor(private result: IssuedSubscriptionInvoice | Error = { manualInvoiceId: "mi-1", electronicStatus: "ACCEPTED", electronicNumber: "CP1", journalError: null }) {}
   async issue(issuerCompanyId: string, buyer: SubscriptionInvoiceBuyer, line: SubscriptionInvoiceLine) {
     this.calls.push({ issuerCompanyId, buyer, line });
     if (this.result instanceof Error) throw this.result;
@@ -84,6 +86,9 @@ describe("InvoiceSubscriptionPaymentUseCase", () => {
     expect(issuer.calls[0]!.line).toEqual({
       description: "Suscripción Contapro - Plan Pyme (mensual), vigente hasta el 04/12/2026",
       amount: 129_900,
+      paymentMethod: "WOMPI",
+      paidAt: new Date("2026-11-04T15:00:00Z"),
+      paymentId: "pay-1",
     });
     expect(repo.invoiced).toEqual({ "pay-1": "mi-1" });
     expect(alerts).toEqual([]);
@@ -126,10 +131,21 @@ describe("InvoiceSubscriptionPaymentUseCase", () => {
     expect(alerts).toEqual(["No se pudo facturar un pago de suscripción"]);
   });
 
+  it("avisa si la factura salio pero el asiento del ingreso no se pudo registrar", async () => {
+    const { useCase, alerts, repo } = setup(
+      paymentData(),
+      new FakeIssuer({ manualInvoiceId: "mi-3", electronicStatus: "ACCEPTED", electronicNumber: "CP3", journalError: "Periodo cerrado" })
+    );
+    const outcome = await useCase.execute("pay-1");
+    expect(outcome.status).toBe("INVOICED");
+    expect(repo.invoiced).toEqual({ "pay-1": "mi-3" });
+    expect(alerts).toEqual(["Factura de suscripción sin contabilizar"]);
+  });
+
   it("avisa si la factura quedo creada pero la DIAN no la acepto", async () => {
     const { useCase, alerts, repo } = setup(
       paymentData({ billingCycle: "YEARLY" }),
-      new FakeIssuer({ manualInvoiceId: "mi-2", electronicStatus: "REJECTED", electronicNumber: "CP2" })
+      new FakeIssuer({ manualInvoiceId: "mi-2", electronicStatus: "REJECTED", electronicNumber: "CP2", journalError: null })
     );
 
     const outcome = await useCase.execute("pay-1");

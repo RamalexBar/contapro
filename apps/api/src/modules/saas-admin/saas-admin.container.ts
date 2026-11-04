@@ -62,7 +62,10 @@ export const disableAutoRenewUseCase = new DisableAutoRenewUseCase(subscriptionR
 const invoiceSubscriptionPaymentUseCase = new InvoiceSubscriptionPaymentUseCase(
   subscriptionRepo,
   // Import diferido: manual-invoicing -> electronic-invoicing -> ... vuelve a importar este container.
-  new ManualInvoiceSubscriptionIssuer(async () => (await import("../manual-invoicing/manual-invoicing.container")).createUseCase),
+  new ManualInvoiceSubscriptionIssuer(
+    async () => (await import("../manual-invoicing/manual-invoicing.container")).createUseCase,
+    async () => (await import("../accounting/accounting.container")).postServiceIncomeJournalEntryUseCase
+  ),
   env.PLATFORM_INVOICING_COMPANY_ID,
   auditService,
   operationalAlerts

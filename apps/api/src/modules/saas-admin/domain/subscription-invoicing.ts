@@ -21,6 +21,9 @@ export interface SubscriptionPaymentInvoiceData {
   paymentId: string;
   status: string;
   amount: number;
+  /** WOMPI, WOMPI_AUTO, TRANSFER, CASH...: define si el ingreso entra a Bancos o a Caja. */
+  method: string;
+  paidAt: Date | null;
   /** Ya facturado: no se vuelve a facturar (el webhook de Wompi puede repetirse). */
   manualInvoiceId: string | null;
   /** "CAJAPRO" = el paquete lo cobra y factura el aliado, no Contapro. */
@@ -41,6 +44,9 @@ export interface ISubscriptionInvoiceRepository {
 export interface SubscriptionInvoiceLine {
   description: string;
   amount: number;
+  paymentMethod: string;
+  paidAt: Date;
+  paymentId: string;
 }
 
 export interface IssuedSubscriptionInvoice {
@@ -48,6 +54,8 @@ export interface IssuedSubscriptionInvoice {
   /** Estado de la factura electronica (ACCEPTED, REJECTED, ...); null si no se llego a generar. */
   electronicStatus: string | null;
   electronicNumber: string | null;
+  /** Error al contabilizar el ingreso (la factura ya quedo creada); null si quedo contabilizado. */
+  journalError: string | null;
 }
 
 /** Emite la factura desde la empresa de Contapro (infraestructura: entra al tenant de esa empresa). */

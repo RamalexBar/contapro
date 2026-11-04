@@ -29,6 +29,7 @@ import { PostJournalEntryUseCase } from "./application/use-cases/post-journal-en
 import { VoidJournalEntryUseCase } from "./application/use-cases/void-journal-entry.use-case";
 import { PostPayrollJournalEntryUseCase } from "./application/use-cases/post-payroll-journal-entry.use-case";
 import { PostSaleJournalEntryUseCase } from "./application/use-cases/post-sale-journal-entry.use-case";
+import { PostServiceIncomeJournalEntryUseCase } from "./application/use-cases/post-service-income-journal-entry.use-case";
 import { PostReturnJournalEntryUseCase } from "./application/use-cases/post-return-journal-entry.use-case";
 import { PostPurchaseJournalEntryUseCase } from "./application/use-cases/post-purchase-journal-entry.use-case";
 import { PostSupplierPaymentJournalEntryUseCase } from "./application/use-cases/post-supplier-payment-journal-entry.use-case";
@@ -147,6 +148,9 @@ export const postPayrollJournalEntryUseCase = new PostPayrollJournalEntryUseCase
   createEntryUseCase,
   postEntryUseCase
 );
+
+/** Usado por saas-admin (factura de la suscripcion de Contapro) para contabilizar el ingreso cobrado. */
+export const postServiceIncomeJournalEntryUseCase = new PostServiceIncomeJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
 
 /** Usado por sale.container.ts para contabilizar una venta al completarse. */
 export const postSaleJournalEntryUseCase = new PostSaleJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);

@@ -327,7 +327,12 @@ resolucion DIAN y Factus configurados como cualquier otra, cuyo id va en `PLATFO
   cliente por su NIT (con correo, telefono, direccion y codigo DANE de la empresa que pago) y reusa
   `CreateManualInvoiceUseCase` (factura sin producto ni inventario). La linea: «Suscripción Contapro - <plan>
   (mensual|anual), vigente hasta el dd/mm/aaaa», cantidad 1, valor pagado, **sin IVA (excluida)**. Factus le
-  envia el XML y el PDF al correo del cliente. El modulo de factura manual no contabiliza (ver su README).
+  envia el XML y el PDF al correo del cliente.
+- Contabilidad: la factura manual por si sola no contabiliza, asi que el emisor registra ademas el ingreso cobrado
+  con `PostServiceIncomeJournalEntryUseCase` (modules/accounting): debito Bancos 1110 (Caja 1105 si el pago fue en
+  efectivo), credito Ingresos 4155 (actividades de informatica; propuesta a revisar con el contador), con
+  `sourceType = "ManualInvoice"`. La comision de Wompi llega neta al banco y se reconoce al conciliar. Si el
+  asiento falla, la factura ya quedo emitida y se avisa por correo para registrarlo a mano.
 - Nunca frena el pago. No factura: pagos ya facturados (el webhook puede repetirse), combos cobrados por Cajapro
   (`billedBy = CAJAPRO`), la propia empresa de Contapro, pagos en cero. Sin la variable no hace nada y el aviso
   de pago al equipo lo dice.

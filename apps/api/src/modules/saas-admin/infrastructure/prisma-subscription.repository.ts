@@ -302,6 +302,8 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository, IP
       paymentId: payment.id,
       status: payment.status,
       amount: Number(payment.amount),
+      method: payment.method,
+      paidAt: payment.paidAt,
       manualInvoiceId: payment.manualInvoiceId,
       billedBy: subscription.billedBy,
       planName: subscription.plan.name,
