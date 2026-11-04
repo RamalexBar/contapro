@@ -1,6 +1,7 @@
 import { calculateNextPeriodEnd } from "@erp/shared-utils";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { ApplyPaymentResult, ISubscriptionRepository } from "../../domain/subscription.repository";
+import type { InvoiceSubscriptionPaymentUseCase, SubscriptionInvoiceOutcome } from "./invoice-subscription-payment.use-case";
 
 export interface RegisterSubscriptionPaymentInput {
   subscriptionId: string;
@@ -16,9 +17,13 @@ export interface RegisterSubscriptionPaymentInput {
  * para que el cliente no gane dias por pagar tarde dentro del periodo de gracia.
  */
 export class RegisterSubscriptionPaymentUseCase {
-  constructor(private readonly repo: ISubscriptionRepository, private readonly audit: AuditService) {}
+  constructor(
+    private readonly repo: ISubscriptionRepository,
+    private readonly audit: AuditService,
+    private readonly invoicePayment?: Pick<InvoiceSubscriptionPaymentUseCase, "execute">
+  ) {}
 
-  async execute(input: RegisterSubscriptionPaymentInput): Promise<ApplyPaymentResult> {
+  async execute(input: RegisterSubscriptionPaymentInput): Promise<ApplyPaymentResult & { invoice: SubscriptionInvoiceOutcome | null }> {
     const subscription = await this.repo.findByIdOrThrow(input.subscriptionId);
     const cycleMonths = subscription.billingCycle === "YEARLY" ? 12 : 1;
     const newPeriodEnd = calculateNextPeriodEnd(subscription.currentPeriodEnd, cycleMonths);
@@ -37,6 +42,8 @@ export class RegisterSubscriptionPaymentUseCase {
       description: `Pago de suscripcion registrado: ${input.amount} (${input.method}). Nuevo vencimiento: ${newPeriodEnd.toISOString().slice(0, 10)}`,
     });
 
-    return result;
+    // La factura al cliente: nunca lanza, el pago ya quedo aplicado.
+    const invoice = this.invoicePayment ? await this.invoicePayment.execute(result.payment.id) : null;
+    return { ...result, invoice };
   }
 }

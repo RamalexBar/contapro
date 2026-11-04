@@ -36,6 +36,10 @@ import { SetPlatformAdminPasswordUseCase } from "./application/use-cases/set-pla
 import { whatsAppSender } from "../whatsapp/whatsapp.container";
 import { SaasAdminController } from "./interfaces/saas-admin.controller";
 import { ResendPlatformNotifier } from "./infrastructure/resend-platform-notifier";
+import { InvoiceSubscriptionPaymentUseCase } from "./application/use-cases/invoice-subscription-payment.use-case";
+import { ManualInvoiceSubscriptionIssuer } from "./infrastructure/manual-invoice-subscription-issuer";
+import { SubscriptionInvoiceController } from "./interfaces/subscription-invoice.controller";
+import { env } from "../../config/env";
 
 const platformAdminRepo = new PrismaPlatformAdminRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
@@ -54,6 +58,17 @@ export const createSubscriptionCheckoutUseCase = new CreateSubscriptionCheckoutU
 export const savePaymentSourceUseCase = new SavePaymentSourceUseCase(subscriptionRepo, paymentGateway, auditService);
 export const disableAutoRenewUseCase = new DisableAutoRenewUseCase(subscriptionRepo, auditService);
 
+/** Factura que Contapro (como empresa) le emite a cada cliente por su pago de suscripcion. */
+const invoiceSubscriptionPaymentUseCase = new InvoiceSubscriptionPaymentUseCase(
+  subscriptionRepo,
+  // Import diferido: manual-invoicing -> electronic-invoicing -> ... vuelve a importar este container.
+  new ManualInvoiceSubscriptionIssuer(async () => (await import("../manual-invoicing/manual-invoicing.container")).createUseCase),
+  env.PLATFORM_INVOICING_COMPANY_ID,
+  auditService,
+  operationalAlerts
+);
+export const subscriptionInvoiceController = new SubscriptionInvoiceController(invoiceSubscriptionPaymentUseCase);
+
 export const saasAdminController = new SaasAdminController(
   new LoginPlatformAdminUseCase(platformAdminRepo),
   new CreatePlanUseCase(planRepo),
@@ -62,14 +77,14 @@ export const saasAdminController = new SaasAdminController(
   new CreateSubscriptionUseCase(subscriptionRepo, auditService),
   new ListSubscriptionsUseCase(subscriptionRepo),
   new GetSubscriptionUseCase(subscriptionRepo),
-  new RegisterSubscriptionPaymentUseCase(subscriptionRepo, auditService),
+  new RegisterSubscriptionPaymentUseCase(subscriptionRepo, auditService, invoiceSubscriptionPaymentUseCase),
   new ListCompaniesUseCase(subscriptionRepo),
   new GetSaasDashboardUseCase(subscriptionRepo),
   createSubscriptionCheckoutUseCase,
   new ConfirmWompiPaymentUseCase(subscriptionRepo, paymentGateway, auditService, {
     reader: subscriptionRepo,
     notifier: new ResendPlatformNotifier(),
-  }),
+  }, invoiceSubscriptionPaymentUseCase),
   new SendFactusActivationRequestUseCase(subscriptionRepo, new ResendFactusActivationNotifier(), auditService),
   new ListPlatformAdminsUseCase(platformAdminRepo),
   new CreatePlatformAdminUseCase(platformAdminRepo),

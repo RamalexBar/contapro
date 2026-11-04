@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requirePlatformAdmin } from "../../../shared/middlewares/require-platform-admin.middleware";
-import { companyAdminController, saasAdminController } from "../saas-admin.container";
+import { companyAdminController, saasAdminController, subscriptionInvoiceController } from "../saas-admin.container";
 
 // NOTA: este router NO usa tenantContextMiddleware -- el panel de administrador SaaS es
 // transversal a todas las empresas, protegido por requirePlatformAdmin (JWT con secreto propio,
@@ -26,6 +26,8 @@ saasAdminRouter.post(
   requirePlatformAdmin,
   saasAdminController.registerSubscriptionPayment
 );
+// Reintentar la factura al cliente de un pago ya confirmado (si fallo o no estaba configurada).
+saasAdminRouter.post("/admin/subscription-payments/:paymentId/invoice", requirePlatformAdmin, subscriptionInvoiceController.retry);
 saasAdminRouter.post(
   "/admin/subscriptions/:id/checkout",
   requirePlatformAdmin,

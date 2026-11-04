@@ -314,6 +314,36 @@ Panel → Empresas (`PATCH /admin/companies/:id/archived { archived }`, `DELETE 
 Verificado en vivo: ensayo con rollback sobre la empresa demo (988 filas, 0 con su `companyId` despues, 0 sueltas)
 y archivar → login 401 «archivada» → borrar con nombre exacto en el navegador.
 
+## Factura de la suscripcion (2026-11-04)
+
+Contapro le emite factura electronica a cada cliente por cada pago de suscripcion confirmado. Contapro es un
+cliente mas de si mismo: una empresa normal en Contapro (persona natural no responsable de IVA), con su
+resolucion DIAN y Factus configurados como cualquier otra, cuyo id va en `PLATFORM_INVOICING_COMPANY_ID`.
+
+- `InvoiceSubscriptionPaymentUseCase` corre despues de confirmar el pago en los dos caminos: el webhook de Wompi
+  (`ConfirmWompiPaymentUseCase`, que tambien cubre el cobro automatico con tarjeta) y el pago registrado a mano
+  en el panel (`RegisterSubscriptionPaymentUseCase`, que devuelve `invoice` en la respuesta).
+- `ManualInvoiceSubscriptionIssuer` entra al tenant de esa empresa con contexto de sistema, busca o crea al
+  cliente por su NIT (con correo, telefono, direccion y codigo DANE de la empresa que pago) y reusa
+  `CreateManualInvoiceUseCase` (factura sin producto ni inventario). La linea: «Suscripción Contapro - <plan>
+  (mensual|anual), vigente hasta el dd/mm/aaaa», cantidad 1, valor pagado, **sin IVA (excluida)**. Factus le
+  envia el XML y el PDF al correo del cliente. El modulo de factura manual no contabiliza (ver su README).
+- Nunca frena el pago. No factura: pagos ya facturados (el webhook puede repetirse), combos cobrados por Cajapro
+  (`billedBy = CAJAPRO`), la propia empresa de Contapro, pagos en cero. Sin la variable no hace nada y el aviso
+  de pago al equipo lo dice.
+- Sin codigo DANE del municipio del cliente (Factus lo exige para un NIT) falla antes de llamar a Factus. Un fallo
+  queda en `subscription_payments.invoiceError`, auditado (`SUBSCRIPTION_PAYMENT_INVOICE_FAILED`) y por correo
+  de avisos; una factura creada que la DIAN no acepto tambien avisa. Panel → Suscripciones muestra «Facturado» /
+  «Factura falló» en el ultimo pago con «Reintentar factura» (`POST /admin/subscription-payments/:paymentId/invoice`).
+  Una factura ya creada pero rechazada se reenvia desde Facturacion electronica en la empresa de Contapro.
+- El modulo de factura manual se importa de forma diferida en `saas-admin.container.ts` (manual-invoicing ->
+  electronic-invoicing -> ... vuelve a importar este container).
+
+Verificado en vivo (local, sandbox de Factus, 2026-11-04): pago registrado a mano desde el panel → factura SETP24
+ACCEPTED con cliente NIT, linea sin IVA y PDF correcto. El primer intento sirvio para encontrar dos problemas:
+Factus exige el codigo de municipio del comprador y exige `taxes` en cada linea (ver README de facturacion
+electronica, linea sin impuesto). Falta: habilitacion real de Contapro en la DIAN y su configuracion en produccion.
+
 ## Que falta implementar
 
 1. Verificacion end-to-end de WhatsApp contra la API real de Meta — ver

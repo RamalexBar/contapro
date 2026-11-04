@@ -3,6 +3,7 @@ import type { AuditService } from "../../../audit/application/audit.service";
 import type { IPaymentGateway, WompiWebhookEvent } from "../../domain/payment-gateway";
 import type { ISubscriptionRepository } from "../../domain/subscription.repository";
 import type { IPaymentNotificationInfoReader, IPlatformNotifier } from "../../domain/platform-notifier";
+import { describeSubscriptionInvoice, type InvoiceSubscriptionPaymentUseCase } from "./invoice-subscription-payment.use-case";
 
 const APPROVED_STATUS = "APPROVED";
 const FAILED_STATUSES = new Set(["DECLINED", "ERROR", "VOIDED"]);
@@ -25,7 +26,8 @@ export class ConfirmWompiPaymentUseCase {
     private readonly subscriptionRepo: ISubscriptionRepository,
     private readonly paymentGateway: IPaymentGateway,
     private readonly audit: AuditService,
-    private readonly notifications?: { reader: IPaymentNotificationInfoReader; notifier: IPlatformNotifier }
+    private readonly notifications?: { reader: IPaymentNotificationInfoReader; notifier: IPlatformNotifier },
+    private readonly invoicePayment?: Pick<InvoiceSubscriptionPaymentUseCase, "execute">
   ) {}
 
   async execute(event: WompiWebhookEvent): Promise<void> {
@@ -50,14 +52,16 @@ export class ConfirmWompiPaymentUseCase {
         description: `Pago Wompi confirmado: ${payment.amount}. Nuevo vencimiento: ${newPeriodEnd.toISOString().slice(0, 10)}`,
         metadata: { reference, wompiTransactionId: event.data.transaction.id },
       });
-      await this.notifyTeam(subscription.id, Number(payment.amount), newPeriodEnd);
+      // La factura al cliente (nunca lanza; si falla queda para reintentar desde el panel).
+      const invoice = this.invoicePayment ? await this.invoicePayment.execute(payment.id) : null;
+      await this.notifyTeam(subscription.id, Number(payment.amount), newPeriodEnd, invoice ? describeSubscriptionInvoice(invoice) : undefined);
     } else if (FAILED_STATUSES.has(status)) {
       await this.subscriptionRepo.failPayment(payment.id);
     }
   }
 
   /** Aviso al equipo de Contapro; si falla, el pago ya quedo aplicado y no se revierte nada. */
-  private async notifyTeam(subscriptionId: string, amount: number, newPeriodEnd: Date): Promise<void> {
+  private async notifyTeam(subscriptionId: string, amount: number, newPeriodEnd: Date, subscriptionInvoice?: string): Promise<void> {
     if (!this.notifications) return;
     try {
       const info = await this.notifications.reader.findPaymentNotificationInfo(subscriptionId);
@@ -67,6 +71,7 @@ export class ConfirmWompiPaymentUseCase {
         amount,
         newPeriodEnd,
         invoicingPending: info.electronicInvoicingProvider !== "FACTUS",
+        subscriptionInvoice,
       });
     } catch (err) {
       console.error("No se pudo enviar el aviso de pago al equipo:", err);

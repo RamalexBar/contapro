@@ -233,7 +233,10 @@ como unico proveedor tecnologico.
       transferencia `47`, credito con forma `2`, medio `1` y el vencimiento de la cuenta por
       cobrar). Factus exige que sumen el total **antes** de retenciones: el vuelto se quita del
       efectivo y lo retenido se suma al ultimo pago (`buildPaymentDetails`). Descuento por linea en
-      `discount_rate`; retenciones de la venta en `withholding_taxes` de cada linea (ReteIVA solo en
+      `discount_rate`; linea sin impuesto (2026-11-04): Factus exige `taxes` en cada linea y rechaza una lista
+      vacia, asi que exento va como IVA `0.00` y lo demas (excluido, IVA 0 % sin tipo, emisor no responsable de
+      IVA) como `[{ is_excluded: true }]`, segun el ejemplo «impuesto excluido» de la documentacion de Factus;
+      antes cualquier venta con un producto al 0 % era rechazada. Retenciones de la venta en `withholding_taxes` de cada linea (ReteIVA solo en
       lineas con IVA; si la base de una retencion no es el subtotal completo, el valor que calcula
       Factus puede diferir del de Contapro). Comprador con NIT: `dv` (escrito o calculado),
       `company`, persona juridica, y tributo/responsabilidades de `Customer.dianTaxRegimeId`

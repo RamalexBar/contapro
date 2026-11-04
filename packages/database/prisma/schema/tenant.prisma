@@ -181,6 +181,11 @@ model SubscriptionPayment {
   status         String       @default("PENDING") // PENDING, CONFIRMED, FAILED
   paidAt         DateTime?
   createdAt      DateTime     @default(now())
+  // Factura que Contapro le emite al cliente por este pago (modules/manual-invoicing en la empresa
+  // PLATFORM_INVOICING_COMPANY_ID). invoiceError = ultimo intento fallido, para reintentar desde el panel.
+  manualInvoiceId String?
+  invoicedAt      DateTime?
+  invoiceError    String?
 
   @@index([subscriptionId])
   @@map("subscription_payments")

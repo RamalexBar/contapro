@@ -74,6 +74,9 @@ export interface SubscriptionPaymentRecord {
   status: string;
   paidAt: Date | null;
   createdAt: Date;
+  /** Factura que Contapro le emitio al cliente por este pago (ver InvoiceSubscriptionPaymentUseCase). */
+  invoicedAt?: Date | null;
+  invoiceError?: string | null;
 }
 
 export interface ApplyPaymentData {

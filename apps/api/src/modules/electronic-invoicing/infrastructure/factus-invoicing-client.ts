@@ -200,6 +200,18 @@ export function factusReferenceCode(input: Pick<ThirdPartyInvoiceInput, "prefix"
   return `${input.prefix}${input.documentNumber}-${input.issueDate.getTime().toString(36)}`;
 }
 
+/**
+ * Factus exige "taxes" en cada linea, tambien sin impuesto (una lista vacia la rechaza: "El campo
+ * items.0.taxes es obligatorio", sandbox 2026-11-04). Sin impuesto: exento = IVA al 0 %; cualquier
+ * otro caso (excluido, o emisor no responsable de IVA) va como excluido, segun el ejemplo
+ * "impuesto excluido" de developers.factus.com.co.
+ */
+function lineTaxes(line: ThirdPartyInvoiceInput["lines"][number]): Record<string, unknown>[] {
+  if (line.taxAmount > 0) return [{ code: line.taxType === "INC" ? TAX_CODE_INC : TAX_CODE_IVA, rate: line.taxPercent.toFixed(2) }];
+  if (line.taxType === "EXEMPT") return [{ code: TAX_CODE_IVA, rate: "0.00" }];
+  return [{ is_excluded: true }];
+}
+
 export function buildBillPayload(input: ThirdPartyInvoiceInput, numberingRangeId: number): Record<string, unknown> {
   const customer = input.customer;
   const referenceCode = factusReferenceCode(input);
@@ -229,7 +241,7 @@ export function buildBillPayload(input: ThirdPartyInvoiceInput, numberingRangeId
         price: money(line.unitPrice),
         unit_measure_code: UNIT_MEASURE_UNIT,
         standard_code: STANDARD_CODE_TAXPAYER_ADOPTED,
-        taxes: line.taxAmount > 0 ? [{ code: line.taxType === "INC" ? TAX_CODE_INC : TAX_CODE_IVA, rate: line.taxPercent.toFixed(2) }] : [],
+        taxes: lineTaxes(line),
         ...(withholdings.length > 0 ? { withholding_taxes: withholdings } : {}),
       };
     }),

@@ -18,6 +18,7 @@ import {
   type SubscriptionWithDetails,
 } from "../domain/subscription.repository";
 import type { IPaymentNotificationInfoReader, PaymentNotificationInfo } from "../domain/platform-notifier";
+import type { ISubscriptionInvoiceRepository, SubscriptionPaymentInvoiceData } from "../domain/subscription-invoicing";
 
 type SubscriptionRow = {
   id: string;
@@ -64,6 +65,8 @@ function toPaymentRecord(row: {
   status: string;
   paidAt: Date | null;
   createdAt: Date;
+  invoicedAt?: Date | null;
+  invoiceError?: string | null;
 }): SubscriptionPaymentRecord {
   return {
     id: row.id,
@@ -74,6 +77,8 @@ function toPaymentRecord(row: {
     status: row.status,
     paidAt: row.paidAt,
     createdAt: row.createdAt,
+    invoicedAt: row.invoicedAt ?? null,
+    invoiceError: row.invoiceError ?? null,
   };
 }
 
@@ -81,7 +86,7 @@ const LIFECYCLE_STATUSES: SubscriptionStatus[] = ["TRIALING", "ACTIVE", "GRACE_P
 
 /** basePrisma en todo el archivo: este panel corre transversal a todas las empresas, sin
  * AsyncLocalStorage/tenant context (ver README del modulo). */
-export class PrismaSubscriptionRepository implements ISubscriptionRepository, IPaymentNotificationInfoReader {
+export class PrismaSubscriptionRepository implements ISubscriptionRepository, IPaymentNotificationInfoReader, ISubscriptionInvoiceRepository {
   async create(data: CreateSubscriptionData): Promise<SubscriptionRecord> {
     const row = await basePrisma.subscription.create({
       data: {
@@ -283,6 +288,48 @@ export class PrismaSubscriptionRepository implements ISubscriptionRepository, IP
         factusActivationRequestedAt: lastActivationRequest.get(company.id) ?? null,
       };
     });
+  }
+
+  async findPaymentInvoiceData(paymentId: string): Promise<SubscriptionPaymentInvoiceData | null> {
+    const payment = await basePrisma.subscriptionPayment.findUnique({
+      where: { id: paymentId },
+      include: { subscription: { include: { plan: { select: { name: true } }, company: true } } },
+    });
+    if (!payment) return null;
+    const { subscription } = payment;
+    const company = subscription.company;
+    return {
+      paymentId: payment.id,
+      status: payment.status,
+      amount: Number(payment.amount),
+      manualInvoiceId: payment.manualInvoiceId,
+      billedBy: subscription.billedBy,
+      planName: subscription.plan.name,
+      billingCycle: subscription.billingCycle,
+      coveredUntil: subscription.currentPeriodEnd,
+      buyer: {
+        companyId: company.id,
+        name: company.legalName || company.name,
+        documentType: company.documentType || "NIT",
+        documentNumber: company.dv && !company.nit.includes("-") ? `${company.nit}-${company.dv}` : company.nit,
+        email: company.email,
+        phone: company.phone,
+        address: company.address,
+        municipalityCode: company.municipalityCode,
+        fiscalResponsibilities: company.fiscalResponsibilities,
+      },
+    };
+  }
+
+  async markPaymentInvoiced(paymentId: string, manualInvoiceId: string): Promise<void> {
+    await basePrisma.subscriptionPayment.update({
+      where: { id: paymentId },
+      data: { manualInvoiceId, invoicedAt: new Date(), invoiceError: null },
+    });
+  }
+
+  async markPaymentInvoiceFailed(paymentId: string, error: string): Promise<void> {
+    await basePrisma.subscriptionPayment.update({ where: { id: paymentId }, data: { invoiceError: error.slice(0, 1000) } });
   }
 
   async findPaymentNotificationInfo(subscriptionId: string): Promise<PaymentNotificationInfo | null> {

@@ -21,7 +21,7 @@ function input(lines: ThirdPartyInvoiceInput["lines"]): ThirdPartyInvoiceInput {
 
 // Codigo de tributo por renglon (2026-10-13): restaurantes facturan INC, no IVA.
 describe("buildBillPayload -- impuesto por renglon", () => {
-  it("IVA sale con el codigo 01 y INC con el 04; sin impuesto no manda tributo", () => {
+  it("IVA sale con el codigo 01 y INC con el 04; sin impuesto va como excluido (Factus exige taxes)", () => {
     const payload = buildBillPayload(
       input([
         { description: "Gaseosa", code: "ITEM-1", quantity: 1, unitPrice: 3361.34, taxPercent: 19, taxType: "IVA", taxAmount: 638.66, lineTotal: 4000 },
@@ -33,7 +33,15 @@ describe("buildBillPayload -- impuesto por renglon", () => {
 
     expect(payload.items[0].taxes).toEqual([{ code: "01", rate: "19.00" }]);
     expect(payload.items[1].taxes).toEqual([{ code: "04", rate: "8.00" }]);
-    expect(payload.items[2].taxes).toEqual([]);
+    expect(payload.items[2].taxes).toEqual([{ is_excluded: true }]);
+  });
+
+  it("exento sale como IVA al 0 %", () => {
+    const payload = buildBillPayload(
+      input([{ description: "Cuaderno", code: "ITEM-1", quantity: 1, unitPrice: 5000, taxPercent: 0, taxType: "EXEMPT", taxAmount: 0, lineTotal: 5000 }]),
+      1
+    ) as { items: { taxes: unknown[] }[] };
+    expect(payload.items[0].taxes).toEqual([{ code: "01", rate: "0.00" }]);
   });
 
   it("sin taxType (ventas del POS propio de Contapro) sigue siendo IVA, como antes", () => {

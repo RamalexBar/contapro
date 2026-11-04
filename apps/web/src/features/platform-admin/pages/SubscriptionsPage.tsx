@@ -14,6 +14,8 @@ import {
   listPlans,
   listSubscriptions,
   registerSubscriptionPayment,
+  retrySubscriptionPaymentInvoice,
+  describeSubscriptionInvoice,
   type SubscriptionStatus,
 } from "../api/saas-admin.api";
 
@@ -59,20 +61,35 @@ export function SubscriptionsPage() {
   const rows = onlyYearly ? data?.data.filter((s) => s.billingCycle === "YEARLY") : data?.data;
 
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [invoiceMessage, setInvoiceMessage] = useState<string | null>(null);
   const [payForm, setPayForm] = useState({ amount: "", method: "CASH", reference: "" });
   const payMutation = useMutation({
     mutationFn: (id: string) =>
       registerSubscriptionPayment(id, { amount: Number(payForm.amount), method: payForm.method, reference: payForm.reference || undefined }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["saas-admin", "subscriptions"] });
+      if (result.invoice) setInvoiceMessage(`Pago registrado. Factura: ${describeSubscriptionInvoice(result.invoice)}`);
       setPayingId(null);
       setPayForm({ amount: "", method: "CASH", reference: "" });
+    },
+  });
+
+  const invoiceMutation = useMutation({
+    mutationFn: retrySubscriptionPaymentInvoice,
+    onSuccess: (result) => {
+      setInvoiceMessage(`Factura: ${result.message}`);
+      queryClient.invalidateQueries({ queryKey: ["saas-admin", "subscriptions"] });
     },
   });
 
   return (
     <PlatformAdminLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Suscripciones</h1>
+      {invoiceMessage && (
+        <Alert tone="info" className="mb-4">
+          {invoiceMessage}
+        </Alert>
+      )}
 
       <Card title="Asignar suscripcion manual" className="mb-6">
         <form
@@ -154,6 +171,25 @@ export function SubscriptionsPage() {
                       <>
                         {(s.lastPayment.paidAt ?? s.lastPayment.createdAt).slice(0, 10)}
                         <span className="text-slate-400"> · {formatCurrency(s.lastPayment.amount)}</span>
+                        <span className="block text-xs">
+                          {s.lastPayment.invoicedAt ? (
+                            <span className="text-success-700">Facturado</span>
+                          ) : (
+                            <>
+                              <span className={s.lastPayment.invoiceError ? "text-danger-600" : "text-slate-400"} title={s.lastPayment.invoiceError ?? undefined}>
+                                {s.lastPayment.invoiceError ? "Factura falló" : "Sin factura"}
+                              </span>{" "}
+                              <button
+                                type="button"
+                                className="font-medium text-brand-600 hover:underline disabled:opacity-50"
+                                disabled={invoiceMutation.isPending}
+                                onClick={() => invoiceMutation.mutate(s.lastPayment!.id)}
+                              >
+                                Reintentar factura
+                              </button>
+                            </>
+                          )}
+                        </span>
                       </>
                     ) : (
                       <span className="text-slate-400">Sin pagos</span>

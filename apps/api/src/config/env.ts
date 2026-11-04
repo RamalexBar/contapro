@@ -52,6 +52,12 @@ const envSchema = z.object({
   // feature roto si falta).
   INTERNAL_NOTIFICATIONS_EMAIL: z.string().default(""),
 
+  // Empresa (Company.id) con la que Contapro le factura a sus propios clientes cada pago de
+  // suscripcion (ver modules/saas-admin/README.md, "Factura de la suscripcion"). Vacio por defecto =
+  // no se factura y el aviso de pago al equipo lo dice; es lo normal hasta que Contapro quede
+  // habilitado en la DIAN con Factus.
+  PLATFORM_INVOICING_COMPANY_ID: z.string().default(""),
+
   // ---- Cobro de suscripciones via Wompi/Bancolombia (ver modules/saas-admin/README.md) ----
   // Vacios por defecto = generar un link de cobro falla con mensaje claro (mismo criterio que
   // las variables DIAN_*/RESEND_* de arriba, no un crash silencioso). WOMPI_PRIVATE_KEY no lo usa

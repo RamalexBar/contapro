@@ -881,3 +881,9 @@ cuando se implemente, mismo criterio que la lista de arriba:
     la respuesta en un aviso (Dashboard y Vacaciones) hasta pulsar "Entendido". Quien aprueba ve en
     el Dashboard cuantas solicitudes tiene pendientes. Endpoints `GET /time-off/notifications` y
     `POST /time-off/notifications/seen`; migracion `20261012230000_time_off_decisions`. Sin correo.
+53. ~~Factura de la suscripcion a cada cliente~~ — 2026-11-04. Cada pago de suscripcion confirmado
+    (Wompi, cobro automatico o pago registrado en el panel) genera una factura electronica desde la propia empresa
+    de Contapro (`PLATFORM_INVOICING_COMPANY_ID`, persona natural no responsable de IVA): factura manual sin IVA,
+    Factus la envia al correo del cliente. Reintento desde Panel → Suscripciones. De paso se corrigio el conector de
+    Factus: las lineas sin impuesto se rechazaban. Probado contra el sandbox; en produccion falta la habilitacion
+    DIAN de Contapro. Detalle en `apps/api/src/modules/saas-admin/README.md`.

@@ -50,6 +50,9 @@ export interface SubscriptionPaymentRecord {
   status: string;
   paidAt: string | null;
   createdAt: string;
+  /** Factura que Contapro le emitio al cliente por este pago; invoiceError = ultimo intento fallido. */
+  invoicedAt: string | null;
+  invoiceError: string | null;
 }
 
 export interface SubscriptionRecord {
@@ -90,8 +93,37 @@ export function createSubscription(input: CreateSubscriptionInput): Promise<Subs
 export function registerSubscriptionPayment(
   id: string,
   input: { amount: number; method: string; reference?: string }
-): Promise<{ subscription: SubscriptionRecord; payment: unknown }> {
+): Promise<{ subscription: SubscriptionRecord; payment: unknown; invoice: SubscriptionInvoiceOutcome | null }> {
   return platformApiFetch(`/admin/subscriptions/${id}/payments`, { method: "POST", body: input });
+}
+
+/** Que paso con la factura que Contapro le emite al cliente por un pago. */
+export interface SubscriptionInvoiceOutcome {
+  status: "INVOICED" | "NOT_CONFIGURED" | "SKIPPED" | "FAILED";
+  electronicStatus?: string | null;
+  electronicNumber?: string | null;
+  reason?: string;
+  error?: string;
+}
+
+export function describeSubscriptionInvoice(outcome: SubscriptionInvoiceOutcome): string {
+  switch (outcome.status) {
+    case "INVOICED":
+      return outcome.electronicStatus === "ACCEPTED"
+        ? `emitida y aceptada por la DIAN (${outcome.electronicNumber}); le llega al correo del cliente.`
+        : `creada, pero la factura electrónica quedó en estado ${outcome.electronicStatus ?? "sin generar"}.`;
+    case "NOT_CONFIGURED":
+      return "no se emitió: todavía no está configurada la empresa de Contapro que factura.";
+    case "SKIPPED":
+      return `no aplica (${outcome.reason}).`;
+    case "FAILED":
+      return `falló: ${outcome.error}`;
+  }
+}
+
+/** Reintenta la factura al cliente de un pago ya confirmado. */
+export function retrySubscriptionPaymentInvoice(paymentId: string): Promise<{ status: string; message: string }> {
+  return platformApiFetch(`/admin/subscription-payments/${paymentId}/invoice`, { method: "POST" });
 }
 
 export interface CompanyWithSubscriptionRecord {

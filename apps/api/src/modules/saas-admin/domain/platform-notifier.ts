@@ -9,6 +9,8 @@ export interface PaymentApprovedNotification {
   newPeriodEnd: Date;
   /** true si la empresa todavia no factura con Factus: hay que pedirle los documentos y activarla. */
   invoicingPending: boolean;
+  /** Que paso con la factura que Contapro le emite al cliente por este pago (texto para el correo). */
+  subscriptionInvoice?: string;
 }
 
 /** Datos de la empresa y el plan de una suscripcion, para armar el aviso del pago. */

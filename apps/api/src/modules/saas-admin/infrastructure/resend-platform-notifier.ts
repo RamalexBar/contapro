@@ -41,6 +41,7 @@ export function buildHtml(n: PaymentApprovedNotification): string {
     <strong>${escapeHtml(n.planName)}</strong> ${cycle}: <strong>${formatCOP(n.amount)}</strong>.</p>
     <p>Queda activo hasta el ${n.newPeriodEnd.toISOString().slice(0, 10)}. Correo de la empresa: ${escapeHtml(n.companyEmail)}.</p>
     ${pending}
+    ${n.subscriptionInvoice ? `<p><strong>Factura al cliente:</strong> ${escapeHtml(n.subscriptionInvoice)}</p>` : ""}
   `.trim();
 }
 
