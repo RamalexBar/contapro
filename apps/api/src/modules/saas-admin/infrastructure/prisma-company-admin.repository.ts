@@ -165,8 +165,10 @@ export async function deleteCompanyIn(tx: Tx, companyId: string): Promise<{ dele
         await tx.$executeRawUnsafe("release savepoint borrar_empresa");
       } catch (err) {
         await tx.$executeRawUnsafe("rollback to savepoint borrar_empresa");
-        // 23503 = todavia tiene hijos: se reintenta en la siguiente pasada
-        if (!String((err as { meta?: { code?: string } }).meta?.code ?? (err as Error).message).includes("23503")) throw err;
+        // Todavia tiene hijos: se reintenta en la siguiente pasada. 23503 = llave foranea normal; 23001 = llave
+        // foranea RESTRICT (ej. users.companyId), que Postgres reporta con otro codigo.
+        const code = String((err as { meta?: { code?: string } }).meta?.code ?? (err as Error).message);
+        if (!code.includes("23503") && !code.includes("23001")) throw err;
         blocked.push(table);
       }
     }
