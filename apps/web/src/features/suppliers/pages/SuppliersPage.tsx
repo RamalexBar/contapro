@@ -6,6 +6,7 @@ import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
+import { MunicipalitySelect } from "../../../components/ui/MunicipalitySelect";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
 import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
@@ -105,11 +106,7 @@ function SuppliersSection() {
           <Input placeholder="NIT / documento" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} required />
           <Input placeholder="Contacto" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
           <Input placeholder="Telefono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input
-            placeholder="Codigo DANE municipio (opcional)"
-            value={form.municipalityCode}
-            onChange={(e) => setForm({ ...form, municipalityCode: e.target.value })}
-          />
+          <MunicipalitySelect label="" value={form.municipalityCode} onChange={(m) => setForm({ ...form, municipalityCode: m?.code ?? "" })} />
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"

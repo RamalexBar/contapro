@@ -20,6 +20,8 @@ import {
 import { fetchAcceptanceToken, isWompiConfigured, tokenizeCard, WompiError } from "../lib/wompi";
 import { getDianProviderSettings } from "../../integrations/api/integrations.api";
 import { EinvoiceActivationCard } from "../components/EinvoiceActivationCard";
+import { Link } from "react-router-dom";
+import { getCompanyProfile } from "../../company/api/company.api";
 
 const STATUS_LABELS: Record<string, string> = {
   TRIALING: "Periodo de prueba",
@@ -217,6 +219,9 @@ export function BillingPage() {
     retry: false,
   });
   const needsEinvoiceActivation = paidAndCurrent && !!dianProvider && dianProvider.provider !== "FACTUS";
+  // Contapro le factura cada pago a la empresa y Factus exige su municipio (codigo DANE): sin el, la factura falla.
+  const { data: profile } = useQuery({ queryKey: ["company-profile"], queryFn: getCompanyProfile, enabled: !!data && !isCombo, retry: false });
+  const missingMunicipality = !!profile && !profile.municipalityCode;
 
   return (
     <AppLayout>
@@ -227,6 +232,15 @@ export function BillingPage() {
       {data && (
         <>
           {needsEinvoiceActivation && <EinvoiceActivationCard />}
+          {missingMunicipality && (
+            <Alert tone="warning" className="mb-6">
+              Antes de pagar, elija la ciudad o municipio de su empresa en{" "}
+              <Link to="/company/profile" className="font-medium underline">
+                Configuración → Datos de la empresa
+              </Link>
+              : lo necesitamos para enviarle la factura electrónica de su suscripción.
+            </Alert>
+          )}
 
           <Card className="mb-6">
             <div className="flex flex-wrap items-center justify-between gap-3">

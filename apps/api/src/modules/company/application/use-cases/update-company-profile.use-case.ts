@@ -1,3 +1,4 @@
+import { findDaneMunicipality } from "@erp/shared-utils";
 import { ConflictError, ValidationError } from "../../../../shared/errors/app-error";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import type { AuditService } from "../../../audit/application/audit.service";
@@ -26,6 +27,11 @@ export class UpdateCompanyProfileUseCase {
           );
         }
       }
+    }
+
+    // El codigo DANE va a las facturas (Factus): solo se aceptan los del catalogo DIVIPOLA.
+    if (input.municipalityCode && !findDaneMunicipality(input.municipalityCode)) {
+      throw new ValidationError(`No existe un municipio con el código DANE ${input.municipalityCode}`);
     }
 
     const company = await this.repo.update(companyId, input);

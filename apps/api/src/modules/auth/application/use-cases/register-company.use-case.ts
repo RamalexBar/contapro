@@ -1,7 +1,8 @@
 import type { RegisterCompanyInput } from "@erp/shared-types";
 import type { IUserRepository } from "../../domain/user.repository";
 import { hashSecret } from "../../infrastructure/password-hasher.service";
-import { ConflictError } from "../../../../shared/errors/app-error";
+import { findDaneMunicipality } from "@erp/shared-utils";
+import { ConflictError, ValidationError } from "../../../../shared/errors/app-error";
 import { basePrisma, seedDefaultChartOfAccounts, seedDefaultExpenseCategories, seedDefaultWithholdingConcepts } from "@erp/database";
 import type { IPlanRepository } from "../../../saas-admin/domain/plan.repository";
 import type { ISubscriptionRepository } from "../../../saas-admin/domain/subscription.repository";
@@ -29,6 +30,11 @@ export class RegisterCompanyUseCase {
       throw new ConflictError(`Ya existe una empresa registrada con NIT ${input.nit}`);
     }
 
+    const municipality = input.municipalityCode ? findDaneMunicipality(input.municipalityCode) : null;
+    if (input.municipalityCode && !municipality) {
+      throw new ValidationError(`No existe un municipio con el código DANE ${input.municipalityCode}`);
+    }
+
     const adminPasswordHash = await hashSecret(input.adminPassword);
 
     const result = await this.userRepo.createCompanyWithAdmin({
@@ -40,6 +46,9 @@ export class RegisterCompanyUseCase {
       adminFullName: input.adminFullName,
       adminEmail: input.adminEmail,
       adminPasswordHash,
+      municipalityCode: municipality?.code,
+      municipality: municipality?.name,
+      department: municipality?.department,
     });
 
     // A diferencia de la suscripcion de prueba (mas abajo, tolerante a que el plan no exista

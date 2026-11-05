@@ -217,7 +217,7 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
         expenseCategoryId: suggestedCategory?.id ?? prev.expenseCategoryId,
         payeeName: extracted.payeeName ?? prev.payeeName,
         description: details.length > 0 ? details.join(" · ") : prev.description,
-        date: extracted.issueDate && /^d{4}-d{2}-d{2}$/.test(extracted.issueDate) ? extracted.issueDate : prev.date,
+        date: extracted.issueDate && /^\d{4}-\d{2}-\d{2}$/.test(extracted.issueDate) ? extracted.issueDate : prev.date,
         subtotal: extracted.subtotal != null ? String(extracted.subtotal) : prev.subtotal,
         taxPercent: taxRatePercent != null ? String(taxRatePercent) : prev.taxPercent,
       }));

@@ -5,6 +5,7 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { MunicipalitySelect } from "../../../components/ui/MunicipalitySelect";
 import { Select } from "../../../components/ui/Select";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
 import { Badge } from "../../../components/ui/Badge";
@@ -119,11 +120,14 @@ export function CustomerListPage() {
               value={form.creditLimit}
               onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
             />
-            <Input
-              placeholder="Código DANE del municipio (para factura electrónica)"
-              value={form.municipalityCode}
-              onChange={(e) => setForm({ ...form, municipalityCode: e.target.value })}
-            />
+            <div className="col-span-2">
+              <MunicipalitySelect
+                label=""
+                value={form.municipalityCode}
+                onChange={(m) => setForm({ ...form, municipalityCode: m?.code ?? "" })}
+                hint={form.documentType === "NIT" ? "Obligatorio para facturarle electrónicamente a una empresa (NIT)." : undefined}
+              />
+            </div>
             <Select value={form.priceListId} onChange={(e) => setForm({ ...form, priceListId: e.target.value })}>
               <option value="">Sin lista de precios (precio base)</option>
               {activePriceLists.map((pl) => (

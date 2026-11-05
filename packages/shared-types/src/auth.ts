@@ -18,6 +18,9 @@ export const registerCompanySchema = z.object({
   adminFullName: z.string().min(2),
   adminEmail: z.string().email(),
   adminPassword: z.string().min(8),
+  // Codigo DANE del municipio (catalogo de @erp/shared-utils). La web lo exige; opcional aqui para
+  // no romper clientes viejos (app movil). Factus lo necesita para facturarle a la empresa.
+  municipalityCode: z.string().regex(/^\d{5}$/, "Código DANE inválido").optional(),
 });
 export type RegisterCompanyInput = z.infer<typeof registerCompanySchema>;
 

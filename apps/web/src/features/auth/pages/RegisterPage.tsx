@@ -5,16 +5,18 @@ import { Input } from "../../../components/ui/Input";
 import { Card } from "../../../components/ui/Card";
 import { Alert } from "../../../components/ui/Alert";
 import { Logo } from "../../../components/ui/Logo";
+import { MunicipalitySelect } from "../../../components/ui/MunicipalitySelect";
 import { login, registerCompany } from "../api/auth.api";
 import { useAuthStore } from "../hooks/useAuthStore";
 import { ApiError } from "../../../lib/api-client";
 import { trackEvent } from "../../../lib/analytics";
 
-// Solo 5 campos: la razon social arranca igual al nombre del negocio y el correo de la empresa
+// Solo 6 campos: la razon social arranca igual al nombre del negocio y el correo de la empresa
 // igual al del usuario; ambos se corrigen despues en la configuracion de la empresa.
 interface FormState {
   companyName: string;
   nit: string;
+  municipalityCode: string;
   adminFullName: string;
   adminEmail: string;
   adminPassword: string;
@@ -23,6 +25,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   companyName: "",
   nit: "",
+  municipalityCode: "",
   adminFullName: "",
   adminEmail: "",
   adminPassword: "",
@@ -43,6 +46,10 @@ export function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.municipalityCode) {
+      setError("Elige tu ciudad o municipio de la lista.");
+      return;
+    }
     setLoading(true);
     setError(null);
     let companyId: string;
@@ -103,6 +110,12 @@ export function RegisterPage() {
             placeholder="900123456-7"
             value={form.nit}
             onChange={(e) => update("nit", e.target.value)}
+            required
+          />
+          <MunicipalitySelect
+            value={form.municipalityCode}
+            onChange={(m) => update("municipalityCode", m?.code ?? "")}
+            hint="Donde está tu negocio. Lo pide la DIAN en las facturas."
             required
           />
           <Input

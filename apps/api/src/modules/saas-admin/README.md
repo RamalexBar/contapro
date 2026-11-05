@@ -336,7 +336,9 @@ resolucion DIAN y Factus configurados como cualquier otra, cuyo id va en `PLATFO
 - Nunca frena el pago. No factura: pagos ya facturados (el webhook puede repetirse), combos cobrados por Cajapro
   (`billedBy = CAJAPRO`), la propia empresa de Contapro, pagos en cero. Sin la variable no hace nada y el aviso
   de pago al equipo lo dice.
-- Sin codigo DANE del municipio del cliente (Factus lo exige para un NIT) falla antes de llamar a Factus. Un fallo
+- Sin codigo DANE del municipio del cliente (Factus lo exige para un NIT) falla antes de llamar a Factus. Desde el
+  2026-11-04 el registro lo pide (selector de municipio con el catalogo DIVIPOLA de `@erp/shared-utils`) y
+  «Mi suscripcion» avisa si falta; las empresas registradas antes lo eligen en Datos de la empresa. Un fallo
   queda en `subscription_payments.invoiceError`, auditado (`SUBSCRIPTION_PAYMENT_INVOICE_FAILED`) y por correo
   de avisos; una factura creada que la DIAN no acepto tambien avisa. Panel → Suscripciones muestra «Facturado» /
   «Factura falló» en el ultimo pago con «Reintentar factura» (`POST /admin/subscription-payments/:paymentId/invoice`).

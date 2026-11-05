@@ -887,3 +887,8 @@ cuando se implemente, mismo criterio que la lista de arriba:
     Factus la envia al correo del cliente, y el ingreso queda contabilizado (Bancos 1110 / Ingresos 4155). Reintento desde Panel → Suscripciones. De paso se corrigio el conector de
     Factus: las lineas sin impuesto se rechazaban. Probado contra el sandbox; en produccion falta la habilitacion
     DIAN de Contapro. Detalle en `apps/api/src/modules/saas-admin/README.md`.
+54. ~~Municipio con codigo DANE en vez de escribirlo a mano~~ — 2026-11-04. Catalogo DIVIPOLA completo (1.122
+    municipios, DANE/datos.gov.co) en `@erp/shared-utils` (`findDaneMunicipality`, `searchDaneMunicipalities`) y
+    un selector con busqueda (`MunicipalitySelect`) en el registro (obligatorio), Datos de la empresa, clientes y
+    proveedores: se elige la ciudad y se guardan nombre, departamento y codigo. La API rechaza codigos que no
+    existen. «Mi suscripcion» avisa si la empresa no tiene municipio, porque Factus lo exige para facturarle.

@@ -54,6 +54,11 @@ describe("UpdateCompanyProfileUseCase — corregir razon social y NIT", () => {
     expect(result).toMatchObject({ legalName: "Alexander Barrios", nit: "1001292780" });
   });
 
+  it("only accepts DANE codes from the DIVIPOLA catalog", async () => {
+    await expect(run(new FakeCompanyProfileRepository(), { municipalityCode: "99999" })).rejects.toThrow(/código DANE/);
+    await expect(run(new FakeCompanyProfileRepository(), { municipalityCode: "66001" })).resolves.toBeDefined();
+  });
+
   it("rejects a NIT that another company already uses", async () => {
     await expect(run(new FakeCompanyProfileRepository(), { nit: "900123456" })).rejects.toThrow(/otra empresa/);
   });

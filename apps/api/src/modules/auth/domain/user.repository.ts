@@ -24,6 +24,10 @@ export interface CreateCompanyWithAdminInput {
   adminFullName: string;
   adminEmail: string;
   adminPasswordHash: string;
+  /** Municipio de la empresa (codigo DANE + nombres), si se conoce al registrarla. */
+  municipalityCode?: string;
+  municipality?: string;
+  department?: string;
 }
 
 export interface CreatedCompanyWithAdmin {

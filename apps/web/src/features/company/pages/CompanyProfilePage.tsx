@@ -6,6 +6,7 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
+import { MunicipalitySelect } from "../../../components/ui/MunicipalitySelect";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { getCompanyProfile, updateCompanyProfile } from "../api/company.api";
 import { listBranches, updateBranch, type BranchRecord } from "../../inventory/api/branch.api";
@@ -423,11 +424,23 @@ export function CompanyProfilePage() {
 
           <Section title="Dirección principal" description="Sale en el tiquete y en el encabezado de las facturas.">
             <Input label="Dirección" value={form.address} onChange={(e) => set("address", e.target.value)} disabled={disabled} />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Input label="Ciudad o municipio" placeholder="Pereira" value={form.municipality} onChange={(e) => set("municipality", e.target.value)} disabled={disabled} />
-              <Input label="Departamento" value={form.department} onChange={(e) => set("department", e.target.value)} disabled={disabled} />
-              <Input label="Código DANE (opcional)" value={form.municipalityCode} onChange={(e) => set("municipalityCode", e.target.value)} disabled={disabled} />
-            </div>
+            <MunicipalitySelect
+              value={form.municipalityCode}
+              disabled={disabled}
+              hint={
+                !form.municipalityCode && form.municipality
+                  ? `Tenía escrito «${form.municipality}»: búsquelo y elíjalo de la lista para guardar su código DANE.`
+                  : "Se guardan el municipio, el departamento y el código DANE que exige la DIAN."
+              }
+              onChange={(m) =>
+                setForm((prev) => ({
+                  ...prev,
+                  municipalityCode: m?.code ?? "",
+                  municipality: m?.name ?? "",
+                  department: m?.department ?? "",
+                }))
+              }
+            />
           </Section>
 
           <Section title="Textos del tiquete">

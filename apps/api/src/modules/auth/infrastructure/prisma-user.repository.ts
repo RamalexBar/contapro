@@ -143,6 +143,9 @@ export class PrismaUserRepository implements IUserRepository {
           legalName: input.legalName,
           nit: input.nit,
           email: input.companyEmail,
+          municipalityCode: input.municipalityCode,
+          municipality: input.municipality,
+          department: input.department,
         },
       });
 
