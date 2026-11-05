@@ -38,7 +38,7 @@ export function BranchSwitcher() {
 
   return (
     <div className="flex min-w-0 items-center gap-1.5 text-sm text-slate-700" title={error || "Sucursal en la que estas trabajando"}>
-      <Store size={18} className={error ? "shrink-0 text-danger-500" : "shrink-0 text-slate-400"} />
+      <Store size={18} className={error ? "hidden shrink-0 text-danger-500 sm:block" : "hidden shrink-0 text-slate-400 sm:block"} />
       {branches.length === 1 ? (
         <span className="max-w-[10rem] truncate font-medium">{current?.name ?? branches[0]!.name}</span>
       ) : (

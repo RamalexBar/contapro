@@ -297,7 +297,8 @@ export function AppLayout({ children }: PropsWithChildren) {
             (facil de perder de vista) y ni siquiera en movil salvo que se abriera el menu -- esta
             barra queda visible siempre, arriba a la derecha, en ambos tamanos de pantalla. */}
         <header className="no-print flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
-          <div className="flex items-center gap-3 md:hidden">
+          {/* shrink-0: en el celular el logo se encogia y el selector de sucursal le quedaba encima */}
+          <div className="flex shrink-0 items-center gap-3 md:hidden">
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
@@ -306,7 +307,7 @@ export function AppLayout({ children }: PropsWithChildren) {
             >
               <Menu size={20} />
             </button>
-            <Logo />
+            <Logo heightClassName="h-7 sm:h-9" />
           </div>
           <div className="hidden md:block" />
           <div className="flex min-w-0 items-center gap-4">
