@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, ScrollRestoration } from "react-router-dom";
 import { ContactWidget } from "../components/ui/ContactWidget";
 
 /** Envuelve todas las rutas publicas y de la app (landing, auth, dashboard, POS, etc.) para que
@@ -10,6 +10,9 @@ export function RootLayout() {
     <>
       <Outlet />
       <ContactWidget />
+      {/* Cada pagina nueva abre arriba (antes quedaba en la posicion de la anterior: al pasar de una
+          pagina larga a Clientes se veia la mitad vacia); con "Atras" vuelve a donde estaba. */}
+      <ScrollRestoration />
     </>
   );
 }

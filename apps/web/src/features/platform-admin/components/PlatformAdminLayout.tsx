@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, ScrollRestoration, useNavigate } from "react-router-dom";
 import { usePlatformAuthStore } from "../hooks/usePlatformAuthStore";
 import { Button } from "../../../components/ui/Button";
 import { Logo } from "../../../components/ui/Logo";
@@ -63,6 +63,8 @@ export function PlatformAdminLayout({ children }: PropsWithChildren) {
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      {/* El panel queda fuera de RootLayout: cada pagina abre arriba, igual que en la app. */}
+      <ScrollRestoration />
     </div>
   );
 }
