@@ -1,20 +1,47 @@
-# Contapro — ERP SaaS Colombia
+# Contapro — ERP SaaS para pymes colombianas
 
-ERP modular multiempresa/multisucursal para pequeños y medianos negocios (tiendas, supermercados,
-minimercados, papelerías, ferreterías, boutiques, droguerías) en Colombia. Inspirado en Alegra, Siigo,
-World Office y Siesa, construido con Clean Architecture, principios SOLID y diseño modular pensado
-para escalar a miles de clientes bajo modalidad SaaS.
+**Software contable y de gestión en la nube para pequeños y medianos negocios en Colombia.** Incluye punto de venta, inventario, contabilidad, nómina y facturación electrónica DIAN, con app web y app móvil.
 
-> Este repositorio arrancó como **iteración 1** (scaffold completo del monorepo + módulos core
-> funcionales) y avanzó módulo por módulo hasta la **iteración 18**: Nómina Colombia (motor de
-> liquidación + PDF del desprendible), Contabilidad (plan de cuentas, comprobantes automáticos,
-> reportes, cierre de período), Proveedores/Compras (orden de compra, recepción con FIFO real,
-> abonos reversables), Facturación electrónica DIAN (los 5 tipos de documento + RIDE), Panel
-> administrador SaaS (cobro de suscripciones + recordatorios reales por correo) y Sincronización
-> offline en el móvil (ventas). Todos los módulos de negocio tienen API + UI web salvo
-> Facturación electrónica (solo API). Ver [`CLAUDE.md`](./CLAUDE.md) para un resumen orientado a
-> trabajar con Claude Code y [`docs/ALCANCE.md`](./docs/ALCANCE.md) para el detalle completo,
-> módulo por módulo e iteración por iteración.
+🔗 **Demo en línea:** [contapro-web.onrender.com](https://contapro-web.onrender.com) · 👤 Autor: [Ramiro Alexander Barrios Torres](https://github.com/RamalexBar)
+
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-339933?logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express-000000?logo=express&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
+![React Native](https://img.shields.io/badge/React_Native-Expo-000020?logo=expo&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?logo=prisma&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-500%2B_pruebas-6E9F18?logo=vitest&logoColor=white)
+
+<!-- Sugerencia: agrega aquí 2 o 3 capturas de pantalla (dashboard, POS, contabilidad) -->
+
+## Qué hace
+
+| Área | Funciones |
+|---|---|
+| Ventas | POS con carrito, cotizaciones, notas crédito y débito, listas de precios, ventas a crédito y cobranza |
+| Inventario | Productos, códigos de barras, stock por sucursal y compras a proveedores con costo FIFO |
+| Contabilidad | PUC precargado, comprobantes automáticos, cierre de período, resumen de IVA, estados financieros NIIF, activos fijos y depreciación |
+| Nómina | Liquidación de nómina colombiana con parámetros legales por año y desprendible en PDF |
+| DIAN | Facturación electrónica (CUFE/CUDE, XML UBL, firma XAdES) e información exógena (formatos 1001 y 1003) |
+| Empresa | Multiempresa y multisucursal, roles y permisos, auditoría inmutable, CRM, comisiones y gastos |
+| Integraciones | API pública con llaves y webhooks, envío por WhatsApp y conexión automática con [Cajapro](https://cajapro-app.onrender.com) |
+| SaaS | Panel de administración, cobro de suscripciones y recordatorios por correo |
+| Móvil | App Expo con POS, caja e inventario, y sincronización offline (patrón outbox) |
+
+## Retos técnicos resueltos
+
+- **Separación segura entre empresas:** una extensión de Prisma con `AsyncLocalStorage` filtra cada consulta por empresa de forma automática. No depende de que quien programa lo recuerde.
+- **Facturación electrónica DIAN:** genera el CUFE con SHA-384 y el XML UBL 2.1, y lo firma digitalmente con XAdES.
+- **Ventas sin internet:** la app móvil guarda las ventas y las sincroniza después. La sincronización es idempotente y resuelve conflictos.
+- **Arquitectura limpia:** módulos independientes (Clean Architecture y SOLID) en un monorepo pnpm + Turborepo. API, web y móvil comparten tipos y validaciones Zod.
+- **Calidad:** más de 500 pruebas automatizadas con Vitest y verificación de tipos en todo el monorepo.
+
+---
+
+## Documentación técnica
+
+> El detalle de cada módulo está en [`docs/ALCANCE.md`](./docs/ALCANCE.md). Las decisiones de arquitectura están en [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md).
 
 ## Contenido
 
