@@ -80,7 +80,7 @@ export function getProduct(id: string): Promise<ProductDetail> {
 }
 
 export function createProduct(input: CreateProductInput) {
-  return apiFetch("/products", { method: "POST", body: input });
+  return apiFetch<ProductDetail>("/products", { method: "POST", body: input });
 }
 
 export function updateProduct(id: string, input: UpdateProductInput) {

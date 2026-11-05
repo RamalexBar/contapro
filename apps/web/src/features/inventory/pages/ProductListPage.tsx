@@ -11,7 +11,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
-import { createProduct, deleteProduct, listProducts, updateProduct, updateProductBarcode, updateProductPrice } from "../api/product.api";
+import { addProductPhoto, createProduct, deleteProduct, listProducts, updateProduct, updateProductBarcode, updateProductPrice } from "../api/product.api";
 import {
   createPriceList,
   deactivatePriceList,
@@ -28,7 +28,7 @@ import { BrandsSection } from "../components/BrandsSection";
 import { BranchStockSection } from "../components/BranchStockSection";
 import { StockMovementsSection } from "../components/StockMovementsSection";
 import { KardexSection } from "../components/KardexSection";
-import { ProductPhotoCell } from "../components/ProductPhoto";
+import { NewProductPhotosPicker, ProductPhotoCell } from "../components/ProductPhoto";
 import { ProductImportCard } from "../components/ProductImportCard";
 
 function ProductsSection() {
@@ -44,9 +44,11 @@ function ProductsSection() {
   const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: listBrands });
 
   const [form, setForm] = useState({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "", categoryId: "", brandId: "", location: "" });
+  const [newPhotos, setNewPhotos] = useState<string[]>([]);
+  const [photoWarning, setPhotoWarning] = useState<string | null>(null);
   const createMutation = useMutation({
-    mutationFn: () =>
-      createProduct({
+    mutationFn: async () => {
+      const product = await createProduct({
         sku: form.sku,
         name: form.name,
         currentPrice: Number(form.currentPrice),
@@ -60,10 +62,19 @@ function ProductsSection() {
         initialStock: 0,
         minStock: 0,
         maxStock: 0,
-      }),
-    onSuccess: () => {
+      });
+      // El producto ya quedo creado: si una foto falla no se pierde el producto, solo se avisa
+      let failed = 0;
+      for (const photo of newPhotos) await addProductPhoto(product.id, photo).catch(() => failed++);
+      return { failed };
+    },
+    onSuccess: ({ failed }) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setForm({ sku: "", name: "", currentPrice: "", currentCost: "", barcode: "", categoryId: "", brandId: "", location: "" });
+      setNewPhotos([]);
+      setPhotoWarning(
+        failed ? `El producto se creo, pero ${failed === 1 ? "una foto no se pudo subir" : `${failed} fotos no se pudieron subir`}. Toque la foto en la lista para intentarlo de nuevo.` : null
+      );
     },
   });
 
@@ -152,10 +163,21 @@ function ProductsSection() {
                 </option>
               ))}
             </Select>
+            {canUpdate && <NewProductPhotosPicker value={newPhotos} onChange={setNewPhotos} />}
             <Button type="submit" loading={createMutation.isPending}>
               Crear
             </Button>
           </form>
+          {createMutation.isError && (
+            <Alert tone="danger" className="mt-2">
+              {(createMutation.error as Error).message}
+            </Alert>
+          )}
+          {photoWarning && (
+            <Alert tone="warning" className="mt-2">
+              {photoWarning}
+            </Alert>
+          )}
         </Card>
       )}
 

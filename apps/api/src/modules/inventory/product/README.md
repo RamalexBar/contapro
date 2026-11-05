@@ -25,6 +25,10 @@ subirla (`apps/web/src/features/inventory/components/ProductPhoto.tsx`): queda e
   la principal. Al quitar una, las demas se corren (si era la principal, la siguiente pasa a serlo). La direccion
   firmada ahora es por foto (`/product-photos/:photoId`); cambiar el orden cambia su version. En la web: clic en la
   miniatura → «Fotos de …» (agregar, «Hacer principal», quitar). Cotizacion: `findMainPhotos`.
+- **Fotos al crear el producto** (2026-11-05): el formulario «Nuevo producto» tiene «Agregar fotos (hasta 5)»
+  (`NewProductPhotosPicker`, solo con `product.update`). Se achican en el navegador antes de crear; despues de
+  `POST /products` la web las sube una por una con `POST /products/:id/photos` (la primera queda de principal). Si
+  alguna falla, el producto queda creado y se avisa para reintentar desde la lista. Sin endpoint nuevo en la API.
 - **Cloudflare R2** (`shared/storage/r2-object-storage.ts`): con las 4 variables `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
   `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` el archivo va a R2 (llave `companies/<empresa>/products/<producto>/<foto>.jpg`,
   `storageKey`) y la fila no guarda bytes; sin ellas, a la base como antes. Las fotos viejas en la base se siguen

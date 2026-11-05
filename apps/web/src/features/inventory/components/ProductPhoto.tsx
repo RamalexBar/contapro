@@ -63,6 +63,77 @@ export function ProductPhotoCell({ productId, name, photoPath, canEdit }: { prod
   );
 }
 
+/**
+ * En el formulario de "Nuevo producto": el producto todavia no existe, asi que las fotos se escogen y se achican
+ * aqui (data URLs) y quien crea el producto las sube despues con addProductPhoto. La primera queda de principal.
+ */
+export function NewProductPhotosPicker({ value, onChange }: { value: string[]; onChange: (photos: string[]) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function pick(files: File[]) {
+    setBusy(true);
+    setError(null);
+    const added: string[] = [];
+    try {
+      for (const file of files.slice(0, MAX_PHOTOS - value.length)) added.push(await shrinkProductPhoto(file));
+      if (files.length > MAX_PHOTOS - value.length) setError(`Maximo ${MAX_PHOTOS} fotos por producto`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo leer la foto");
+    } finally {
+      setBusy(false);
+      if (added.length) onChange([...value, ...added]);
+    }
+  }
+
+  return (
+    <div className="col-span-2 sm:col-span-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {value.map((photo, i) => (
+          <div key={i} className={`relative h-16 w-16 overflow-hidden rounded-md border ${i === 0 ? "border-brand-500 ring-2 ring-brand-200" : "border-slate-200"}`}>
+            <img src={photo} alt={`Foto ${i + 1}`} className="h-full w-full bg-white object-cover" />
+            {i === 0 && <Star size={12} className="absolute left-1 top-1 fill-brand-500 text-brand-500" aria-label="Principal" />}
+            <button
+              type="button"
+              className="absolute right-0.5 top-0.5 rounded-full bg-white/90 p-0.5 text-slate-500 hover:text-danger-600"
+              onClick={() => onChange(value.filter((_, j) => j !== i))}
+              title="Quitar foto"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+        {value.length < MAX_PHOTOS && (
+          <button
+            type="button"
+            className="flex h-16 items-center gap-2 rounded-md border-2 border-dashed border-slate-300 px-3 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-700 disabled:opacity-50"
+            disabled={busy}
+            onClick={() => input.current?.click()}
+          >
+            <ImagePlus size={20} />
+            {busy ? "Preparando…" : value.length ? "Agregar otra foto" : `Agregar fotos (hasta ${MAX_PHOTOS})`}
+          </button>
+        )}
+      </div>
+      {value.length > 1 && <p className="mt-1 text-xs text-slate-500">La primera es la principal (la que sale en el punto de venta).</p>}
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (files.length) void pick(files);
+        }}
+      />
+      {error && <p className="mt-1 text-sm text-danger-600">{error}</p>}
+    </div>
+  );
+}
+
 function ProductPhotosDialog({ productId, name, canEdit, onClose }: { productId: string; name: string; canEdit: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
