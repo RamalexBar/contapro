@@ -52,6 +52,12 @@ import { saasAdminRouter } from "./modules/saas-admin/interfaces/saas-admin.rout
 
 export const app = express();
 
+// Render pone un proxy delante: sin esto req.ip es la del proxy y TODOS los visitantes cuentan como uno solo en los
+// limites (20 intentos de login cada 15 min, 5 mensajes de contacto por hora... para todos juntos), y
+// express-rate-limit lo registra como ERR_ERL_UNEXPECTED_X_FORWARDED_FOR. 1 = confiar solo en ese proxy: req.ip es la
+// direccion que el proxy vio (la ultima de X-Forwarded-For), que el visitante no puede falsificar.
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 // 30mb: el default (100kb) rechazaria de entrada la foto/PDF en base64 de POST /purchases/extract
