@@ -48,6 +48,29 @@ export function removeProductPhoto(id: string): Promise<void> {
   return apiFetch(`/products/${id}/photo`, { method: "DELETE" });
 }
 
+/** Hasta 5 fotos por producto; la principal (isMain) es la que sale en el POS, la lista y la cotizacion. */
+export interface ProductPhotoItem {
+  id: string;
+  path: string;
+  isMain: boolean;
+}
+
+export function listProductPhotos(id: string): Promise<{ data: ProductPhotoItem[] }> {
+  return apiFetch(`/products/${id}/photos`);
+}
+
+export function addProductPhoto(id: string, dataUrl: string): Promise<{ data: ProductPhotoItem[] }> {
+  return apiFetch(`/products/${id}/photos`, { method: "POST", body: { dataUrl } });
+}
+
+export function deleteProductPhoto(id: string, photoId: string): Promise<void> {
+  return apiFetch(`/products/${id}/photos/${photoId}`, { method: "DELETE" });
+}
+
+export function setMainProductPhoto(id: string, photoId: string): Promise<void> {
+  return apiFetch(`/products/${id}/photos/${photoId}/main`, { method: "POST" });
+}
+
 export function listProducts(search?: string): Promise<{ data: ProductListItem[] }> {
   return apiFetch(`/products${search ? `?search=${encodeURIComponent(search)}` : ""}`);
 }

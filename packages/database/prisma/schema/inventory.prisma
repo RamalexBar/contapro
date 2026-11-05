@@ -61,7 +61,7 @@ model Product {
   updatedAt     DateTime   @updatedAt
 
   images         ProductImage[]
-  photo          ProductPhoto?
+  photos         ProductPhoto[]
   barcodes       Barcode[]
   presentations  ProductPresentation[]
   branchStocks   ProductBranchStock[]
@@ -84,18 +84,23 @@ model ProductImage {
   @@map("product_images")
 }
 
-/// La foto del producto (una por producto), guardada en la base: pesa ~30-40 KB porque el navegador la achica
-/// antes de subirla. Tabla aparte para que la lista de productos no cargue los bytes: la foto se pide por su
-/// direccion firmada (ver modules/inventory/product/README.md, "Foto del producto").
+/// Fotos del producto (hasta 5; position 0 = la principal, la del POS, la lista y la cotizacion). El navegador las
+/// achica a ~30-40 KB antes de subirlas. El archivo va a Cloudflare R2 (storageKey) si esta configurado; si no, en
+/// `data`. La lista de productos no carga bytes: cada foto se pide por su direccion firmada (ver
+/// modules/inventory/product/README.md, "Fotos del producto").
 model ProductPhoto {
-  productId String   @id
-  product   Product  @relation(fields: [productId], references: [id])
-  companyId String
-  mimeType  String
-  data      Bytes
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  companyId  String
+  position   Int      @default(0)
+  mimeType   String
+  data       Bytes?
+  storageKey String?
+  updatedAt  DateTime @updatedAt
 
   @@index([companyId])
+  @@index([productId, position])
   @@map("product_photos")
 }
 

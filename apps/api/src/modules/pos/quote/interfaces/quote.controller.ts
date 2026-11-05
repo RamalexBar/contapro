@@ -42,7 +42,7 @@ export class QuoteController {
       if (!company) throw new NotFoundError("Company", getTenantContext().companyId);
 
       // La foto de cada producto, si tiene (se la muestra al cliente junto al nombre)
-      const photos = await this.photoRepo.findMany(company.id, quote.items.map((i) => i.productId));
+      const photos = await this.photoRepo.findMainPhotos(company.id, quote.items.map((i) => i.productId));
 
       const pdf = await renderSimpleDocumentPdf({
         company: { name: company.name, nit: company.nit },

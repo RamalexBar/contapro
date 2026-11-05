@@ -31,7 +31,8 @@ export interface ProductListItem {
   isActive: boolean;
   barcodes: string[];
   /** Fecha de la foto (null = sin foto); ListProductsUseCase la vuelve la direccion firmada. */
-  photoUpdatedAt: Date | null;
+  /** La foto principal (la direccion firmada se arma con su id y su fecha). */
+  mainPhoto: { id: string; updatedAt: Date } | null;
 }
 
 export interface IProductRepository {

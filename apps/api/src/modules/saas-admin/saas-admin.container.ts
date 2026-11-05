@@ -40,6 +40,7 @@ import { InvoiceSubscriptionPaymentUseCase } from "./application/use-cases/invoi
 import { ManualInvoiceSubscriptionIssuer } from "./infrastructure/manual-invoice-subscription-issuer";
 import { SubscriptionInvoiceController } from "./interfaces/subscription-invoice.controller";
 import { env } from "../../config/env";
+import { objectStorage } from "../../shared/storage/storage.container";
 
 const platformAdminRepo = new PrismaPlatformAdminRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
@@ -110,5 +111,5 @@ export const runSubscriptionAutoChargesUseCase = new RunSubscriptionAutoChargesU
 // Archivar / borrar empresas (panel de plataforma → Empresas)
 export const companyAdminController = new CompanyAdminController(
   new SetCompanyArchivedUseCase(companyAdminRepo, auditService),
-  new DeleteCompanyUseCase(companyAdminRepo, operationalAlerts)
+  new DeleteCompanyUseCase(companyAdminRepo, operationalAlerts, objectStorage)
 );

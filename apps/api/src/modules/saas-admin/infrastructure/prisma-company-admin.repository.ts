@@ -44,6 +44,11 @@ export class PrismaCompanyAdminRepository implements ICompanyAdminRepository {
     await basePrisma.company.update({ where: { id }, data: { isActive } });
   }
 
+  async listStoredFileKeys(companyId: string): Promise<string[]> {
+    const rows = await basePrisma.productPhoto.findMany({ where: { companyId, storageKey: { not: null } }, select: { storageKey: true } });
+    return rows.map((r) => r.storageKey!);
+  }
+
   async deleteCompletely(companyId: string): Promise<{ deleted: number }> {
     return basePrisma.$transaction(async (tx) => deleteCompanyIn(tx, companyId), { timeout: 120_000, maxWait: 10_000 });
   }

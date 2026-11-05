@@ -1,13 +1,15 @@
 import { useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ImageIcon } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ImageIcon, ImagePlus, Star, Trash2, X } from "lucide-react";
 import { ApiError } from "../../../lib/api-client";
-import { productPhotoUrl, removeProductPhoto, setProductPhoto } from "../api/product.api";
+import { addProductPhoto, deleteProductPhoto, listProductPhotos, productPhotoUrl, setMainProductPhoto } from "../api/product.api";
+
+const MAX_PHOTOS = 5;
 
 const PHOTO_MAX_SIDE = 400;
 const PHOTO_MAX_DATA_URL_LENGTH = 400_000;
 
-/** Achica la foto a 400 px en el navegador (JPG, fondo blanco): ~30-40 KB, lo que se guarda en la base. */
+/** Achica la foto a 400 px en el navegador (JPG, fondo blanco): ~30-40 KB, lo que se guarda (R2 o la base). */
 export async function shrinkProductPhoto(file: File): Promise<string> {
   const original = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -47,46 +49,111 @@ export function ProductThumb({ photoPath, name, size = 40 }: { photoPath: string
   );
 }
 
-/** En la lista de productos: ver la foto y, con permiso, ponerla, cambiarla o quitarla. */
+/** En la lista de productos: la foto principal; al tocarla se abren todas (hasta 5) para verlas y, con permiso, cambiarlas. */
 export function ProductPhotoCell({ productId, name, photoPath, canEdit }: { productId: string; name: string; photoPath: string | null; canEdit: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (!canEdit && !photoPath) return <ProductThumb photoPath={null} name={name} />;
+  return (
+    <>
+      <button type="button" title={canEdit ? "Fotos del producto" : "Ver fotos"} onClick={() => setOpen(true)}>
+        <ProductThumb photoPath={photoPath} name={name} />
+      </button>
+      {open && <ProductPhotosDialog productId={productId} name={name} canEdit={canEdit} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function ProductPhotosDialog({ productId, name, canEdit, onClose }: { productId: string; name: string; canEdit: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const done = () => queryClient.invalidateQueries({ queryKey: ["products"] });
+  const { data, isLoading } = useQuery({ queryKey: ["product-photos", productId], queryFn: () => listProductPhotos(productId) });
+  const photos = data?.data ?? [];
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["product-photos", productId] });
+    // La principal sale en la lista, el POS y la cotizacion
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+  };
+  const onError = (err: unknown) => setError(err instanceof ApiError || err instanceof Error ? err.message : "No se pudo guardar");
   const upload = useMutation({
-    mutationFn: async (file: File) => setProductPhoto(productId, await shrinkProductPhoto(file)),
+    mutationFn: async (file: File) => addProductPhoto(productId, await shrinkProductPhoto(file)),
     onSuccess: () => {
       setError(null);
-      done();
+      refresh();
     },
-    onError: (err) => setError(err instanceof ApiError || err instanceof Error ? err.message : "No se pudo subir la foto"),
+    onError,
   });
-  const remove = useMutation({ mutationFn: () => removeProductPhoto(productId), onSuccess: done });
+  const remove = useMutation({ mutationFn: (photoId: string) => deleteProductPhoto(productId, photoId), onSuccess: refresh, onError });
+  const makeMain = useMutation({ mutationFn: (photoId: string) => setMainProductPhoto(productId, photoId), onSuccess: refresh, onError });
+  const busy = upload.isPending || remove.isPending || makeMain.isPending;
 
-  if (!canEdit) return <ProductThumb photoPath={photoPath} name={name} />;
   return (
-    <div className="flex items-center gap-2">
-      <button type="button" title={photoPath ? "Cambiar la foto" : "Poner foto"} onClick={() => input.current?.click()} disabled={upload.isPending}>
-        <ProductThumb photoPath={photoPath} name={name} />
-      </button>
-      <input
-        ref={input}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) upload.mutate(file);
-        }}
-      />
-      {upload.isPending && <span className="text-xs text-slate-500">Subiendo…</span>}
-      {photoPath && !upload.isPending && (
-        <button type="button" className="text-xs text-slate-400 hover:text-danger-600" onClick={() => remove.mutate()} disabled={remove.isPending}>
-          Quitar
-        </button>
-      )}
-      {error && <span className="text-xs text-danger-600">{error}</span>}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-1 flex items-start justify-between gap-3">
+          <h2 className="text-base font-semibold text-slate-900">Fotos de {name}</h2>
+          <button type="button" className="text-slate-400 hover:text-slate-700" onClick={onClose} aria-label="Cerrar">
+            <X size={20} />
+          </button>
+        </div>
+        <p className="mb-4 text-sm text-slate-500">
+          Hasta {MAX_PHOTOS} fotos. La <strong>principal</strong> es la que sale en el punto de venta, la lista y las cotizaciones.
+        </p>
+
+        {isLoading ? (
+          <p className="text-sm text-slate-500">Cargando…</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {photos.map((photo) => (
+              <div key={photo.id} className={`overflow-hidden rounded-lg border ${photo.isMain ? "border-brand-500 ring-2 ring-brand-200" : "border-slate-200"}`}>
+                <img src={productPhotoUrl(photo.path)} alt={name} className="aspect-square w-full bg-white object-contain" />
+                <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-2 py-1.5 text-xs">
+                  {photo.isMain ? (
+                    <span className="flex items-center gap-1 font-medium text-brand-700">
+                      <Star size={12} className="fill-current" /> Principal
+                    </span>
+                  ) : canEdit ? (
+                    <button type="button" className="text-slate-600 hover:text-brand-700" disabled={busy} onClick={() => makeMain.mutate(photo.id)}>
+                      Hacer principal
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  {canEdit && (
+                    <button type="button" className="text-slate-400 hover:text-danger-600" disabled={busy} onClick={() => remove.mutate(photo.id)} title="Quitar foto">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {canEdit && photos.length < MAX_PHOTOS && (
+              <button
+                type="button"
+                className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-300 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-700 disabled:opacity-50"
+                disabled={busy}
+                onClick={() => input.current?.click()}
+              >
+                <ImagePlus size={24} />
+                {upload.isPending ? "Subiendo…" : "Agregar foto"}
+              </button>
+            )}
+            {!canEdit && photos.length === 0 && <p className="text-sm text-slate-500">Este producto no tiene fotos.</p>}
+          </div>
+        )}
+        <input
+          ref={input}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) upload.mutate(file);
+          }}
+        />
+        {error && <p className="mt-3 text-sm text-danger-600">{error}</p>}
+      </div>
     </div>
   );
 }

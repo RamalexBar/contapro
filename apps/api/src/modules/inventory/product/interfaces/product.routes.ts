@@ -22,5 +22,11 @@ productRouter.patch("/products/:id", requirePermission("product.update"), produc
 productRouter.patch("/products/:id/price", requirePermission("product.price.update"), productController.updatePrice);
 productRouter.patch("/products/:id/barcode", requirePermission("product.barcode.update"), productController.updateBarcode);
 productRouter.delete("/products/:id", requirePermission("product.delete"), productController.remove);
+// La foto principal (lo de antes de las 5 fotos: reemplazar / quitar la principal)
 productRouter.put("/products/:id/photo", requirePermission("product.update"), productPhotoController.set);
 productRouter.delete("/products/:id/photo", requirePermission("product.update"), productPhotoController.remove);
+// Hasta 5 fotos por producto
+productRouter.get("/products/:id/photos", requirePermission("product.read"), productPhotoController.list);
+productRouter.post("/products/:id/photos", requirePermission("product.update"), productPhotoController.add);
+productRouter.delete("/products/:id/photos/:photoId", requirePermission("product.update"), productPhotoController.remove);
+productRouter.post("/products/:id/photos/:photoId/main", requirePermission("product.update"), productPhotoController.setMain);

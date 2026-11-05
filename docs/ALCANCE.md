@@ -892,3 +892,7 @@ cuando se implemente, mismo criterio que la lista de arriba:
     un selector con busqueda (`MunicipalitySelect`) en el registro (obligatorio), Datos de la empresa, clientes y
     proveedores: se elige la ciudad y se guardan nombre, departamento y codigo. La API rechaza codigos que no
     existen. «Mi suscripcion» avisa si la empresa no tiene municipio, porque Factus lo exige para facturarle.
+55. ~~Fotos de productos fuera de la base, hasta 5 por producto~~ — 2026-11-05. Hasta 5 fotos con una principal (POS,
+    lista, cotizacion) y un administrador de fotos en Inventario. Con las variables `R2_*` los archivos van a
+    Cloudflare R2 (firma S3 a mano, sin SDK); sin ellas, a la base como antes. Borrar una empresa borra sus archivos en
+    R2. Probado en vivo con la base; contra R2 real falta crear el bucket. Ver `modules/inventory/product/README.md`.

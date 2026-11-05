@@ -58,6 +58,13 @@ const envSchema = z.object({
   // habilitado en la DIAN con Factus.
   PLATFORM_INVOICING_COMPANY_ID: z.string().default(""),
 
+  // ---- Archivos (fotos de productos) en Cloudflare R2 (ver shared/storage/r2-object-storage.ts) ----
+  // Vacios por defecto = las fotos se guardan en la base, como antes. Hacen falta los 4 para usar R2.
+  R2_ACCOUNT_ID: z.string().default(""),
+  R2_ACCESS_KEY_ID: z.string().default(""),
+  R2_SECRET_ACCESS_KEY: z.string().default(""),
+  R2_BUCKET: z.string().default(""),
+
   // ---- Cobro de suscripciones via Wompi/Bancolombia (ver modules/saas-admin/README.md) ----
   // Vacios por defecto = generar un link de cobro falla con mensaje claro (mismo criterio que
   // las variables DIAN_*/RESEND_* de arriba, no un crash silencioso). WOMPI_PRIVATE_KEY no lo usa

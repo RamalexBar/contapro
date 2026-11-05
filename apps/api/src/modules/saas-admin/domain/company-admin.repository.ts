@@ -14,4 +14,6 @@ export interface ICompanyAdminRepository {
   setActive(id: string, isActive: boolean): Promise<void>;
   /** Borra la empresa y todo lo que cuelga de ella (lanza CompanyDeleteError si algo es de otra empresa). */
   deleteCompletely(id: string): Promise<{ deleted: number }>;
+  /** Llaves de los archivos de la empresa guardados fuera de la base (fotos en Cloudflare R2). */
+  listStoredFileKeys(id: string): Promise<string[]>;
 }
