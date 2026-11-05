@@ -52,11 +52,18 @@ import { saasAdminRouter } from "./modules/saas-admin/interfaces/saas-admin.rout
 
 export const app = express();
 
-// Render pone un proxy delante: sin esto req.ip es la del proxy y TODOS los visitantes cuentan como uno solo en los
-// limites (20 intentos de login cada 15 min, 5 mensajes de contacto por hora... para todos juntos), y
-// express-rate-limit lo registra como ERR_ERL_UNEXPECTED_X_FORWARDED_FOR. 1 = confiar solo en ese proxy: req.ip es la
-// direccion que el proxy vio (la ultima de X-Forwarded-For), que el visitante no puede falsificar.
-app.set("trust proxy", 1);
+// Delante de la API hay dos intermediarios: Cloudflare (contapro.com.co) y el balanceador de Render (red 10.x). Sin
+// esto req.ip era la de uno de ellos y TODOS los visitantes compartian los limites (20 intentos de login cada 15 min, 5
+// mensajes de contacto por hora...). Se confia solo en esas direcciones: req.ip queda en el primer salto que no es
+// ninguno de los dos (el visitante), y una cabecera X-Forwarded-For inventada no sirve para hacerse pasar por otro.
+// Rangos publicados por Cloudflare en https://www.cloudflare.com/ips/ (revisar si algun dia cambian).
+const CLOUDFLARE_RANGES = [
+  "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18",
+  "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13",
+  "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22",
+  "2400:cb00::/32", "2606:4700::/32", "2803:f800::/32", "2405:b500::/32", "2405:8100::/32", "2a06:98c0::/29", "2c0f:f248::/32",
+];
+app.set("trust proxy", ["loopback", "10.0.0.0/8", ...CLOUDFLARE_RANGES]);
 
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
