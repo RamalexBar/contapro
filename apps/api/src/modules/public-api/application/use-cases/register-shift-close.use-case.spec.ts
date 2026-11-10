@@ -86,6 +86,7 @@ const INPUT: RegisterShiftCloseInput = {
   openAccounts: { received: 0, applied: 0 },
   cashExpected: 119_000,
   cashCounted: 119_000,
+  costOfSales: 0,
 };
 
 describe("RegisterShiftCloseUseCase", () => {

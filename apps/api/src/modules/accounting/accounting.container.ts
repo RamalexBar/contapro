@@ -1,3 +1,6 @@
+import { basePrisma } from "@erp/database";
+import { getTenantContext } from "../../shared/context/request-context";
+import { isCajaproComboPlan } from "../partner-api/application/use-cases/provision-partner-account.use-case";
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
 // Instancia propia, no importada de cash-session.container.ts: ese container importa
@@ -213,10 +216,23 @@ const inventoryValueReader = {
 };
 
 /** Conciliacion y regularizacion de la 1435 (pantalla de Contabilidad y script src/scripts/regularize-inventory-account.ts). */
+/** Combo Cajapro = la suscripcion vigente (la mas reciente, mismo criterio que billing) es un plan COMBO_CAJAPRO*. */
+const cajaproComboChecker = {
+  isCajaproCombo: async () => {
+    const latest = await basePrisma.subscription.findFirst({
+      where: { companyId: getTenantContext().companyId },
+      orderBy: { createdAt: "desc" },
+      select: { plan: { select: { code: true } } },
+    });
+    return !!latest && isCajaproComboPlan(latest.plan.code);
+  },
+};
+
 export const regularizeInventoryAccountUseCase = new RegularizeInventoryAccountUseCase(
   accountRepo,
   journalRepo,
   inventoryValueReader,
-  postInventoryJournalEntryUseCase
+  postInventoryJournalEntryUseCase,
+  cajaproComboChecker
 );
 export const inventoryReconciliationController = new InventoryReconciliationController(regularizeInventoryAccountUseCase);

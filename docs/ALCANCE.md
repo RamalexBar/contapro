@@ -910,3 +910,8 @@ cuando se implemente, mismo criterio que la lista de arriba:
     PEPS: entradas sin compra contra 3115 Aportes sociales, sobrantes contra 4295 y faltantes contra 5195. Se agrego la
     conciliacion 1435 vs inventario valorizado con asiento de regularizacion (Contabilidad → Reportes, y el script
     `src/scripts/regularize-inventory-account.ts` para todas las empresas). Ver `modules/accounting/README.md`.
+58. ~~Combo Cajapro: costo de ventas y conciliación de la 1435~~ — 2026-11-10. El cierre de turno de Cajapro ahora
+    manda `costOfSales` (costo de lo vendido neto de lo devuelto a bodega) y Contapro lo contabiliza Débito 6135 /
+    Crédito 1435; antes la utilidad del combo salía sin costo y la 1435 solo crecía. La conciliación/regularización de la
+    1435 se bloquea para empresas del combo (su inventario vive en Cajapro). Ver `modules/public-api/README.md` y
+    `modules/accounting/README.md`.

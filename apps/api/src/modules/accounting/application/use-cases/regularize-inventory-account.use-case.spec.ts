@@ -14,7 +14,7 @@ function line(accountId: string, debit: number, credit: number): PostedLineAggre
   return { id: "l", accountId, debit, credit, date: new Date(), entryId: "e", entryNumber: 1, description: null, sourceType: null, sourceId: null };
 }
 
-function makeUseCase(lines: PostedLineAggregate[], inventoryValue: number) {
+function makeUseCase(lines: PostedLineAggregate[], inventoryValue: number, cajaproCombo = false) {
   const accountRepo = { list: async () => accounts } as unknown as IChartOfAccountsRepository;
   const journalRepo = { listPostedLines: async () => lines } as unknown as IJournalEntryRepository;
   const post = { execute: vi.fn(async () => ({ id: "entry-1" })) };
@@ -22,7 +22,8 @@ function makeUseCase(lines: PostedLineAggregate[], inventoryValue: number) {
     accountRepo,
     journalRepo,
     { totalValue: async () => inventoryValue },
-    post as unknown as PostInventoryJournalEntryUseCase
+    post as unknown as PostInventoryJournalEntryUseCase,
+    { isCajaproCombo: async () => cajaproCombo }
   );
   return { useCase, post };
 }
@@ -34,7 +35,7 @@ describe("RegularizeInventoryAccountUseCase", () => {
   it("sin aplicar solo informa la diferencia (incluye subcuentas de la 1435, no otras cuentas)", async () => {
     const { useCase, post } = makeUseCase(lines, 3537124);
     const result = await useCase.execute({ apply: false });
-    expect(result).toEqual({ ledgerBalance: -768676, inventoryValue: 3537124, difference: 4305800, entry: null });
+    expect(result).toEqual({ ledgerBalance: -768676, inventoryValue: 3537124, difference: 4305800, entry: null, cajaproCombo: false });
     expect(post.execute).not.toHaveBeenCalled();
   });
 
@@ -43,6 +44,19 @@ describe("RegularizeInventoryAccountUseCase", () => {
     const result = await useCase.execute({ apply: true });
     expect(post.execute).toHaveBeenCalledWith(expect.objectContaining({ kind: "REGULARIZATION", amount: 4305800, sourceType: "InventoryRegularization" }));
     expect(result.entry).toEqual({ id: "entry-1" });
+  });
+
+  it("en el combo Cajapro solo informa la 1435 y rechaza regularizar (el inventario vive en Cajapro)", async () => {
+    const { useCase, post } = makeUseCase([line("inv", 818600, 0)], 0, true);
+    expect(await useCase.execute({ apply: false })).toEqual({
+      ledgerBalance: 818600,
+      inventoryValue: 0,
+      difference: 0,
+      entry: null,
+      cajaproCombo: true,
+    });
+    await expect(useCase.execute({ apply: true })).rejects.toThrow(/combo con Cajapro/);
+    expect(post.execute).not.toHaveBeenCalled();
   });
 
   it("no registra nada si ya cuadra", async () => {

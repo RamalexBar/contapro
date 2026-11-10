@@ -26,7 +26,13 @@ export function InventoryReconciliationReport() {
       </p>
       {isLoading && <Spinner />}
       {error && <Alert tone="danger">{(error as Error).message}</Alert>}
-      {data && (
+      {data?.cajaproCombo && (
+        <Alert tone="info">
+          Esta empresa usa el combo con Cajapro: los productos, las existencias y su costo se manejan en Cajapro, así que esta conciliación no
+          aplica. Saldo actual de la cuenta 1435: {formatCOP(data.ledgerBalance)}.
+        </Alert>
+      )}
+      {data && !data.cajaproCombo && (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-slate-200 p-3">

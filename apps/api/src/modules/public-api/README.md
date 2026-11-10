@@ -79,6 +79,10 @@ revisa).
   de celular: `thirdPartyIncome[]`, solo la comisión es ingreso real, el resto queda como cuenta
   por pagar al tercero — el efectivo/banco ya entró por `payments`, este campo solo lo reparte), y
   el faltante/sobrante del arqueo (`cashExpected` vs `cashCounted`).
+- **`costOfSales` (agregado 2026-11-10, opcional, default 0)**: costo de lo vendido en el turno, ya neto de lo
+  devuelto que volvió a bodega. Se contabiliza Débito 6135 Costo de ventas / Crédito 1435 Inventarios (negativo =
+  el reverso). Lo manda el POS porque es quien lleva el inventario: sin él, las compras que entran por
+  `/purchases` cargan la 1435 y nada la descarga, y la utilidad del turno queda sin costo.
 - **Conceptos agregados 2026-10-13 para la conexión con Cajapro** (todos opcionales con valor por
   defecto — un POS que ya integraba sigue funcionando igual):
   - Formas de pago nuevas: `CREDIT` (venta fiada → Clientes 1305), `ADVANCE` (pagada con un anticipo

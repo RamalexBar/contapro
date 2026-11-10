@@ -188,6 +188,10 @@ export const registerShiftCloseBodySchema = z
     // Arqueo: lo esperado (segun lo que registro el turno) vs. lo contado fisicamente.
     cashExpected: z.number().nonnegative(),
     cashCounted: z.number().nonnegative(),
+    // Agregado 2026-11-10: costo de lo vendido en el turno, ya neto de lo devuelto que volvio a bodega (el POS lleva el
+    // inventario y conoce el costo de cada linea). Contapro lo contabiliza Debito 6135 / Credito 1435; negativo = el
+    // reverso (mas devoluciones que ventas). Opcional: sin el, el cierre no registra costo de ventas, como antes.
+    costOfSales: z.number().default(0),
   })
   .refine((v) => v.thirdPartyIncome.every((t) => t.commission <= t.amount), {
     message: "La comision de un ingreso de terceros no puede superar el monto total",

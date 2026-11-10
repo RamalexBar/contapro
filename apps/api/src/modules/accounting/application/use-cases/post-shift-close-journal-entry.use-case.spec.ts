@@ -209,6 +209,7 @@ function baseInput() {
     openAccounts: { received: 0, applied: 0 },
     cashExpected: 0,
     cashCounted: 0,
+    costOfSales: 0,
   };
 }
 
@@ -246,6 +247,44 @@ describe("PostShiftCloseJournalEntryUseCase", () => {
     expect(journalRepo.entries[0].sourceType).toBe("ExternalShiftClose");
     expect(journalRepo.entries[0].sourceId).toBe("close-1");
     expect(journalRepo.entries[0].type).toBe("SHIFT_CLOSE");
+  });
+
+  it("posts the cost of sales sent by the POS: Debito 6135 / Credito 1435 (combo Cajapro)", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+    const input = {
+      ...baseInput(),
+      payments: [{ method: "CASH" as const, amount: 119_000 }],
+      salesTaxBreakdown: [{ taxType: "IVA" as const, taxRate: 19, taxableBase: 100_000, taxAmount: 19_000 }],
+      cashExpected: 119_000,
+      cashCounted: 119_000,
+      costOfSales: 62_500,
+    };
+
+    await withTenantContext(() => useCase.execute("close-cost", input));
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-6135")).toMatchObject({ debit: 62_500, credit: 0 });
+    expect(lines.find((l) => l.accountId === "acc-1435")).toMatchObject({ debit: 0, credit: 62_500 });
+    const totals = sumDebitCredit(lines);
+    expect(totals.debit).toBe(totals.credit);
+  });
+
+  it("reverses the cost when the shift returned more goods to stock than it sold (negative cost of sales)", async () => {
+    const { useCase, journalRepo } = makeUseCase();
+    const input = {
+      ...baseInput(),
+      returns: [{ taxType: "IVA" as const, taxableAmount: 10_000, taxAmount: 1_900, refundMethod: "CASH" as const }],
+      deposits: [{ amount: 11_900, description: "Base" }],
+      cashExpected: 0,
+      cashCounted: 0,
+      costOfSales: -6_000,
+    };
+
+    await withTenantContext(() => useCase.execute("close-return", input));
+
+    const lines = journalRepo.entries[0].lines;
+    expect(lines.find((l) => l.accountId === "acc-1435")).toMatchObject({ debit: 6_000, credit: 0 });
+    expect(lines.find((l) => l.accountId === "acc-6135")).toMatchObject({ debit: 0, credit: 6_000 });
   });
 
   it("nets a single line per account instead of emitting both debit and credit for the same account (regression: mixed cash sale + cash expense)", async () => {

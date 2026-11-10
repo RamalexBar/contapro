@@ -406,6 +406,8 @@ export interface InventoryReconciliation {
   inventoryValue: number;
   difference: number;
   entry: { id: string; number: number } | null;
+  /** Empresa del combo Cajapro: su inventario vive en Cajapro y la conciliacion no aplica. */
+  cajaproCombo: boolean;
 }
 
 export function getInventoryReconciliation(): Promise<InventoryReconciliation> {

@@ -34,6 +34,9 @@ const STANDARD_ACCOUNTS = {
   saldoTercerosPorPagar: { code: "280515", name: "Saldo por pagar a terceros (recargas/plataformas)", type: "LIABILITY" as const }, // NUEVA, SIN VERIFICAR
   clientes: { code: "1305", name: "Clientes (cuentas por cobrar)", type: "ASSET" as const }, // reusa (ventas a credito)
   domiciliariosPorLegalizar: { code: "138095", name: "Domiciliarios por legalizar", type: "ASSET" as const }, // NUEVA, SIN VERIFICAR -- plata que cobro el domiciliario y aun no entrega
+  // Costo de ventas del turno (2026-11-10): mismas dos cuentas que PostSaleJournalEntryUseCase.
+  costoVentas: { code: "6135", name: "Costo de ventas", type: "EXPENSE" as const }, // reusa
+  inventario: { code: "1435", name: "Inventarios - mercancias no fabricadas por la empresa", type: "ASSET" as const }, // reusa
 };
 
 type AccountKey = keyof typeof STANDARD_ACCOUNTS;
@@ -192,6 +195,17 @@ export class PostShiftCloseJournalEntryUseCase {
       add("ingresosPorComisiones", 0, thirdParty.commission);
       const owedToThirdParty = round2(thirdParty.amount - thirdParty.commission);
       if (owedToThirdParty > 0) add("saldoTercerosPorPagar", 0, owedToThirdParty);
+    }
+
+    // 6i. Costo de lo vendido (combo Cajapro, 2026-11-10): las compras ya cargaron la 1435 por /purchases; sin esta linea
+    // la mercancia vendida nunca salia del inventario contable y la utilidad del turno quedaba sin costo.
+    const costOfSales = round2(input.costOfSales ?? 0);
+    if (costOfSales > 0) {
+      add("costoVentas", costOfSales, 0);
+      add("inventario", 0, costOfSales);
+    } else if (costOfSales < 0) {
+      add("inventario", -costOfSales, 0);
+      add("costoVentas", 0, -costOfSales);
     }
 
     // 7. Arqueo: diferencia entre lo esperado y lo contado -- sobrante (otro ingreso) o faltante

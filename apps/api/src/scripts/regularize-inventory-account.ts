@@ -23,13 +23,18 @@ async function main() {
     const user = await prisma.user.findFirst({ where: { companyId: company.id }, orderBy: { createdAt: "asc" }, select: { id: true } });
     if (!user) continue;
 
-    const result = await tenantStorage.run(
-      { companyId: company.id, branchId: null, userId: user.id, roles: [], permissions: new Set() },
-      () => regularizeInventoryAccountUseCase.execute({ apply })
-    );
+    // Se consulta sin aplicar primero: una empresa del combo Cajapro rechaza la regularizacion (su inventario vive en
+    // Cajapro), y aqui solo se informa en vez de cortar el recorrido de las demas.
+    const ctx = { companyId: company.id, branchId: null, userId: user.id, roles: [], permissions: new Set<string>() };
+    const preview = await tenantStorage.run(ctx, () => regularizeInventoryAccountUseCase.execute({ apply: false }));
+    const fmt = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+    if (preview.cajaproCombo) {
+      console.log(`${company.name}: combo Cajapro, se omite (1435 = ${fmt(preview.ledgerBalance)}, el inventario vive en Cajapro)`);
+      continue;
+    }
+    const result = apply ? await tenantStorage.run(ctx, () => regularizeInventoryAccountUseCase.execute({ apply: true })) : preview;
     if (Math.abs(result.difference) < 0.01 && Math.abs(result.ledgerBalance) < 0.01) continue;
 
-    const fmt = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
     console.log(
       `${company.name}: 1435 = ${fmt(result.ledgerBalance)} | inventario real = ${fmt(result.inventoryValue)} | diferencia = ${fmt(result.difference)}` +
         (result.entry ? ` -> comprobante #${result.entry.number}` : "")

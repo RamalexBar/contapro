@@ -488,3 +488,6 @@ idempotente: si ya cuadra, no registra nada.
   `pnpm --filter @erp/api exec tsx src/scripts/regularize-inventory-account.ts` sin parámetros solo muestra las
   diferencias; con `--apply` registra los asientos. Cada comprobante queda a nombre del usuario más antiguo de la
   empresa.
+- **Combo Cajapro (2026-11-10):** la conciliación solo informa el saldo de la 1435 y rechaza regularizar cuando la
+  suscripción vigente es un plan `COMBO_CAJAPRO*`: el inventario de esas empresas vive en Cajapro, y Contapro creería
+  que vale 0. El script las omite.
