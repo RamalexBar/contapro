@@ -2,7 +2,7 @@
   "name": "@erp/mobile",
   "version": "0.1.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -11,6 +11,7 @@
     "lint": "eslint src App.tsx --ext .ts,.tsx"
   },
   "dependencies": {
+    "@babel/runtime": "^7",
     "@erp/shared-types": "workspace:*",
     "@erp/shared-utils": "workspace:*",
     "@react-native-async-storage/async-storage": "^1.23.1",

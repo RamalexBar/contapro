@@ -13,8 +13,8 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),
 ];
-// pnpm usa symlinks + estructura no-jerarquica; esto evita que Metro intente resolver
-// duplicados de paquetes por el hoisting parcial de pnpm.
-config.resolver.disableHierarchicalLookup = true;
+// Con pnpm (modo aislado) cada paquete trae sus dependencias en su propia carpeta de .pnpm: Metro tiene que poder
+// buscar hacia arriba desde el archivo que pide el modulo; si no, no encuentra nada (la app no compilaba para el celular).
+config.resolver.disableHierarchicalLookup = false;
 
 module.exports = config;

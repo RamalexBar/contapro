@@ -132,6 +132,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@babel/runtime':
+        specifier: ^7
+        version: 7.29.7
       '@erp/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
