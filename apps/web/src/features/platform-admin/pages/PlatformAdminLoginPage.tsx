@@ -12,8 +12,9 @@ import { usePlatformAuthStore } from "../hooks/usePlatformAuthStore";
 export function PlatformAdminLoginPage() {
   const navigate = useNavigate();
   const setSession = usePlatformAuthStore((s) => s.setSession);
-  const [email, setEmail] = useState("platform@demo.com");
-  const [password, setPassword] = useState("Demo1234!");
+  // Credenciales demo solo en desarrollo (mismo criterio que LoginPage): en produccion no se prellenan ni se muestran.
+  const [email, setEmail] = useState(import.meta.env.DEV ? "platform@demo.com" : "");
+  const [password, setPassword] = useState(import.meta.env.DEV ? "Demo1234!" : "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,7 +50,7 @@ export function PlatformAdminLoginPage() {
               Ingresar
             </Button>
           </form>
-          <p className="mt-4 text-xs text-slate-400">Demo: platform@demo.com — contraseña Demo1234!</p>
+          {import.meta.env.DEV && <p className="mt-4 text-xs text-slate-400">Demo: platform@demo.com — contraseña Demo1234!</p>}
         </Card>
       </div>
     </div>
