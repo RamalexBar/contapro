@@ -39,9 +39,20 @@ function buildHtml(n: PasswordResetNotification): string {
   return `
     <p>Hola ${escapeHtml(n.fullName)},</p>
     <p>Recibimos una solicitud para restablecer tu contraseña en Contapro.</p>
-    <p><a href="${n.resetUrl}">Haz clic aquí para elegir una nueva contraseña</a></p>
-    <p>Este enlace vence en 1 hora. Si no solicitaste esto, puedes ignorar este correo.</p>
+    ${linksHtml(n)}
+    <p>${n.links.length > 1 ? "Estos enlaces vencen" : "Este enlace vence"} en 1 hora. Si no solicitaste esto, puedes ignorar este correo.</p>
   `.trim();
+}
+
+/** Un enlace: como siempre. Varios (el correo esta en varias empresas): uno por empresa, con su nombre. */
+export function linksHtml(n: Pick<PasswordResetNotification, "links">): string {
+  if (n.links.length === 1) {
+    return `<p><a href="${n.links[0].resetUrl}">Haz clic aquí para elegir una nueva contraseña</a></p>`;
+  }
+  const items = n.links
+    .map((l) => `<li><a href="${l.resetUrl}">${escapeHtml(l.companyName)}</a></li>`)
+    .join("");
+  return `<p>Tu correo está registrado en varias empresas. Elige en cuál quieres cambiar la contraseña (cada enlace cambia solo la de esa empresa):</p><ul>${items}</ul>`;
 }
 
 function escapeHtml(value: string): string {
