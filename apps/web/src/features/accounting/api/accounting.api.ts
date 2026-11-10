@@ -364,3 +364,39 @@ export function getVatSummary(from: string, to: string, branchId?: string): Prom
   if (branchId) params.set("branchId", branchId);
   return apiFetch(`/reports/vat-summary?${params.toString()}`);
 }
+
+export interface TrialBalanceAmounts {
+  opening: number;
+  debit: number;
+  credit: number;
+  closing: number;
+}
+
+export interface TrialBalanceThirdPartyRow extends TrialBalanceAmounts {
+  thirdPartyId: string | null;
+  name: string;
+  document: string | null;
+}
+
+export interface TrialBalanceAccountRow extends TrialBalanceAmounts {
+  accountId: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  nature: "DEBIT" | "CREDIT";
+  thirdParties: TrialBalanceThirdPartyRow[];
+}
+
+export interface TrialBalanceByThirdParty {
+  from: string;
+  to: string;
+  accounts: TrialBalanceAccountRow[];
+  totalDebit: number;
+  totalCredit: number;
+}
+
+export function getTrialBalanceByThirdParty(from: string, to: string, branchId?: string): Promise<TrialBalanceByThirdParty> {
+  const params = new URLSearchParams({ from, to });
+  if (branchId) params.set("branchId", branchId);
+  return apiFetch(`/reports/trial-balance-by-third-party?${params.toString()}`);
+}

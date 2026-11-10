@@ -72,9 +72,11 @@ export function KardexSection() {
               <tr>
                 <Th>Fecha</Th>
                 <Th>Movimiento</Th>
-                <Th>Cantidad</Th>
-                <Th>Saldo</Th>
-                <Th>Costo promedio</Th>
+                <Th className="text-right">Cantidad</Th>
+                <Th className="text-right">Costo unitario</Th>
+                <Th className="text-right">Costo total</Th>
+                <Th className="text-right">Saldo</Th>
+                <Th className="text-right">Valor del saldo</Th>
               </tr>
             </TableHead>
             <TableBody>
@@ -82,14 +84,16 @@ export function KardexSection() {
                 <TableRow key={k.id}>
                   <Td>{new Date(k.createdAt).toLocaleString("es-CO")}</Td>
                   <Td>{MOVEMENT_LABELS[k.movementType] ?? k.movementType}</Td>
-                  <Td>{k.movementQuantity}</Td>
-                  <Td>{k.balanceQty}</Td>
-                  <Td>{formatCOP(k.averageCost)}</Td>
+                  <Td className="text-right tabular-nums">{k.movementQuantity}</Td>
+                  <Td className="text-right tabular-nums">{formatCOP(k.movementUnitCost)}</Td>
+                  <Td className="text-right tabular-nums">{formatCOP(k.movementQuantity * k.movementUnitCost)}</Td>
+                  <Td className="text-right tabular-nums">{k.balanceQty}</Td>
+                  <Td className="text-right tabular-nums">{formatCOP(k.balanceCost)}</Td>
                 </TableRow>
               ))}
               {kardex?.data.length === 0 && (
                 <TableRow>
-                  <Td colSpan={5} className="text-center text-slate-400">
+                  <Td colSpan={7} className="text-center text-slate-400">
                     Sin movimientos en el rango elegido
                   </Td>
                 </TableRow>

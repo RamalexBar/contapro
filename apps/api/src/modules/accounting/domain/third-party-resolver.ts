@@ -1,6 +1,8 @@
 export interface ThirdPartyRef {
   id: string;
   name: string;
+  /** NIT / documento del tercero cuando se conoce (null para beneficiarios de gastos, que son texto libre). */
+  document?: string | null;
 }
 
 /** Cuentas del PUC para las que el Balance General puede desglosar el saldo por tercero (item
@@ -9,12 +11,11 @@ export interface ThirdPartyRef {
  * ningun cliente/proveedor asociado en ningun lado del schema. */
 export const THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES = new Set(["1305", "2205"]);
 
-/** Resuelve el cliente/proveedor detras de una linea de comprobante segun su sourceType/sourceId
- * (ver STANDARD_ACCOUNTS y sourceType en cada Post*JournalEntryUseCase). Solo reconoce los 5
- * sourceType que efectivamente tocan 1305/2205: Sale, Return, Purchase, SupplierPayment,
- * AccountReceivablePayment. Cualquier otro (o una venta sin cliente asignado, "consumidor final")
- * simplemente no aparece en el mapa devuelto -- el llamador (AccountingReportsService) agrupa esas
- * lineas como "Sin tercero identificado". */
+/** Resuelve el tercero detras de una linea de comprobante segun el sourceType/sourceId de su comprobante (ver
+ * sourceType en cada Post*JournalEntryUseCase): Sale, Return, ManualInvoice y AccountReceivablePayment -> cliente;
+ * Purchase y SupplierPayment -> proveedor; Commission -> vendedor; Expense -> beneficiario (texto libre, sin NIT).
+ * Cualquier otro (cierres de caja, nomina global, depreciacion, comprobantes manuales) o una venta sin cliente
+ * ("consumidor final") no aparece en el mapa devuelto -- el llamador lo agrupa como "Sin tercero identificado". */
 export interface IThirdPartyResolver {
   resolveForLines(lines: { sourceType: string | null; sourceId: string | null }[]): Promise<Map<string, ThirdPartyRef>>;
 }

@@ -11,3 +11,6 @@ stockRouter.post("/stock/adjustments", requirePermission("stock.adjust"), stockC
 stockRouter.post("/stock/transfers", requirePermission("stock.transfer"), stockController.transfer);
 stockRouter.get("/kardex", requirePermission("product.read"), stockController.listKardex);
 stockRouter.get("/stock/branch-stock", requirePermission("product.read"), stockController.listBranchStock);
+// Valorizado muestra costos: accounting.read (reportes financieros), no product.read, para que el Cajero no lo vea.
+stockRouter.get("/stock/valuation", requirePermission("accounting.read"), stockController.getValuation);
+stockRouter.get("/stock/alerts", requirePermission("product.read"), stockController.listAlerts);

@@ -110,6 +110,9 @@ model SaleItem {
   taxPercent                    Decimal @db.Decimal(5, 2)
   taxAmount                     Decimal @db.Decimal(14, 2)
   total                         Decimal @db.Decimal(14, 2)
+  // Costo real (PEPS) de lo vendido en esta linea, fijado al completar la venta. Null mientras no se completa.
+  // Ventas anteriores a 2026-11-10: estimado con el costo del producto en ese momento (migracion fifo_cost_layers).
+  costTotal                     Decimal? @db.Decimal(14, 2)
   requiresDiscountAuthorization Boolean @default(false)
   discountAuthorizationId       String?
 

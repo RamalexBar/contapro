@@ -7,6 +7,8 @@ export interface KardexEntryRecord {
    * RETURN_IN/OUT) -- sin esto una fila de Kardex es solo un saldo sin contexto de que lo movio. */
   movementType: string;
   movementQuantity: number;
+  /** Costo unitario real del movimiento (capa PEPS de donde salio o costo de la entrada). */
+  movementUnitCost: number;
   balanceQty: number;
   balanceCost: number;
   averageCost: number;

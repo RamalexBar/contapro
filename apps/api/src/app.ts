@@ -41,6 +41,7 @@ import { collectionsWebhookRouter } from "./modules/collections/interfaces/colle
 import { opportunityRouter } from "./modules/crm/opportunity/interfaces/opportunity.routes";
 import { recurringInvoiceRouter } from "./modules/recurring-invoices/interfaces/recurring-invoice.routes";
 import { exogenaRouter } from "./modules/exogena/interfaces/exogena.routes";
+import { profitabilityRouter } from "./modules/profitability/interfaces/profitability.routes";
 import { commissionsRouter } from "./modules/commissions/interfaces/commissions.routes";
 import { fixedAssetsRouter } from "./modules/fixed-assets/interfaces/fixed-assets.routes";
 import { apiKeyRouter } from "./modules/public-api/interfaces/api-key.routes";
@@ -130,6 +131,7 @@ app.use("/api", collectionsRouter);
 app.use("/api", opportunityRouter);
 app.use("/api", recurringInvoiceRouter);
 app.use("/api", exogenaRouter);
+app.use("/api", profitabilityRouter);
 app.use("/api", commissionsRouter);
 app.use("/api", fixedAssetsRouter);
 app.use("/api", apiKeyRouter);

@@ -242,6 +242,23 @@ export class AccountingController {
     }
   };
 
+  /** Balance de prueba por tercero: ?from=AAAA-MM-DD&to=AAAA-MM-DD (por defecto, el mes en curso hasta hoy). */
+  getTrialBalanceByThirdParty = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+      const fromRaw = typeof req.query.from === "string" ? req.query.from : `${today.slice(0, 8)}01`;
+      const toRaw = typeof req.query.to === "string" ? req.query.to : today;
+      const from = startOfDayInBogota(fromRaw);
+      const to = endOfDayInBogota(toRaw);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+        throw new ValidationError("Rango de fechas invalido: from debe ser anterior o igual a to (AAAA-MM-DD)");
+      }
+      res.json(await this.reports.getTrialBalanceByThirdParty(from, to, queryBranchId(req)));
+    } catch (err) {
+      next(err);
+    }
+  };
+
   /** Estados financieros NIIF (Situacion Financiera al corte + Resultados del periodo), con los mismos saldos. */
   getNiifStatements = async (req: Request, res: Response, next: NextFunction) => {
     try {

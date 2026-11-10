@@ -37,6 +37,8 @@ export interface KardexEntryRecord {
   movementId: string;
   movementType: string;
   movementQuantity: number;
+  /** Costo unitario real (PEPS) de este movimiento. */
+  movementUnitCost: number;
   balanceQty: number;
   balanceCost: number;
   averageCost: number;

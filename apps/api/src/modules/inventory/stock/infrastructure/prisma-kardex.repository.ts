@@ -19,7 +19,7 @@ export class PrismaKardexRepository implements IKardexRepository {
     // que se resuelve con una segunda consulta en vez de un include.
     const movements = await prisma.stockMovement.findMany({
       where: { id: { in: rows.map((r) => r.movementId) } },
-      select: { id: true, type: true, quantity: true },
+      select: { id: true, type: true, quantity: true, unitCost: true },
     });
     const movementById = new Map(movements.map((m) => [m.id, m]));
 
@@ -32,6 +32,7 @@ export class PrismaKardexRepository implements IKardexRepository {
         movementId: row.movementId,
         movementType: movement?.type ?? "UNKNOWN",
         movementQuantity: Number(movement?.quantity ?? 0),
+        movementUnitCost: Number(movement?.unitCost ?? 0),
         balanceQty: Number(row.balanceQty),
         balanceCost: Number(row.balanceCost),
         averageCost: Number(row.averageCost),

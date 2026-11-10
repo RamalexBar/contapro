@@ -28,6 +28,9 @@ import { BrandsSection } from "../components/BrandsSection";
 import { BranchStockSection } from "../components/BranchStockSection";
 import { StockMovementsSection } from "../components/StockMovementsSection";
 import { KardexSection } from "../components/KardexSection";
+import { StockAlertsSection } from "../components/StockAlertsSection";
+import { InventoryValuationSection } from "../components/InventoryValuationSection";
+import { ProfitabilitySection } from "../components/ProfitabilitySection";
 import { NewProductPhotosPicker, ProductPhotoCell } from "../components/ProductPhoto";
 import { ProductImportCard } from "../components/ProductImportCard";
 
@@ -539,7 +542,17 @@ function PriceListsSection() {
   );
 }
 
-type Section = "products" | "price-lists" | "categories" | "brands" | "branches" | "movements" | "kardex";
+type Section =
+  | "products"
+  | "price-lists"
+  | "categories"
+  | "brands"
+  | "branches"
+  | "movements"
+  | "kardex"
+  | "alerts"
+  | "valuation"
+  | "profitability";
 
 const SECTION_LABELS: Record<Section, string> = {
   products: "Productos",
@@ -549,16 +562,24 @@ const SECTION_LABELS: Record<Section, string> = {
   branches: "Sucursales",
   movements: "Movimientos de stock",
   kardex: "Kardex",
+  alerts: "Alertas de stock",
+  valuation: "Inventario valorizado",
+  profitability: "Rentabilidad",
 };
+
+/** Muestran costos y utilidades: solo con permiso de reportes financieros (el Cajero no los ve). */
+const COST_SECTIONS = new Set<Section>(["valuation", "profitability"]);
 
 export function ProductListPage() {
   const [section, setSection] = useState<Section>("products");
+  const canSeeCosts = useAuthStore((s) => s.hasPermission("accounting.read"));
+  const sections = (Object.keys(SECTION_LABELS) as Section[]).filter((s) => canSeeCosts || !COST_SECTIONS.has(s));
 
   return (
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Inventario</h1>
       <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-        {(Object.keys(SECTION_LABELS) as Section[]).map((s) => (
+        {sections.map((s) => (
           <Button key={s} size="sm" variant={section === s ? "primary" : "secondary"} onClick={() => setSection(s)}>
             {SECTION_LABELS[s]}
           </Button>
@@ -572,6 +593,9 @@ export function ProductListPage() {
       {section === "branches" && <BranchStockSection />}
       {section === "movements" && <StockMovementsSection />}
       {section === "kardex" && <KardexSection />}
+      {section === "alerts" && <StockAlertsSection />}
+      {section === "valuation" && canSeeCosts && <InventoryValuationSection />}
+      {section === "profitability" && canSeeCosts && <ProfitabilitySection />}
     </AppLayout>
   );
 }

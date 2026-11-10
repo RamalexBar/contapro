@@ -5,6 +5,8 @@ import { getTenantContext } from "../../../../shared/context/request-context";
 import { NotFoundError } from "../../../../shared/errors/app-error";
 import type { CreateSaleData, ISaleRepository, SaleRecord } from "../domain/sale.repository";
 import { recordKardexEntry } from "../../../inventory/stock/infrastructure/kardex-writer";
+import { consumeCostLayers, refreshCurrentCost } from "../../../inventory/stock/infrastructure/cost-layers";
+import { segmentsCost } from "../../../inventory/stock/domain/fifo-cost";
 
 function toRecord(row: any, costTotal = 0): SaleRecord {
   return {
@@ -282,16 +284,15 @@ export class PrismaSaleRepository implements ISaleRepository {
   }
 
   /**
-   * Efectos que solo deben ocurrir cuando una venta queda COMPLETED (de entrada, o al
-   * autorizarse el ultimo descuento pendiente): descontar stock por sucursal, registrar
-   * StockMovement SALE_OUT y, si hay caja activa, un CashMovement de tipo SALE_IN. Devuelve el
-   * costo real total de lo vendido (para el asiento de costo de venta, ver
-   * post-sale-journal-entry.use-case.ts) -- bajo FIFO, la suma de los lotes realmente
-   * consumidos (`segment.unitCost`, el mismo costo real que ya guarda StockMovement para FIFO);
-   * sin FIFO, `Product.currentCost` al momento de la venta, NO `item.unitPrice` (StockMovement si
-   * usa el precio de venta como unitCost para AVERAGE/LAST, limitacion preexistente documentada
-   * en el modulo de proveedores -- no se reutiliza ese valor aqui para no heredar el mismo error
-   * en la contabilidad).
+   * Efectos que solo deben ocurrir cuando una venta queda COMPLETED (de entrada, o al autorizarse el ultimo descuento
+   * pendiente): descontar stock por sucursal, consumir las capas de costo PEPS (un StockMovement SALE_OUT por capa
+   * tocada, con su costo real), guardar el costo real de cada linea en SaleItem.costTotal (base del reporte de
+   * rentabilidad) y, si hay caja activa, un CashMovement SALE_IN. Devuelve el costo total de lo vendido para el asiento
+   * de costo de venta (ver post-sale-journal-entry.use-case.ts).
+   *
+   * Lo que no alcanza a cubrir ninguna capa (venta sin existencias registradas) sale al Product.currentCost vigente, sin
+   * bloquear la venta. No reversa el consumo si la venta se anula despues -- el modulo de Devoluciones es el que
+   * devuelve mercancia (limitacion ya documentada de CancelSaleUseCase).
    */
   private async applyCompletionSideEffects(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -299,43 +300,25 @@ export class PrismaSaleRepository implements ISaleRepository {
     saleId: string,
     branchId: string,
     cashSessionId: string | undefined | null,
-    items: Array<{ productId: string; quantity: unknown; unitPrice: unknown }>,
+    items: Array<{ id: string; productId: string; quantity: unknown; unitPrice: unknown }>,
     total: unknown,
     sellerUserId: string
   ): Promise<number> {
     const companyId = getTenantContext().companyId;
     let costTotal = 0;
 
-    // Branch esta en TENANT_MODELS (auto-scoped por findFirst) -- se confirma ANTES de usar
-    // branchId en cualquier where/create de abajo. Sin esto, un branchId de otra empresa no
-    // llegaria a leer/tocar datos ajenos (ProductBranchStock tambien esta tenant-scoped, un
-    // branchId ajeno simplemente no matchea ninguna fila), pero si dejaria StockMovement/Kardex
-    // con una referencia colgada dentro de los propios registros del atacante -- mismo criterio
-    // de "no depender de que el caller ya valido esto" que authorizeItemDiscount de mas abajo.
+    // Branch esta en TENANT_MODELS (auto-scoped por findFirst) -- se confirma ANTES de usar branchId en cualquier
+    // where/create de abajo, para no dejar StockMovement/Kardex con una referencia a una sucursal ajena.
     const branch = await tx.branch.findFirst({ where: { id: branchId } });
     if (!branch) throw new NotFoundError("Branch", branchId);
 
     for (const item of items) {
       const quantity = Number(item.quantity);
 
-      const product = await tx.product.findFirst({
-        where: { id: item.productId },
-        select: { costMethod: true, tracksBatches: true, currentCost: true },
-      });
+      const product = await tx.product.findFirst({ where: { id: item.productId }, select: { id: true } });
       if (!product) throw new NotFoundError("Product", item.productId);
-      const useFifo = product?.costMethod === "FIFO" && product?.tracksBatches;
-      const averageCost = Number(product?.currentCost ?? 0);
 
-      // Bajo FIFO se genera una linea de StockMovement (y su Kardex) POR LOTE realmente
-      // consumido, no una sola linea agregada por item -- para trazabilidad fina (que lote
-      // exacto salio en esta venta). Sin FIFO/tracksBatches, un solo segmento igual que antes.
-      const segments = useFifo
-        ? await this.consumeFifoBatches(tx, item.productId, branchId, quantity, averageCost)
-        : [{ batchId: null, quantity, unitCost: Number(item.unitPrice) }];
-
-      for (const segment of segments) {
-        costTotal += segment.quantity * (useFifo ? segment.unitCost : averageCost);
-
+      const segments = await consumeCostLayers(tx, { productId: item.productId, branchId, quantity }, async (segment) => {
         await tx.productBranchStock.updateMany({
           where: { productId: item.productId, branchId },
           data: { quantity: { decrement: segment.quantity } },
@@ -345,7 +328,7 @@ export class PrismaSaleRepository implements ISaleRepository {
             companyId,
             branchId,
             productId: item.productId,
-            batchId: segment.batchId,
+            batchId: segment.layerId,
             type: "SALE_OUT",
             quantity: segment.quantity,
             unitCost: segment.unitCost,
@@ -355,7 +338,13 @@ export class PrismaSaleRepository implements ISaleRepository {
           },
         });
         await recordKardexEntry(tx, { branchId, productId: item.productId, movementId: movement.id });
-      }
+      });
+      await refreshCurrentCost(tx, item.productId);
+
+      const lineCost = round2(segmentsCost(segments));
+      costTotal += lineCost;
+      // SaleItem no tiene companyId propio (se aisla por su Sale): el id viene de la venta recien leida en esta misma tx.
+      await tx.saleItem.update({ where: { id: item.id }, data: { costTotal: lineCost } });
     }
 
     if (cashSessionId) {
@@ -373,63 +362,5 @@ export class PrismaSaleRepository implements ISaleRepository {
     }
 
     return round2(costTotal);
-  }
-
-  /**
-   * Consumo FIFO real: agota los Batch del producto/sucursal en orden de entrada (`createdAt`
-   * asc) hasta cubrir `quantity`, devolviendo un segmento por cada lote realmente consumido (con
-   * su `batchId` y el costo real de ESE lote, `costAtEntry`) -- antes se devolvia un solo costo
-   * unitario ponderado y el llamador creaba una unica linea de StockMovement por item de venta,
-   * sin importar cuantos lotes distintos se hubieran tocado; ahora cada segmento se convierte en
-   * su propia linea de StockMovement (ver `applyCompletionSideEffects`), para trazabilidad fina
-   * de que lote exacto salio en la venta (iteracion 23, ver `suppliers/README.md` punto 1).
-   *
-   * Actualiza Product.currentCost al costo del lote mas antiguo que quede disponible tras el
-   * consumo (el "proximo costo a vender" bajo FIFO), sin tocarlo si no queda ninguno.
-   *
-   * Si Batch no alcanza a cubrir toda la cantidad (drift frente a ProductBranchStock por ajustes
-   * o transferencias que no tocan Batch -- ver limitacion ya documentada en el modulo de
-   * inventario), el remanente se devuelve como un segmento con `batchId: null` valorado al ultimo
-   * currentCost conocido, en vez de bloquear la venta. No reversa el consumo si la venta se anula
-   * despues -- ver limitacion ya documentada de CancelSaleUseCase (el modulo de Devoluciones es
-   * el que ajusta stock).
-   */
-  private async consumeFifoBatches(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tx: any,
-    productId: string,
-    branchId: string,
-    quantity: number,
-    fallbackCost: number
-  ): Promise<Array<{ batchId: string | null; quantity: number; unitCost: number }>> {
-    const batches = await tx.batch.findMany({
-      where: { productId, branchId, quantity: { gt: 0 } },
-      orderBy: { createdAt: "asc" },
-    });
-
-    const segments: Array<{ batchId: string | null; quantity: number; unitCost: number }> = [];
-    let remaining = quantity;
-    for (const batch of batches) {
-      if (remaining <= 0) break;
-      const batchQty = Number(batch.quantity);
-      const consumeQty = Math.min(remaining, batchQty);
-      await tx.batch.update({ where: { id: batch.id }, data: { quantity: { decrement: consumeQty } } });
-      segments.push({ batchId: batch.id, quantity: consumeQty, unitCost: Number(batch.costAtEntry) });
-      remaining -= consumeQty;
-    }
-
-    if (remaining > 0) {
-      segments.push({ batchId: null, quantity: remaining, unitCost: fallbackCost });
-    }
-
-    const nextBatch = await tx.batch.findFirst({
-      where: { productId, branchId, quantity: { gt: 0 } },
-      orderBy: { createdAt: "asc" },
-    });
-    if (nextBatch) {
-      await tx.product.update({ where: { id: productId }, data: { currentCost: nextBatch.costAtEntry } });
-    }
-
-    return segments;
   }
 }

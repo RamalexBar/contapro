@@ -50,7 +50,9 @@ model Product {
   brandId       String?
   brand         Brand?     @relation(fields: [brandId], references: [id])
   unit          String     @default("UN")
-  costMethod    CostMethod @default(AVERAGE)
+  // PEPS para todos desde 2026-11-10: cada entrada crea una capa de costo (Batch) y cada salida consume primero la
+  // mas vieja. AVERAGE/LAST quedan en el enum solo por compatibilidad, ya no cambian el calculo.
+  costMethod    CostMethod @default(FIFO)
   currentCost   Decimal    @db.Decimal(14, 4) @default(0)
   currentPrice  Decimal    @db.Decimal(14, 4) @default(0)
   taxRate       Decimal    @db.Decimal(5, 2)  @default(19) // IVA %
@@ -145,8 +147,11 @@ model ProductBranchStock {
   @@map("product_branch_stocks")
 }
 
+/// Lote y, desde 2026-11-10, capa de costo PEPS: TODA entrada de mercancia crea una (compra, entrada manual, ajuste,
+/// traslado, devolucion), maneje o no el producto lotes/vencimientos (`Product.tracksBatches` solo decide si se piden
+/// numero de lote y vencimiento). La suma de `quantity * costAtEntry` de las capas de una sucursal es su saldo valorizado.
 model Batch {
-  id             String    @id @default(uuid())
+  id            String    @id @default(uuid())
   companyId      String
   productId      String
   product        Product   @relation(fields: [productId], references: [id])
@@ -246,8 +251,8 @@ model PhysicalInventoryItem {
   @@map("physical_inventory_items")
 }
 
-/// Historial de saldos por producto/sucursal (costo promedio). Preparado para FIFO futuro
-/// (Batch + Product.costMethod ya soportan el dato de entrada por lote).
+/// Historial de saldos por producto/sucursal. Desde 2026-11-10 `balanceCost` es el valor real de las capas PEPS que
+/// quedan en la sucursal y `averageCost` = balanceCost / balanceQty (costo unitario del saldo, no un promedio movil).
 model Kardex {
   id          String   @id @default(uuid())
   companyId   String

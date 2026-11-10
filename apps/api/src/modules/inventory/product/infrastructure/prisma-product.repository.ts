@@ -5,6 +5,7 @@ import { ConflictError, NotFoundError } from "../../../../shared/errors/app-erro
 import { Product } from "../domain/product.entity";
 import type { CreateProductData, IProductRepository, ProductListItem } from "../domain/product.repository";
 import { recordKardexEntry } from "../../stock/infrastructure/kardex-writer";
+import { addCostLayer } from "../../stock/infrastructure/cost-layers";
 
 type ProductRow = {
   id: string;
@@ -77,11 +78,20 @@ export class PrismaProductRepository implements IProductRepository {
         });
 
         if (data.initialStock > 0) {
+          // Existencias iniciales = primera capa de costo PEPS del producto.
+          const batchId = await addCostLayer(tx, {
+            productId: product.id,
+            branchId: data.branchId,
+            quantity: data.initialStock,
+            unitCost: data.currentCost,
+            batchNumber: "SALDO-INICIAL",
+          });
           const movement = await tx.stockMovement.create({
             data: {
               companyId,
               branchId: data.branchId,
               productId: product.id,
+              batchId,
               type: "ADJUSTMENT_IN",
               quantity: data.initialStock,
               unitCost: data.currentCost,

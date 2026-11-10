@@ -41,7 +41,7 @@ export class GetDashboardMetricsUseCase {
         }),
         prisma.saleItem.findMany({
           where: { sale: { branchId, status: "COMPLETED", createdAt: { gte: monthStart } } },
-          select: { productId: true, quantity: true, total: true },
+          select: { productId: true, quantity: true, total: true, taxAmount: true, costTotal: true },
         }),
         prisma.stockMovement.aggregate({
           where: { branchId, type: "SALE_OUT", createdAt: { gte: monthStart } },
@@ -59,9 +59,8 @@ export class GetDashboardMetricsUseCase {
         prisma.customer.count({ where: { createdAt: { gte: monthStart } } }),
       ]);
 
-    // Costo de lo vendido en el mes (para estimar utilidad): se recalcula por producto usando
-    // el costo actual como aproximacion (el costo historico exacto por movimiento se deja para
-    // cuando el costeo FIFO/promedio este completamente implementado, ver docs/ALCANCE.md).
+    // Utilidad del mes = ventas sin IVA - costo real PEPS de cada linea (SaleItem.costTotal, fijado al completar la
+    // venta). Solo si una linea no lo tuviera se estima con el costo actual del producto.
     void cogsMonth;
     const productIds = [...new Set(saleItemsMonth.map((i) => i.productId))];
     const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
@@ -73,8 +72,8 @@ export class GetDashboardMetricsUseCase {
     for (const item of saleItemsMonth) {
       const qty = Number(item.quantity);
       const total = Number(item.total);
-      revenueMonth += total;
-      cogsEstimate += (costByProduct.get(item.productId) ?? 0) * qty;
+      revenueMonth += total - Number(item.taxAmount);
+      cogsEstimate += item.costTotal !== null ? Number(item.costTotal) : (costByProduct.get(item.productId) ?? 0) * qty;
       const current = topProductsMap.get(item.productId) ?? { quantitySold: 0, total: 0 };
       current.quantitySold += qty;
       current.total += total;

@@ -4,7 +4,15 @@ import type { AdjustStockUseCase } from "../application/use-cases/adjust-stock.u
 import type { TransferStockUseCase } from "../application/use-cases/transfer-stock.use-case";
 import type { ListKardexUseCase } from "../application/use-cases/list-kardex.use-case";
 import type { ListBranchStockUseCase } from "../application/use-cases/list-branch-stock.use-case";
-import { listBranchStockQuerySchema, listKardexQuerySchema, stockAdjustSchema, stockEntrySchema, transferStockSchema } from "./stock.validators";
+import type { GetInventoryValuationUseCase, ListStockAlertsUseCase } from "../application/use-cases/get-inventory-reports.use-case";
+import {
+  inventoryReportQuerySchema,
+  listBranchStockQuerySchema,
+  listKardexQuerySchema,
+  stockAdjustSchema,
+  stockEntrySchema,
+  transferStockSchema,
+} from "./stock.validators";
 
 export class StockController {
   constructor(
@@ -12,7 +20,9 @@ export class StockController {
     private readonly adjustUseCase: AdjustStockUseCase,
     private readonly transferUseCase: TransferStockUseCase,
     private readonly listKardexUseCase: ListKardexUseCase,
-    private readonly listBranchStockUseCase: ListBranchStockUseCase
+    private readonly listBranchStockUseCase: ListBranchStockUseCase,
+    private readonly valuationUseCase: GetInventoryValuationUseCase,
+    private readonly alertsUseCase: ListStockAlertsUseCase
   ) {}
 
   registerEntry = async (req: Request, res: Response, next: NextFunction) => {
@@ -56,6 +66,24 @@ export class StockController {
     try {
       const query = listBranchStockQuerySchema.parse(req.query);
       res.json({ data: await this.listBranchStockUseCase.execute(query.branchId) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getValuation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const query = inventoryReportQuerySchema.parse(req.query);
+      res.json(await this.valuationUseCase.execute(query.branchId));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listAlerts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const query = inventoryReportQuerySchema.parse(req.query);
+      res.json({ data: await this.alertsUseCase.execute(query.branchId) });
     } catch (err) {
       next(err);
     }

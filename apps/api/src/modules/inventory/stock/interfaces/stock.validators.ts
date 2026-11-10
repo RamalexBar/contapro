@@ -21,3 +21,8 @@ export const listKardexQuerySchema = z.object({
 export const listBranchStockQuerySchema = z.object({
   branchId: z.string().uuid(),
 });
+
+/** Inventario valorizado / alertas de stock: sin branchId = todas las sucursales. */
+export const inventoryReportQuerySchema = z.object({
+  branchId: z.string().uuid().optional(),
+});

@@ -4,6 +4,7 @@ import type { IJournalEntryRepository, PostedLineAggregate } from "../domain/jou
 import type { IBankTransactionRepository } from "../domain/bank-transaction.repository";
 import type { ICashSessionRepository } from "../../cash/cash-session/domain/cash-session.repository";
 import { THIRD_PARTY_BREAKDOWN_ACCOUNT_CODES, type IThirdPartyResolver } from "../domain/third-party-resolver";
+import { buildTrialBalanceByThirdParty, type TrialBalanceByThirdParty } from "./trial-balance-by-third-party";
 
 export interface AccountBalance {
   accountId: string;
@@ -193,6 +194,14 @@ export class AccountingReportsService {
       });
     }
     return rows.sort((a, b) => (a.thirdPartyName ?? "").localeCompare(b.thirdPartyName ?? ""));
+  }
+
+  /** Balance de prueba por tercero (todas las cuentas del PUC con saldo o movimiento), ver
+   * trial-balance-by-third-party.ts para la regla de saldos iniciales. */
+  async getTrialBalanceByThirdParty(from: Date, to: Date, branchId?: string): Promise<TrialBalanceByThirdParty> {
+    const [accounts, lines] = await Promise.all([this.accountRepo.list(), this.journalRepo.listPostedLines({ to, branchId })]);
+    const thirdPartyByKey = await this.thirdPartyResolver.resolveForLines(lines);
+    return buildTrialBalanceByThirdParty({ from, to, accounts, lines, thirdPartyByKey });
   }
 
   async getIncomeStatement(from: Date, to: Date, costCenterId?: string, branchId?: string): Promise<IncomeStatement> {

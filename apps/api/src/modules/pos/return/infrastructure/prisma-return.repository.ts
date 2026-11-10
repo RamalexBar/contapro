@@ -2,6 +2,7 @@ import { prisma } from "../../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { NotFoundError, ValidationError } from "../../../../shared/errors/app-error";
 import { recordKardexEntry } from "../../../inventory/stock/infrastructure/kardex-writer";
+import { addCostLayer, refreshCurrentCost } from "../../../inventory/stock/infrastructure/cost-layers";
 import type { CreateReturnData, IReturnRepository, ReturnRecord } from "../domain/return.repository";
 
 function toRecord(row: {
@@ -107,33 +108,24 @@ export class PrismaReturnRepository implements IReturnRepository {
         if (!item.restockedToBranch) continue;
 
         const product = await tx.product.findFirst({ where: { id: item.productId } });
-        const useFifo = product?.costMethod === "FIFO" && product?.tracksBatches;
 
+        // Costo real con el que salio en la venta original. Fuente principal: SaleItem.costTotal (PEPS, desde
+        // 2026-11-10, o estimado para ventas anteriores). Si no estuviera, el promedio de los SALE_OUT con capa.
+        const saleItem = sale.items.find((si: { id: string }) => si.id === item.saleItemId) as
+          | { quantity: unknown; costTotal: unknown }
+          | undefined;
+        const originalSaleMovements = await tx.stockMovement.findMany({
+          where: { referenceType: "Sale", referenceId: data.saleId, productId: item.productId, type: "SALE_OUT" },
+          orderBy: { createdAt: "asc" },
+        });
         let unitCost: number;
-        if (useFifo) {
-          // Bajo FIFO, el/los StockMovement(s) SALE_OUT originales ya guardan el costo real del
-          // lote consumido (ver PrismaSaleRepository.applyCompletionSideEffects) -- una venta
-          // pudo haber tocado varios lotes distintos (uno por segmento, ver
-          // `consumeFifoBatches`), asi que se promedia ponderado por cantidad, no se toma solo el
-          // primero. Fallback a currentCost si no se encuentra ninguno (no deberia pasar para una
-          // venta COMPLETED, defensivo).
-          const originalSaleMovements = await tx.stockMovement.findMany({
-            where: { referenceType: "Sale", referenceId: data.saleId, productId: item.productId, type: "SALE_OUT" },
-          });
-          const originalQty = originalSaleMovements.reduce((sum: number, m: { quantity: unknown }) => sum + Number(m.quantity), 0);
-          const originalCost = originalSaleMovements.reduce(
-            (sum: number, m: { quantity: unknown; unitCost: unknown }) => sum + Number(m.quantity) * Number(m.unitCost),
-            0
-          );
-          unitCost = originalQty > 0 ? originalCost / originalQty : Number(product?.currentCost ?? 0);
+        if (saleItem && saleItem.costTotal !== null && saleItem.costTotal !== undefined && Number(saleItem.quantity) > 0) {
+          unitCost = Number(saleItem.costTotal) / Number(saleItem.quantity);
         } else {
-          // Sin FIFO, el StockMovement SALE_OUT original guarda el PRECIO de venta como
-          // unitCost, no el costo real (limitacion preexistente, ver
-          // PrismaSaleRepository.applyCompletionSideEffects) -- promediarlo desde ahi
-          // reingresaria el producto a bodega (y calcularia el reverso contable) al precio de
-          // venta en vez de al costo real. Se usa Product.currentCost directamente, mismo
-          // criterio que el costo de venta de la venta original.
-          unitCost = Number(product?.currentCost ?? 0);
+          const layered = originalSaleMovements.filter((m: { batchId: string | null }) => m.batchId);
+          const qty = layered.reduce((sum: number, m: { quantity: unknown }) => sum + Number(m.quantity), 0);
+          const cost = layered.reduce((sum: number, m: { quantity: unknown; unitCost: unknown }) => sum + Number(m.quantity) * Number(m.unitCost), 0);
+          unitCost = qty > 0 ? cost / qty : Number(product?.currentCost ?? 0);
         }
         costTotal += unitCost * item.quantity;
 
@@ -143,27 +135,28 @@ export class PrismaReturnRepository implements IReturnRepository {
           update: { quantity: { increment: item.quantity } },
         });
 
-        if (product?.tracksBatches) {
-          // Lote nuevo, no se reinserta en el lote FIFO original consumido: SaleItem/StockMovement
-          // no guardan a nivel de linea que lote especifico se consumio (limitacion ya
-          // documentada en suppliers/README.md, punto 1 -- no se inventa esa trazabilidad aqui).
-          await tx.batch.create({
-            data: {
-              companyId,
-              productId: item.productId,
-              branchId: data.branchId,
-              batchNumber: `DEVOLUCION-${created.id}`,
-              quantity: item.quantity,
-              costAtEntry: unitCost,
-            },
-          });
-        }
+        // Vuelve como capa con el costo con que salio y con la antiguedad de la capa mas vieja que consumio la venta:
+        // en PEPS lo devuelto se vende de nuevo antes que lo comprado despues.
+        const firstLayerId = originalSaleMovements.find((m: { batchId: string | null }) => m.batchId)?.batchId ?? null;
+        const firstLayer = firstLayerId
+          ? await tx.batch.findFirst({ where: { id: firstLayerId }, select: { createdAt: true } })
+          : null;
+        const batchId = await addCostLayer(tx, {
+          productId: item.productId,
+          branchId: data.branchId,
+          quantity: item.quantity,
+          unitCost,
+          batchNumber: `DEVOLUCION-${created.id}`,
+          createdAt: firstLayer?.createdAt,
+        });
+        await refreshCurrentCost(tx, item.productId);
 
         const movement = await tx.stockMovement.create({
           data: {
             companyId,
             branchId: data.branchId,
             productId: item.productId,
+            batchId,
             type: "RETURN_IN",
             quantity: item.quantity,
             unitCost,
@@ -172,8 +165,6 @@ export class PrismaReturnRepository implements IReturnRepository {
             createdByUserId: data.createdByUserId,
           },
         });
-        // Deliberadamente NO se actualiza Product.currentCost aqui: restaurar una devolucion al
-        // mismo costo con el que salio no debe re-promediar el costo de productos no tocados.
         await recordKardexEntry(tx, { branchId: data.branchId, productId: item.productId, movementId: movement.id });
       }
 

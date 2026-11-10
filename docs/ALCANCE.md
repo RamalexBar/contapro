@@ -896,3 +896,12 @@ cuando se implemente, mismo criterio que la lista de arriba:
     lista, cotizacion) y un administrador de fotos en Inventario. Con las variables `R2_*` los archivos van a
     Cloudflare R2 (firma S3 a mano, sin SDK); sin ellas, a la base como antes. Borrar una empresa borra sus archivos en
     R2. Probado en vivo con la base; contra R2 real falta crear el bucket. Ver `modules/inventory/product/README.md`.
+56. ~~Costeo PEPS real, rentabilidad, inventario valorizado, alertas y balance de prueba por tercero~~ — 2026-11-10.
+    Todo producto se costea por PEPS: cada entrada es una capa de costo (`Batch`) y cada salida consume primero la mas
+    vieja, asi la utilidad sale con el costo real (compro a $250 y luego a $300: se vende lo de $250 hasta agotarlo).
+    `SaleItem.costTotal` guarda el costo real de cada linea. Reportes nuevos: rentabilidad por producto, categoria y
+    cliente (`GET /reports/profitability`), inventario valorizado con sus capas (`GET /stock/valuation`), alertas de
+    stock minimo (`GET /stock/alerts`), kardex con costo unitario real, y balance de prueba por tercero de todas las
+    cuentas (`GET /reports/trial-balance-by-third-party`, con NIT, exportable a Excel). Migracion
+    `20261110120000_fifo_cost_layers`. Detalle en `modules/inventory/stock/README.md`, `modules/profitability/README.md`
+    y `modules/accounting/README.md`.

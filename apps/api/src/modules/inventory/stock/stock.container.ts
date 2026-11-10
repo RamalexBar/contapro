@@ -8,9 +8,12 @@ import { TransferStockUseCase } from "./application/use-cases/transfer-stock.use
 import { ListKardexUseCase } from "./application/use-cases/list-kardex.use-case";
 import { ListBranchStockUseCase } from "./application/use-cases/list-branch-stock.use-case";
 import { StockController } from "./interfaces/stock.controller";
+import { PrismaInventoryReportReader } from "./infrastructure/prisma-inventory-report.reader";
+import { GetInventoryValuationUseCase, ListStockAlertsUseCase } from "./application/use-cases/get-inventory-reports.use-case";
 
 const repo = new PrismaStockMovementRepository();
 const kardexRepo = new PrismaKardexRepository();
+const inventoryReportReader = new PrismaInventoryReportReader();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
 /** Usado por suppliers.container.ts para el impacto en inventario de una recepcion de
@@ -22,5 +25,7 @@ export const stockController = new StockController(
   new AdjustStockUseCase(repo, auditService),
   new TransferStockUseCase(repo, auditService),
   new ListKardexUseCase(kardexRepo),
-  new ListBranchStockUseCase(repo)
+  new ListBranchStockUseCase(repo),
+  new GetInventoryValuationUseCase(inventoryReportReader),
+  new ListStockAlertsUseCase(inventoryReportReader)
 );

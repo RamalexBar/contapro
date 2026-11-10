@@ -16,6 +16,7 @@ import { AccountCombobox } from "../components/AccountCombobox";
 import { ChartOfAccountsImportCard } from "../components/ChartOfAccountsImportCard";
 import { VatSummaryReport } from "../components/VatSummaryReport";
 import { NiifStatementsReport } from "../components/NiifStatementsReport";
+import { TrialBalanceByThirdPartyReport } from "../components/TrialBalanceByThirdPartyReport";
 import {
   type AccountType,
   type WithholdingType,
@@ -69,9 +70,10 @@ const WITHHOLDING_TYPES: { value: WithholdingType; label: string }[] = [
 ];
 
 type Section = "accounts" | "entries" | "reports" | "periods" | "withholding" | "cost-centers";
-type ReportTab = "balance" | "income" | "cashflow" | "ledger" | "vat" | "niif";
+type ReportTab = "balance" | "thirdparty" | "income" | "cashflow" | "ledger" | "vat" | "niif";
 const REPORT_TAB_LABELS: Record<ReportTab, string> = {
   balance: "Balance General",
+  thirdparty: "Balance de prueba x tercero",
   income: "Estado de Resultados",
   cashflow: "Flujo de caja",
   ledger: "Libro mayor",
@@ -874,7 +876,7 @@ function ReportsSection() {
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          {(["balance", "income", "cashflow", "ledger", "vat", "niif"] as ReportTab[]).map((tab) => (
+          {(["balance", "thirdparty", "income", "cashflow", "ledger", "vat", "niif"] as ReportTab[]).map((tab) => (
             <Button key={tab} size="sm" variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
               {REPORT_TAB_LABELS[tab]}
             </Button>
@@ -1032,6 +1034,7 @@ function ReportsSection() {
         </Card>
       )}
 
+      {reportTab === "thirdparty" && <TrialBalanceByThirdPartyReport branchId={branchFilter} />}
       {reportTab === "vat" && <VatSummaryReport branchId={branchFilter} />}
       {reportTab === "niif" && <NiifStatementsReport branchId={branchFilter} />}
 

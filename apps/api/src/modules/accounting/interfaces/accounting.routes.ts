@@ -84,6 +84,11 @@ accountingRouter.get(
 // Resumen de IVA para el formulario 300 (2026-10-24)
 accountingRouter.get("/reports/vat-summary", requirePermission("accounting.read"), vatSummaryController.get);
 accountingRouter.get("/reports/niif", requirePermission("accounting.read"), accountingController.getNiifStatements);
+accountingRouter.get(
+  "/reports/trial-balance-by-third-party",
+  requirePermission("accounting.read"),
+  accountingController.getTrialBalanceByThirdParty
+);
 
 accountingRouter.post("/bank-accounts", requirePermission("accounting.manage"), accountingController.createBankAccount);
 accountingRouter.get("/bank-accounts", requirePermission("accounting.read"), accountingController.listBankAccounts);

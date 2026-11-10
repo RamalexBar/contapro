@@ -437,3 +437,23 @@ Contabilidad → Reportes. Se sigue registrando con el PUC; esto es la **present
 - «Resultados acumulados sin cerrar» = ingresos − gastos aún no cerrados (como el Balance General).
 - Pendiente: estado de cambios en el patrimonio, flujo de efectivo NIIF (método indirecto), comparativo con el año
   anterior y notas.
+
+## Balance de prueba por tercero — 2026-11-10
+
+`GET /reports/trial-balance-by-third-party?from=AAAA-MM-DD&to=AAAA-MM-DD&branchId=` (accounting.read). Incluye todas
+las cuentas con saldo o movimiento, ordenadas por código. Cada una trae saldo inicial, débitos, créditos y saldo final,
+y el mismo desglose por tercero, con su NIT o documento. La web lo muestra en Contabilidad → Reportes → "Balance de
+prueba x tercero", con buscador por cuenta, tercero o NIT y exportación a Excel. La lógica está en
+`application/trial-balance-by-third-party.ts`, una función pura con pruebas.
+
+- **Tercero de cada línea:** se toma del documento que originó el comprobante. `PrismaThirdPartyResolver` ahora
+  también reconoce `ManualInvoice` (cliente), `Commission` (vendedor) y `Expense` (beneficiario: es texto libre, sin
+  NIT; mismo nombre = mismo tercero). Todas las líneas de un comprobante llevan su tercero, no solo la 1305/2205. Lo
+  que no tiene tercero (consumidor final, cierres de caja, nómina global, depreciación, comprobantes manuales) se
+  agrupa como "Sin tercero identificado".
+- **Saldo inicial:** las cuentas de balance (activo, pasivo, patrimonio) toman todo lo anterior a `from`. Las de
+  resultado (ingresos, gastos y costos) arrancan en cero el 1 de enero del año de `from`, porque el módulo no genera
+  asiento de cierre anual.
+- **Naturaleza:** activos y gastos/costos son débito (saldo = débitos − créditos); el resto es crédito.
+- **Limitación:** los comprobantes manuales no permiten elegir tercero por línea (`JournalEntryLine.thirdPartyId`
+  existe en el schema pero nadie lo llena todavía).
