@@ -49,7 +49,13 @@ export class PrismaStockMovementRepository implements IStockRepository {
     });
   }
 
-  async adjust(productId: string, branchId: string, quantityDelta: number, reason: string, userId: string): Promise<StockMovementRecord> {
+  async adjust(
+    productId: string,
+    branchId: string,
+    quantityDelta: number,
+    reason: string,
+    userId: string
+  ): Promise<StockMovementRecord & { totalCost: number }> {
     const companyId = getTenantContext().companyId;
     return prisma.$transaction(async (tx) => {
       const stock = await tx.productBranchStock.findFirst({ where: { productId, branchId } });
@@ -59,7 +65,9 @@ export class PrismaStockMovementRepository implements IStockRepository {
       const product = await tx.product.findFirst({ where: { id: productId } });
       const currentCost = Number(product?.currentCost ?? 0);
       let first: StockMovementRecord | null = null;
+      let totalCost = 0;
       const recordMovement = async (segment: { layerId: string | null; quantity: number; unitCost: number }) => {
+        totalCost += segment.quantity * segment.unitCost;
         const movement = await tx.stockMovement.create({
           data: {
             companyId,
@@ -95,8 +103,9 @@ export class PrismaStockMovementRepository implements IStockRepository {
       }
       await refreshCurrentCost(tx, productId);
       void reason; // el motivo se registra en AuditLog desde el caso de uso, no en StockMovement
-      if (!first) throw new ValidationError("El ajuste debe tener una cantidad distinta de cero");
-      return first;
+      const firstMovement = first as StockMovementRecord | null;
+      if (!firstMovement) throw new ValidationError("El ajuste debe tener una cantidad distinta de cero");
+      return { ...firstMovement, totalCost: Math.round(totalCost * 100) / 100 };
     });
   }
 

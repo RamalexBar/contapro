@@ -1,3 +1,4 @@
+import { postInventoryJournalEntryUseCase } from "../../accounting/accounting.container";
 import { PrismaAuditLogRepository } from "../../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../../audit/application/audit.service";
 import { PrismaProductRepository } from "./infrastructure/prisma-product.repository";
@@ -26,7 +27,7 @@ import { ProductPhotoController } from "./interfaces/product-photo.controller";
 
 const productRepo = new PrismaProductRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
-const createProductUseCase = new CreateProductUseCase(productRepo, auditService);
+const createProductUseCase = new CreateProductUseCase(productRepo, auditService, postInventoryJournalEntryUseCase);
 const photoRepo = new PrismaProductPhotoRepository(objectStorage);
 /** Lo usa la cotizacion (pos/quote) para poner la foto de cada producto en su PDF. */
 export const productPhotoRepo = photoRepo;

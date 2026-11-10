@@ -400,3 +400,18 @@ export function getTrialBalanceByThirdParty(from: string, to: string, branchId?:
   if (branchId) params.set("branchId", branchId);
   return apiFetch(`/reports/trial-balance-by-third-party?${params.toString()}`);
 }
+
+export interface InventoryReconciliation {
+  ledgerBalance: number;
+  inventoryValue: number;
+  difference: number;
+  entry: { id: string; number: number } | null;
+}
+
+export function getInventoryReconciliation(): Promise<InventoryReconciliation> {
+  return apiFetch("/inventory-reconciliation");
+}
+
+export function regularizeInventoryAccount(): Promise<InventoryReconciliation> {
+  return apiFetch("/inventory-reconciliation/regularize", { method: "POST" });
+}

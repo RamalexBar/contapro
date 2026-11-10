@@ -34,6 +34,11 @@ import { PostReturnJournalEntryUseCase } from "./application/use-cases/post-retu
 import { PostPurchaseJournalEntryUseCase } from "./application/use-cases/post-purchase-journal-entry.use-case";
 import { PostSupplierPaymentJournalEntryUseCase } from "./application/use-cases/post-supplier-payment-journal-entry.use-case";
 import { PostCashSessionAdjustmentJournalEntryUseCase } from "./application/use-cases/post-cash-session-adjustment-journal-entry.use-case";
+import { PostInventoryJournalEntryUseCase } from "./application/use-cases/post-inventory-journal-entry.use-case";
+import { RegularizeInventoryAccountUseCase } from "./application/use-cases/regularize-inventory-account.use-case";
+import { InventoryReconciliationController } from "./interfaces/inventory-reconciliation.controller";
+import { PrismaInventoryReportReader } from "../inventory/stock/infrastructure/prisma-inventory-report.reader";
+import { buildValuationReport } from "../inventory/stock/application/inventory-reports";
 import { PostExpenseJournalEntryUseCase } from "./application/use-cases/post-expense-journal-entry.use-case";
 import { PostCommissionJournalEntryUseCase } from "./application/use-cases/post-commission-journal-entry.use-case";
 import { PostDepreciationJournalEntryUseCase } from "./application/use-cases/post-depreciation-journal-entry.use-case";
@@ -197,3 +202,21 @@ export const postCommissionJournalEntryUseCase = new PostCommissionJournalEntryU
 
 /** Usado por fixed-assets.container.ts para contabilizar una entrada de depreciacion. */
 export const postDepreciationJournalEntryUseCase = new PostDepreciationJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
+
+/** Usado por product.container.ts y stock.container.ts: asientos de existencias iniciales, entradas manuales y ajustes
+ * de inventario (Debito/Credito 1435 contra 3115, 4295 o 5195), y por la regularizacion de la 1435. */
+export const postInventoryJournalEntryUseCase = new PostInventoryJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
+
+/** Valor real del inventario (capas PEPS de todas las sucursales), para conciliar la 1435. */
+const inventoryValueReader = {
+  totalValue: async () => buildValuationReport(await new PrismaInventoryReportReader().listStockLevels({ withLayers: true })).totalValue,
+};
+
+/** Conciliacion y regularizacion de la 1435 (pantalla de Contabilidad y script src/scripts/regularize-inventory-account.ts). */
+export const regularizeInventoryAccountUseCase = new RegularizeInventoryAccountUseCase(
+  accountRepo,
+  journalRepo,
+  inventoryValueReader,
+  postInventoryJournalEntryUseCase
+);
+export const inventoryReconciliationController = new InventoryReconciliationController(regularizeInventoryAccountUseCase);

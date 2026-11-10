@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { tenantContextMiddleware } from "../../../shared/middlewares/tenant-context.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
-import { accountingController, vatSummaryController } from "../accounting.container";
+import { accountingController, inventoryReconciliationController, vatSummaryController } from "../accounting.container";
 
 export const accountingRouter = Router();
 accountingRouter.use(tenantContextMiddleware);
@@ -187,4 +187,12 @@ accountingRouter.post(
   "/cost-centers/:id/deactivate",
   requirePermission("accounting.manage"),
   accountingController.deactivateCostCenter
+);
+
+// Conciliacion de la cuenta 1435 contra el inventario valorizado real (2026-11-10).
+accountingRouter.get("/inventory-reconciliation", requirePermission("accounting.read"), inventoryReconciliationController.get);
+accountingRouter.post(
+  "/inventory-reconciliation/regularize",
+  requirePermission("accounting.manage"),
+  inventoryReconciliationController.regularize
 );

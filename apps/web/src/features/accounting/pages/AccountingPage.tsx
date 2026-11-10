@@ -17,6 +17,7 @@ import { ChartOfAccountsImportCard } from "../components/ChartOfAccountsImportCa
 import { VatSummaryReport } from "../components/VatSummaryReport";
 import { NiifStatementsReport } from "../components/NiifStatementsReport";
 import { TrialBalanceByThirdPartyReport } from "../components/TrialBalanceByThirdPartyReport";
+import { InventoryReconciliationReport } from "../components/InventoryReconciliationReport";
 import {
   type AccountType,
   type WithholdingType,
@@ -70,7 +71,7 @@ const WITHHOLDING_TYPES: { value: WithholdingType; label: string }[] = [
 ];
 
 type Section = "accounts" | "entries" | "reports" | "periods" | "withholding" | "cost-centers";
-type ReportTab = "balance" | "thirdparty" | "income" | "cashflow" | "ledger" | "vat" | "niif";
+type ReportTab = "balance" | "thirdparty" | "income" | "cashflow" | "ledger" | "vat" | "niif" | "inventory";
 const REPORT_TAB_LABELS: Record<ReportTab, string> = {
   balance: "Balance General",
   thirdparty: "Balance de prueba x tercero",
@@ -79,6 +80,7 @@ const REPORT_TAB_LABELS: Record<ReportTab, string> = {
   ledger: "Libro mayor",
   vat: "Resumen de IVA",
   niif: "Estados NIIF",
+  inventory: "Conciliación inventario (1435)",
 };
 
 function formatLocalDate(d: Date): string {
@@ -876,14 +878,14 @@ function ReportsSection() {
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          {(["balance", "thirdparty", "income", "cashflow", "ledger", "vat", "niif"] as ReportTab[]).map((tab) => (
+          {(["balance", "thirdparty", "income", "cashflow", "ledger", "vat", "niif", "inventory"] as ReportTab[]).map((tab) => (
             <Button key={tab} size="sm" variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
               {REPORT_TAB_LABELS[tab]}
             </Button>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {(reportBranches?.data.length ?? 0) > 1 && reportTab !== "cashflow" && (
+          {(reportBranches?.data.length ?? 0) > 1 && reportTab !== "cashflow" && reportTab !== "inventory" && (
             <Select aria-label="Sucursal" value={reportBranchId} onChange={(e) => setReportBranchId(e.target.value)}>
               <option value="">Todas las sucursales</option>
               {reportBranches?.data.map((b) => (
@@ -899,7 +901,7 @@ function ReportsSection() {
           </Button>
         </div>
       </div>
-      {reportBranchId && reportTab !== "cashflow" && (
+      {reportBranchId && reportTab !== "cashflow" && reportTab !== "inventory" && (
         <p className="text-sm text-slate-500">
           Sucursal: <span className="font-medium text-slate-700">{reportBranches?.data.find((b) => b.id === reportBranchId)?.name}</span>. Solo los
           movimientos registrados en esa sucursal (ventas, compras, caja y gastos de esa sede).
@@ -1035,6 +1037,7 @@ function ReportsSection() {
       )}
 
       {reportTab === "thirdparty" && <TrialBalanceByThirdPartyReport branchId={branchFilter} />}
+      {reportTab === "inventory" && <InventoryReconciliationReport />}
       {reportTab === "vat" && <VatSummaryReport branchId={branchFilter} />}
       {reportTab === "niif" && <NiifStatementsReport branchId={branchFilter} />}
 

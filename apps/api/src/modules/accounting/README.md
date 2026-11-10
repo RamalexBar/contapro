@@ -457,3 +457,34 @@ prueba x tercero", con buscador por cuenta, tercero o NIT y exportación a Excel
 - **Naturaleza:** activos y gastos/costos son débito (saldo = débitos − créditos); el resto es crédito.
 - **Limitación:** los comprobantes manuales no permiten elegir tercero por línea (`JournalEntryLine.thirdPartyId`
   existe en el schema pero nadie lo llena todavía).
+
+## Asientos de inventario y regularización de la 1435 — 2026-11-10
+
+**Problema:** la 1435 (Inventarios) quedaba descuadrada, incluso en negativo. Solo las compras la cargaban y las
+ventas la descargaban; las existencias iniciales al crear o importar productos, las entradas manuales y los ajustes
+movían inventario **sin asiento**. En la demo, "Minimarket La Esquina" tenía la 1435 en −$768.659 con un inventario
+real de $3,29 millones.
+
+**Ahora** (`PostInventoryJournalEntryUseCase`, `type: "INVENTORY"`, al costo real PEPS):
+
+| Movimiento | Asiento |
+| --- | --- |
+| Existencias iniciales (crear o importar producto) | Débito 1435 / Crédito 3115 Aportes sociales |
+| Entrada manual (Inventario → Movimientos) | Débito 1435 / Crédito 3115 Aportes sociales |
+| Ajuste a favor (sobrante) | Débito 1435 / Crédito 4295 Diversos (otros ingresos) |
+| Ajuste en contra (faltante, daño) | Débito 5195 Diversos (gastos) / Crédito 1435 |
+| Traslado entre sucursales | Sin asiento (misma cuenta) |
+
+La contrapartida 3115 para mercancía que entra sin compra la eligió el usuario: es mercancía que el dueño pone en el
+negocio. Si viene de un proveedor, lo correcto es registrarla por Compras.
+
+**Regularización** (`RegularizeInventoryAccountUseCase`): compara la 1435 (con sus subcuentas) contra el inventario
+valorizado de los productos activos y, si se aplica, registra un comprobante por la diferencia contra 3115. Es
+idempotente: si ya cuadra, no registra nada.
+
+- `GET /inventory-reconciliation` (accounting.read) y `POST /inventory-reconciliation/regularize` (accounting.manage).
+  En la web: Contabilidad → Reportes → "Conciliación inventario (1435)".
+- Para todas las empresas a la vez (producción):
+  `pnpm --filter @erp/api exec tsx src/scripts/regularize-inventory-account.ts` sin parámetros solo muestra las
+  diferencias; con `--apply` registra los asientos. Cada comprobante queda a nombre del usuario más antiguo de la
+  empresa.

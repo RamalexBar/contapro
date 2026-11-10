@@ -19,7 +19,15 @@ export interface ReceiveGoodsItem {
 
 export interface IStockRepository {
   registerEntry(productId: string, branchId: string, quantity: number, unitCost: number, userId: string): Promise<StockMovementRecord>;
-  adjust(productId: string, branchId: string, quantityDelta: number, reason: string, userId: string): Promise<StockMovementRecord>;
+  /** Devuelve el primer movimiento creado y `totalCost`: el costo real PEPS de todo el ajuste (un faltante puede tocar
+   * varias capas), para su asiento contable. */
+  adjust(
+    productId: string,
+    branchId: string,
+    quantityDelta: number,
+    reason: string,
+    userId: string
+  ): Promise<StockMovementRecord & { totalCost: number }>;
   transfer(productId: string, fromBranchId: string, toBranchId: string, quantity: number, userId: string): Promise<void>;
   getBranchStock(productId: string, branchId: string): Promise<{ quantity: number; minStock: number; maxStock: number } | null>;
   /** Item 42 de docs/ALCANCE.md: stock de TODOS los productos de una sucursal en una sola

@@ -905,3 +905,8 @@ cuando se implemente, mismo criterio que la lista de arriba:
     cuentas (`GET /reports/trial-balance-by-third-party`, con NIT, exportable a Excel). Migracion
     `20261110120000_fifo_cost_layers`. Detalle en `modules/inventory/stock/README.md`, `modules/profitability/README.md`
     y `modules/accounting/README.md`.
+57. ~~Cuenta 1435 (Inventarios) descuadrada / en negativo~~ — 2026-11-10. Las existencias iniciales, las entradas
+    manuales y los ajustes no generaban asiento y las ventas igual descargaban la 1435. Ahora se contabilizan al costo
+    PEPS: entradas sin compra contra 3115 Aportes sociales, sobrantes contra 4295 y faltantes contra 5195. Se agrego la
+    conciliacion 1435 vs inventario valorizado con asiento de regularizacion (Contabilidad → Reportes, y el script
+    `src/scripts/regularize-inventory-account.ts` para todas las empresas). Ver `modules/accounting/README.md`.

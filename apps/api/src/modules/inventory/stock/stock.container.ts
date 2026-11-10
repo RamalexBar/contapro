@@ -1,3 +1,4 @@
+import { postInventoryJournalEntryUseCase } from "../../accounting/accounting.container";
 import { PrismaAuditLogRepository } from "../../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../../audit/application/audit.service";
 import { PrismaStockMovementRepository } from "./infrastructure/prisma-stock-movement.repository";
@@ -21,8 +22,8 @@ const auditService = new AuditService(new PrismaAuditLogRepository());
 export const stockRepo = repo;
 
 export const stockController = new StockController(
-  new RegisterStockEntryUseCase(repo, auditService),
-  new AdjustStockUseCase(repo, auditService),
+  new RegisterStockEntryUseCase(repo, auditService, postInventoryJournalEntryUseCase),
+  new AdjustStockUseCase(repo, auditService, postInventoryJournalEntryUseCase),
   new TransferStockUseCase(repo, auditService),
   new ListKardexUseCase(kardexRepo),
   new ListBranchStockUseCase(repo),
