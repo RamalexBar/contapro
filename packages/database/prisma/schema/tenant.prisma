@@ -28,6 +28,10 @@ model Company {
   // Preparado para nomina electronica DIAN (ver electronic-invoicing.prisma). municipalityCode
   // SIN VERIFICAR: simplificacion de "una sola sede" para todos los empleados, ver README.
   municipalityCode          String? // codigo DANE del lugar de trabajo por defecto
+  // Exoneracion de aportes del art. 114-1 E.T. (salud empleador, SENA, ICBF por trabajadores de
+  // menos de 10 SMMLV). La marca la empresa en Nomina -> Configuracion: depende de su situacion
+  // tributaria (ver PayrollCompanyOptions en payroll-calculator.ts).
+  payrollExemptArt1141      Boolean @default(false)
   payrollElectronicSequence Int     @default(0)
   payrollElectronicPrefix   String?
   // ---- Proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md) ----

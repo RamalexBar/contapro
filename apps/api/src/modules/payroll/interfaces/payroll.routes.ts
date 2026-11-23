@@ -9,6 +9,11 @@ payrollRouter.use(tenantContextMiddleware);
 payrollRouter.post("/payroll-parameters", requirePermission("payroll.parameter.manage"), payrollController.createParameter);
 payrollRouter.get("/payroll-parameters", requirePermission("payroll.parameter.manage"), payrollController.listParameters);
 
+// Configuracion de nomina de la empresa (exoneracion art. 114-1 E.T.): la cambia quien maneja los
+// parametros legales (administrador o contador).
+payrollRouter.get("/payroll-settings", requirePermission("payroll.read"), payrollController.getSettings);
+payrollRouter.put("/payroll-settings", requirePermission("payroll.parameter.manage"), payrollController.updateSettings);
+
 payrollRouter.post("/payrolls", requirePermission("payroll.create"), payrollController.create);
 payrollRouter.get("/payrolls", requirePermission("payroll.read"), payrollController.list);
 payrollRouter.get("/payrolls/:id", requirePermission("payroll.read"), payrollController.getById);

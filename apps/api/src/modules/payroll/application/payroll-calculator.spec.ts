@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EmployeeRecord } from "../../employees/domain/employee.repository";
 import type { PayrollDeductionRecord } from "../domain/payroll-deduction.repository";
 import type { PayrollParameterRecord } from "../domain/payroll-parameter.repository";
-import { calculateEmployeePayroll } from "./payroll-calculator";
+import { calculateEmployeePayroll, legalMonthlyHoursDivisor, legalSundaySurchargePercent, salaryWithholdingTax, solidarityFundPercent } from "./payroll-calculator";
 
 // Valores de PayrollParameter tal como los siembra packages/database/prisma/seed.ts (2026, de
 // EJEMPLO, no cifras oficiales -- ver ese archivo).
@@ -159,5 +159,147 @@ describe("calculateEmployeePayroll -- libranzas y embargos (PayrollDeduction)", 
     expect(summary.deducciones.adicionales).toEqual([
       { id: "ded-1", type: "LOAN_DEDUCTION", description: "Credito libranza banco X", amount: 100_000 },
     ]);
+  });
+});
+
+describe("calculateEmployeePayroll -- base de cesantias y prima", () => {
+  const amount = (result: ReturnType<typeof calculateEmployeePayroll>, code: string) =>
+    result.items.find((i) => i.conceptCode === code)?.amount;
+
+  it("includes the transport allowance in severance and service bonus, but not in vacation or contributions", () => {
+    const result = calculateEmployeePayroll(makeEmployee(), makeParameter(), [], PERIOD_START, PERIOD_END, []);
+
+    // Base de prestaciones = 1,400,000 + 200,000 de auxilio = 1,600,000 x 8.33% = 133,280.
+    expect(amount(result, "SEVERANCE")).toBe(133_280);
+    expect(amount(result, "SERVICE_BONUS")).toBe(133_280);
+    // Intereses: provision del 12% de las cesantias causadas en el mes (al cierre del año suman el 12%).
+    expect(amount(result, "SEVERANCE_INTEREST")).toBe(15_993.6);
+    // Vacaciones y aportes siguen solo sobre el salario (1,400,000).
+    expect(amount(result, "VACATION")).toBe(58_380);
+    expect(amount(result, "HEALTH_EMPLOYER")).toBe(119_000);
+  });
+
+  it("uses only the salary when the employee earns more than 2 minimum wages (no transport allowance)", () => {
+    const result = calculateEmployeePayroll(makeEmployee({ baseSalary: 3_000_000 }), makeParameter(), [], PERIOD_START, PERIOD_END, []);
+
+    expect(result.items.some((i) => i.conceptCode === "TRANSPORT_ALLOWANCE")).toBe(false);
+    expect(amount(result, "SEVERANCE")).toBe(249_900);
+    expect(amount(result, "SERVICE_BONUS")).toBe(249_900);
+  });
+});
+
+describe("calculateEmployeePayroll -- cumplimiento legal", () => {
+  const amount = (result: ReturnType<typeof calculateEmployeePayroll>, code: string) =>
+    result.items.find((i) => i.conceptCode === code)?.amount;
+  const entry = (clockIn: string, clockOut: string) => ({
+    id: clockIn,
+    employeeId: "emp-1",
+    branchId: "branch-1",
+    clockIn: new Date(clockIn),
+    clockOut: new Date(clockOut),
+    source: "WEB",
+    notes: null,
+  });
+
+  it("art. 114-1 E.T.: an exempt company skips employer health, ICBF and SENA for workers under 10 SMMLV", () => {
+    const result = calculateEmployeePayroll(makeEmployee(), makeParameter(), [], PERIOD_START, PERIOD_END, [], { exemptArt1141: true });
+
+    expect(amount(result, "HEALTH_EMPLOYER")).toBeUndefined();
+    expect(amount(result, "ICBF")).toBeUndefined();
+    expect(amount(result, "SENA")).toBeUndefined();
+    // Caja de compensacion y pension del empleador se siguen pagando.
+    expect(amount(result, "CCF")).toBe(56_000);
+    expect(amount(result, "PENSION_EMPLOYER")).toBe(168_000);
+    expect(result.summary.exemptArt1141).toBe(true);
+  });
+
+  it("art. 114-1 E.T.: the exemption does not cover workers earning 10 SMMLV or more", () => {
+    const result = calculateEmployeePayroll(makeEmployee({ baseSalary: 15_000_000 }), makeParameter(), [], PERIOD_START, PERIOD_END, [], { exemptArt1141: true });
+
+    expect(amount(result, "HEALTH_EMPLOYER")).toBe(1_275_000);
+    expect(amount(result, "SENA")).toBe(300_000);
+  });
+
+  it("non-exempt companies (default) pay employer health, ICBF and SENA", () => {
+    const result = calculateEmployeePayroll(makeEmployee(), makeParameter(), [], PERIOD_START, PERIOD_END, []);
+    expect(amount(result, "HEALTH_EMPLOYER")).toBe(119_000);
+    expect(amount(result, "ICBF")).toBe(42_000);
+  });
+
+  it("Fondo de Solidaridad Pensional: 1% from 4 SMMLV, rising to 2% from 20 SMMLV", () => {
+    expect(solidarityFundPercent(3.99)).toBe(0);
+    expect(solidarityFundPercent(4)).toBe(1);
+    expect(solidarityFundPercent(16.5)).toBe(1.2);
+    expect(solidarityFundPercent(25)).toBe(2);
+
+    const result = calculateEmployeePayroll(makeEmployee({ baseSalary: 6_000_000 }), makeParameter(), [], PERIOD_START, PERIOD_END, []);
+    expect(amount(result, "SOLIDARITY_FUND")).toBe(60_000);
+  });
+
+  it("caps the contribution base (IBC) at 25 SMMLV", () => {
+    const result = calculateEmployeePayroll(makeEmployee({ baseSalary: 40_000_000 }), makeParameter(), [], PERIOD_START, PERIOD_END, []);
+    // 25 x 1,400,000 = 35,000,000
+    expect(result.summary.ibc).toBe(35_000_000);
+    expect(amount(result, "HEALTH_EMPLOYEE")).toBe(1_400_000);
+    expect(amount(result, "SOLIDARITY_FUND")).toBe(700_000);
+  });
+
+  it("retencion en la fuente, procedimiento 1 (art. 383/385 E.T.)", () => {
+    // 10,000,000 - 900,000 de aportes = 9,100,000; exenta 25% = 2,275,000; base 6,825,000 =
+    // 139.29 UVT (UVT 49,000) -> (139.29 - 95) x 19% = 8.414 UVT = 412,300 -> 412,000.
+    expect(salaryWithholdingTax(10_000_000, 900_000, 49_000)).toBe(412_000);
+    expect(salaryWithholdingTax(4_000_000, 320_000, 49_000)).toBe(0);
+
+    const result = calculateEmployeePayroll(makeEmployee({ baseSalary: 10_000_000 }), makeParameter(), [], PERIOD_START, PERIOD_END, []);
+    expect(amount(result, "WITHHOLDING_TAX")).toBe(412_000);
+    expect(result.netPay).toBe(10_000_000 - 400_000 - 400_000 - 100_000 - 412_000);
+  });
+
+  it("Ley 2466 de 2025: dominical surcharge 80% -> 90% (jul 2026) -> 100% (jul 2027), never below the parameter", () => {
+    expect(legalSundaySurchargePercent(new Date("2026-06-30T12:00:00-05:00"), 75)).toBe(80);
+    expect(legalSundaySurchargePercent(new Date("2026-07-01T12:00:00-05:00"), 75)).toBe(90);
+    expect(legalSundaySurchargePercent(new Date("2027-07-02T12:00:00-05:00"), 75)).toBe(100);
+    expect(legalSundaySurchargePercent(new Date("2026-07-01T12:00:00-05:00"), 110)).toBe(110);
+  });
+
+  it("Ley 2101 de 2021: 42-hour week from 2026-07-15 (hours divisor 210)", () => {
+    expect(legalMonthlyHoursDivisor(new Date("2026-07-14T12:00:00-05:00"), 240)).toBe(220);
+    expect(legalMonthlyHoursDivisor(new Date("2026-07-20T12:00:00-05:00"), 220)).toBe(210);
+    expect(legalMonthlyHoursDivisor(new Date("2026-07-20T12:00:00-05:00"), 200)).toBe(200);
+  });
+
+  it("pays a Sunday in July 2026 at 90% with the 210-hour divisor", () => {
+    const result = calculateEmployeePayroll(
+      makeEmployee(),
+      makeParameter(),
+      [entry("2026-07-05T08:00:00-05:00", "2026-07-05T12:00:00-05:00")],
+      PERIOD_START,
+      PERIOD_END,
+      []
+    );
+    // 1,400,000 / 210 = 6,666.67 por hora x 4 h x 90% = 24,000
+    expect(amount(result, "SUNDAY_SURCHARGE")).toBe(24_000);
+  });
+
+  it("Ley 2466 de 2025: night work starts at 7 p.m. from 2025-12-25 (9 p.m. before)", () => {
+    const after = calculateEmployeePayroll(
+      makeEmployee(),
+      makeParameter(),
+      [entry("2026-07-07T19:30:00-05:00", "2026-07-07T23:30:00-05:00")],
+      PERIOD_START,
+      PERIOD_END,
+      []
+    );
+    expect(after.items.find((i) => i.conceptCode === "NIGHT_SURCHARGE")?.quantity).toBe(4);
+
+    const before = calculateEmployeePayroll(
+      makeEmployee(),
+      makeParameter(),
+      [entry("2025-11-04T19:30:00-05:00", "2025-11-04T23:30:00-05:00")],
+      new Date("2025-11-01"),
+      new Date("2025-11-30"),
+      []
+    );
+    expect(before.items.some((i) => i.conceptCode === "NIGHT_SURCHARGE")).toBe(false);
   });
 });

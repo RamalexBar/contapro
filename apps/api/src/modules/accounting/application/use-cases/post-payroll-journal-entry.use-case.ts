@@ -13,6 +13,9 @@ const STANDARD_ACCOUNTS = {
   provisionesGasto: { code: "5108", name: "Provisiones de prestaciones sociales", type: "EXPENSE" as const },
   salariosPorPagar: { code: "2505", name: "Salarios por pagar", type: "LIABILITY" as const },
   retencionesNomina: { code: "2370", name: "Retenciones y aportes de nomina por pagar", type: "LIABILITY" as const },
+  // Retencion en la fuente por salarios: cuenta propia (subcuenta PUC 236505 "Salarios y pagos
+  // laborales") porque se declara y paga a la DIAN en el formulario 350, no a los fondos.
+  retencionFuenteSalarios: { code: "236505", name: "Retencion en la fuente - salarios y pagos laborales", type: "LIABILITY" as const },
   aportesPatronalesPasivo: { code: "2380", name: "Aportes patronales por pagar", type: "LIABILITY" as const },
   provisionesPasivo: { code: "2610", name: "Provisiones para obligaciones laborales", type: "LIABILITY" as const },
 };
@@ -55,6 +58,7 @@ export class PostPayrollJournalEntryUseCase {
     let provisiones = 0;
     let netPay = 0;
     let deduccionesEmpleado = 0;
+    let retencionFuente = 0;
 
     for (const detail of input.details) {
       devengado += detail.grossTotal;
@@ -63,13 +67,15 @@ export class PostPayrollJournalEntryUseCase {
       for (const item of detail.items) {
         if (EMPLOYER_CONTRIBUTION_CODES.has(item.conceptCode)) aportesPatronales += item.amount;
         if (PROVISION_CODES.has(item.conceptCode)) provisiones += item.amount;
+        if (item.conceptCode === "WITHHOLDING_TAX") retencionFuente += item.amount;
       }
     }
     devengado = round2(devengado);
     aportesPatronales = round2(aportesPatronales);
     provisiones = round2(provisiones);
     netPay = round2(netPay);
-    deduccionesEmpleado = round2(deduccionesEmpleado);
+    retencionFuente = round2(retencionFuente);
+    deduccionesEmpleado = round2(deduccionesEmpleado - retencionFuente);
 
     const accounts = await this.ensureAccounts();
 
@@ -94,6 +100,12 @@ export class PostPayrollJournalEntryUseCase {
           debit: 0,
           credit: deduccionesEmpleado,
           description: "Deducciones de empleado",
+        },
+        {
+          accountId: accounts.retencionFuenteSalarios.id,
+          debit: 0,
+          credit: retencionFuente,
+          description: "Retencion en la fuente",
         },
         {
           accountId: accounts.aportesPatronalesPasivo.id,

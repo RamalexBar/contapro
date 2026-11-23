@@ -19,6 +19,8 @@ interface PayrollSummaryJson {
   deducciones?: {
     health?: number;
     pension?: number;
+    solidarityFund?: number;
+    withholdingTax?: number;
     adicionales?: Array<{ id: string; type: string; description: string; amount: number }>;
     total?: number;
   };
@@ -67,6 +69,8 @@ const EARNING_LABELS: Record<string, string> = {
 const DEDUCTION_LABELS: Record<string, string> = {
   health: "Salud (empleado)",
   pension: "Pension (empleado)",
+  solidarityFund: "Fondo de solidaridad pensional",
+  withholdingTax: "Retencion en la fuente",
 };
 
 function toLines(source: Record<string, number | undefined> | undefined, labels: Record<string, string>): PayslipPdfLine[] {
@@ -98,7 +102,15 @@ export function mapToPayslipPdfData(
     earnings: toLines(summary.devengados, EARNING_LABELS),
     grossTotal: summary.devengados?.total ?? 0,
     deductions: [
-      ...toLines({ health: summary.deducciones?.health, pension: summary.deducciones?.pension }, DEDUCTION_LABELS),
+      ...toLines(
+        {
+          health: summary.deducciones?.health,
+          pension: summary.deducciones?.pension,
+          solidarityFund: summary.deducciones?.solidarityFund,
+          withholdingTax: summary.deducciones?.withholdingTax,
+        },
+        DEDUCTION_LABELS
+      ),
       ...(summary.deducciones?.adicionales ?? []).map((d) => ({
         label: d.type === "LOAN_DEDUCTION" ? `Libranza: ${d.description}` : `Embargo: ${d.description}`,
         amount: d.amount,

@@ -75,6 +75,19 @@ export function createPayrollParameter(input: CreatePayrollParameterInput): Prom
   return apiFetch("/payroll-parameters", { method: "POST", body: input });
 }
 
+export interface PayrollSettings {
+  /** Exoneracion de aportes del art. 114-1 E.T. (salud empleador, SENA, ICBF). */
+  exemptArt1141: boolean;
+}
+
+export function getPayrollSettings(): Promise<PayrollSettings> {
+  return apiFetch("/payroll-settings");
+}
+
+export function updatePayrollSettings(input: PayrollSettings): Promise<PayrollSettings> {
+  return apiFetch("/payroll-settings", { method: "PUT", body: input });
+}
+
 export function listPayrolls(filter?: { year?: number }): Promise<{ data: PayrollRecord[] }> {
   const query = filter?.year ? `?year=${filter.year}` : "";
   return apiFetch(`/payrolls${query}`);

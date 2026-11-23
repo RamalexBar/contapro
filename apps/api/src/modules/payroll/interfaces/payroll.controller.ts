@@ -9,6 +9,7 @@ import type { PayPayrollUseCase } from "../application/use-cases/pay-payroll.use
 import type { CreatePayrollDeductionUseCase } from "../application/use-cases/create-payroll-deduction.use-case";
 import type { ListPayrollDeductionsUseCase } from "../application/use-cases/list-payroll-deductions.use-case";
 import type { CancelPayrollDeductionUseCase } from "../application/use-cases/cancel-payroll-deduction.use-case";
+import type { UpdatePayrollSettingsUseCase } from "../application/use-cases/update-payroll-settings.use-case";
 import type { SendPayslipWhatsAppUseCase } from "../application/use-cases/send-payslip-whatsapp.use-case";
 import type { IWhatsAppDeliveryLogRepository } from "../../whatsapp/domain/whatsapp-delivery-log.repository";
 import type { IPayrollRepository } from "../domain/payroll.repository";
@@ -17,7 +18,7 @@ import type { IEmployeeRepository } from "../../employees/domain/employee.reposi
 import type { ICompanyReader } from "../domain/company-reader.repository";
 import { mapToPayslipPdfData } from "../application/payslip-data-mapper";
 import { renderPayslipPdf } from "../infrastructure/pdfkit-payslip-renderer";
-import { createPayrollDeductionSchema, createPayrollParameterSchema, createPayrollSchema } from "./payroll.validators";
+import { createPayrollDeductionSchema, createPayrollParameterSchema, createPayrollSchema, updatePayrollSettingsSchema } from "./payroll.validators";
 import { getTenantContext } from "../../../shared/context/request-context";
 
 export class PayrollController {
@@ -36,8 +37,26 @@ export class PayrollController {
     private readonly listDeductionsUseCase: ListPayrollDeductionsUseCase,
     private readonly cancelDeductionUseCase: CancelPayrollDeductionUseCase,
     private readonly whatsAppDeliveryLogRepo: IWhatsAppDeliveryLogRepository,
-    private readonly sendPayslipWhatsAppUseCase: SendPayslipWhatsAppUseCase
+    private readonly sendPayslipWhatsAppUseCase: SendPayslipWhatsAppUseCase,
+    private readonly payrollSettingsUseCase: UpdatePayrollSettingsUseCase
   ) {}
+
+  getSettings = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.payrollSettingsUseCase.get(getTenantContext().companyId));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateSettings = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = updatePayrollSettingsSchema.parse(req.body);
+      res.json(await this.payrollSettingsUseCase.execute(getTenantContext().companyId, body));
+    } catch (err) {
+      next(err);
+    }
+  };
 
   createParameter = async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -18,6 +18,7 @@ import { PayPayrollUseCase } from "./application/use-cases/pay-payroll.use-case"
 import { CreatePayrollDeductionUseCase } from "./application/use-cases/create-payroll-deduction.use-case";
 import { ListPayrollDeductionsUseCase } from "./application/use-cases/list-payroll-deductions.use-case";
 import { CancelPayrollDeductionUseCase } from "./application/use-cases/cancel-payroll-deduction.use-case";
+import { UpdatePayrollSettingsUseCase } from "./application/use-cases/update-payroll-settings.use-case";
 import { SendPayslipWhatsAppUseCase } from "./application/use-cases/send-payslip-whatsapp.use-case";
 import { whatsAppSender, whatsAppDeliveryLogRepo } from "../whatsapp/whatsapp.container";
 import { PayrollController } from "./interfaces/payroll.controller";
@@ -47,7 +48,7 @@ export const payrollController = new PayrollController(
   new ListPayrollParametersUseCase(payrollParameterRepo),
   new CreatePayrollUseCase(payrollRepo, auditService),
   new ListPayrollsUseCase(payrollRepo),
-  new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, auditService),
+  new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, companyReader, auditService),
   new ApprovePayrollUseCase(
     payrollRepo,
     payrollDeductionRepo,
@@ -61,5 +62,6 @@ export const payrollController = new PayrollController(
   new ListPayrollDeductionsUseCase(payrollDeductionRepo),
   new CancelPayrollDeductionUseCase(payrollDeductionRepo, auditService),
   whatsAppDeliveryLogRepo,
-  sendPayslipWhatsAppUseCase
+  sendPayslipWhatsAppUseCase,
+  new UpdatePayrollSettingsUseCase(companyReader, auditService)
 );

@@ -3,6 +3,8 @@ export interface CompanyRecord {
   nit: string;
   legalName: string;
   name: string;
+  /** Exoneracion de aportes art. 114-1 E.T. (ver PayrollCompanyOptions en payroll-calculator.ts). */
+  payrollExemptArt1141: boolean;
 }
 
 /**
@@ -12,4 +14,6 @@ export interface CompanyRecord {
  */
 export interface ICompanyReader {
   findByIdOrThrow(id: string): Promise<CompanyRecord>;
+  /** Unica configuracion de Company que escribe este modulo (Nomina -> Configuracion). */
+  setPayrollExemptArt1141(id: string, exempt: boolean): Promise<CompanyRecord>;
 }

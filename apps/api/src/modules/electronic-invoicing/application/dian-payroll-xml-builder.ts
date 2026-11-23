@@ -41,7 +41,7 @@ export interface DianPayrollInput {
   employer: { nit: string; legalName: string; municipalityCode: string | null };
   employee: DianPayrollEmployee;
   earnings: DianPayrollLine[]; // devengados (SALARY, TRANSPORT_ALLOWANCE, OVERTIME_*, *_SURCHARGE)
-  deductions: DianPayrollLine[]; // deducciones (HEALTH_EMPLOYEE, PENSION_EMPLOYEE)
+  deductions: DianPayrollLine[]; // deducciones (HEALTH_EMPLOYEE, PENSION_EMPLOYEE, SOLIDARITY_FUND, WITHHOLDING_TAX)
   grossTotal: number;
   totalDeductions: number;
   netPay: number;
@@ -59,6 +59,7 @@ const EARNING_CONCEPT_TAGS: Record<string, string> = {
 const DEDUCTION_CONCEPT_TAGS: Record<string, string> = {
   HEALTH_EMPLOYEE: "Salud",
   PENSION_EMPLOYEE: "FondoPension",
+  SOLIDARITY_FUND: "FondoSP",
 };
 
 function escapeXml(value: string): string {
@@ -137,7 +138,7 @@ export function buildDianPayrollXml(input: DianPayrollInput): string {
     <TotalDevengado currencyID="COP">${input.grossTotal.toFixed(2)}</TotalDevengado>
   </Devengados>
   <Deducciones>${buildDeductionLines(input.deductions)}
-    <RetencionFuente currencyID="COP">0.00</RetencionFuente>
+    <RetencionFuente currencyID="COP">${input.deductions.filter((d) => d.conceptCode === "WITHHOLDING_TAX").reduce((sum, d) => sum + d.amount, 0).toFixed(2)}</RetencionFuente>
     <TotalDeducciones currencyID="COP">${input.totalDeductions.toFixed(2)}</TotalDeducciones>
   </Deducciones>
   <ComprobanteTotal>

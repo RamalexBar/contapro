@@ -2,6 +2,7 @@ import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IEmployeeRepository } from "../../../employees/domain/employee.repository";
 import type { ITimeTrackingRepository } from "../../../timetracking/domain/timetracking.repository";
+import type { ICompanyReader } from "../../domain/company-reader.repository";
 import type { IPayrollDeductionRepository } from "../../domain/payroll-deduction.repository";
 import type { IPayrollParameterRepository } from "../../domain/payroll-parameter.repository";
 import type { EmployeeCalculationResult, IPayrollRepository, PayrollRecord } from "../../domain/payroll.repository";
@@ -16,6 +17,7 @@ export class CalculatePayrollUseCase {
     private readonly timeTrackingRepo: ITimeTrackingRepository,
     private readonly parameterRepo: IPayrollParameterRepository,
     private readonly deductionRepo: IPayrollDeductionRepository,
+    private readonly companyReader: ICompanyReader,
     private readonly audit: AuditService
   ) {}
 
@@ -28,6 +30,8 @@ export class CalculatePayrollUseCase {
     }
 
     const parameter = await this.parameterRepo.findByYearOrThrow(payroll.year);
+    const company = await this.companyReader.findByIdOrThrow(payroll.companyId);
+    const companyOptions = { exemptArt1141: company.payrollExemptArt1141 };
     const employees = await this.employeeRepo.listActiveForPeriod(payroll.branchId, payroll.startDate, payroll.endDate);
 
     const results: EmployeeCalculationResult[] = [];
@@ -35,7 +39,7 @@ export class CalculatePayrollUseCase {
       const timeEntries = await this.timeTrackingRepo.listClosedForPeriod(employee.id, payroll.startDate, payroll.endDate);
       const activeDeductions = await this.deductionRepo.listActiveForEmployee(employee.id);
       results.push(
-        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions)
+        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions, companyOptions)
       );
     }
 
@@ -47,7 +51,7 @@ export class CalculatePayrollUseCase {
       entityType: "Payroll",
       entityId: updated.id,
       description: `Nomina calculada: ${updated.month}/${updated.year} (${results.length} empleados)`,
-      metadata: { employeeCount: results.length },
+      metadata: { employeeCount: results.length, exemptArt1141: company.payrollExemptArt1141 },
     });
 
     return updated;

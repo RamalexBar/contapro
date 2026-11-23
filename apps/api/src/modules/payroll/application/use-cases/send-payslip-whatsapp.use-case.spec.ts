@@ -49,7 +49,7 @@ const PAYSLIP: PayslipDocumentRecord = {
   summaryJson: { employeeName: "Laura Gomez", daysWorked: 30, devengados: { salary: 1400000, total: 1400000 }, netPay: 1300000 },
 };
 
-const COMPANY: CompanyRecord = { id: "company-1", nit: "900123456-7", legalName: "Minimarket La Esquina S.A.S.", name: "Minimarket" };
+const COMPANY: CompanyRecord = { id: "company-1", nit: "900123456-7", legalName: "Minimarket La Esquina S.A.S.", name: "Minimarket", payrollExemptArt1141: false };
 
 class FakeEmployeeRepository implements Partial<IEmployeeRepository> {
   constructor(private readonly employees: EmployeeRecord[]) {}
@@ -68,6 +68,9 @@ class FakePayrollRepository implements Partial<IPayrollRepository> {
 
 class FakeCompanyReader implements ICompanyReader {
   async findByIdOrThrow(): Promise<CompanyRecord> {
+    return COMPANY;
+  }
+  async setPayrollExemptArt1141(): Promise<CompanyRecord> {
     return COMPANY;
   }
 }

@@ -12,7 +12,7 @@ import { buildDianPayrollXml, type DianPayrollLine } from "../dian-payroll-xml-b
 import { signAndQueueElectronicDocument } from "../sign-and-queue-electronic-document";
 
 const EARNING_CODES = new Set(["SALARY", "TRANSPORT_ALLOWANCE", "OVERTIME_DAY", "OVERTIME_NIGHT", "NIGHT_SURCHARGE", "SUNDAY_SURCHARGE"]);
-const DEDUCTION_CODES = new Set(["HEALTH_EMPLOYEE", "PENSION_EMPLOYEE"]);
+const DEDUCTION_CODES = new Set(["HEALTH_EMPLOYEE", "PENSION_EMPLOYEE", "SOLIDARITY_FUND", "WITHHOLDING_TAX"]);
 
 export interface GenerateElectronicPayrollInput {
   payrollDetailId: string;

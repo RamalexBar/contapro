@@ -22,6 +22,8 @@ import {
   getPayroll,
   listPayrollDeductions,
   listPayrollParameters,
+  getPayrollSettings,
+  updatePayrollSettings,
   listPayrolls,
   listPayslipWhatsAppDeliveries,
   payPayroll,
@@ -58,9 +60,10 @@ const EMPTY_DEDUCTION_FORM = {
 const PARAMETER_DEFAULTS = {
   year: new Date().getFullYear(),
   effectiveFrom: `${new Date().getFullYear()}-01-01`,
-  minimumWage: "1400000",
-  transportAllowance: "200000",
-  uvt: "49000",
+  // Valores oficiales 2026 (Decretos 1469/1470 de 2025 y Resolucion DIAN 000238 de 2025).
+  minimumWage: "1750905",
+  transportAllowance: "249095",
+  uvt: "52374",
   healthEmployeePercent: "4",
   healthEmployerPercent: "8.5",
   pensionEmployeePercent: "4",
@@ -80,7 +83,7 @@ const PARAMETER_DEFAULTS = {
   overtimeDayPercent: "25",
   overtimeNightPercent: "75",
   nightSurchargePercent: "35",
-  sundayHolidaySurchargePercent: "75",
+  sundayHolidaySurchargePercent: "80",
   monthlyHoursDivisor: "220",
 };
 
@@ -102,6 +105,11 @@ export function PayrollPage() {
   const canManageDeductions = useAuthStore((s) => s.hasPermission("payroll.deduction.manage"));
 
   const { data: parameters } = useQuery({ queryKey: ["payroll-parameters"], queryFn: listPayrollParameters });
+  const { data: settings } = useQuery({ queryKey: ["payroll-settings"], queryFn: getPayrollSettings });
+  const settingsMutation = useMutation({
+    mutationFn: (exemptArt1141: boolean) => updatePayrollSettings({ exemptArt1141 }),
+    onSuccess: (data) => queryClient.setQueryData(["payroll-settings"], data),
+  });
   const { data: payrolls, isLoading } = useQuery({ queryKey: ["payrolls"], queryFn: () => listPayrolls() });
   const { data: employees } = useQuery({ queryKey: ["employees"], queryFn: () => listEmployees() });
   const employeeNames = new Map((employees?.data ?? []).map((e) => [e.id, `${e.firstName} ${e.lastName}`]));
@@ -213,6 +221,34 @@ export function PayrollPage() {
   return (
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Nomina</h1>
+
+      {canManageParameters && settings && (
+        <Card className="mb-6">
+          <h2 className="mb-2 text-sm font-semibold text-slate-900">Configuracion de la empresa</h2>
+          <label className="flex items-start gap-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={settings.exemptArt1141}
+              disabled={settingsMutation.isPending}
+              onChange={(e) => settingsMutation.mutate(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium text-slate-900">Exonerada de aportes (art. 114-1 del Estatuto Tributario)</span>
+              <br />
+              No paga salud del empleador (8,5%), SENA (2%) ni ICBF (3%) por los trabajadores que ganan menos de 10
+              salarios minimos. Aplica a sociedades y personas juridicas declarantes de renta, personas naturales con 2 o
+              mas trabajadores y contribuyentes del regimen SIMPLE. No aplica a entidades sin animo de lucro ni a personas
+              naturales con un solo trabajador. Confirmelo con su contador. Se aplica al calcular (o recalcular) la nomina.
+            </span>
+          </label>
+          <p className="mt-3 text-xs text-slate-500">
+            La reforma laboral se aplica sola segun la fecha: jornada nocturna desde las 7 p. m. (desde el 25/12/2025),
+            recargo dominical y festivo de 80% / 90% (desde el 01/07/2026) / 100% (desde el 01/07/2027) y jornada de 42
+            horas (divisor 210, desde el 15/07/2026).
+          </p>
+        </Card>
+      )}
 
       {canManageParameters && (
         <Card className="mb-6">

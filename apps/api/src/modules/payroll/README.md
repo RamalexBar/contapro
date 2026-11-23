@@ -2,10 +2,40 @@
 
 Estado: **funcional** (motor de liquidacion real). Ver `docs/ALCANCE.md` para el estado general.
 
-> **IMPORTANTE**: los porcentajes/valores de `PayrollParameter` sembrados por el seed
-> (`packages/database/prisma/seed.ts`) son de **EJEMPLO** para poder probar el flujo end-to-end.
-> NO son cifras oficiales del DIAN/Mintrabajo. Verifica los valores reales del año a liquidar
-> antes de usar esto en produccion.
+> **Valores 2026 oficiales** (verificados 2026-11-23, cargados por la migracion
+> `20261123120000_payroll_legal_2026` y por el seed): salario minimo $1.750.905, auxilio de
+> transporte $249.095 (Decretos 1469 y 1470 de 2025, ratificados por el Decreto 0159 de 2026), UVT
+> $52.374 (Resolucion DIAN 000238 de 2025). Cada año nuevo hay que crear su fila de parametros.
+
+## Reglas legales que aplica el motor (ajuste 2026-11-23)
+
+| Regla | Norma | Donde |
+|---|---|---|
+| IBC de salud/pension/ARL/FSP entre 1 y 25 SMMLV (proporcional a los dias) | Ley 100/1993 art. 18, Ley 797/2003 art. 5 | `payroll-calculator.ts` |
+| Fondo de Solidaridad Pensional 1% desde 4 SMMLV, hasta 2% desde 20 SMMLV | Ley 100/1993 art. 27, Ley 797/2003 art. 8 | `solidarityFundPercent` |
+| Retencion en la fuente por salarios, procedimiento 1: aportes como no gravados, renta exenta 25% (tope 790 UVT/año), tope conjunto 40% / 1.340 UVT, tabla art. 383, redondeo a miles | E.T. arts. 206-10, 336, 383, 385, 868 | `salaryWithholdingTax` |
+| Exoneracion de salud empleador, SENA e ICBF por trabajadores de menos de 10 SMMLV (lo marca la empresa en Nomina -> Configuracion; por defecto NO) | E.T. art. 114-1 | `PayrollCompanyOptions`, `Company.payrollExemptArt1141` |
+| Parafiscales (caja, ICBF, SENA) sobre la nomina de salarios, sin tope de 25 SMMLV | Ley 21/1982 | `payroll-calculator.ts` |
+| Cesantias y prima sobre salario + auxilio de transporte; vacaciones solo salario | Ley 1/1963 art. 7 | `benefitsBase` |
+| Intereses de cesantias: provision del 12% de las cesantias del mes | Ley 52/1975 | `severanceInterest` |
+| Trabajo nocturno desde las 7 p. m. a partir del 2025-12-25 (antes 9 p. m.) | Ley 2466/2025 | `NIGHT_FROM_7PM_SINCE` |
+| Recargo dominical/festivo 80% (jul 2025), 90% (jul 2026), 100% (jul 2027); se usa el mayor entre esto y el parametro | Ley 2466/2025 | `legalSundaySurchargePercent` |
+| Jornada de 44 h (jul 2025) y 42 h (15 jul 2026): divisor 220 / 210; se usa el menor entre esto y el parametro | Ley 2101/2021 | `legalMonthlyHoursDivisor` |
+
+Contabilidad: la retencion en la fuente va a su propia cuenta **236505** (se declara en el
+formulario 350); salud, pension, FSP y libranzas siguen en 2370. Nomina electronica DIAN: el FSP sale
+como `FondoSP` y la retencion en `RetencionFuente` (antes iba siempre en 0).
+
+**Lo que NO calcula todavia** (para revisar con el contador):
+- Deducciones voluntarias de la retencion (dependientes, intereses de vivienda, medicina prepagada,
+  aportes voluntarios / AFC): Contapro aun no guarda esos certificados por empleado, asi que la
+  retencion puede salir mayor que la real para quien los tenga. Tampoco el procedimiento 2.
+- Salario integral (IBC del 70%), aprendices SENA y contratos de medio tiempo con IBC inferior al minimo.
+- Horas extra en domingo/festivo como recargo combinado, y marcaciones que cruzan la franja
+  diurna/nocturna (se clasifican por la hora de inicio, ver limitacion abajo).
+- Liquidacion de contrato (pago de cesantias, prima y vacaciones al retiro) y pago de la prima en
+  junio/diciembre: hoy solo se provisionan cada mes.
+- Topes legales de embargabilidad (ver "Deducciones recurrentes").
 
 ## Modelos (`packages/database/prisma/schema/payroll.prisma`)
 
@@ -48,7 +78,9 @@ Por cada `Employee` activo en la sucursal/periodo (`IEmployeeRepository.listActi
 4. **Aportes patronales** (`HEALTH_EMPLOYER`, `PENSION_EMPLOYER`, `ARL` segun
    `Employee.arlRiskLevel`, `CCF`, `ICBF`, `SENA`) y **provisiones** (`SEVERANCE`,
    `SEVERANCE_INTEREST`, `SERVICE_BONUS`, `VACATION`) — no afectan `netPay`, solo
-   `employerCostTotal`.
+   `employerCostTotal`. Cesantias y prima se calculan sobre salario **+ auxilio de transporte**
+   (Ley 1 de 1963, art. 7); vacaciones y aportes solo sobre la base salarial (corregido
+   2026-11-23: antes cesantias y prima tampoco incluian el auxilio).
 5. Persiste `PayrollDetail` + `PayrollItem[]` + `PayslipDocument` (JSON resumen) en una sola
    transaccion Prisma (`PrismaPayrollRepository.saveCalculationResults`), borrando el detalle
    previo si es un recalculo.

@@ -205,7 +205,7 @@ async function main() {
         lastName: "Gomez",
         position: "Auxiliar de bodega",
         contractType: "INDEFINITE",
-        baseSalary: 1400000,
+        baseSalary: 1750905, // salario minimo 2026
         hireDate: new Date("2024-02-01"),
         eps: "Sura EPS",
         arlRiskLevel: "I",
@@ -238,17 +238,18 @@ async function main() {
     });
 
     // ---- Parametros legales de nomina 2026 ----
-    // IMPORTANTE: estos son valores de EJEMPLO para poder probar el motor de calculo end-to-end.
-    // NO son cifras oficiales del DIAN/Mintrabajo -- verificalas contra la legislacion vigente
-    // antes de liquidar nomina real. Ver docs/ALCANCE.md y modules/payroll/README.md.
+    // Valores oficiales 2026 (verificados 2026-11-23): minimo y auxilio por Decretos 1469/1470 de
+    // 2025 (ratificados por Decreto 0159 de 2026), UVT por Resolucion DIAN 000238 de 2025. Recargo
+    // dominical (80%) y divisor (220) son los del 1 de enero; los cambios de julio 2026 (90%, 42 h)
+    // los aplica payroll-calculator.ts por fecha. Ver modules/payroll/README.md.
     await tx.payrollParameter.upsert({
       where: { year: 2026 },
       create: {
         year: 2026,
         effectiveFrom: new Date("2026-01-01"),
-        minimumWage: 1400000,
-        transportAllowance: 200000,
-        uvt: 49000,
+        minimumWage: 1750905,
+        transportAllowance: 249095,
+        uvt: 52374,
         healthEmployeePercent: 4,
         healthEmployerPercent: 8.5,
         pensionEmployeePercent: 4,
@@ -264,7 +265,7 @@ async function main() {
         overtimeDayPercent: 25,
         overtimeNightPercent: 75,
         nightSurchargePercent: 35,
-        sundayHolidaySurchargePercent: 75,
+        sundayHolidaySurchargePercent: 80,
         monthlyHoursDivisor: 220,
       },
       update: {},

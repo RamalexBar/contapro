@@ -51,6 +51,39 @@ interface HourBuckets {
   overtimeDayHours: number;
   overtimeNightHours: number;
   sundayOrdinaryHours: number;
+  /** Suma de horas x porcentaje de recargo dominical de cada marcacion (el % cambia por fecha). */
+  sundayPercentHours: number;
+}
+
+// ---- Calendario legal (verificado 2026-11-23) ----
+// Ley 2466 de 2025 (reforma laboral, promulgada 2025-06-25): el trabajo nocturno empieza a las
+// 7 p. m. desde el 2025-12-25 (antes: 9 p. m.).
+const NIGHT_FROM_7PM_SINCE = Date.UTC(2025, 11, 25, 5); // 2025-12-25 00:00 hora Colombia
+// Ley 2466 de 2025: recargo dominical/festivo escalonado. Se aplica el MAYOR entre este minimo
+// legal y el del parametro del año (el parametro puede ser mas generoso, nunca menor).
+const SUNDAY_SURCHARGE_SCHEDULE: Array<{ since: number; percent: number }> = [
+  { since: Date.UTC(2027, 6, 1, 5), percent: 100 },
+  { since: Date.UTC(2026, 6, 1, 5), percent: 90 },
+  { since: Date.UTC(2025, 6, 1, 5), percent: 80 },
+];
+// Ley 2101 de 2021: reduccion gradual de la jornada maxima semanal. Divisor mensual de horas =
+// horas semanales / 6 dias x 30 (48h -> 240, 44h -> 220, 42h -> 210). Se usa el MENOR entre este y
+// el del parametro (un divisor menor da una hora mas cara, nunca se paga por debajo de la ley).
+const WEEKLY_HOURS_SCHEDULE: Array<{ since: number; divisor: number }> = [
+  { since: Date.UTC(2026, 6, 15, 5), divisor: 210 },
+  { since: Date.UTC(2025, 6, 15, 5), divisor: 220 },
+  { since: Date.UTC(2024, 6, 15, 5), divisor: 230 },
+  { since: Date.UTC(2023, 6, 15, 5), divisor: 235 },
+];
+
+export function legalSundaySurchargePercent(date: Date, parameterPercent: number): number {
+  const legal = SUNDAY_SURCHARGE_SCHEDULE.find((s) => date.getTime() >= s.since)?.percent ?? 0;
+  return Math.max(parameterPercent, legal);
+}
+
+export function legalMonthlyHoursDivisor(date: Date, parameterDivisor: number): number {
+  const legal = WEEKLY_HOURS_SCHEDULE.find((s) => date.getTime() >= s.since)?.divisor ?? parameterDivisor;
+  return Math.min(parameterDivisor, legal);
 }
 
 /**
@@ -60,13 +93,14 @@ interface HourBuckets {
  * 8 por marcacion se tratan como extra; si un empleado tiene varias marcaciones el mismo dia,
  * no se acumulan entre si para el calculo de horas extra.
  */
-function classifyTimeEntries(entries: TimeEntryRecord[]): HourBuckets {
+function classifyTimeEntries(entries: TimeEntryRecord[], parameterSundayPercent: number): HourBuckets {
   const buckets: HourBuckets = {
     ordinaryDayHours: 0,
     ordinaryNightHours: 0,
     overtimeDayHours: 0,
     overtimeNightHours: 0,
     sundayOrdinaryHours: 0,
+    sundayPercentHours: 0,
   };
 
   for (const entry of entries) {
@@ -78,7 +112,8 @@ function classifyTimeEntries(entries: TimeEntryRecord[]): HourBuckets {
     const overtimeHours = Math.max(0, totalHours - ORDINARY_DAILY_HOURS);
 
     const startHour = bogotaHour(entry.clockIn);
-    const isNight = startHour >= 21 || startHour < 6;
+    const nightStartHour = entry.clockIn.getTime() >= NIGHT_FROM_7PM_SINCE ? 19 : 21;
+    const isNight = startHour >= nightStartHour || startHour < 6;
     const isSundayOrHoliday = bogotaWeekday(entry.clockIn) === 0 || isColombianHoliday(entry.clockIn);
 
     if (isNight) {
@@ -90,10 +125,80 @@ function classifyTimeEntries(entries: TimeEntryRecord[]): HourBuckets {
     }
     if (isSundayOrHoliday) {
       buckets.sundayOrdinaryHours += ordinaryHours;
+      buckets.sundayPercentHours += ordinaryHours * legalSundaySurchargePercent(entry.clockIn, parameterSundayPercent);
     }
   }
 
   return buckets;
+}
+
+
+/** Opciones de la empresa que cambian la liquidacion (no dependen del empleado ni del año). */
+export interface PayrollCompanyOptions {
+  /**
+   * Exoneracion de aportes del art. 114-1 del Estatuto Tributario: salud del empleador (8,5%),
+   * SENA (2%) e ICBF (3%) NO se pagan por los trabajadores que devenguen menos de 10 SMMLV.
+   * Aplica a sociedades y personas juridicas declarantes de renta, a personas naturales con 2 o mas
+   * trabajadores y a contribuyentes del regimen SIMPLE. NO aplica, entre otros, a entidades sin
+   * animo de lucro ni a personas naturales con un solo trabajador. Lo marca la empresa (su
+   * contador), porque depende de su situacion tributaria, no de un dato que Contapro pueda inferir.
+   */
+  exemptArt1141: boolean;
+}
+
+const DEFAULT_COMPANY_OPTIONS: PayrollCompanyOptions = { exemptArt1141: false };
+
+/**
+ * Fondo de Solidaridad Pensional (art. 27 Ley 100 de 1993, modificado por art. 8 Ley 797 de 2003):
+ * aporte adicional del trabajador cuando su IBC es de 4 SMMLV o mas.
+ */
+export function solidarityFundPercent(ibcInMinimumWages: number): number {
+  if (ibcInMinimumWages < 4) return 0;
+  if (ibcInMinimumWages < 16) return 1;
+  if (ibcInMinimumWages < 17) return 1.2;
+  if (ibcInMinimumWages < 18) return 1.4;
+  if (ibcInMinimumWages < 19) return 1.6;
+  if (ibcInMinimumWages < 20) return 1.8;
+  return 2;
+}
+
+/** Tabla del art. 383 del E.T. (retencion en la fuente por ingresos laborales), en UVT. */
+const WITHHOLDING_TABLE: Array<{ from: number; rate: number; plusUvt: number }> = [
+  { from: 2300, rate: 39, plusUvt: 770 },
+  { from: 945, rate: 37, plusUvt: 268 },
+  { from: 640, rate: 35, plusUvt: 162 },
+  { from: 360, rate: 33, plusUvt: 69 },
+  { from: 150, rate: 28, plusUvt: 10 },
+  { from: 95, rate: 19, plusUvt: 0 },
+];
+
+// Renta exenta del 25% (num. 10 art. 206 E.T., Ley 2277 de 2022): tope 790 UVT al año.
+const EXEMPT_25_ANNUAL_CAP_UVT = 790;
+// Tope conjunto de deducciones + rentas exentas (art. 336 E.T.): 40% y 1.340 UVT al año.
+const EXEMPTIONS_ANNUAL_CAP_UVT = 1340;
+
+/**
+ * Retencion en la fuente por salarios, procedimiento 1 (art. 385 E.T.), mensual:
+ *   ingresos laborales del mes
+ *   - ingresos no constitutivos de renta (aportes obligatorios a salud, pension y FSP del trabajador)
+ *   - renta exenta del 25% (tope 790 UVT/año), sin pasar del 40% ni de 1.340 UVT/año
+ *   = base gravable, que se lleva a UVT y se busca en la tabla del art. 383.
+ * El resultado se redondea al multiplo de 1.000 mas cercano (art. 868 E.T.).
+ *
+ * LIMITACION: no se descuentan deducciones voluntarias que el trabajador certifique (dependientes,
+ * intereses de vivienda, medicina prepagada, aportes voluntarios / AFC) porque Contapro aun no
+ * guarda esos soportes por empleado; con ellas la retencion real puede ser menor.
+ */
+export function salaryWithholdingTax(laborIncome: number, nonTaxableContributions: number, uvt: number): number {
+  if (uvt <= 0) return 0;
+  const netIncome = Math.max(0, laborIncome - nonTaxableContributions);
+  const exempt25 = Math.min(netIncome * 0.25, (EXEMPT_25_ANNUAL_CAP_UVT / 12) * uvt);
+  const exemptions = Math.min(exempt25, netIncome * 0.4, (EXEMPTIONS_ANNUAL_CAP_UVT / 12) * uvt);
+  const baseUvt = (netIncome - exemptions) / uvt;
+  const row = WITHHOLDING_TABLE.find((r) => baseUvt > r.from);
+  if (!row) return 0;
+  const taxUvt = (baseUvt - row.from) * (row.rate / 100) + row.plusUvt;
+  return Math.round((taxUvt * uvt) / 1000) * 1000;
 }
 
 export function calculateEmployeePayroll(
@@ -102,12 +207,14 @@ export function calculateEmployeePayroll(
   timeEntries: TimeEntryRecord[],
   periodStart: Date,
   periodEnd: Date,
-  activeDeductions: PayrollDeductionRecord[] = []
+  activeDeductions: PayrollDeductionRecord[] = [],
+  companyOptions: PayrollCompanyOptions = DEFAULT_COMPANY_OPTIONS
 ): EmployeeCalculationResult {
   const daysWorked = daysWorkedInPeriod(periodStart, periodEnd, employee.hireDate, employee.terminationDate);
   const proration = daysWorked / DAYS_IN_PAYROLL_MONTH;
   const dailyRate = employee.baseSalary / DAYS_IN_PAYROLL_MONTH;
-  const hourlyRate = employee.baseSalary / parameter.monthlyHoursDivisor;
+  const hoursDivisor = legalMonthlyHoursDivisor(periodEnd, parameter.monthlyHoursDivisor);
+  const hourlyRate = employee.baseSalary / hoursDivisor;
 
   const items: PayrollItemCalc[] = [];
 
@@ -127,7 +234,7 @@ export function calculateEmployeePayroll(
     }
   }
 
-  const hours = classifyTimeEntries(timeEntries);
+  const hours = classifyTimeEntries(timeEntries, parameter.sundayHolidaySurchargePercent);
 
   let overtimeDayAmount = 0;
   if (hours.overtimeDayHours > 0) {
@@ -149,19 +256,43 @@ export function calculateEmployeePayroll(
 
   let sundaySurchargeAmount = 0;
   if (hours.sundayOrdinaryHours > 0) {
-    sundaySurchargeAmount = round2(hours.sundayOrdinaryHours * hourlyRate * (parameter.sundayHolidaySurchargePercent / 100));
-    items.push({ conceptCode: "SUNDAY_SURCHARGE", quantity: round2(hours.sundayOrdinaryHours), rate: hourlyRate, amount: sundaySurchargeAmount });
+    sundaySurchargeAmount = round2(hourlyRate * (hours.sundayPercentHours / 100));
+    items.push({
+      conceptCode: "SUNDAY_SURCHARGE",
+      quantity: round2(hours.sundayOrdinaryHours),
+      rate: round2(hours.sundayPercentHours / hours.sundayOrdinaryHours),
+      amount: sundaySurchargeAmount,
+    });
   }
 
   // Base salarial (constitutiva de salario): NO incluye auxilio de transporte.
-  const salarialBase = salaryAmount + overtimeDayAmount + overtimeNightAmount + nightSurchargeAmount + sundaySurchargeAmount;
+  const salarialBase = round2(salaryAmount + overtimeDayAmount + overtimeNightAmount + nightSurchargeAmount + sundaySurchargeAmount);
   const grossTotal = round2(salarialBase + transportAmount);
 
-  const healthEmployee = round2(salarialBase * (parameter.healthEmployeePercent / 100));
-  const pensionEmployee = round2(salarialBase * (parameter.pensionEmployeePercent / 100));
+  // IBC para salud, pension, ARL y FSP: minimo 1 SMMLV y maximo 25 SMMLV, proporcional a los dias
+  // (art. 18 Ley 100 de 1993, art. 5 Ley 797 de 2003).
+  const minimumWageForDays = parameter.minimumWage * proration;
+  const ibc = daysWorked > 0 ? round2(Math.min(Math.max(salarialBase, minimumWageForDays), 25 * minimumWageForDays)) : 0;
+  const ibcInMinimumWages = minimumWageForDays > 0 ? ibc / minimumWageForDays : 0;
+  const earningsInMinimumWages = minimumWageForDays > 0 ? salarialBase / minimumWageForDays : 0;
+
+  const healthEmployee = round2(ibc * (parameter.healthEmployeePercent / 100));
+  const pensionEmployee = round2(ibc * (parameter.pensionEmployeePercent / 100));
   items.push({ conceptCode: "HEALTH_EMPLOYEE", rate: parameter.healthEmployeePercent, amount: healthEmployee });
   items.push({ conceptCode: "PENSION_EMPLOYEE", rate: parameter.pensionEmployeePercent, amount: pensionEmployee });
-  const legalDeductions = round2(healthEmployee + pensionEmployee);
+
+  const solidarityPercent = solidarityFundPercent(ibcInMinimumWages);
+  const solidarityFund = round2(ibc * (solidarityPercent / 100));
+  if (solidarityFund > 0) {
+    items.push({ conceptCode: "SOLIDARITY_FUND", rate: solidarityPercent, amount: solidarityFund });
+  }
+
+  const withholdingTax = salaryWithholdingTax(grossTotal, healthEmployee + pensionEmployee + solidarityFund, parameter.uvt);
+  if (withholdingTax > 0) {
+    items.push({ conceptCode: "WITHHOLDING_TAX", amount: withholdingTax });
+  }
+
+  const legalDeductions = round2(healthEmployee + pensionEmployee + solidarityFund + withholdingTax);
   const netPayBeforeAdditionalDeductions = round2(grossTotal - legalDeductions);
 
   // Libranzas/embargos (PayrollDeduction, ver domain/payroll-deduction.repository.ts): se aplican
@@ -188,23 +319,34 @@ export function calculateEmployeePayroll(
   const totalDeductions = round2(legalDeductions + additionalDeductionsTotal);
   const netPay = round2(grossTotal - totalDeductions);
 
+  // Exoneracion art. 114-1 E.T.: por trabajador que devengue menos de 10 SMMLV.
+  const exempt = companyOptions.exemptArt1141 && earningsInMinimumWages < 10;
+
   const arlPercent = employee.arlRiskLevel ? parameter.arlPercentByRiskLevel[employee.arlRiskLevel] ?? 0 : 0;
-  const healthEmployer = round2(salarialBase * (parameter.healthEmployerPercent / 100));
-  const pensionEmployer = round2(salarialBase * (parameter.pensionEmployerPercent / 100));
-  const arl = round2(salarialBase * (arlPercent / 100));
+  const healthEmployer = exempt ? 0 : round2(ibc * (parameter.healthEmployerPercent / 100));
+  const pensionEmployer = round2(ibc * (parameter.pensionEmployerPercent / 100));
+  const arl = round2(ibc * (arlPercent / 100));
+  // Parafiscales (caja, ICBF, SENA) sobre la nomina de salarios del mes, sin el tope de 25 SMMLV.
   const ccf = round2(salarialBase * (parameter.familyCompensationPercent / 100));
-  const icbf = round2(salarialBase * (parameter.icbfPercent / 100));
-  const sena = round2(salarialBase * (parameter.senaPercent / 100));
-  items.push({ conceptCode: "HEALTH_EMPLOYER", rate: parameter.healthEmployerPercent, amount: healthEmployer });
+  const icbf = exempt ? 0 : round2(salarialBase * (parameter.icbfPercent / 100));
+  const sena = exempt ? 0 : round2(salarialBase * (parameter.senaPercent / 100));
+  if (healthEmployer > 0) items.push({ conceptCode: "HEALTH_EMPLOYER", rate: parameter.healthEmployerPercent, amount: healthEmployer });
   items.push({ conceptCode: "PENSION_EMPLOYER", rate: parameter.pensionEmployerPercent, amount: pensionEmployer });
   items.push({ conceptCode: "ARL", rate: arlPercent, amount: arl });
   items.push({ conceptCode: "CCF", rate: parameter.familyCompensationPercent, amount: ccf });
-  items.push({ conceptCode: "ICBF", rate: parameter.icbfPercent, amount: icbf });
-  items.push({ conceptCode: "SENA", rate: parameter.senaPercent, amount: sena });
+  if (icbf > 0) items.push({ conceptCode: "ICBF", rate: parameter.icbfPercent, amount: icbf });
+  if (sena > 0) items.push({ conceptCode: "SENA", rate: parameter.senaPercent, amount: sena });
 
-  const severance = round2(salarialBase * (parameter.severancePercent / 100));
-  const severanceInterest = round2(severance * (parameter.severanceInterestPercent / 100) * (daysWorked / 360));
-  const serviceBonus = round2(salarialBase * (parameter.serviceBonusPercent / 100));
+  // Cesantias y prima se liquidan sobre el salario MAS el auxilio de transporte (art. 7 Ley 1 de 1963:
+  // el auxilio se incorpora al salario para liquidar prestaciones sociales). Vacaciones no: son
+  // descanso remunerado y se pagan solo con el salario ordinario.
+  const benefitsBase = round2(salarialBase + transportAmount);
+  const severance = round2(benefitsBase * (parameter.severancePercent / 100));
+  // Intereses de cesantias: 12% anual sobre las cesantias (Ley 52 de 1975). La provision del mes es
+  // el 12% de las cesantias causadas en el mes (los dias ya estan en `severance` via la proporcion),
+  // asi al cierre del año la provision acumulada = 12% de las cesantias del año.
+  const severanceInterest = round2(severance * (parameter.severanceInterestPercent / 100));
+  const serviceBonus = round2(benefitsBase * (parameter.serviceBonusPercent / 100));
   const vacation = round2(salarialBase * (parameter.vacationPercent / 100));
   items.push({ conceptCode: "SEVERANCE", rate: parameter.severancePercent, amount: severance });
   items.push({ conceptCode: "SEVERANCE_INTEREST", rate: parameter.severanceInterestPercent, amount: severanceInterest });
@@ -227,6 +369,8 @@ export function calculateEmployeePayroll(
       employeeName: `${employee.firstName} ${employee.lastName}`,
       period: { startDate: periodStart.toISOString(), endDate: periodEnd.toISOString() },
       daysWorked,
+      ibc,
+      exemptArt1141: exempt,
       devengados: {
         salary: salaryAmount,
         transportAllowance: transportAmount,
@@ -239,6 +383,8 @@ export function calculateEmployeePayroll(
       deducciones: {
         health: healthEmployee,
         pension: pensionEmployee,
+        solidarityFund,
+        withholdingTax,
         adicionales: additionalDeductions,
         total: totalDeductions,
       },
