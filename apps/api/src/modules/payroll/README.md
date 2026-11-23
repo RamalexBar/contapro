@@ -19,22 +19,33 @@ Estado: **funcional** (motor de liquidacion real). Ver `docs/ALCANCE.md` para el
 | Cesantias y prima sobre salario + auxilio de transporte; vacaciones solo salario | Ley 1/1963 art. 7 | `benefitsBase` |
 | Intereses de cesantias: provision del 12% de las cesantias del mes | Ley 52/1975 | `severanceInterest` |
 | Trabajo nocturno desde las 7 p. m. a partir del 2025-12-25 (antes 9 p. m.) | Ley 2466/2025 | `NIGHT_FROM_7PM_SINCE` |
-| Recargo dominical/festivo 80% (jul 2025), 90% (jul 2026), 100% (jul 2027); se usa el mayor entre esto y el parametro | Ley 2466/2025 | `legalSundaySurchargePercent` |
+| Recargo dominical/festivo 80% (jul 2025), 90% (jul 2026), 100% (jul 2027) sobre toda hora de domingo/festivo (tambien las extra); se usa el mayor entre esto y el parametro | Ley 2466/2025 | `legalSundaySurchargePercent` |
 | Jornada de 44 h (jul 2025) y 42 h (15 jul 2026): divisor 220 / 210; se usa el menor entre esto y el parametro | Ley 2101/2021 | `legalMonthlyHoursDivisor` |
 
 Contabilidad: la retencion en la fuente va a su propia cuenta **236505** (se declara en el
 formulario 350); salud, pension, FSP y libranzas siguen en 2370. Nomina electronica DIAN: el FSP sale
 como `FondoSP` y la retencion en `RetencionFuente` (antes iba siempre en 0).
 
+**Agregado el mismo dia (segunda pasada):**
+- Parametros legales SOLO desde el panel de plataforma (`/admin/payroll-parameters`, pagina "Nomina" del
+  panel). Antes `POST /payroll-parameters` lo podia usar el administrador o contador de cualquier
+  empresa y los valores aplicaban a todas; ahora las empresas solo los leen (`payroll.read`).
+- Retencion con soportes del trabajador (Empleados -> Editar): dependientes (10%, tope 32 UVT), intereses
+  de vivienda (tope 100 UVT), medicina prepagada (tope 16 UVT), aportes voluntarios/AFC (30% y 3.800
+  UVT/año), todo dentro del tope conjunto 40% / 1.340 UVT.
+- Salario integral (`Employee.salaryType = INTEGRAL`): minimo 13 SMMLV (se valida al calcular),
+  aportes y parafiscales sobre el 70%, sin auxilio, cesantias, intereses ni prima.
+- Horas trabajadas clasificadas minuto a minuto: una marcacion que cruza las 7 p. m. se divide en
+  diurna y nocturna; las marcaciones del mismo dia se suman antes de contar extras; la hora extra en
+  domingo/festivo lleva tambien el recargo dominical.
+
 **Lo que NO calcula todavia** (para revisar con el contador):
-- Deducciones voluntarias de la retencion (dependientes, intereses de vivienda, medicina prepagada,
-  aportes voluntarios / AFC): Contapro aun no guarda esos certificados por empleado, asi que la
-  retencion puede salir mayor que la real para quien los tenga. Tampoco el procedimiento 2.
-- Salario integral (IBC del 70%), aprendices SENA y contratos de medio tiempo con IBC inferior al minimo.
-- Horas extra en domingo/festivo como recargo combinado, y marcaciones que cruzan la franja
-  diurna/nocturna (se clasifican por la hora de inicio, ver limitacion abajo).
+- Deduccion adicional de 72 UVT por dependiente (Ley 2277 de 2022) y procedimiento 2 de retencion.
+- Aprendices SENA (contrato de aprendizaje, cambiado por la Ley 2466 de 2025): no se liquidan aparte.
+- Contratos de medio tiempo con IBC inferior al minimo (el IBC se sube siempre a 1 SMMLV).
+- Jornadas pactadas distintas de 8 h diarias: lo que pase de 8 h en un dia se trata como extra.
 - Liquidacion de contrato (pago de cesantias, prima y vacaciones al retiro) y pago de la prima en
-  junio/diciembre: hoy solo se provisionan cada mes.
+  junio/diciembre y de cesantias al fondo en febrero: hoy solo se provisionan cada mes.
 - Topes legales de embargabilidad (ver "Deducciones recurrentes").
 
 ## Modelos (`packages/database/prisma/schema/payroll.prisma`)

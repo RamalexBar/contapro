@@ -34,6 +34,15 @@ export class CalculatePayrollUseCase {
     const companyOptions = { exemptArt1141: company.payrollExemptArt1141 };
     const employees = await this.employeeRepo.listActiveForPeriod(payroll.branchId, payroll.startDate, payroll.endDate);
 
+    // Salario integral: minimo 10 SMMLV + 30% de factor prestacional = 13 SMMLV (art. 132 CST).
+    const invalidIntegral = employees.filter((e) => e.salaryType === "INTEGRAL" && e.baseSalary < 13 * parameter.minimumWage);
+    if (invalidIntegral.length > 0) {
+      throw new ValidationError(
+        `El salario integral no puede ser menor a 13 salarios minimos ($${(13 * parameter.minimumWage).toLocaleString("es-CO")}): ` +
+          invalidIntegral.map((e) => `${e.firstName} ${e.lastName}`).join(", ")
+      );
+    }
+
     const results: EmployeeCalculationResult[] = [];
     for (const employee of employees) {
       const timeEntries = await this.timeTrackingRepo.listClosedForPeriod(employee.id, payroll.startDate, payroll.endDate);

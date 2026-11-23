@@ -38,6 +38,11 @@ const EMPLOYEE_WITH_PHONE: EmployeeRecord = {
   compensationFund: null,
   bankName: null,
   bankAccountNumber: null,
+    salaryType: "ORDINARY",
+    withholdingDependents: false,
+    withholdingHousingInterest: 0,
+    withholdingPrepaidHealth: 0,
+    withholdingVoluntaryPension: 0,
 };
 const EMPLOYEE_NO_PHONE: EmployeeRecord = { ...EMPLOYEE_WITH_PHONE, id: "employee-2", phone: null };
 

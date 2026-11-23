@@ -10,6 +10,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
+import { PayrollParametersCard } from "../components/PayrollParametersCard";
 import { listEmployees } from "../../employees/api/employee.api";
 import {
   approvePayroll,
@@ -17,7 +18,6 @@ import {
   cancelPayrollDeduction,
   createPayroll,
   createPayrollDeduction,
-  createPayrollParameter,
   downloadPayslipPdf,
   getPayroll,
   listPayrollDeductions,
@@ -57,35 +57,6 @@ const EMPTY_DEDUCTION_FORM = {
   startDate: "",
 };
 
-const PARAMETER_DEFAULTS = {
-  year: new Date().getFullYear(),
-  effectiveFrom: `${new Date().getFullYear()}-01-01`,
-  // Valores oficiales 2026 (Decretos 1469/1470 de 2025 y Resolucion DIAN 000238 de 2025).
-  minimumWage: "1750905",
-  transportAllowance: "249095",
-  uvt: "52374",
-  healthEmployeePercent: "4",
-  healthEmployerPercent: "8.5",
-  pensionEmployeePercent: "4",
-  pensionEmployerPercent: "12",
-  arlI: "0.522",
-  arlII: "1.044",
-  arlIII: "2.436",
-  arlIV: "4.35",
-  arlV: "6.96",
-  severancePercent: "8.33",
-  severanceInterestPercent: "12",
-  serviceBonusPercent: "8.33",
-  vacationPercent: "4.17",
-  familyCompensationPercent: "4",
-  icbfPercent: "3",
-  senaPercent: "2",
-  overtimeDayPercent: "25",
-  overtimeNightPercent: "75",
-  nightSurchargePercent: "35",
-  sundayHolidaySurchargePercent: "80",
-  monthlyHoursDivisor: "220",
-};
 
 const EMPTY_PAYROLL_FORM = {
   year: new Date().getFullYear(),
@@ -114,45 +85,6 @@ export function PayrollPage() {
   const { data: employees } = useQuery({ queryKey: ["employees"], queryFn: () => listEmployees() });
   const employeeNames = new Map((employees?.data ?? []).map((e) => [e.id, `${e.firstName} ${e.lastName}`]));
 
-  const [showParameterForm, setShowParameterForm] = useState(false);
-  const [paramForm, setParamForm] = useState(PARAMETER_DEFAULTS);
-  const createParameterMutation = useMutation({
-    mutationFn: () =>
-      createPayrollParameter({
-        year: Number(paramForm.year),
-        effectiveFrom: new Date(paramForm.effectiveFrom),
-        minimumWage: Number(paramForm.minimumWage),
-        transportAllowance: Number(paramForm.transportAllowance),
-        uvt: Number(paramForm.uvt),
-        healthEmployeePercent: Number(paramForm.healthEmployeePercent),
-        healthEmployerPercent: Number(paramForm.healthEmployerPercent),
-        pensionEmployeePercent: Number(paramForm.pensionEmployeePercent),
-        pensionEmployerPercent: Number(paramForm.pensionEmployerPercent),
-        arlPercentByRiskLevel: {
-          I: Number(paramForm.arlI),
-          II: Number(paramForm.arlII),
-          III: Number(paramForm.arlIII),
-          IV: Number(paramForm.arlIV),
-          V: Number(paramForm.arlV),
-        },
-        severancePercent: Number(paramForm.severancePercent),
-        severanceInterestPercent: Number(paramForm.severanceInterestPercent),
-        serviceBonusPercent: Number(paramForm.serviceBonusPercent),
-        vacationPercent: Number(paramForm.vacationPercent),
-        familyCompensationPercent: Number(paramForm.familyCompensationPercent),
-        icbfPercent: Number(paramForm.icbfPercent),
-        senaPercent: Number(paramForm.senaPercent),
-        overtimeDayPercent: Number(paramForm.overtimeDayPercent),
-        overtimeNightPercent: Number(paramForm.overtimeNightPercent),
-        nightSurchargePercent: Number(paramForm.nightSurchargePercent),
-        sundayHolidaySurchargePercent: Number(paramForm.sundayHolidaySurchargePercent),
-        monthlyHoursDivisor: Number(paramForm.monthlyHoursDivisor),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["payroll-parameters"] });
-      setShowParameterForm(false);
-    },
-  });
 
   const [payrollForm, setPayrollForm] = useState(EMPTY_PAYROLL_FORM);
   const createPayrollMutation = useMutation({
@@ -250,260 +182,7 @@ export function PayrollPage() {
         </Card>
       )}
 
-      {canManageParameters && (
-        <Card className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Parametros legales por año</h2>
-            <Button size="sm" variant="secondary" onClick={() => setShowParameterForm((v) => !v)}>
-              {showParameterForm ? "Cancelar" : "Nuevo parametro"}
-            </Button>
-          </div>
-
-          <Table className="mb-3">
-            <TableHead>
-              <tr>
-                <Th>Año</Th>
-                <Th>Salario minimo</Th>
-                <Th>Aux. transporte</Th>
-                <Th>Divisor horas</Th>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {parameters?.data.map((p) => (
-                <TableRow key={p.id}>
-                  <Td className="font-medium text-slate-900">{p.year}</Td>
-                  <Td>{formatCOP(p.minimumWage)}</Td>
-                  <Td>{formatCOP(p.transportAllowance)}</Td>
-                  <Td>{p.monthlyHoursDivisor}</Td>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {showParameterForm && (
-            <form
-              className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                createParameterMutation.mutate();
-              }}
-            >
-              <Input
-                label="Año"
-                type="number"
-                value={paramForm.year}
-                onChange={(e) => setParamForm({ ...paramForm, year: Number(e.target.value) })}
-                required
-              />
-              <Input
-                label="Vigente desde"
-                type="date"
-                value={paramForm.effectiveFrom}
-                onChange={(e) => setParamForm({ ...paramForm, effectiveFrom: e.target.value })}
-                required
-              />
-              <Input
-                label="Salario minimo"
-                type="number"
-                value={paramForm.minimumWage}
-                onChange={(e) => setParamForm({ ...paramForm, minimumWage: e.target.value })}
-                required
-              />
-              <Input
-                label="Auxilio de transporte"
-                type="number"
-                value={paramForm.transportAllowance}
-                onChange={(e) => setParamForm({ ...paramForm, transportAllowance: e.target.value })}
-                required
-              />
-              <Input
-                label="UVT"
-                type="number"
-                value={paramForm.uvt}
-                onChange={(e) => setParamForm({ ...paramForm, uvt: e.target.value })}
-                required
-              />
-              <Input
-                label="Salud empleado %"
-                type="number"
-                step="0.01"
-                value={paramForm.healthEmployeePercent}
-                onChange={(e) => setParamForm({ ...paramForm, healthEmployeePercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Salud empleador %"
-                type="number"
-                step="0.01"
-                value={paramForm.healthEmployerPercent}
-                onChange={(e) => setParamForm({ ...paramForm, healthEmployerPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Pension empleado %"
-                type="number"
-                step="0.01"
-                value={paramForm.pensionEmployeePercent}
-                onChange={(e) => setParamForm({ ...paramForm, pensionEmployeePercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Pension empleador %"
-                type="number"
-                step="0.01"
-                value={paramForm.pensionEmployerPercent}
-                onChange={(e) => setParamForm({ ...paramForm, pensionEmployerPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="ARL nivel I %"
-                type="number"
-                step="0.001"
-                value={paramForm.arlI}
-                onChange={(e) => setParamForm({ ...paramForm, arlI: e.target.value })}
-                required
-              />
-              <Input
-                label="ARL nivel II %"
-                type="number"
-                step="0.001"
-                value={paramForm.arlII}
-                onChange={(e) => setParamForm({ ...paramForm, arlII: e.target.value })}
-                required
-              />
-              <Input
-                label="ARL nivel III %"
-                type="number"
-                step="0.001"
-                value={paramForm.arlIII}
-                onChange={(e) => setParamForm({ ...paramForm, arlIII: e.target.value })}
-                required
-              />
-              <Input
-                label="ARL nivel IV %"
-                type="number"
-                step="0.001"
-                value={paramForm.arlIV}
-                onChange={(e) => setParamForm({ ...paramForm, arlIV: e.target.value })}
-                required
-              />
-              <Input
-                label="ARL nivel V %"
-                type="number"
-                step="0.001"
-                value={paramForm.arlV}
-                onChange={(e) => setParamForm({ ...paramForm, arlV: e.target.value })}
-                required
-              />
-              <Input
-                label="Cesantias %"
-                type="number"
-                step="0.01"
-                value={paramForm.severancePercent}
-                onChange={(e) => setParamForm({ ...paramForm, severancePercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Int. cesantias %"
-                type="number"
-                step="0.01"
-                value={paramForm.severanceInterestPercent}
-                onChange={(e) => setParamForm({ ...paramForm, severanceInterestPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Prima %"
-                type="number"
-                step="0.01"
-                value={paramForm.serviceBonusPercent}
-                onChange={(e) => setParamForm({ ...paramForm, serviceBonusPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Vacaciones %"
-                type="number"
-                step="0.01"
-                value={paramForm.vacationPercent}
-                onChange={(e) => setParamForm({ ...paramForm, vacationPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Caja compensacion %"
-                type="number"
-                step="0.01"
-                value={paramForm.familyCompensationPercent}
-                onChange={(e) => setParamForm({ ...paramForm, familyCompensationPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="ICBF %"
-                type="number"
-                step="0.01"
-                value={paramForm.icbfPercent}
-                onChange={(e) => setParamForm({ ...paramForm, icbfPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="SENA %"
-                type="number"
-                step="0.01"
-                value={paramForm.senaPercent}
-                onChange={(e) => setParamForm({ ...paramForm, senaPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Hora extra diurna %"
-                type="number"
-                step="0.01"
-                value={paramForm.overtimeDayPercent}
-                onChange={(e) => setParamForm({ ...paramForm, overtimeDayPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Hora extra nocturna %"
-                type="number"
-                step="0.01"
-                value={paramForm.overtimeNightPercent}
-                onChange={(e) => setParamForm({ ...paramForm, overtimeNightPercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Recargo nocturno %"
-                type="number"
-                step="0.01"
-                value={paramForm.nightSurchargePercent}
-                onChange={(e) => setParamForm({ ...paramForm, nightSurchargePercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Recargo dom./festivo %"
-                type="number"
-                step="0.01"
-                value={paramForm.sundayHolidaySurchargePercent}
-                onChange={(e) => setParamForm({ ...paramForm, sundayHolidaySurchargePercent: e.target.value })}
-                required
-              />
-              <Input
-                label="Divisor horas mensual"
-                type="number"
-                value={paramForm.monthlyHoursDivisor}
-                onChange={(e) => setParamForm({ ...paramForm, monthlyHoursDivisor: e.target.value })}
-                required
-              />
-              <div className="col-span-2 sm:col-span-4">
-                <Button type="submit" loading={createParameterMutation.isPending}>
-                  Guardar parametro
-                </Button>
-              </div>
-              {createParameterMutation.isError && (
-                <Alert tone="danger" className="col-span-full">
-                  {(createParameterMutation.error as Error).message}
-                </Alert>
-              )}
-            </form>
-          )}
-        </Card>
-      )}
+      <PayrollParametersCard queryKey={["payroll-parameters"]} list={listPayrollParameters} />
 
       {canCreate && (
         <Card className="mb-6">

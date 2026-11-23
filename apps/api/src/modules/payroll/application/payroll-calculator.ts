@@ -1,4 +1,4 @@
-import { COMPANY_TIMEZONE, isColombianHoliday, round2 } from "@erp/shared-utils";
+import { isColombianHoliday, round2 } from "@erp/shared-utils";
 import type { EmployeeRecord } from "../../employees/domain/employee.repository";
 import type { TimeEntryRecord } from "../../timetracking/domain/timetracking.repository";
 import type { PayrollDeductionRecord } from "../domain/payroll-deduction.repository";
@@ -7,19 +7,6 @@ import type { EmployeeCalculationResult, PayrollItemCalc } from "../domain/payro
 
 const ORDINARY_DAILY_HOURS = 8;
 const DAYS_IN_PAYROLL_MONTH = 30; // convencion legal colombiana del "mes de 30 dias"
-const WEEKDAY_MAP: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-
-function bogotaHour(date: Date): number {
-  return Number(
-    new Intl.DateTimeFormat("en-US", { timeZone: COMPANY_TIMEZONE, hour: "numeric", hourCycle: "h23" }).format(date)
-  );
-}
-
-/** 0 = domingo, igual que Date.getDay() pero en hora de Colombia. */
-function bogotaWeekday(date: Date): number {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: COMPANY_TIMEZONE, weekday: "short" }).format(date);
-  return WEEKDAY_MAP[weekday] ?? date.getDay();
-}
 
 function toDateOnly(date: Date): number {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
@@ -86,12 +73,23 @@ export function legalMonthlyHoursDivisor(date: Date, parameterDivisor: number): 
   return Math.min(parameterDivisor, legal);
 }
 
+// Colombia no tiene horario de verano: hora local = UTC-5 fija. Se usa aritmetica directa porque
+// la clasificacion recorre las marcaciones minuto a minuto.
+const BOGOTA_OFFSET_MS = 5 * 3_600_000;
+const MINUTE_MS = 60_000;
+
 /**
- * LIMITACION CONOCIDA (documentada tambien en el README del modulo): cada `TimeEntry` se
- * clasifica como diurna/nocturna en bloque segun la hora de INICIO de la marcacion (no se
- * divide una misma marcacion que cruza la franja diurna/nocturna). Las horas que exceden
- * 8 por marcacion se tratan como extra; si un empleado tiene varias marcaciones el mismo dia,
- * no se acumulan entre si para el calculo de horas extra.
+ * Clasifica las horas trabajadas minuto a minuto:
+ * - diurna/nocturna segun la hora real de cada minuto (una marcacion de 5 p. m. a 11 p. m. se divide
+ *   en horas diurnas y nocturnas; el nocturno empieza a las 7 p. m. desde el 2025-12-25, Ley 2466);
+ * - las primeras 8 horas de cada DIA (sumando todas las marcaciones de ese dia en hora Colombia) son
+ *   ordinarias y las demas son extra;
+ * - el recargo dominical/festivo se aplica a toda hora trabajada en domingo o festivo, ordinaria o
+ *   extra (la hora extra dominical lleva su recargo de extra MAS el dominical), con el % vigente en
+ *   esa fecha.
+ * LIMITACION: el limite de 8 horas diarias es la jornada estandar; si la empresa pacto otra
+ * distribucion de la jornada semanal (ej. 42 h en 5 dias), las horas por encima de 8 en un dia se
+ * siguen tratando como extra.
  */
 function classifyTimeEntries(entries: TimeEntryRecord[], parameterSundayPercent: number): HourBuckets {
   const buckets: HourBuckets = {
@@ -102,33 +100,41 @@ function classifyTimeEntries(entries: TimeEntryRecord[], parameterSundayPercent:
     sundayOrdinaryHours: 0,
     sundayPercentHours: 0,
   };
+  const minutesByDay = new Map<number, number>();
+  const holidayCache = new Map<number, boolean>();
+  const ordinaryMinutesPerDay = ORDINARY_DAILY_HOURS * 60;
 
-  for (const entry of entries) {
-    if (!entry.clockOut) continue;
-    const totalHours = (entry.clockOut.getTime() - entry.clockIn.getTime()) / 3_600_000;
-    if (totalHours <= 0) continue;
+  const sorted = entries.filter((e) => e.clockOut && e.clockOut > e.clockIn).sort((a, b) => a.clockIn.getTime() - b.clockIn.getTime());
+  for (const entry of sorted) {
+    for (let t = entry.clockIn.getTime(); t < entry.clockOut!.getTime(); t += MINUTE_MS) {
+      const local = new Date(t - BOGOTA_OFFSET_MS);
+      const dayKey = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
+      const worked = minutesByDay.get(dayKey) ?? 0;
+      minutesByDay.set(dayKey, worked + 1);
+      const isOvertime = worked >= ordinaryMinutesPerDay;
 
-    const ordinaryHours = Math.min(totalHours, ORDINARY_DAILY_HOURS);
-    const overtimeHours = Math.max(0, totalHours - ORDINARY_DAILY_HOURS);
+      const hour = local.getUTCHours();
+      const nightStartHour = t >= NIGHT_FROM_7PM_SINCE ? 19 : 21;
+      const isNight = hour >= nightStartHour || hour < 6;
+      const hours = 1 / 60;
+      if (isOvertime) {
+        if (isNight) buckets.overtimeNightHours += hours;
+        else buckets.overtimeDayHours += hours;
+      } else if (isNight) buckets.ordinaryNightHours += hours;
+      else buckets.ordinaryDayHours += hours;
 
-    const startHour = bogotaHour(entry.clockIn);
-    const nightStartHour = entry.clockIn.getTime() >= NIGHT_FROM_7PM_SINCE ? 19 : 21;
-    const isNight = startHour >= nightStartHour || startHour < 6;
-    const isSundayOrHoliday = bogotaWeekday(entry.clockIn) === 0 || isColombianHoliday(entry.clockIn);
-
-    if (isNight) {
-      buckets.ordinaryNightHours += ordinaryHours;
-      buckets.overtimeNightHours += overtimeHours;
-    } else {
-      buckets.ordinaryDayHours += ordinaryHours;
-      buckets.overtimeDayHours += overtimeHours;
-    }
-    if (isSundayOrHoliday) {
-      buckets.sundayOrdinaryHours += ordinaryHours;
-      buckets.sundayPercentHours += ordinaryHours * legalSundaySurchargePercent(entry.clockIn, parameterSundayPercent);
+      let isHoliday = holidayCache.get(dayKey);
+      if (isHoliday === undefined) {
+        isHoliday = isColombianHoliday(new Date(t));
+        holidayCache.set(dayKey, isHoliday);
+      }
+      if (local.getUTCDay() === 0 || isHoliday) {
+        buckets.sundayOrdinaryHours += hours;
+        buckets.sundayPercentHours += hours * legalSundaySurchargePercent(new Date(t), parameterSundayPercent);
+      }
     }
   }
-
+  for (const key of Object.keys(buckets) as Array<keyof HourBuckets>) buckets[key] = round2(buckets[key]);
   return buckets;
 }
 
@@ -177,23 +183,52 @@ const EXEMPT_25_ANNUAL_CAP_UVT = 790;
 // Tope conjunto de deducciones + rentas exentas (art. 336 E.T.): 40% y 1.340 UVT al año.
 const EXEMPTIONS_ANNUAL_CAP_UVT = 1340;
 
+/** Soportes que el trabajador certifico para la retencion (valores MENSUALES). */
+export interface WithholdingSupports {
+  /** Dependientes economicos (art. 387 E.T.): deduce el 10% del ingreso laboral, tope 32 UVT/mes. */
+  dependents: boolean;
+  /** Intereses de credito de vivienda (art. 119 E.T.): tope 100 UVT/mes. */
+  housingInterest: number;
+  /** Medicina prepagada / seguros de salud (art. 387 E.T.): tope 16 UVT/mes. */
+  prepaidHealth: number;
+  /** Aportes voluntarios a pension, AFC o AVC (arts. 126-1 y 126-4): renta exenta hasta el 30% del
+   * ingreso laboral y 3.800 UVT/año. */
+  voluntaryPension: number;
+}
+
+const NO_SUPPORTS: WithholdingSupports = { dependents: false, housingInterest: 0, prepaidHealth: 0, voluntaryPension: 0 };
+
 /**
  * Retencion en la fuente por salarios, procedimiento 1 (art. 385 E.T.), mensual:
  *   ingresos laborales del mes
  *   - ingresos no constitutivos de renta (aportes obligatorios a salud, pension y FSP del trabajador)
- *   - renta exenta del 25% (tope 790 UVT/año), sin pasar del 40% ni de 1.340 UVT/año
+ *   - deducciones (dependientes, intereses de vivienda, medicina prepagada) con sus topes
+ *   - rentas exentas: aportes voluntarios/AFC (30% y 3.800 UVT/año) y el 25% (tope 790 UVT/año)
+ *   con el tope conjunto de deducciones + exentas: 40% y 1.340 UVT/año (art. 336 E.T.)
  *   = base gravable, que se lleva a UVT y se busca en la tabla del art. 383.
  * El resultado se redondea al multiplo de 1.000 mas cercano (art. 868 E.T.).
  *
- * LIMITACION: no se descuentan deducciones voluntarias que el trabajador certifique (dependientes,
- * intereses de vivienda, medicina prepagada, aportes voluntarios / AFC) porque Contapro aun no
- * guarda esos soportes por empleado; con ellas la retencion real puede ser menor.
+ * LIMITACION: no aplica la deduccion adicional de 72 UVT por dependiente de la Ley 2277 de 2022
+ * (art. 336 num. 3) ni el procedimiento 2; el contador puede ajustar con una deduccion manual.
  */
-export function salaryWithholdingTax(laborIncome: number, nonTaxableContributions: number, uvt: number): number {
+export function salaryWithholdingTax(
+  laborIncome: number,
+  nonTaxableContributions: number,
+  uvt: number,
+  supports: WithholdingSupports = NO_SUPPORTS
+): number {
   if (uvt <= 0) return 0;
   const netIncome = Math.max(0, laborIncome - nonTaxableContributions);
-  const exempt25 = Math.min(netIncome * 0.25, (EXEMPT_25_ANNUAL_CAP_UVT / 12) * uvt);
-  const exemptions = Math.min(exempt25, netIncome * 0.4, (EXEMPTIONS_ANNUAL_CAP_UVT / 12) * uvt);
+  const deductions =
+    (supports.dependents ? Math.min(laborIncome * 0.1, 32 * uvt) : 0) +
+    Math.min(Math.max(0, supports.housingInterest), 100 * uvt) +
+    Math.min(Math.max(0, supports.prepaidHealth), 16 * uvt);
+  const voluntaryExempt = Math.min(Math.max(0, supports.voluntaryPension), laborIncome * 0.3, (3800 / 12) * uvt);
+  const exempt25 = Math.min(
+    Math.max(0, netIncome - deductions - voluntaryExempt) * 0.25,
+    (EXEMPT_25_ANNUAL_CAP_UVT / 12) * uvt
+  );
+  const exemptions = Math.min(deductions + voluntaryExempt + exempt25, netIncome * 0.4, (EXEMPTIONS_ANNUAL_CAP_UVT / 12) * uvt);
   const baseUvt = (netIncome - exemptions) / uvt;
   const row = WITHHOLDING_TABLE.find((r) => baseUvt > r.from);
   if (!row) return 0;
@@ -221,8 +256,12 @@ export function calculateEmployeePayroll(
   const salaryAmount = round2(employee.baseSalary * proration);
   items.push({ conceptCode: "SALARY", quantity: daysWorked, rate: dailyRate, amount: salaryAmount });
 
+  // Salario integral (art. 132 CST): incluye el factor prestacional (30%), asi que no lleva auxilio
+  // de transporte, ni cesantias, intereses ni prima; los aportes se liquidan sobre el 70%.
+  const isIntegral = employee.salaryType === "INTEGRAL";
+
   let transportAmount = 0;
-  if (employee.baseSalary <= 2 * parameter.minimumWage) {
+  if (!isIntegral && employee.baseSalary <= 2 * parameter.minimumWage) {
     transportAmount = round2(parameter.transportAllowance * proration);
     if (transportAmount > 0) {
       items.push({
@@ -272,7 +311,8 @@ export function calculateEmployeePayroll(
   // IBC para salud, pension, ARL y FSP: minimo 1 SMMLV y maximo 25 SMMLV, proporcional a los dias
   // (art. 18 Ley 100 de 1993, art. 5 Ley 797 de 2003).
   const minimumWageForDays = parameter.minimumWage * proration;
-  const ibc = daysWorked > 0 ? round2(Math.min(Math.max(salarialBase, minimumWageForDays), 25 * minimumWageForDays)) : 0;
+  const contributionBase = isIntegral ? round2(salarialBase * 0.7) : salarialBase;
+  const ibc = daysWorked > 0 ? round2(Math.min(Math.max(contributionBase, minimumWageForDays), 25 * minimumWageForDays)) : 0;
   const ibcInMinimumWages = minimumWageForDays > 0 ? ibc / minimumWageForDays : 0;
   const earningsInMinimumWages = minimumWageForDays > 0 ? salarialBase / minimumWageForDays : 0;
 
@@ -287,7 +327,12 @@ export function calculateEmployeePayroll(
     items.push({ conceptCode: "SOLIDARITY_FUND", rate: solidarityPercent, amount: solidarityFund });
   }
 
-  const withholdingTax = salaryWithholdingTax(grossTotal, healthEmployee + pensionEmployee + solidarityFund, parameter.uvt);
+  const withholdingTax = salaryWithholdingTax(grossTotal, healthEmployee + pensionEmployee + solidarityFund, parameter.uvt, {
+    dependents: employee.withholdingDependents,
+    housingInterest: employee.withholdingHousingInterest,
+    prepaidHealth: employee.withholdingPrepaidHealth,
+    voluntaryPension: employee.withholdingVoluntaryPension,
+  });
   if (withholdingTax > 0) {
     items.push({ conceptCode: "WITHHOLDING_TAX", amount: withholdingTax });
   }
@@ -326,10 +371,11 @@ export function calculateEmployeePayroll(
   const healthEmployer = exempt ? 0 : round2(ibc * (parameter.healthEmployerPercent / 100));
   const pensionEmployer = round2(ibc * (parameter.pensionEmployerPercent / 100));
   const arl = round2(ibc * (arlPercent / 100));
-  // Parafiscales (caja, ICBF, SENA) sobre la nomina de salarios del mes, sin el tope de 25 SMMLV.
-  const ccf = round2(salarialBase * (parameter.familyCompensationPercent / 100));
-  const icbf = exempt ? 0 : round2(salarialBase * (parameter.icbfPercent / 100));
-  const sena = exempt ? 0 : round2(salarialBase * (parameter.senaPercent / 100));
+  // Parafiscales (caja, ICBF, SENA) sobre la nomina de salarios del mes, sin el tope de 25 SMMLV
+  // (en salario integral, sobre el 70%).
+  const ccf = round2(contributionBase * (parameter.familyCompensationPercent / 100));
+  const icbf = exempt ? 0 : round2(contributionBase * (parameter.icbfPercent / 100));
+  const sena = exempt ? 0 : round2(contributionBase * (parameter.senaPercent / 100));
   if (healthEmployer > 0) items.push({ conceptCode: "HEALTH_EMPLOYER", rate: parameter.healthEmployerPercent, amount: healthEmployer });
   items.push({ conceptCode: "PENSION_EMPLOYER", rate: parameter.pensionEmployerPercent, amount: pensionEmployer });
   items.push({ conceptCode: "ARL", rate: arlPercent, amount: arl });
@@ -341,16 +387,18 @@ export function calculateEmployeePayroll(
   // el auxilio se incorpora al salario para liquidar prestaciones sociales). Vacaciones no: son
   // descanso remunerado y se pagan solo con el salario ordinario.
   const benefitsBase = round2(salarialBase + transportAmount);
-  const severance = round2(benefitsBase * (parameter.severancePercent / 100));
+  const severance = isIntegral ? 0 : round2(benefitsBase * (parameter.severancePercent / 100));
   // Intereses de cesantias: 12% anual sobre las cesantias (Ley 52 de 1975). La provision del mes es
   // el 12% de las cesantias causadas en el mes (los dias ya estan en `severance` via la proporcion),
   // asi al cierre del año la provision acumulada = 12% de las cesantias del año.
   const severanceInterest = round2(severance * (parameter.severanceInterestPercent / 100));
-  const serviceBonus = round2(benefitsBase * (parameter.serviceBonusPercent / 100));
+  const serviceBonus = isIntegral ? 0 : round2(benefitsBase * (parameter.serviceBonusPercent / 100));
   const vacation = round2(salarialBase * (parameter.vacationPercent / 100));
-  items.push({ conceptCode: "SEVERANCE", rate: parameter.severancePercent, amount: severance });
-  items.push({ conceptCode: "SEVERANCE_INTEREST", rate: parameter.severanceInterestPercent, amount: severanceInterest });
-  items.push({ conceptCode: "SERVICE_BONUS", rate: parameter.serviceBonusPercent, amount: serviceBonus });
+  if (!isIntegral) {
+    items.push({ conceptCode: "SEVERANCE", rate: parameter.severancePercent, amount: severance });
+    items.push({ conceptCode: "SEVERANCE_INTEREST", rate: parameter.severanceInterestPercent, amount: severanceInterest });
+    items.push({ conceptCode: "SERVICE_BONUS", rate: parameter.serviceBonusPercent, amount: serviceBonus });
+  }
   items.push({ conceptCode: "VACATION", rate: parameter.vacationPercent, amount: vacation });
 
   const employerContributions = healthEmployer + pensionEmployer + arl + ccf + icbf + sena;
@@ -370,6 +418,7 @@ export function calculateEmployeePayroll(
       period: { startDate: periodStart.toISOString(), endDate: periodEnd.toISOString() },
       daysWorked,
       ibc,
+      salaryType: isIntegral ? "INTEGRAL" : "ORDINARY",
       exemptArt1141: exempt,
       devengados: {
         salary: salaryAmount,

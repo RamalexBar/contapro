@@ -1,3 +1,5 @@
+import type { CreatePayrollParameterInput } from "@erp/shared-types";
+import type { PayrollParameterRecord } from "../../payroll/api/payroll.api";
 import { platformApiFetch } from "../lib/platform-api-client";
 import type { PlatformAdminUser } from "../hooks/usePlatformAuthStore";
 
@@ -229,4 +231,13 @@ export function setPlatformAdminActive(id: string, isActive: boolean): Promise<P
 
 export function setPlatformAdminPassword(id: string, password: string): Promise<void> {
   return platformApiFetch(`/admin/platform-admins/${id}/password`, { method: "PUT", body: { password } });
+}
+
+// ---- Parametros legales de nomina (tabla global; solo este panel los publica) ----
+export function listPlatformPayrollParameters(): Promise<{ data: PayrollParameterRecord[] }> {
+  return platformApiFetch("/admin/payroll-parameters");
+}
+
+export function createPlatformPayrollParameter(input: CreatePayrollParameterInput): Promise<unknown> {
+  return platformApiFetch("/admin/payroll-parameters", { method: "POST", body: input });
 }

@@ -34,6 +34,14 @@ model Employee {
   secondLastName    String? // segundo apellido
   workerType        String  @default("01") // tipo de trabajador DIAN
   workerSubtype     String  @default("00") // subtipo trabajador DIAN
+  // Salario integral (art. 132 CST): minimo 13 SMMLV, aportes sobre el 70%, sin cesantias ni prima.
+  salaryType        String  @default("ORDINARY") // ORDINARY, INTEGRAL
+  // Soportes que el trabajador certifica para la retencion en la fuente (art. 387 E.T. y 126-1/126-4),
+  // valores MENSUALES. Los topes legales los aplica payroll-calculator.ts.
+  withholdingDependents       Boolean @default(false)
+  withholdingHousingInterest  Decimal @default(0) @db.Decimal(14, 2)
+  withholdingPrepaidHealth    Decimal @default(0) @db.Decimal(14, 2)
+  withholdingVoluntaryPension Decimal @default(0) @db.Decimal(14, 2) // aportes voluntarios a pension, AFC o AVC
 
   timeEntries       TimeEntry[]
   vacations         Vacation[]

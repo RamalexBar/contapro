@@ -67,6 +67,11 @@ function makeEmployee(overrides: Partial<EmployeeRecord> = {}): EmployeeRecord {
     compensationFund: null,
     bankName: null,
     bankAccountNumber: null,
+    salaryType: "ORDINARY",
+    withholdingDependents: false,
+    withholdingHousingInterest: 0,
+    withholdingPrepaidHealth: 0,
+    withholdingVoluntaryPension: 0,
     ...overrides,
   };
 }
@@ -300,6 +305,75 @@ describe("calculateEmployeePayroll -- cumplimiento legal", () => {
       new Date("2025-11-30"),
       []
     );
-    expect(before.items.some((i) => i.conceptCode === "NIGHT_SURCHARGE")).toBe(false);
+    // Antes del 2025-12-25 el nocturno empezaba a las 9 p. m.: de 7:30 a 9:00 es diurno (1.5 h) y de
+    // 9:00 a 11:30 es nocturno (2.5 h) -- la marcacion se divide, no se clasifica en bloque.
+    expect(before.items.find((i) => i.conceptCode === "NIGHT_SURCHARGE")?.quantity).toBe(2.5);
+  });
+});
+
+describe("calculateEmployeePayroll -- jornada, salario integral y soportes de retencion", () => {
+  const amount = (result: ReturnType<typeof calculateEmployeePayroll>, code: string) =>
+    result.items.find((i) => i.conceptCode === code)?.amount;
+  const qty = (result: ReturnType<typeof calculateEmployeePayroll>, code: string) =>
+    result.items.find((i) => i.conceptCode === code)?.quantity;
+  const entry = (clockIn: string, clockOut: string) => ({
+    id: clockIn, employeeId: "emp-1", branchId: "branch-1", clockIn: new Date(clockIn), clockOut: new Date(clockOut), source: "WEB", notes: null,
+  });
+
+  it("splits a shift that crosses into night hours (2 p.m. - 11 p.m. = 5 day + 3 night, 1 of them overtime)", () => {
+    const result = calculateEmployeePayroll(makeEmployee(), makeParameter(), [entry("2026-07-07T14:00:00-05:00", "2026-07-07T23:00:00-05:00")], PERIOD_START, PERIOD_END, []);
+    // 9 horas: las 8 primeras ordinarias (5 diurnas 2-7 p. m. + 3 nocturnas 7-10 p. m.), la novena extra nocturna.
+    expect(qty(result, "NIGHT_SURCHARGE")).toBe(3);
+    expect(qty(result, "OVERTIME_NIGHT")).toBe(1);
+    expect(result.items.some((i) => i.conceptCode === "OVERTIME_DAY")).toBe(false);
+  });
+
+  it("adds up several clock-ins on the same day before counting overtime", () => {
+    const result = calculateEmployeePayroll(
+      makeEmployee(),
+      makeParameter(),
+      [entry("2026-07-07T07:00:00-05:00", "2026-07-07T12:00:00-05:00"), entry("2026-07-07T13:00:00-05:00", "2026-07-07T18:00:00-05:00")],
+      PERIOD_START,
+      PERIOD_END,
+      []
+    );
+    // 5 + 5 = 10 horas en el dia: 2 extra diurnas.
+    expect(qty(result, "OVERTIME_DAY")).toBe(2);
+  });
+
+  it("charges the Sunday surcharge on Sunday overtime too", () => {
+    const result = calculateEmployeePayroll(makeEmployee(), makeParameter(), [entry("2026-07-05T08:00:00-05:00", "2026-07-05T18:00:00-05:00")], PERIOD_START, PERIOD_END, []);
+    // 10 horas de domingo: 8 ordinarias + 2 extra, todas con 90% dominical.
+    expect(qty(result, "SUNDAY_SURCHARGE")).toBe(10);
+    expect(qty(result, "OVERTIME_DAY")).toBe(2);
+    // 1,400,000 / 210 x 10 h x 90% = 60,000
+    expect(amount(result, "SUNDAY_SURCHARGE")).toBe(60_000);
+  });
+
+  it("salario integral: contributions on 70%, no transport allowance, severance or service bonus", () => {
+    const result = calculateEmployeePayroll(makeEmployee({ baseSalary: 20_000_000, salaryType: "INTEGRAL" }), makeParameter(), [], PERIOD_START, PERIOD_END, []);
+    expect(result.summary.ibc).toBe(14_000_000);
+    expect(amount(result, "HEALTH_EMPLOYEE")).toBe(560_000);
+    expect(amount(result, "TRANSPORT_ALLOWANCE")).toBeUndefined();
+    expect(amount(result, "SEVERANCE")).toBeUndefined();
+    expect(amount(result, "SERVICE_BONUS")).toBeUndefined();
+    // Vacaciones si, sobre el salario completo.
+    expect(amount(result, "VACATION")).toBe(834_000);
+  });
+
+  it("withholding: dependents, housing interest, prepaid health and voluntary pension lower the base, within the caps", () => {
+    const base = salaryWithholdingTax(10_000_000, 900_000, 49_000);
+    const withSupports = salaryWithholdingTax(10_000_000, 900_000, 49_000, {
+      dependents: true,
+      housingInterest: 1_000_000,
+      prepaidHealth: 300_000,
+      voluntaryPension: 500_000,
+    });
+    // Deducciones: dependientes 10% = 1,000,000 (tope 32 UVT = 1,568,000), vivienda 1,000,000,
+    // prepagada tope 16 UVT = 784,000 -> 300,000; voluntarios 500,000; 25% de (9,100,000 - 2,800,000)
+    // = 1,575,000. Total 4,375,000 > 40% de 9,100,000 = 3,640,000 -> se topa en 3,640,000.
+    // Base 5,460,000 = 111.43 UVT -> (111.43 - 95) x 19% = 3.12 UVT = 152,950 -> 153,000.
+    expect(base).toBe(412_000);
+    expect(withSupports).toBe(153_000);
   });
 });

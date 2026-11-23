@@ -6,8 +6,9 @@ import { payrollController } from "../payroll.container";
 export const payrollRouter = Router();
 payrollRouter.use(tenantContextMiddleware);
 
-payrollRouter.post("/payroll-parameters", requirePermission("payroll.parameter.manage"), payrollController.createParameter);
-payrollRouter.get("/payroll-parameters", requirePermission("payroll.parameter.manage"), payrollController.listParameters);
+// Solo lectura para las empresas: los parametros legales son globales y los publica el panel de
+// plataforma (payroll-platform.routes.ts).
+payrollRouter.get("/payroll-parameters", requirePermission("payroll.read"), payrollController.listParameters);
 
 // Configuracion de nomina de la empresa (exoneracion art. 114-1 E.T.): la cambia quien maneja los
 // parametros legales (administrador o contador).

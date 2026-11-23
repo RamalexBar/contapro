@@ -27,6 +27,11 @@ export interface EmployeeRecord {
   compensationFund: string | null;
   bankName: string | null;
   bankAccountNumber: string | null;
+  salaryType: string;
+  withholdingDependents: boolean;
+  withholdingHousingInterest: number;
+  withholdingPrepaidHealth: number;
+  withholdingVoluntaryPension: number;
 }
 
 export interface CreateEmployeeData {
@@ -53,6 +58,11 @@ export interface CreateEmployeeData {
   compensationFund?: string;
   bankName?: string;
   bankAccountNumber?: string;
+  salaryType?: string;
+  withholdingDependents?: boolean;
+  withholdingHousingInterest?: number;
+  withholdingPrepaidHealth?: number;
+  withholdingVoluntaryPension?: number;
 }
 
 export interface UpdateEmployeeData {
@@ -76,6 +86,11 @@ export interface UpdateEmployeeData {
   compensationFund?: string;
   bankName?: string;
   bankAccountNumber?: string;
+  salaryType?: string;
+  withholdingDependents?: boolean;
+  withholdingHousingInterest?: number;
+  withholdingPrepaidHealth?: number;
+  withholdingVoluntaryPension?: number;
 }
 
 export interface IEmployeeRepository {

@@ -24,6 +24,11 @@ export const createEmployeeSchema = z.object({
   compensationFund: z.string().optional(),
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
+  salaryType: z.enum(["ORDINARY", "INTEGRAL"]).optional(),
+  withholdingDependents: z.boolean().optional(),
+  withholdingHousingInterest: z.number().nonnegative().optional(),
+  withholdingPrepaidHealth: z.number().nonnegative().optional(),
+  withholdingVoluntaryPension: z.number().nonnegative().optional(),
 });
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 
@@ -47,6 +52,11 @@ export const updateEmployeeSchema = z.object({
   compensationFund: z.string().optional(),
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
+  salaryType: z.enum(["ORDINARY", "INTEGRAL"]).optional(),
+  withholdingDependents: z.boolean().optional(),
+  withholdingHousingInterest: z.number().nonnegative().optional(),
+  withholdingPrepaidHealth: z.number().nonnegative().optional(),
+  withholdingVoluntaryPension: z.number().nonnegative().optional(),
   // Usuario de Contapro con el que el empleado entra (para pedir vacaciones, permisos e
   // incapacidades a su nombre, y marcar horario). null lo desvincula.
   userId: z.string().uuid().nullable().optional(),

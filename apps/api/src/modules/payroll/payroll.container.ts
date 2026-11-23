@@ -40,12 +40,15 @@ export const sendPayslipWhatsAppUseCase = new SendPayslipWhatsAppUseCase(
   auditService
 );
 
+/** Parametros legales (tabla global): solo el panel de plataforma los crea o corrige. */
+export const createPayrollParameterUseCase = new CreatePayrollParameterUseCase(payrollParameterRepo);
+export const listPayrollParametersUseCase = new ListPayrollParametersUseCase(payrollParameterRepo);
+
 export const payrollController = new PayrollController(
   payrollRepo,
   employeeRepo,
   companyReader,
-  new CreatePayrollParameterUseCase(payrollParameterRepo, auditService),
-  new ListPayrollParametersUseCase(payrollParameterRepo),
+  listPayrollParametersUseCase,
   new CreatePayrollUseCase(payrollRepo, auditService),
   new ListPayrollsUseCase(payrollRepo),
   new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, companyReader, auditService),

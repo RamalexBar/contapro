@@ -25,6 +25,11 @@ export interface EmployeeRecord {
   compensationFund: string | null;
   bankName: string | null;
   bankAccountNumber: string | null;
+  salaryType: "ORDINARY" | "INTEGRAL";
+  withholdingDependents: boolean;
+  withholdingHousingInterest: number;
+  withholdingPrepaidHealth: number;
+  withholdingVoluntaryPension: number;
 }
 
 export function listEmployees(filter?: { status?: string }): Promise<{ data: EmployeeRecord[] }> {

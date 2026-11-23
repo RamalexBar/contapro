@@ -38,10 +38,21 @@ type EmployeeRow = {
   compensationFund: string | null;
   bankName: string | null;
   bankAccountNumber: string | null;
+  salaryType: string;
+  withholdingDependents: boolean;
+  withholdingHousingInterest: Prisma.Decimal;
+  withholdingPrepaidHealth: Prisma.Decimal;
+  withholdingVoluntaryPension: Prisma.Decimal;
 };
 
 function toRecord(row: EmployeeRow): EmployeeRecord {
-  return { ...row, baseSalary: Number(row.baseSalary) };
+  return {
+    ...row,
+    baseSalary: Number(row.baseSalary),
+    withholdingHousingInterest: Number(row.withholdingHousingInterest),
+    withholdingPrepaidHealth: Number(row.withholdingPrepaidHealth),
+    withholdingVoluntaryPension: Number(row.withholdingVoluntaryPension),
+  };
 }
 
 export class PrismaEmployeeRepository implements IEmployeeRepository {
@@ -74,6 +85,11 @@ export class PrismaEmployeeRepository implements IEmployeeRepository {
           compensationFund: data.compensationFund,
           bankName: data.bankName,
           bankAccountNumber: data.bankAccountNumber,
+          salaryType: data.salaryType,
+          withholdingDependents: data.withholdingDependents,
+          withholdingHousingInterest: data.withholdingHousingInterest,
+          withholdingPrepaidHealth: data.withholdingPrepaidHealth,
+          withholdingVoluntaryPension: data.withholdingVoluntaryPension,
         },
       });
       return toRecord(row);

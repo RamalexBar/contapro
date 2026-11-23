@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from "express";
-import type { CreatePayrollParameterUseCase } from "../application/use-cases/create-payroll-parameter.use-case";
 import type { ListPayrollParametersUseCase } from "../application/use-cases/list-payroll-parameters.use-case";
 import type { CreatePayrollUseCase } from "../application/use-cases/create-payroll.use-case";
 import type { ListPayrollsUseCase } from "../application/use-cases/list-payrolls.use-case";
@@ -18,7 +17,7 @@ import type { IEmployeeRepository } from "../../employees/domain/employee.reposi
 import type { ICompanyReader } from "../domain/company-reader.repository";
 import { mapToPayslipPdfData } from "../application/payslip-data-mapper";
 import { renderPayslipPdf } from "../infrastructure/pdfkit-payslip-renderer";
-import { createPayrollDeductionSchema, createPayrollParameterSchema, createPayrollSchema, updatePayrollSettingsSchema } from "./payroll.validators";
+import { createPayrollDeductionSchema, createPayrollSchema, updatePayrollSettingsSchema } from "./payroll.validators";
 import { getTenantContext } from "../../../shared/context/request-context";
 
 export class PayrollController {
@@ -26,7 +25,6 @@ export class PayrollController {
     private readonly payrollRepo: IPayrollRepository,
     private readonly employeeRepo: IEmployeeRepository,
     private readonly companyReader: ICompanyReader,
-    private readonly createParameterUseCase: CreatePayrollParameterUseCase,
     private readonly listParametersUseCase: ListPayrollParametersUseCase,
     private readonly createPayrollUseCase: CreatePayrollUseCase,
     private readonly listPayrollsUseCase: ListPayrollsUseCase,
@@ -53,15 +51,6 @@ export class PayrollController {
     try {
       const body = updatePayrollSettingsSchema.parse(req.body);
       res.json(await this.payrollSettingsUseCase.execute(getTenantContext().companyId, body));
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  createParameter = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = createPayrollParameterSchema.parse(req.body);
-      res.status(201).json(await this.createParameterUseCase.execute(body));
     } catch (err) {
       next(err);
     }

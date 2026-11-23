@@ -27,6 +27,7 @@ import { customerRouter } from "./modules/customers/interfaces/customer.routes";
 import { employeesRouter } from "./modules/employees/interfaces/employees.routes";
 import { timetrackingRouter } from "./modules/timetracking/interfaces/timetracking.routes";
 import { payrollRouter } from "./modules/payroll/interfaces/payroll.routes";
+import { payrollPlatformRouter } from "./modules/payroll/interfaces/payroll-platform.routes";
 import { accountingRouter } from "./modules/accounting/interfaces/accounting.routes";
 import { suppliersRouter } from "./modules/suppliers/interfaces/suppliers.routes";
 import { expensesRouter } from "./modules/expenses/interfaces/expenses.routes";
@@ -87,6 +88,9 @@ app.use("/api", authRouter);
 // shared/middlewares/require-platform-admin.middleware.ts), tiene que montarse antes de que un
 // router tenant-scoped tenga la oportunidad de interceptarlo.
 app.use("/api", saasAdminRouter);
+// Parametros legales de nomina (globales): solo panel de plataforma. Antes de payrollRouter, que
+// aplica tenantContextMiddleware a todo lo que pasa por el.
+app.use("/api", payrollPlatformRouter);
 // Formulario de contacto (publico) y su listado del panel: sin sesion de empresa, antes de los routers con sesion.
 app.use("/api", contactRouter);
 // Mismo motivo que saasAdminRouter arriba: el webhook de Wompi para cobranza (item 31) no lleva

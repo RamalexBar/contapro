@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EmployeeUsersCard } from "../components/EmployeeUsersCard";
 import { formatCOP } from "@erp/shared-utils";
@@ -43,6 +43,17 @@ const EMPTY_FORM = {
   arlRiskLevel: "I",
   pensionFund: "",
   compensationFund: "",
+  salaryType: "ORDINARY",
+};
+
+const EMPTY_EDIT = {
+  position: "",
+  baseSalary: "",
+  salaryType: "ORDINARY",
+  withholdingDependents: false,
+  withholdingHousingInterest: "",
+  withholdingPrepaidHealth: "",
+  withholdingVoluntaryPension: "",
 };
 
 function formatDate(value: string | null): string {
@@ -77,6 +88,7 @@ export function EmployeeListPage() {
         arlRiskLevel: form.arlRiskLevel as "I" | "II" | "III" | "IV" | "V",
         pensionFund: form.pensionFund || undefined,
         compensationFund: form.compensationFund || undefined,
+        salaryType: form.salaryType as "ORDINARY" | "INTEGRAL",
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
@@ -85,10 +97,18 @@ export function EmployeeListPage() {
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState({ position: "", baseSalary: "" });
+  const [editValues, setEditValues] = useState(EMPTY_EDIT);
   const updateMutation = useMutation({
     mutationFn: (id: string) =>
-      updateEmployee(id, { position: editValues.position, baseSalary: Number(editValues.baseSalary) }),
+      updateEmployee(id, {
+        position: editValues.position,
+        baseSalary: Number(editValues.baseSalary),
+        salaryType: editValues.salaryType as "ORDINARY" | "INTEGRAL",
+        withholdingDependents: editValues.withholdingDependents,
+        withholdingHousingInterest: Number(editValues.withholdingHousingInterest || 0),
+        withholdingPrepaidHealth: Number(editValues.withholdingPrepaidHealth || 0),
+        withholdingVoluntaryPension: Number(editValues.withholdingVoluntaryPension || 0),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       setEditingId(null);
@@ -107,7 +127,15 @@ export function EmployeeListPage() {
 
   function startEdit(employee: EmployeeRecord) {
     setEditingId(employee.id);
-    setEditValues({ position: employee.position, baseSalary: String(employee.baseSalary) });
+    setEditValues({
+      position: employee.position,
+      baseSalary: String(employee.baseSalary),
+      salaryType: employee.salaryType,
+      withholdingDependents: employee.withholdingDependents,
+      withholdingHousingInterest: employee.withholdingHousingInterest ? String(employee.withholdingHousingInterest) : "",
+      withholdingPrepaidHealth: employee.withholdingPrepaidHealth ? String(employee.withholdingPrepaidHealth) : "",
+      withholdingVoluntaryPension: employee.withholdingVoluntaryPension ? String(employee.withholdingVoluntaryPension) : "",
+    });
   }
 
   return (
@@ -161,6 +189,10 @@ export function EmployeeListPage() {
               onChange={(e) => setForm({ ...form, baseSalary: e.target.value })}
               required
             />
+            <Select value={form.salaryType} onChange={(e) => setForm({ ...form, salaryType: e.target.value })}>
+              <option value="ORDINARY">Salario ordinario</option>
+              <option value="INTEGRAL">Salario integral (min. 13 SMMLV)</option>
+            </Select>
             <Input
               placeholder="Fecha de ingreso"
               type="date"
@@ -219,7 +251,8 @@ export function EmployeeListPage() {
             </TableHead>
             <TableBody>
               {data?.data.map((employee) => (
-                <TableRow key={employee.id}>
+                <Fragment key={employee.id}>
+                <TableRow>
                   <Td>{employee.documentNumber}</Td>
                   <Td>
                     {employee.firstName} {employee.lastName}
@@ -299,6 +332,58 @@ export function EmployeeListPage() {
                     )}
                   </Td>
                 </TableRow>
+                {canUpdate && editingId === employee.id && (
+                  <TableRow>
+                    <Td colSpan={8} className="bg-slate-50">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+                        <Select
+                          value={editValues.salaryType}
+                          onChange={(e) => setEditValues({ ...editValues, salaryType: e.target.value })}
+                        >
+                          <option value="ORDINARY">Salario ordinario</option>
+                          <option value="INTEGRAL">Salario integral (min. 13 SMMLV)</option>
+                        </Select>
+                        <label className="flex items-center gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={editValues.withholdingDependents}
+                            onChange={(e) => setEditValues({ ...editValues, withholdingDependents: e.target.checked })}
+                          />
+                          Tiene dependientes (retención)
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="Intereses de vivienda / mes"
+                          value={editValues.withholdingHousingInterest}
+                          onChange={(e) => setEditValues({ ...editValues, withholdingHousingInterest: e.target.value })}
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Medicina prepagada / mes"
+                          value={editValues.withholdingPrepaidHealth}
+                          onChange={(e) => setEditValues({ ...editValues, withholdingPrepaidHealth: e.target.value })}
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Pensión voluntaria o AFC / mes"
+                          value={editValues.withholdingVoluntaryPension}
+                          onChange={(e) => setEditValues({ ...editValues, withholdingVoluntaryPension: e.target.value })}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Soportes que el trabajador certifica para bajar su retención en la fuente (valores mensuales). Contapro aplica
+                        los topes de ley: dependientes 10% hasta 32 UVT, vivienda hasta 100 UVT, prepagada hasta 16 UVT, voluntarios
+                        hasta 30% del ingreso, y en total máximo 40% / 1.340 UVT al año.
+                      </p>
+                      {updateMutation.isError && (
+                        <Alert tone="danger" className="mt-2">
+                          {(updateMutation.error as Error).message}
+                        </Alert>
+                      )}
+                    </Td>
+                  </TableRow>
+                )}
+                </Fragment>
               ))}
             </TableBody>
           </Table>

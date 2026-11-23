@@ -42,6 +42,7 @@ import { SubscriptionsPage } from "../features/platform-admin/pages/Subscription
 import { CompaniesPage } from "../features/platform-admin/pages/CompaniesPage";
 import { ContactMessagesPage } from "../features/platform-admin/pages/ContactMessagesPage";
 import { PlatformAdminsPage } from "../features/platform-admin/pages/PlatformAdminsPage";
+import { PayrollParametersPage } from "../features/platform-admin/pages/PayrollParametersPage";
 import { PlatformProtectedRoute } from "../features/platform-admin/routes/PlatformProtectedRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
 
@@ -331,6 +332,14 @@ export const router = createBrowserRouter([
     element: (
       <PlatformProtectedRoute>
         <ContactMessagesPage />
+      </PlatformProtectedRoute>
+    ),
+  },
+  {
+    path: "/admin/payroll-parameters",
+    element: (
+      <PlatformProtectedRoute>
+        <PayrollParametersPage />
       </PlatformProtectedRoute>
     ),
   },

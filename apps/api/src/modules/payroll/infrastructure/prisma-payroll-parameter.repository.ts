@@ -83,6 +83,13 @@ export class PrismaPayrollParameterRepository implements IPayrollParameterReposi
     return rows.map(toRecord);
   }
 
+  async updateByYear(year: number, data: CreatePayrollParameterData): Promise<PayrollParameterRecord> {
+    const existing = await prisma.payrollParameter.findFirst({ where: { year } });
+    if (!existing) throw new NotFoundError("PayrollParameter", String(year));
+    const row = await prisma.payrollParameter.update({ where: { id: existing.id }, data });
+    return toRecord(row);
+  }
+
   async findByYearOrThrow(year: number): Promise<PayrollParameterRecord> {
     const row = await prisma.payrollParameter.findFirst({ where: { year, isActive: true } });
     if (!row) throw new NotFoundError("PayrollParameter", String(year));

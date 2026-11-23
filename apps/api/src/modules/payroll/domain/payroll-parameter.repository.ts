@@ -38,4 +38,5 @@ export interface IPayrollParameterRepository {
   create(data: CreatePayrollParameterData): Promise<PayrollParameterRecord>;
   list(): Promise<PayrollParameterRecord[]>;
   findByYearOrThrow(year: number): Promise<PayrollParameterRecord>;
+  updateByYear(year: number, data: CreatePayrollParameterData): Promise<PayrollParameterRecord>;
 }
