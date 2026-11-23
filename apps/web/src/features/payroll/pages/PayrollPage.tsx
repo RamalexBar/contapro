@@ -11,6 +11,7 @@ import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { PayrollParametersCard } from "../components/PayrollParametersCard";
+import { BenefitSettlementsCard } from "../components/BenefitSettlementsCard";
 import { listEmployees } from "../../employees/api/employee.api";
 import {
   approvePayroll,
@@ -183,6 +184,8 @@ export function PayrollPage() {
       )}
 
       <PayrollParametersCard queryKey={["payroll-parameters"]} list={listPayrollParameters} />
+
+      {canCalculate && <BenefitSettlementsCard canSettle={canApprove} />}
 
       {canCreate && (
         <Card className="mb-6">

@@ -152,3 +152,30 @@ model PayslipDocument {
 
   @@map("payslip_documents")
 }
+
+// Pago de prestaciones sociales (las nominas mensuales solo las provisionan): prima semestral,
+// consolidacion anual de cesantias e intereses, y liquidacion del contrato al retiro. Una fila por
+// empleado y liquidacion; el unique evita pagar dos veces el mismo periodo. Ver
+// apps/api/src/modules/payroll/application/benefit-settlement-calculator.ts.
+model BenefitSettlement {
+  id              String   @id @default(uuid())
+  companyId       String
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  type            String   // SERVICE_BONUS, SEVERANCE, TERMINATION
+  periodStart     DateTime
+  periodEnd       DateTime
+  grossTotal      Decimal  @db.Decimal(14, 2)
+  withholding     Decimal  @db.Decimal(14, 2)
+  netPay          Decimal  @db.Decimal(14, 2)
+  toSeveranceFund Decimal  @default(0) @db.Decimal(14, 2)
+  detail          Json     // EmployeeSettlement completo (lineas, dias, bases, provisionado, notas)
+  terminationReason String?
+  journalEntryId  String?
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@unique([employeeId, type, periodStart])
+  @@index([companyId, type])
+  @@map("benefit_settlements")
+}

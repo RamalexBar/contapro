@@ -66,6 +66,7 @@ const TENANT_MODELS = new Set([
   "Employee",
   "Payroll",
   "PayrollDeduction",
+  "BenefitSettlement",
   "SyncDevice",
   "SyncOutbox",
   "InvoiceNumberingResolution",

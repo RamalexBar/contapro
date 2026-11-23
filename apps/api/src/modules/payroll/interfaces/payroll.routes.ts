@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { tenantContextMiddleware } from "../../../shared/middlewares/tenant-context.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
-import { payrollController } from "../payroll.container";
+import { benefitSettlementController, payrollController } from "../payroll.container";
 
 export const payrollRouter = Router();
 payrollRouter.use(tenantContextMiddleware);
@@ -42,3 +42,10 @@ payrollRouter.post(
   requirePermission("payroll.deduction.manage"),
   payrollController.cancelDeduction
 );
+
+// Prestaciones sociales: prima semestral, consolidacion de cesantias y liquidacion del contrato.
+// Calcular la vista previa usa el permiso de calcular nomina; confirmar (guarda y contabiliza), el de aprobar.
+payrollRouter.post("/benefit-settlements/preview", requirePermission("payroll.calculate"), benefitSettlementController.preview);
+payrollRouter.post("/benefit-settlements", requirePermission("payroll.approve"), benefitSettlementController.settle);
+payrollRouter.get("/benefit-settlements", requirePermission("payroll.read"), benefitSettlementController.list);
+payrollRouter.get("/benefit-settlements/:id/pdf", requirePermission("payroll.read"), benefitSettlementController.pdf);

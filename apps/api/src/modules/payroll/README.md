@@ -39,13 +39,36 @@ como `FondoSP` y la retencion en `RetencionFuente` (antes iba siempre en 0).
   diurna y nocturna; las marcaciones del mismo dia se suman antes de contar extras; la hora extra en
   domingo/festivo lleva tambien el recargo dominical.
 
+## Pago de prestaciones sociales (Nomina -> Prestaciones sociales)
+
+La nomina mensual solo PROVISIONA cesantias, intereses, prima y vacaciones. Su pago se hace aqui
+(`benefit-settlement-calculator.ts`, `SettleBenefitsUseCase`, tabla `BenefitSettlement`):
+
+| Operacion | Que calcula | Contabilidad |
+|---|---|---|
+| Prima de servicios (semestre 1 o 2) | (salario + auxilio + promedio de extras/recargos) x dias del semestre / 360 (art. 306 CST) | Dr 2610 (provision) / Cr 2505 |
+| Consolidacion anual de cesantias | Cesantias (art. 249) al fondo + intereses 12% (Ley 52/1975) al trabajador | Dr 2610 / Cr 2510 (fondo) y 2505 |
+| Liquidacion de contrato (al dar de baja) | Cesantias e intereses del año, prima del semestre (si no se pago), vacaciones pendientes (15 dias habiles por año menos las tomadas, art. 189) e indemnizacion art. 64 si es despido sin justa causa (indefinido: 30 dias + 20 por año adicional, o 20 + 15 si gana 10 SMMLV o mas; fijo: salarios hasta el fin pactado) | Dr 2610 / Cr 2505; indemnizacion Dr 510560 |
+
+- Siempre hay vista previa; al confirmar se guarda una fila por empleado (unique por empleado,
+  tipo y periodo: no se paga dos veces) y un solo comprobante para el lote.
+- Se usa TODO lo provisionado del concepto en el periodo (nominas aprobadas que empiezan en el
+  periodo): si se paga mas, la diferencia es gasto (510530/510533/510536/510539); si se provisiono
+  de mas, se recupera con credito a 5108.
+- Retencion: prima, vacaciones y la parte gravada de cesantias/intereses (art. 206 num. 4 segun el
+  salario en UVT) por procedimiento 1 sobre el pago solo; indemnizacion 20% si gana mas de 10 SMMLV
+  (art. 401-3). Va a 236505.
+- PDF para firmar (`GET /benefit-settlements/:id/pdf`).
+- Simplificaciones: la base es el salario ACTUAL (si cambio en los ultimos 3 meses, el art. 253 pide
+  el promedio del año: revisar); no descuenta licencias no remuneradas; las vacaciones se compensan
+  con el salario ordinario sin promedio de recargos; no calcula la indemnizacion moratoria (art. 65)
+  ni la sancion por no consignar cesantias a tiempo.
+
 **Lo que NO calcula todavia** (para revisar con el contador):
 - Deduccion adicional de 72 UVT por dependiente (Ley 2277 de 2022) y procedimiento 2 de retencion.
 - Aprendices SENA (contrato de aprendizaje, cambiado por la Ley 2466 de 2025): no se liquidan aparte.
 - Contratos de medio tiempo con IBC inferior al minimo (el IBC se sube siempre a 1 SMMLV).
 - Jornadas pactadas distintas de 8 h diarias: lo que pase de 8 h en un dia se trata como extra.
-- Liquidacion de contrato (pago de cesantias, prima y vacaciones al retiro) y pago de la prima en
-  junio/diciembre y de cesantias al fondo en febrero: hoy solo se provisionan cada mes.
 - Topes legales de embargabilidad (ver "Deducciones recurrentes").
 
 ## Modelos (`packages/database/prisma/schema/payroll.prisma`)

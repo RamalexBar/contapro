@@ -1,6 +1,6 @@
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
-import { postPayrollJournalEntryUseCase } from "../accounting/accounting.container";
+import { postBenefitSettlementJournalEntryUseCase, postPayrollJournalEntryUseCase } from "../accounting/accounting.container";
 import { generateElectronicPayrollUseCase } from "../electronic-invoicing/electronic-invoicing.container";
 import { employeeRepo } from "../employees/employees.container";
 import { timeTrackingRepo } from "../timetracking/timetracking.container";
@@ -22,6 +22,9 @@ import { UpdatePayrollSettingsUseCase } from "./application/use-cases/update-pay
 import { SendPayslipWhatsAppUseCase } from "./application/use-cases/send-payslip-whatsapp.use-case";
 import { whatsAppSender, whatsAppDeliveryLogRepo } from "../whatsapp/whatsapp.container";
 import { PayrollController } from "./interfaces/payroll.controller";
+import { BenefitSettlementController } from "./interfaces/benefit-settlement.controller";
+import { PrismaBenefitSettlementRepository } from "./infrastructure/prisma-benefit-settlement.repository";
+import { SettleBenefitsUseCase } from "./application/use-cases/settle-benefits.use-case";
 
 const payrollParameterRepo = new PrismaPayrollParameterRepository();
 const payrollRepo = new PrismaPayrollRepository();
@@ -67,4 +70,13 @@ export const payrollController = new PayrollController(
   whatsAppDeliveryLogRepo,
   sendPayslipWhatsAppUseCase,
   new UpdatePayrollSettingsUseCase(companyReader, auditService)
+);
+
+/** Prima de servicios, consolidacion de cesantias y liquidacion del contrato. */
+const benefitSettlementRepo = new PrismaBenefitSettlementRepository();
+export const benefitSettlementController = new BenefitSettlementController(
+  new SettleBenefitsUseCase(benefitSettlementRepo, employeeRepo, payrollParameterRepo, postBenefitSettlementJournalEntryUseCase, auditService),
+  benefitSettlementRepo,
+  employeeRepo,
+  companyReader
 );

@@ -50,6 +50,7 @@ model Employee {
   sickLeaves        SickLeave[]
   payrollDetails    PayrollDetail[]
   payrollDeductions PayrollDeduction[]
+  benefitSettlements BenefitSettlement[]
 
   @@unique([companyId, documentNumber])
   @@index([companyId, branchId])

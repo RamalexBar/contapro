@@ -175,3 +175,84 @@ export function createPayrollDeduction(input: CreatePayrollDeductionInput): Prom
 export function cancelPayrollDeduction(id: string): Promise<PayrollDeductionRecord> {
   return apiFetch(`/payroll-deductions/${id}/cancel`, { method: "POST" });
 }
+
+// ---- Prestaciones sociales: prima, cesantias y liquidacion del contrato ----
+export type BenefitSettlementType = "SERVICE_BONUS" | "SEVERANCE" | "TERMINATION";
+export type TerminationReason = "RESIGNATION" | "JUST_CAUSE" | "WITHOUT_JUST_CAUSE" | "END_OF_TERM" | "MUTUAL_AGREEMENT";
+
+export type SettleBenefitsInput =
+  | { type: "SERVICE_BONUS"; year: number; semester: 1 | 2 }
+  | { type: "SEVERANCE"; year: number }
+  | { type: "TERMINATION"; employeeId: string; reason: TerminationReason; fixedTermEndDate?: string };
+
+export interface BenefitLine {
+  concept: string;
+  label: string;
+  days: number;
+  base: number;
+  amount: number;
+  provisioned: number;
+}
+
+export interface EmployeeSettlement {
+  employeeId: string;
+  employeeName: string;
+  documentNumber: string;
+  lines: BenefitLine[];
+  grossTotal: number;
+  withholding: number;
+  netPay: number;
+  toSeveranceFund: number;
+  notes: string[];
+}
+
+export interface SettleBenefitsPreview {
+  type: BenefitSettlementType;
+  periodStart: string;
+  periodEnd: string;
+  description: string;
+  settlements: EmployeeSettlement[];
+  skipped: Array<{ employeeName: string; reason: string }>;
+}
+
+export interface BenefitSettlementRecord {
+  id: string;
+  employeeId: string;
+  type: BenefitSettlementType;
+  periodStart: string;
+  periodEnd: string;
+  grossTotal: number;
+  withholding: number;
+  netPay: number;
+  toSeveranceFund: number;
+  detail: EmployeeSettlement;
+  createdAt: string;
+}
+
+export function previewBenefitSettlement(input: SettleBenefitsInput): Promise<SettleBenefitsPreview> {
+  return apiFetch("/benefit-settlements/preview", { method: "POST", body: input });
+}
+
+export function settleBenefits(input: SettleBenefitsInput): Promise<{ data: BenefitSettlementRecord[] }> {
+  return apiFetch("/benefit-settlements", { method: "POST", body: input });
+}
+
+export function listBenefitSettlements(): Promise<{ data: BenefitSettlementRecord[] }> {
+  return apiFetch("/benefit-settlements");
+}
+
+export async function downloadBenefitSettlementPdf(id: string, fileName: string): Promise<void> {
+  const { accessToken } = useAuthStore.getState();
+  const res = await fetch(`${BASE_URL}/benefit-settlements/${id}/pdf`, {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  if (!res.ok) throw new Error("No se pudo descargar el documento");
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
