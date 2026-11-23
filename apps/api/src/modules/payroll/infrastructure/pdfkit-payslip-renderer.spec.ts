@@ -15,6 +15,8 @@ describe("renderPayslipPdf", () => {
       },
       periodStart: new Date("2026-07-01T00:00:00.000Z"),
       periodEnd: new Date("2026-07-31T00:00:00.000Z"),
+      paymentDate: new Date("2026-07-31T00:00:00.000Z"),
+      periodLabel: "Julio de 2026",
       daysWorked: 30,
       earnings: [
         { label: "Salario", amount: 1400000 },
@@ -42,6 +44,8 @@ describe("renderPayslipPdf", () => {
       employee: { fullName: "", documentType: "CC", documentNumber: "", position: "", contractType: "" },
       periodStart: null,
       periodEnd: null,
+      paymentDate: null,
+      periodLabel: "",
       daysWorked: 0,
       earnings: [],
       grossTotal: 0,

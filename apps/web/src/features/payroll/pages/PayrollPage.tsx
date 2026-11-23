@@ -5,6 +5,7 @@ import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "../../../components/ui/Table";
 import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
@@ -59,13 +60,33 @@ const EMPTY_DEDUCTION_FORM = {
 };
 
 
-const EMPTY_PAYROLL_FORM = {
-  year: new Date().getFullYear(),
-  month: new Date().getMonth() + 1,
-  periodType: "MONTHLY" as "MONTHLY" | "BIWEEKLY",
-  startDate: "",
-  endDate: "",
-};
+type PeriodPreset = "Q1" | "Q2" | "MONTH";
+
+/** Fechas del periodo: en Colombia se paga normalmente el 15 y el ultimo dia del mes (28, 29, 30 o 31). */
+function periodDates(year: number, month: number, preset: PeriodPreset) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const ym = `${year}-${pad(month)}`;
+  if (preset === "Q1") return { periodType: "BIWEEKLY" as const, startDate: `${ym}-01`, endDate: `${ym}-15` };
+  if (preset === "Q2") return { periodType: "BIWEEKLY" as const, startDate: `${ym}-16`, endDate: `${ym}-${pad(lastDay)}` };
+  return { periodType: "MONTHLY" as const, startDate: `${ym}-01`, endDate: `${ym}-${pad(lastDay)}` };
+}
+
+interface PayrollPeriodForm {
+  year: number;
+  month: number;
+  preset: PeriodPreset;
+  periodType: "MONTHLY" | "BIWEEKLY";
+  startDate: string;
+  endDate: string;
+}
+
+function emptyPayrollForm(): PayrollPeriodForm {
+  const year = new Date().getFullYear();
+  const month = new Date().getMonth() + 1;
+  const preset: PeriodPreset = new Date().getDate() <= 15 ? "Q1" : "Q2";
+  return { year, month, preset, ...periodDates(year, month, preset) };
+}
 
 export function PayrollPage() {
   const queryClient = useQueryClient();
@@ -87,7 +108,11 @@ export function PayrollPage() {
   const employeeNames = new Map((employees?.data ?? []).map((e) => [e.id, `${e.firstName} ${e.lastName}`]));
 
 
-  const [payrollForm, setPayrollForm] = useState(EMPTY_PAYROLL_FORM);
+  const [payrollForm, setPayrollForm] = useState<PayrollPeriodForm>(emptyPayrollForm);
+  const updatePeriod = (changes: Partial<{ year: number; month: number; preset: PeriodPreset }>) => {
+    const next = { ...payrollForm, ...changes };
+    setPayrollForm({ ...next, ...periodDates(next.year, next.month, next.preset) });
+  };
   const createPayrollMutation = useMutation({
     mutationFn: () =>
       createPayroll({
@@ -99,7 +124,7 @@ export function PayrollPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
-      setPayrollForm(EMPTY_PAYROLL_FORM);
+      setPayrollForm(emptyPayrollForm());
     },
   });
 
@@ -191,7 +216,7 @@ export function PayrollPage() {
         <Card className="mb-6">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">Nuevo periodo de nomina</h2>
           <form
-            className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-6"
             onSubmit={(e) => {
               e.preventDefault();
               createPayrollMutation.mutate();
@@ -201,7 +226,7 @@ export function PayrollPage() {
               label="Año"
               type="number"
               value={payrollForm.year}
-              onChange={(e) => setPayrollForm({ ...payrollForm, year: Number(e.target.value) })}
+              onChange={(e) => updatePeriod({ year: Number(e.target.value) })}
               required
             />
             <Input
@@ -210,9 +235,14 @@ export function PayrollPage() {
               min={1}
               max={12}
               value={payrollForm.month}
-              onChange={(e) => setPayrollForm({ ...payrollForm, month: Number(e.target.value) })}
+              onChange={(e) => updatePeriod({ month: Number(e.target.value) })}
               required
             />
+            <Select label="Periodo" value={payrollForm.preset} onChange={(e) => updatePeriod({ preset: e.target.value as PeriodPreset })}>
+              <option value="Q1">1ª quincena (del 1 al 15)</option>
+              <option value="Q2">2ª quincena (del 16 al último día)</option>
+              <option value="MONTH">Mes completo</option>
+            </Select>
             <Input
               label="Inicio"
               type="date"
@@ -457,7 +487,7 @@ export function PayrollPage() {
                                       onClick={() =>
                                         downloadPayslipMutation.mutate({
                                           payslipId: detail.payslip!.id,
-                                          fileName: `desprendible-${(employeeNames.get(detail.employeeId) ?? detail.employeeId).replace(/\s+/g, "-")}-${payroll.month}-${payroll.year}.pdf`,
+                                          fileName: `Desprendible-${(employeeNames.get(detail.employeeId) ?? detail.employeeId).replace(/\s+/g, "-")}-${payroll.startDate.slice(0, 10)}-a-${payroll.endDate.slice(0, 10)}.pdf`,
                                         })
                                       }
                                     >

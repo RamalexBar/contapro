@@ -1,7 +1,7 @@
 import { round2 } from "@erp/shared-utils";
 import type { EmployeeRecord } from "../../employees/domain/employee.repository";
 import type { PayrollParameterRecord } from "../domain/payroll-parameter.repository";
-import { salaryWithholdingTax } from "./payroll-calculator";
+import { days360, salaryWithholdingTax } from "./payroll-calculator";
 
 /**
  * Prestaciones sociales que se PAGAN (la nomina mensual solo las provisiona, ver payroll-calculator.ts):
@@ -54,26 +54,8 @@ export interface EmployeePeriodData {
 
 const DAY_MS = 86_400_000;
 
-function utcParts(date: Date) {
-  return { y: date.getUTCFullYear(), m: date.getUTCMonth() + 1, d: date.getUTCDate() };
-}
-
-function isLastDayOfFebruary(date: Date): boolean {
-  return date.getUTCMonth() === 1 && new Date(date.getTime() + DAY_MS).getUTCMonth() === 2;
-}
-
-/**
- * Dias entre dos fechas (ambas incluidas) en año comercial de 360 dias / meses de 30, como se liquidan
- * las prestaciones en Colombia. El 31 cuenta como 30 y el ultimo dia de febrero como 30.
- */
-export function days360(start: Date, end: Date): number {
-  if (end.getTime() < start.getTime()) return 0;
-  const a = utcParts(start);
-  const b = utcParts(end);
-  const d1 = Math.min(a.d, 30);
-  const d2 = isLastDayOfFebruary(end) ? 30 : Math.min(b.d, 30);
-  return (b.y - a.y) * 360 + (b.m - a.m) * 30 + (d2 - d1) + 1;
-}
+// days360 vive en payroll-calculator.ts (lo usa tambien la nomina); se reexporta aqui por comodidad.
+export { days360 };
 
 function maxDate(a: Date, b: Date): Date {
   return a.getTime() >= b.getTime() ? a : b;

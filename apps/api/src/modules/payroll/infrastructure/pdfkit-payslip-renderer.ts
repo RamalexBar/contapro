@@ -11,8 +11,18 @@ import type { PayslipPdfData, PayslipPdfLine } from "../application/payslip-data
 
 const PAGE_MARGIN = 50;
 
+const CONTRACTS: Record<string, string> = {
+  INDEFINITE: "Termino indefinido",
+  FIXED_TERM: "Termino fijo",
+  SERVICE: "Prestacion de servicios",
+  LEARNING: "Aprendizaje",
+};
+
+/** dd/mm/aaaa, como se leen las fechas en Colombia. */
 function formatDate(date: Date | null): string {
-  return date ? date.toISOString().slice(0, 10) : "-";
+  if (!date) return "-";
+  const iso = date.toISOString().slice(0, 10);
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 }
 
 function renderLinesTable(doc: PDFKit.PDFDocument, title: string, lines: PayslipPdfLine[], total: number, pageWidth: number): void {
@@ -54,8 +64,11 @@ export async function renderPayslipPdf(data: PayslipPdfData): Promise<Buffer> {
   doc.fontSize(14).font("Helvetica-Bold").text(data.company.name || "(razon social no disponible)");
   doc.fontSize(9).font("Helvetica").text(`NIT: ${data.company.nit || "-"}`);
   doc.moveDown(0.5);
-  doc.fontSize(13).font("Helvetica-Bold").text("Desprendible de Pago", { align: "center" });
-  doc.fontSize(9).font("Helvetica").text(`Periodo: ${formatDate(data.periodStart)} a ${formatDate(data.periodEnd)}`, { align: "center" });
+  doc.fontSize(13).font("Helvetica-Bold").text(`Desprendible de pago · ${data.employee.fullName}`, { align: "center" });
+  if (data.periodLabel) doc.fontSize(10).font("Helvetica").text(data.periodLabel, { align: "center" });
+  doc.fontSize(9).font("Helvetica").text(`Periodo: del ${formatDate(data.periodStart)} al ${formatDate(data.periodEnd)}`, { align: "center" });
+  doc.font("Helvetica-Bold").text(`Fecha de pago: ${formatDate(data.paymentDate)}`, { align: "center" });
+  doc.font("Helvetica");
   doc.moveDown(1);
 
   doc.font("Helvetica-Bold").fontSize(10).text("Trabajador");
@@ -63,7 +76,7 @@ export async function renderPayslipPdf(data: PayslipPdfData): Promise<Buffer> {
   doc.text(data.employee.fullName);
   doc.text(`${data.employee.documentType}: ${data.employee.documentNumber}`);
   doc.text(`Cargo: ${data.employee.position}`);
-  doc.text(`Tipo de contrato: ${data.employee.contractType}`);
+  doc.text(`Tipo de contrato: ${CONTRACTS[data.employee.contractType] ?? data.employee.contractType}`);
   doc.text(`Dias trabajados en el periodo: ${data.daysWorked}`);
   doc.moveDown(1);
 

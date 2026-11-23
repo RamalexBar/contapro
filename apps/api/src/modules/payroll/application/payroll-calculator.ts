@@ -8,14 +8,32 @@ import type { EmployeeCalculationResult, PayrollItemCalc } from "../domain/payro
 const ORDINARY_DAILY_HOURS = 8;
 const DAYS_IN_PAYROLL_MONTH = 30; // convencion legal colombiana del "mes de 30 dias"
 
-function toDateOnly(date: Date): number {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+const DAY_MS = 86_400_000;
+
+function isLastDayOfFebruary(date: Date): boolean {
+  return date.getUTCMonth() === 1 && new Date(date.getTime() + DAY_MS).getUTCMonth() === 2;
 }
 
 /**
- * Dias trabajados en el periodo bajo la convencion legal colombiana de mes de 30 dias:
- * cada mes calendario cuenta 30 dias sin importar si tiene 28/29/31, y se prorratea por
- * fecha de ingreso/retiro si caen dentro del periodo. Tope de 30 dias.
+ * Dias entre dos fechas (ambas incluidas) en año comercial de 360 dias / meses de 30, como se
+ * liquidan nomina y prestaciones en Colombia: el 31 cuenta como 30 y el ultimo dia de febrero como 30.
+ * Asi un mes siempre vale 30 dias (tambien febrero) y cada quincena 15 (1-15 y 16-fin de mes, sea
+ * 28, 29, 30 o 31).
+ */
+export function days360(start: Date, end: Date): number {
+  if (end.getTime() < start.getTime()) return 0;
+  const d1 = Math.min(start.getUTCDate(), 30);
+  const d2 = isLastDayOfFebruary(end) ? 30 : Math.min(end.getUTCDate(), 30);
+  return (end.getUTCFullYear() - start.getUTCFullYear()) * 360 + (end.getUTCMonth() - start.getUTCMonth()) * 30 + (d2 - d1) + 1;
+}
+
+function toDateOnly(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+/**
+ * Dias trabajados en el periodo con la convencion del mes comercial de 30 dias (ver days360),
+ * proporcional a la fecha de ingreso/retiro si caen dentro del periodo. Tope de 30 dias.
  */
 export function daysWorkedInPeriod(
   periodStart: Date,
@@ -23,13 +41,10 @@ export function daysWorkedInPeriod(
   hireDate: Date,
   terminationDate: Date | null
 ): number {
-  const effectiveStartMs = Math.max(toDateOnly(periodStart), toDateOnly(hireDate));
-  const effectiveEndMs = terminationDate
-    ? Math.min(toDateOnly(periodEnd), toDateOnly(terminationDate))
-    : toDateOnly(periodEnd);
-  if (effectiveEndMs < effectiveStartMs) return 0;
-  const diffDays = Math.round((effectiveEndMs - effectiveStartMs) / 86_400_000) + 1;
-  return Math.min(DAYS_IN_PAYROLL_MONTH, diffDays);
+  const start = toDateOnly(periodStart.getTime() >= hireDate.getTime() ? periodStart : hireDate);
+  const endCandidate = terminationDate && terminationDate.getTime() < periodEnd.getTime() ? terminationDate : periodEnd;
+  const end = toDateOnly(endCandidate);
+  return Math.min(DAYS_IN_PAYROLL_MONTH, days360(start, end));
 }
 
 interface HourBuckets {
@@ -327,12 +342,20 @@ export function calculateEmployeePayroll(
     items.push({ conceptCode: "SOLIDARITY_FUND", rate: solidarityPercent, amount: solidarityFund });
   }
 
-  const withholdingTax = salaryWithholdingTax(grossTotal, healthEmployee + pensionEmployee + solidarityFund, parameter.uvt, {
+  // La tabla del art. 383 es MENSUAL: en una quincena se calcula sobre el equivalente mensual del pago
+  // y se toma la parte del periodo (la mitad), para no quedar en un rango mas bajo que el real.
+  const periodFactor = Math.min(1, days360(toDateOnly(periodStart), toDateOnly(periodEnd)) / DAYS_IN_PAYROLL_MONTH);
+  const supports = {
     dependents: employee.withholdingDependents,
     housingInterest: employee.withholdingHousingInterest,
     prepaidHealth: employee.withholdingPrepaidHealth,
     voluntaryPension: employee.withholdingVoluntaryPension,
-  });
+  };
+  const contributions = healthEmployee + pensionEmployee + solidarityFund;
+  const withholdingTax =
+    periodFactor < 1 && periodFactor > 0
+      ? Math.round((salaryWithholdingTax(grossTotal / periodFactor, contributions / periodFactor, parameter.uvt, supports) * periodFactor) / 1000) * 1000
+      : salaryWithholdingTax(grossTotal, contributions, parameter.uvt, supports);
   if (withholdingTax > 0) {
     items.push({ conceptCode: "WITHHOLDING_TAX", amount: withholdingTax });
   }

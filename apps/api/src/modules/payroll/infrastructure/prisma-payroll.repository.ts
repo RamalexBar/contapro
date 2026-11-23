@@ -29,7 +29,7 @@ export class PrismaPayrollRepository implements IPayrollRepository {
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-        throw new ConflictError(`Ya existe un periodo de nomina ${data.periodType} para ${data.month}/${data.year}`);
+        throw new ConflictError(`Ya existe un periodo de nomina que empieza el ${data.startDate.toISOString().slice(0, 10)} (${data.month}/${data.year})`);
       }
       throw err;
     }

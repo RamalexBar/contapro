@@ -7,6 +7,16 @@ Estado: **funcional** (motor de liquidacion real). Ver `docs/ALCANCE.md` para el
 > transporte $249.095 (Decretos 1469 y 1470 de 2025, ratificados por el Decreto 0159 de 2026), UVT
 > $52.374 (Resolucion DIAN 000238 de 2025). Cada año nuevo hay que crear su fila de parametros.
 
+## Nomina quincenal
+
+En Colombia se paga normalmente el 15 y el ultimo dia del mes. Al crear el periodo se elige "1a quincena"
+(1-15), "2a quincena" (16 al ultimo dia: 28, 29, 30 o 31) o "Mes completo", y las fechas se llenan solas.
+Los dias se cuentan en año comercial (`days360`): cada quincena vale 15 dias y cada mes 30 (tambien
+febrero). Pueden existir dos periodos BIWEEKLY en el mismo mes (`startDate` en la llave unica). La
+retencion de una quincena se calcula sobre el equivalente mensual y se toma la mitad. El desprendible
+lleva el nombre del empleado, el periodo ("Segunda quincena de septiembre de 2026"), las fechas desde y
+hasta y la fecha de pago.
+
 ## Reglas legales que aplica el motor (ajuste 2026-11-23)
 
 | Regla | Norma | Donde |

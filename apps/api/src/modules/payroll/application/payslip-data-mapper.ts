@@ -48,6 +48,10 @@ export interface PayslipPdfData {
   };
   periodStart: Date | null;
   periodEnd: Date | null;
+  /** Dia en que se paga: el ultimo dia del periodo (15 o fin de mes en nomina quincenal). */
+  paymentDate: Date | null;
+  /** "Primera quincena de noviembre de 2026", "Segunda quincena de ...", o "Noviembre de 2026". */
+  periodLabel: string;
   daysWorked: number;
   earnings: PayslipPdfLine[];
   grossTotal: number;
@@ -80,6 +84,18 @@ function toLines(source: Record<string, number | undefined> | undefined, labels:
     .map(([key, label]) => ({ label, amount: source[key] ?? 0 }));
 }
 
+const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+/** Nombre del periodo para el desprendible: quincena 1 (1-15), quincena 2 (16-fin de mes) o mes completo. */
+export function payslipPeriodLabel(start: Date | null, end: Date | null): string {
+  if (!start || !end) return "";
+  const month = `${MONTHS[end.getUTCMonth()]} de ${end.getUTCFullYear()}`;
+  const spanDays = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  if (spanDays <= 16 && start.getUTCDate() === 1) return `Primera quincena de ${month}`;
+  if (spanDays <= 16 && start.getUTCDate() === 16) return `Segunda quincena de ${month}`;
+  return month.charAt(0).toUpperCase() + month.slice(1);
+}
+
 export function mapToPayslipPdfData(
   payslip: PayslipDocumentRecord,
   employee: EmployeeRecord,
@@ -98,6 +114,11 @@ export function mapToPayslipPdfData(
     },
     periodStart: summary.period?.startDate ? new Date(summary.period.startDate) : null,
     periodEnd: summary.period?.endDate ? new Date(summary.period.endDate) : null,
+    paymentDate: summary.period?.endDate ? new Date(summary.period.endDate) : null,
+    periodLabel: payslipPeriodLabel(
+      summary.period?.startDate ? new Date(summary.period.startDate) : null,
+      summary.period?.endDate ? new Date(summary.period.endDate) : null
+    ),
     daysWorked: summary.daysWorked ?? 0,
     earnings: toLines(summary.devengados, EARNING_LABELS),
     grossTotal: summary.devengados?.total ?? 0,

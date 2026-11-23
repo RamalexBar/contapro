@@ -68,7 +68,8 @@ model Payroll {
 
   details PayrollDetail[]
 
-  @@unique([companyId, branchId, year, month, periodType])
+  // startDate en la llave: en nomina quincenal hay dos periodos BIWEEKLY en el mismo mes (1-15 y 16-fin).
+  @@unique([companyId, branchId, year, month, periodType, startDate])
   @@map("payrolls")
 }
 

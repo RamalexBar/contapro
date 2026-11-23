@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { EmployeeRecord } from "../../employees/domain/employee.repository";
 import type { PayrollDeductionRecord } from "../domain/payroll-deduction.repository";
 import type { PayrollParameterRecord } from "../domain/payroll-parameter.repository";
-import { calculateEmployeePayroll, legalMonthlyHoursDivisor, legalSundaySurchargePercent, salaryWithholdingTax, solidarityFundPercent } from "./payroll-calculator";
+import { payslipPeriodLabel } from "./payslip-data-mapper";
+import { calculateEmployeePayroll, daysWorkedInPeriod, legalMonthlyHoursDivisor, legalSundaySurchargePercent, salaryWithholdingTax, solidarityFundPercent } from "./payroll-calculator";
 
 // Valores de PayrollParameter tal como los siembra packages/database/prisma/seed.ts (2026, de
 // EJEMPLO, no cifras oficiales -- ver ese archivo).
@@ -375,5 +376,46 @@ describe("calculateEmployeePayroll -- jornada, salario integral y soportes de re
     // Base 5,460,000 = 111.43 UVT -> (111.43 - 95) x 19% = 3.12 UVT = 152,950 -> 153,000.
     expect(base).toBe(412_000);
     expect(withSupports).toBe(153_000);
+  });
+});
+
+describe("calculateEmployeePayroll -- quincenas y mes comercial", () => {
+  const d = (iso: string) => new Date(iso + "T00:00:00.000Z");
+  const hire = d("2024-01-10");
+
+  it("each fortnight is 15 days and every month 30, whatever its length", () => {
+    expect(daysWorkedInPeriod(d("2026-11-01"), d("2026-11-15"), hire, null)).toBe(15);
+    expect(daysWorkedInPeriod(d("2026-11-16"), d("2026-11-30"), hire, null)).toBe(15);
+    expect(daysWorkedInPeriod(d("2026-10-16"), d("2026-10-31"), hire, null)).toBe(15);
+    expect(daysWorkedInPeriod(d("2026-02-16"), d("2026-02-28"), hire, null)).toBe(15);
+    expect(daysWorkedInPeriod(d("2026-02-01"), d("2026-02-28"), hire, null)).toBe(30);
+    expect(daysWorkedInPeriod(d("2026-12-01"), d("2026-12-31"), hire, null)).toBe(30);
+    // Retiro el 20: del 16 al 20 son 5 dias.
+    expect(daysWorkedInPeriod(d("2026-11-16"), d("2026-11-30"), hire, d("2026-11-20"))).toBe(5);
+  });
+
+  it("a fortnight pays half the salary and half the transport allowance", () => {
+    const first = calculateEmployeePayroll(makeEmployee(), makeParameter(), [], d("2026-10-01"), d("2026-10-15"), []);
+    const second = calculateEmployeePayroll(makeEmployee(), makeParameter(), [], d("2026-10-16"), d("2026-10-31"), []);
+    expect(first.items.find((i) => i.conceptCode === "SALARY")?.amount).toBe(700_000);
+    expect(second.items.find((i) => i.conceptCode === "SALARY")?.amount).toBe(700_000);
+    expect(second.items.find((i) => i.conceptCode === "TRANSPORT_ALLOWANCE")?.amount).toBe(100_000);
+  });
+
+  it("fortnight withholding is half of the monthly one, not computed on the half payment alone", () => {
+    const monthly = calculateEmployeePayroll(makeEmployee({ baseSalary: 10_000_000 }), makeParameter(), [], d("2026-10-01"), d("2026-10-31"), []);
+    const fortnight = calculateEmployeePayroll(makeEmployee({ baseSalary: 10_000_000 }), makeParameter(), [], d("2026-10-01"), d("2026-10-15"), []);
+    const tax = (r: ReturnType<typeof calculateEmployeePayroll>) => r.items.find((i) => i.conceptCode === "WITHHOLDING_TAX")?.amount ?? 0;
+    expect(tax(monthly)).toBe(412_000);
+    expect(tax(fortnight)).toBe(206_000);
+  });
+});
+
+describe("payslipPeriodLabel", () => {
+  const d = (iso: string) => new Date(iso + "T00:00:00.000Z");
+  it("names the fortnight or the month", () => {
+    expect(payslipPeriodLabel(d("2026-11-01"), d("2026-11-15"))).toBe("Primera quincena de noviembre de 2026");
+    expect(payslipPeriodLabel(d("2026-02-16"), d("2026-02-28"))).toBe("Segunda quincena de febrero de 2026");
+    expect(payslipPeriodLabel(d("2026-12-01"), d("2026-12-31"))).toBe("Diciembre de 2026");
   });
 });
