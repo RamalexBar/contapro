@@ -1,5 +1,13 @@
 import PDFDocument from "pdfkit";
-import { formatCOP } from "@erp/shared-utils";
+import { formatCOP as formatWholeCOP } from "@erp/shared-utils";
+
+/** Con centavos cuando los hay (una quincena de salario minimo da $875.452,50): asi las lineas suman
+ * exactamente el neto en el papel; los valores enteros se ven como siempre. */
+function formatCOP(amount: number): string {
+  const cents = Math.round(amount * 100);
+  if (cents % 100 === 0) return formatWholeCOP(amount);
+  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+}
 import type { PayslipPdfData, PayslipPdfLine } from "../application/payslip-data-mapper";
 
 /**
