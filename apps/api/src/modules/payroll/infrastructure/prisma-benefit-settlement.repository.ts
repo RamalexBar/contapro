@@ -69,6 +69,8 @@ export class PrismaBenefitSettlementRepository implements IBenefitSettlementRepo
       const amount = Number(item.amount);
       if (VARIABLE_CODES.has(item.conceptCode)) variableEarnings += amount;
       if (PROVISION_CODES.has(item.conceptCode)) provisions[item.conceptCode] = round2((provisions[item.conceptCode] ?? 0) + amount);
+      // Las vacaciones disfrutadas y pagadas en nomina ya consumieron esa parte de la provision.
+      if (item.conceptCode === "VACATION_PAY") provisions.VACATION = round2((provisions.VACATION ?? 0) - amount);
     }
     return { variableEarnings: round2(variableEarnings), provisions };
   }

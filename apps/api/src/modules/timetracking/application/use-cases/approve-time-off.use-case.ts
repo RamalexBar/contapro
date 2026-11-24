@@ -1,3 +1,4 @@
+import { vacationBusinessDaysBetween } from "../../../payroll/application/payroll-novelties";
 import { getTenantContext } from "../../../../shared/context/request-context";
 import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
@@ -68,7 +69,11 @@ export class ApproveTimeOffUseCase {
       note: input.note?.trim() || undefined,
       startDate: input.startDate,
       endDate: input.endDate,
-      daysTaken: kind === "vacation" ? input.daysTaken : undefined,
+      // Si se aprueban otras fechas sin indicar los dias, se recalculan los dias habiles.
+      daysTaken:
+        kind === "vacation"
+          ? input.daysTaken ?? (input.startDate || input.endDate ? vacationBusinessDaysBetween(startDate, endDate) : undefined)
+          : undefined,
     };
     const updated =
       kind === "vacation"

@@ -4,6 +4,7 @@ import { ForbiddenError, ValidationError } from "../../../../shared/errors/app-e
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IEmployeeRepository } from "../../../employees/domain/employee.repository";
 import type { ITimeOffRepository, VacationRecord } from "../../domain/time-off.repository";
+import { vacationBusinessDaysBetween } from "../../../payroll/application/payroll-novelties";
 
 /**
  * Un usuario sin "timeoff.manage" solo puede solicitar vacaciones para si mismo (vinculo
@@ -26,7 +27,10 @@ export class RequestVacationUseCase {
       throw new ValidationError("La fecha de fin debe ser posterior a la fecha de inicio");
     }
 
-    const vacation = await this.repo.createVacation(input);
+    // Las vacaciones se cuentan en dias habiles (art. 186 CST). Si no se indican, se calculan.
+    const daysTaken = input.daysTaken ?? vacationBusinessDaysBetween(input.startDate, input.endDate);
+    if (daysTaken <= 0) throw new ValidationError("Entre esas fechas no hay ningun dia habil");
+    const vacation = await this.repo.createVacation({ ...input, daysTaken });
 
     await this.audit.record({
       action: "VACATION_REQUESTED",

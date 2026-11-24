@@ -187,7 +187,8 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
         employeeId: resolveEmployeeId(employeeId),
         startDate: new Date(startDate),
         endDate: new Date(endDate),
-        daysTaken: Number(daysTaken),
+        // Vacio: el servidor calcula los dias habiles (lunes a sabado sin festivos).
+        daysTaken: daysTaken ? Number(daysTaken) : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vacations"] });
@@ -231,12 +232,12 @@ function VacationSection({ canRequest, canManage, canRead, employees, employeeNa
           <Input label="Inicio" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
           <Input label="Fin" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
           <Input
-            label="Dias"
+            label="Días hábiles (opcional)"
             type="number"
             min={1}
+            placeholder="Se calculan solos"
             value={daysTaken}
             onChange={(e) => setDaysTaken(e.target.value)}
-            required
           />
           <Button type="submit" loading={requestMutation.isPending}>
             Solicitar

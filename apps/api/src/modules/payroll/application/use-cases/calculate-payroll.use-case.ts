@@ -5,6 +5,7 @@ import type { ITimeTrackingRepository } from "../../../timetracking/domain/timet
 import type { ICompanyReader } from "../../domain/company-reader.repository";
 import type { IPayrollDeductionRepository } from "../../domain/payroll-deduction.repository";
 import type { IPayrollParameterRepository } from "../../domain/payroll-parameter.repository";
+import type { IPayrollNoveltyReader } from "../../domain/payroll-novelty.reader";
 import type { EmployeeCalculationResult, IPayrollRepository, PayrollRecord } from "../../domain/payroll.repository";
 import { calculateEmployeePayroll } from "../payroll-calculator";
 
@@ -18,7 +19,8 @@ export class CalculatePayrollUseCase {
     private readonly parameterRepo: IPayrollParameterRepository,
     private readonly deductionRepo: IPayrollDeductionRepository,
     private readonly companyReader: ICompanyReader,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly noveltyReader: IPayrollNoveltyReader
   ) {}
 
   async execute(payrollId: string): Promise<PayrollRecord> {
@@ -47,8 +49,9 @@ export class CalculatePayrollUseCase {
     for (const employee of employees) {
       const timeEntries = await this.timeTrackingRepo.listClosedForPeriod(employee.id, payroll.startDate, payroll.endDate);
       const activeDeductions = await this.deductionRepo.listActiveForEmployee(employee.id);
+      const novelties = await this.noveltyReader.listForPeriod(employee.id, payroll.startDate, payroll.endDate);
       results.push(
-        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions, companyOptions)
+        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions, companyOptions, novelties)
       );
     }
 

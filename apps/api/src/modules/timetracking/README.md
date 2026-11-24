@@ -64,6 +64,8 @@ Ver `apps/api/src/modules/payroll/application/payroll-calculator.ts` para el det
 
 ## Que sigue sin implementar
 
+- ~~Las novedades no llegaban a la nomina~~: desde el 2026-11-24 las incapacidades, licencias,
+  vacaciones y ausencias injustificadas APROBADAS cambian la liquidacion (ver `payroll/README.md`,
+  seccion Novedades). `Vacation.daysTaken` se calcula solo (dias habiles) si no se indica.
+
 - Reportes por empleado/sucursal/periodo.
-- `Vacation.daysTaken` lo indica quien solicita (no se calcula automaticamente contra un
-  calendario de dias habiles/festivos).

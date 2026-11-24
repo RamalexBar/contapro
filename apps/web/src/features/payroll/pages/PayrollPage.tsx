@@ -30,6 +30,7 @@ import {
   listPayslipWhatsAppDeliveries,
   payPayroll,
   resendPayslipWhatsApp,
+  type PayrollItem,
 } from "../api/payroll.api";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -86,6 +87,26 @@ function emptyPayrollForm(): PayrollPeriodForm {
   const month = new Date().getMonth() + 1;
   const preset: PeriodPreset = new Date().getDate() <= 15 ? "Q1" : "Q2";
   return { year, month, preset, ...periodDates(year, month, preset) };
+}
+
+/** Novedades del periodo de un empleado (vacaciones, incapacidades, licencias, dias sin pago), en dias. */
+const NOVELTY_LABELS: Record<string, string> = {
+  VACATION_PAY: "Vacaciones",
+  SICK_LEAVE_EMPLOYER: "Incapacidad",
+  SICK_LEAVE_EPS: "Incapacidad",
+  WORK_INJURY_ARL: "Incap. laboral",
+  MATERNITY_LEAVE: "Lic. maternidad",
+  PATERNITY_LEAVE: "Lic. paternidad",
+  UNPAID_LEAVE: "Sin pago",
+};
+
+function noveltySummary(items: PayrollItem[]): string {
+  const days = new Map<string, number>();
+  for (const item of items) {
+    const label = NOVELTY_LABELS[item.conceptCode];
+    if (label) days.set(label, (days.get(label) ?? 0) + Number(item.quantity ?? 0));
+  }
+  return days.size === 0 ? "—" : [...days].map(([label, d]) => `${label} ${d} d`).join(" · ");
 }
 
 export function PayrollPage() {
@@ -463,6 +484,7 @@ export function PayrollPage() {
                           <thead>
                             <tr className="text-slate-500">
                               <th className="py-1">Empleado</th>
+                              <th>Novedades</th>
                               <th>Devengado</th>
                               <th>Deducciones</th>
                               <th>Neto a pagar</th>
@@ -474,6 +496,7 @@ export function PayrollPage() {
                             {expandedPayroll.details.map((detail) => (
                               <tr key={detail.id} className="border-t border-slate-200">
                                 <td className="py-1">{employeeNames.get(detail.employeeId) ?? detail.employeeId}</td>
+                                <td className="text-slate-600">{noveltySummary(detail.items)}</td>
                                 <td>{formatCOP(detail.grossTotal)}</td>
                                 <td>{formatCOP(detail.totalDeductions)}</td>
                                 <td className="font-semibold text-slate-900">{formatCOP(detail.netPay)}</td>

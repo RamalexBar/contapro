@@ -7,6 +7,7 @@ interface PayrollSummaryJson {
   employeeName?: string;
   period?: { startDate?: string; endDate?: string };
   daysWorked?: number;
+  workedDays?: number;
   devengados?: {
     salary?: number;
     transportAllowance?: number;
@@ -14,7 +15,21 @@ interface PayrollSummaryJson {
     overtimeNight?: number;
     nightSurcharge?: number;
     sundaySurcharge?: number;
+    vacationPay?: number;
+    sickLeaveEmployer?: number;
+    sickLeaveEps?: number;
+    workInjuryArl?: number;
+    maternityLeave?: number;
+    paternityLeave?: number;
     total?: number;
+  };
+  novedades?: {
+    vacationBusinessDays?: number;
+    sickLeaveDays?: number;
+    workInjuryDays?: number;
+    maternityDays?: number;
+    paternityDays?: number;
+    unpaidDays?: number;
   };
   deducciones?: {
     health?: number;
@@ -53,6 +68,10 @@ export interface PayslipPdfData {
   /** "Primera quincena de noviembre de 2026", "Segunda quincena de ...", o "Noviembre de 2026". */
   periodLabel: string;
   daysWorked: number;
+  /** Dias efectivamente trabajados (sin vacaciones, incapacidades ni licencias). */
+  workedDays: number;
+  /** "Vacaciones 5 d, Incapacidad 3 d" (vacio si no hubo novedades). */
+  noveltiesLabel: string;
   earnings: PayslipPdfLine[];
   grossTotal: number;
   deductions: PayslipPdfLine[];
@@ -68,6 +87,12 @@ const EARNING_LABELS: Record<string, string> = {
   overtimeNight: "Horas extra nocturnas",
   nightSurcharge: "Recargo nocturno",
   sundaySurcharge: "Recargo dominical/festivo",
+  vacationPay: "Vacaciones disfrutadas",
+  sickLeaveEmployer: "Incapacidad (dias 1 y 2, empleador)",
+  sickLeaveEps: "Incapacidad (EPS)",
+  workInjuryArl: "Incapacidad laboral (ARL)",
+  maternityLeave: "Licencia de maternidad",
+  paternityLeave: "Licencia de paternidad",
 };
 
 const DEDUCTION_LABELS: Record<string, string> = {
@@ -82,6 +107,20 @@ function toLines(source: Record<string, number | undefined> | undefined, labels:
   return Object.entries(labels)
     .filter(([key]) => (source[key] ?? 0) !== 0)
     .map(([key, label]) => ({ label, amount: source[key] ?? 0 }));
+}
+
+/** Resumen de novedades del periodo, en dias. */
+export function noveltiesLabel(novedades: PayrollSummaryJson["novedades"]): string {
+  if (!novedades) return "";
+  const parts: Array<[string, number | undefined]> = [
+    ["Vacaciones", novedades.vacationBusinessDays],
+    ["Incapacidad", novedades.sickLeaveDays],
+    ["Incapacidad laboral", novedades.workInjuryDays],
+    ["Licencia de maternidad", novedades.maternityDays],
+    ["Licencia de paternidad", novedades.paternityDays],
+    ["Dias no remunerados", novedades.unpaidDays],
+  ];
+  return parts.filter(([, d]) => (d ?? 0) > 0).map(([label, d]) => `${label} ${d} d`).join(", ");
 }
 
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -120,6 +159,8 @@ export function mapToPayslipPdfData(
       summary.period?.endDate ? new Date(summary.period.endDate) : null
     ),
     daysWorked: summary.daysWorked ?? 0,
+    workedDays: summary.workedDays ?? summary.daysWorked ?? 0,
+    noveltiesLabel: noveltiesLabel(summary.novedades),
     earnings: toLines(summary.devengados, EARNING_LABELS),
     grossTotal: summary.devengados?.total ?? 0,
     deductions: [

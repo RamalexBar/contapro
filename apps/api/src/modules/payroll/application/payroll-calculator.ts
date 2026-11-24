@@ -4,6 +4,7 @@ import type { TimeEntryRecord } from "../../timetracking/domain/timetracking.rep
 import type { PayrollDeductionRecord } from "../domain/payroll-deduction.repository";
 import type { PayrollParameterRecord } from "../domain/payroll-parameter.repository";
 import type { EmployeeCalculationResult, PayrollItemCalc } from "../domain/payroll.repository";
+import { computeNovelties, type PayrollNovelty } from "./payroll-novelties";
 
 const ORDINARY_DAILY_HOURS = 8;
 const DAYS_IN_PAYROLL_MONTH = 30; // convencion legal colombiana del "mes de 30 dias"
@@ -258,7 +259,8 @@ export function calculateEmployeePayroll(
   periodStart: Date,
   periodEnd: Date,
   activeDeductions: PayrollDeductionRecord[] = [],
-  companyOptions: PayrollCompanyOptions = DEFAULT_COMPANY_OPTIONS
+  companyOptions: PayrollCompanyOptions = DEFAULT_COMPANY_OPTIONS,
+  novelties: PayrollNovelty[] = []
 ): EmployeeCalculationResult {
   const daysWorked = daysWorkedInPeriod(periodStart, periodEnd, employee.hireDate, employee.terminationDate);
   const proration = daysWorked / DAYS_IN_PAYROLL_MONTH;
@@ -268,8 +270,40 @@ export function calculateEmployeePayroll(
 
   const items: PayrollItemCalc[] = [];
 
-  const salaryAmount = round2(employee.baseSalary * proration);
-  items.push({ conceptCode: "SALARY", quantity: daysWorked, rate: dailyRate, amount: salaryAmount });
+  // Novedades (incapacidades, licencias, vacaciones, dias no remunerados), solo dentro del tiempo
+  // en que el trabajador estuvo vinculado en el periodo. Ver payroll-novelties.ts.
+  const employedFrom = employee.hireDate.getTime() > periodStart.getTime() ? employee.hireDate : periodStart;
+  const employedTo = employee.terminationDate && employee.terminationDate.getTime() < periodEnd.getTime() ? employee.terminationDate : periodEnd;
+  const nov = computeNovelties({ novelties, from: employedFrom, to: employedTo, baseSalary: employee.baseSalary, minimumWage: parameter.minimumWage });
+  const noveltyDays = Math.min(daysWorked, nov.totalNoveltyDays);
+  // Dias efectivamente trabajados: llevan auxilio de transporte y cotizan ARL.
+  const workedDays = round2(daysWorked - noveltyDays);
+  // Salario ordinario: dias trabajados + domingos/festivos dentro de las vacaciones.
+  const salaryDays = round2(Math.min(daysWorked, workedDays + nov.vacationRestDays));
+  // Dias remunerados (todo menos licencias no remuneradas/ausencias): base del IBC minimo y de prestaciones.
+  const paidDays = round2(Math.max(0, daysWorked - nov.unpaidDays));
+
+  const salaryAmount = round2(dailyRate * salaryDays);
+  items.push({ conceptCode: "SALARY", quantity: salaryDays, rate: dailyRate, amount: salaryAmount });
+
+  const noveltyItems: Array<{ code: string; days: number; amount: number }> = [
+    { code: "VACATION_PAY", days: nov.vacationBusinessDays, amount: nov.vacationAmount },
+    { code: "SICK_LEAVE_EMPLOYER", days: nov.sickGeneralEmployerDays, amount: nov.sickGeneralEmployerAmount },
+    { code: "SICK_LEAVE_EPS", days: nov.sickGeneralEpsDays, amount: nov.sickGeneralEpsAmount },
+    { code: "WORK_INJURY_ARL", days: nov.sickLaborArlDays, amount: nov.sickLaborArlAmount },
+    { code: "MATERNITY_LEAVE", days: nov.maternityDays, amount: nov.maternityAmount },
+    { code: "PATERNITY_LEAVE", days: nov.paternityDays, amount: nov.paternityAmount },
+  ];
+  for (const n of noveltyItems) {
+    if (n.amount > 0) items.push({ conceptCode: n.code, quantity: n.days, rate: round2(n.amount / n.days), amount: n.amount });
+  }
+  if (nov.unpaidDays > 0) items.push({ conceptCode: "UNPAID_LEAVE", quantity: nov.unpaidDays, rate: 0, amount: 0 });
+  const vacationPay = nov.vacationAmount;
+  // Incapacidades y licencias: no son salario (no van a parafiscales) y son rentas exentas (art. 206
+  // num. 1 y 2 E.T.), pero si cotizan salud y pension.
+  const leavePay = round2(
+    nov.sickGeneralEmployerAmount + nov.sickGeneralEpsAmount + nov.sickLaborArlAmount + nov.maternityAmount + nov.paternityAmount
+  );
 
   // Salario integral (art. 132 CST): incluye el factor prestacional (30%), asi que no lleva auxilio
   // de transporte, ni cesantias, intereses ni prima; los aportes se liquidan sobre el 70%.
@@ -277,11 +311,12 @@ export function calculateEmployeePayroll(
 
   let transportAmount = 0;
   if (!isIntegral && employee.baseSalary <= 2 * parameter.minimumWage) {
-    transportAmount = round2(parameter.transportAllowance * proration);
+    // Solo por los dias trabajados: en vacaciones, incapacidades y licencias no hay desplazamiento.
+    transportAmount = round2((parameter.transportAllowance / DAYS_IN_PAYROLL_MONTH) * workedDays);
     if (transportAmount > 0) {
       items.push({
         conceptCode: "TRANSPORT_ALLOWANCE",
-        quantity: daysWorked,
+        quantity: workedDays,
         rate: round2(parameter.transportAllowance / DAYS_IN_PAYROLL_MONTH),
         amount: transportAmount,
       });
@@ -319,17 +354,25 @@ export function calculateEmployeePayroll(
     });
   }
 
-  // Base salarial (constitutiva de salario): NO incluye auxilio de transporte.
-  const salarialBase = round2(salaryAmount + overtimeDayAmount + overtimeNightAmount + nightSurchargeAmount + sundaySurchargeAmount);
-  const grossTotal = round2(salarialBase + transportAmount);
+  const variablePay = round2(overtimeDayAmount + overtimeNightAmount + nightSurchargeAmount + sundaySurchargeAmount);
+  // Base salarial (constitutiva de salario): NO incluye auxilio de transporte. Las vacaciones si.
+  const salarialBase = round2(salaryAmount + variablePay + vacationPay);
+  const grossTotal = round2(salarialBase + leavePay + transportAmount);
 
-  // IBC para salud, pension, ARL y FSP: minimo 1 SMMLV y maximo 25 SMMLV, proporcional a los dias
-  // (art. 18 Ley 100 de 1993, art. 5 Ley 797 de 2003).
-  const minimumWageForDays = parameter.minimumWage * proration;
+  // IBC para salud, pension y FSP: lo devengado (incluidas incapacidades y licencias), minimo 1 SMMLV
+  // y maximo 25 SMMLV, proporcional a los dias remunerados (art. 18 Ley 100 de 1993, art. 5 Ley 797
+  // de 2003). Los dias de licencia no remunerada no cotizan salud.
+  const minimumWageForDays = parameter.minimumWage * (paidDays / DAYS_IN_PAYROLL_MONTH);
+  const ibcSource = round2(salarialBase + leavePay);
   const contributionBase = isIntegral ? round2(salarialBase * 0.7) : salarialBase;
-  const ibc = daysWorked > 0 ? round2(Math.min(Math.max(contributionBase, minimumWageForDays), 25 * minimumWageForDays)) : 0;
+  const ibcBase = isIntegral ? round2(ibcSource * 0.7) : ibcSource;
+  const ibc = paidDays > 0 ? round2(Math.min(Math.max(ibcBase, minimumWageForDays), 25 * minimumWageForDays)) : 0;
   const ibcInMinimumWages = minimumWageForDays > 0 ? ibc / minimumWageForDays : 0;
-  const earningsInMinimumWages = minimumWageForDays > 0 ? salarialBase / minimumWageForDays : 0;
+  const earningsInMinimumWages = parameter.minimumWage * proration > 0 ? salarialBase / (parameter.minimumWage * proration) : 0;
+  // ARL: solo por los dias trabajados (en vacaciones, incapacidad o licencia no hay riesgo que cubrir).
+  const minimumWageForWorkedDays = parameter.minimumWage * (workedDays / DAYS_IN_PAYROLL_MONTH);
+  const arlSource = round2(dailyRate * workedDays + variablePay);
+  const arlBase = workedDays > 0 ? round2(Math.min(Math.max(isIntegral ? arlSource * 0.7 : arlSource, minimumWageForWorkedDays), 25 * minimumWageForWorkedDays)) : 0;
 
   const healthEmployee = round2(ibc * (parameter.healthEmployeePercent / 100));
   const pensionEmployee = round2(ibc * (parameter.pensionEmployeePercent / 100));
@@ -352,10 +395,12 @@ export function calculateEmployeePayroll(
     voluntaryPension: employee.withholdingVoluntaryPension,
   };
   const contributions = healthEmployee + pensionEmployee + solidarityFund;
+  // Incapacidades y licencias de maternidad/paternidad son rentas exentas (art. 206 num. 1 y 2 E.T.).
+  const taxableLaborIncome = round2(grossTotal - leavePay);
   const withholdingTax =
     periodFactor < 1 && periodFactor > 0
-      ? Math.round((salaryWithholdingTax(grossTotal / periodFactor, contributions / periodFactor, parameter.uvt, supports) * periodFactor) / 1000) * 1000
-      : salaryWithholdingTax(grossTotal, contributions, parameter.uvt, supports);
+      ? Math.round((salaryWithholdingTax(taxableLaborIncome / periodFactor, contributions / periodFactor, parameter.uvt, supports) * periodFactor) / 1000) * 1000
+      : salaryWithholdingTax(taxableLaborIncome, contributions, parameter.uvt, supports);
   if (withholdingTax > 0) {
     items.push({ conceptCode: "WITHHOLDING_TAX", amount: withholdingTax });
   }
@@ -392,8 +437,12 @@ export function calculateEmployeePayroll(
 
   const arlPercent = employee.arlRiskLevel ? parameter.arlPercentByRiskLevel[employee.arlRiskLevel] ?? 0 : 0;
   const healthEmployer = exempt ? 0 : round2(ibc * (parameter.healthEmployerPercent / 100));
-  const pensionEmployer = round2(ibc * (parameter.pensionEmployerPercent / 100));
-  const arl = round2(ibc * (arlPercent / 100));
+  // Licencia no remunerada: el empleador sigue cotizando su parte de pension (12 %) sobre el salario de
+  // esos dias; salud, ARL y parafiscales no (Decreto 1406 de 1999, novedad SLN de la PILA). Verificar con
+  // el contador: hay quien tambien liquida la parte del trabajador.
+  const unpaidPensionBase = round2(dailyRate * nov.unpaidDays);
+  const pensionEmployer = round2((ibc + unpaidPensionBase) * (parameter.pensionEmployerPercent / 100));
+  const arl = round2(arlBase * (arlPercent / 100));
   // Parafiscales (caja, ICBF, SENA) sobre la nomina de salarios del mes, sin el tope de 25 SMMLV
   // (en salario integral, sobre el 70%).
   const ccf = round2(contributionBase * (parameter.familyCompensationPercent / 100));
@@ -409,14 +458,17 @@ export function calculateEmployeePayroll(
   // Cesantias y prima se liquidan sobre el salario MAS el auxilio de transporte (art. 7 Ley 1 de 1963:
   // el auxilio se incorpora al salario para liquidar prestaciones sociales). Vacaciones no: son
   // descanso remunerado y se pagan solo con el salario ordinario.
-  const benefitsBase = round2(salarialBase + transportAmount);
+  // Los dias de incapacidad, licencia remunerada y vacaciones cuentan para prestaciones con el salario
+  // completo; los de licencia no remunerada no (suspenden el contrato, art. 53 CST).
+  const benefitsSalary = round2(dailyRate * paidDays + variablePay);
+  const benefitsBase = round2(benefitsSalary + transportAmount);
   const severance = isIntegral ? 0 : round2(benefitsBase * (parameter.severancePercent / 100));
   // Intereses de cesantias: 12% anual sobre las cesantias (Ley 52 de 1975). La provision del mes es
   // el 12% de las cesantias causadas en el mes (los dias ya estan en `severance` via la proporcion),
   // asi al cierre del año la provision acumulada = 12% de las cesantias del año.
   const severanceInterest = round2(severance * (parameter.severanceInterestPercent / 100));
   const serviceBonus = isIntegral ? 0 : round2(benefitsBase * (parameter.serviceBonusPercent / 100));
-  const vacation = round2(salarialBase * (parameter.vacationPercent / 100));
+  const vacation = round2(benefitsSalary * (parameter.vacationPercent / 100));
   if (!isIntegral) {
     items.push({ conceptCode: "SEVERANCE", rate: parameter.severancePercent, amount: severance });
     items.push({ conceptCode: "SEVERANCE_INTEREST", rate: parameter.severanceInterestPercent, amount: severanceInterest });
@@ -440,6 +492,7 @@ export function calculateEmployeePayroll(
       employeeName: `${employee.firstName} ${employee.lastName}`,
       period: { startDate: periodStart.toISOString(), endDate: periodEnd.toISOString() },
       daysWorked,
+      workedDays,
       ibc,
       salaryType: isIntegral ? "INTEGRAL" : "ORDINARY",
       exemptArt1141: exempt,
@@ -450,8 +503,25 @@ export function calculateEmployeePayroll(
         overtimeNight: overtimeNightAmount,
         nightSurcharge: nightSurchargeAmount,
         sundaySurcharge: sundaySurchargeAmount,
+        vacationPay,
+        sickLeaveEmployer: nov.sickGeneralEmployerAmount,
+        sickLeaveEps: nov.sickGeneralEpsAmount,
+        workInjuryArl: nov.sickLaborArlAmount,
+        maternityLeave: nov.maternityAmount,
+        paternityLeave: nov.paternityAmount,
         total: grossTotal,
       },
+      novedades: {
+        vacationBusinessDays: nov.vacationBusinessDays,
+        vacationRestDays: nov.vacationRestDays,
+        sickLeaveDays: round2(nov.sickGeneralEmployerDays + nov.sickGeneralEpsDays),
+        workInjuryDays: nov.sickLaborArlDays,
+        maternityDays: nov.maternityDays,
+        paternityDays: nov.paternityDays,
+        unpaidDays: nov.unpaidDays,
+      },
+      /** Lo que el empleador recobra a la EPS/ARL (incapacidades desde el dia 3, ARL, licencias). */
+      recoverableFromSocialSecurity: round2(nov.sickGeneralEpsAmount + nov.sickLaborArlAmount + nov.maternityAmount + nov.paternityAmount),
       deducciones: {
         health: healthEmployee,
         pension: pensionEmployee,

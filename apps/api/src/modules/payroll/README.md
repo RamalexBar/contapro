@@ -49,6 +49,48 @@ como `FondoSP` y la retencion en `RetencionFuente` (antes iba siempre en 0).
   diurna y nocturna; las marcaciones del mismo dia se suman antes de contar extras; la hora extra en
   domingo/festivo lleva tambien el recargo dominical.
 
+## Novedades: incapacidades, licencias, vacaciones y dias sin pago (2026-11-24)
+
+Antes la nomina pagaba el mes completo aunque el trabajador estuviera incapacitado, en licencia o de
+vacaciones: los registros de Horarios/Vacaciones no llegaban al calculo. Ahora `CalculatePayrollUseCase`
+lee las novedades APROBADAS que se cruzan con el periodo (`PrismaPayrollNoveltyReader`) y
+`computeNovelties` (`application/payroll-novelties.ts`) reparte los dias:
+
+| Novedad (origen) | Concepto | Quien paga | Valor por dia | Norma |
+|---|---|---|---|---|
+| Incapacidad GENERAL (`SickLeave`) | `SICK_LEAVE_EMPLOYER` dias 1-2, `SICK_LEAVE_EPS` desde el 3 | Empleador / EPS | 2/3 del salario hasta el dia 90, 1/2 desde el 91, nunca menos del minimo diario | Art. 227 CST, Decreto 2943/2013, C-543/2007 |
+| Incapacidad LABOR_ARL | `WORK_INJURY_ARL` desde el dia siguiente al accidente (ese dia es salario) | ARL | 100 % | Ley 776/2002 |
+| Maternidad (`SickLeave` MATERNITY o licencia MATERNITY) | `MATERNITY_LEAVE` | EPS | 100 % | Ley 1822/2017 |
+| Paternidad (licencia PATERNITY) | `PATERNITY_LEAVE` | EPS | 100 % | Ley 2114/2021 |
+| Vacaciones aprobadas (`Vacation`) | `VACATION_PAY` por dia habil; domingos y festivos siguen como `SALARY` | Empleador, contra la provision | 100 % | Art. 186 CST |
+| Licencia no remunerada / ausencia injustificada | `UNPAID_LEAVE` (valor 0) | — | 0 | Arts. 51 y 53 CST |
+
+- El dia k de una incapacidad se cuenta desde su inicio real (puede venir del periodo anterior). Mes
+  comercial: el 31 no cuenta y el ultimo dia de febrero cuenta hasta completar 30. Si dos novedades
+  caen el mismo dia gana maternidad > paternidad > laboral > comun > vacaciones > sin pago.
+- Las licencias remuneradas (luto, calamidad, permisos pagos) se pagan como dias trabajados; las
+  ausencias justificadas no descuentan.
+- **Auxilio de transporte** solo por los dias trabajados. **ARL** solo sobre los dias trabajados.
+  **Salud, pension y FSP** sobre todo lo devengado (incluidas incapacidades y licencias), minimo el
+  salario minimo de los dias remunerados. **Parafiscales** (caja, ICBF, SENA) sobre salario y vacaciones,
+  no sobre incapacidades ni licencias. **Retencion**: incapacidades y licencias son rentas exentas (art.
+  206 num. 1 y 2 E.T.). **Prestaciones**: los dias de incapacidad, licencia y vacaciones cuentan con el
+  salario completo; los no remunerados no (suspenden el contrato).
+- Dias no remunerados: el empleador sigue cotizando su 12 % de pension sobre el salario de esos dias
+  (novedad SLN). **A verificar con el contador**: hay quien tambien liquida el 4 % del trabajador.
+- **Contabilidad**: lo que paga la EPS/ARL (`SICK_LEAVE_EPS`, `WORK_INJURY_ARL`, licencias) va a la cuenta
+  por cobrar **138095** "Incapacidades y licencias por cobrar a EPS/ARL", no al gasto; las vacaciones
+  disfrutadas debitan la provision **2610**. La liquidacion de contrato resta lo ya pagado como
+  `VACATION_PAY` de lo provisionado de vacaciones.
+- **Vacaciones**: los dias habiles (lunes a sabado sin festivos) se calculan solos al solicitarlas o al
+  aprobarlas con otras fechas, si no se escriben (`vacationBusinessDaysBetween`).
+- Desprendible: "Dias del periodo / Dias trabajados", linea de novedades y cada concepto con su nombre.
+  Nomina -> detalle muestra una columna "Novedades".
+- Simplificaciones: la incapacidad se liquida sobre el salario basico (con salario variable la ley pide
+  el IBC del mes anterior); las prorrogas de una incapacidad registradas como otra incapacidad vuelven a
+  contar desde el dia 1; no se descuenta el dominical por ausencia injustificada (art. 173 CST). La
+  nomina electronica (camino directo) todavia no incluye estos conceptos; por Factus esta pendiente.
+
 ## Pago de prestaciones sociales (Nomina -> Prestaciones sociales)
 
 La nomina mensual solo PROVISIONA cesantias, intereses, prima y vacaciones. Su pago se hace aqui

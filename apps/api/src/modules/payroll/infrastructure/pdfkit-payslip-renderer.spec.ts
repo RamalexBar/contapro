@@ -18,6 +18,8 @@ describe("renderPayslipPdf", () => {
       paymentDate: new Date("2026-07-31T00:00:00.000Z"),
       periodLabel: "Julio de 2026",
       daysWorked: 30,
+      workedDays: 30,
+      noveltiesLabel: "",
       earnings: [
         { label: "Salario", amount: 1400000 },
         { label: "Auxilio de transporte", amount: 200000 },
@@ -47,6 +49,8 @@ describe("renderPayslipPdf", () => {
       paymentDate: null,
       periodLabel: "",
       daysWorked: 0,
+      workedDays: 0,
+      noveltiesLabel: "",
       earnings: [],
       grossTotal: 0,
       deductions: [],

@@ -1,3 +1,4 @@
+import { PrismaPayrollNoveltyReader } from "./infrastructure/prisma-payroll-novelty.reader";
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
 import { postBenefitSettlementJournalEntryUseCase, postPayrollJournalEntryUseCase } from "../accounting/accounting.container";
@@ -54,7 +55,7 @@ export const payrollController = new PayrollController(
   listPayrollParametersUseCase,
   new CreatePayrollUseCase(payrollRepo, auditService),
   new ListPayrollsUseCase(payrollRepo),
-  new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, companyReader, auditService),
+  new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, companyReader, auditService, new PrismaPayrollNoveltyReader()),
   new ApprovePayrollUseCase(
     payrollRepo,
     payrollDeductionRepo,

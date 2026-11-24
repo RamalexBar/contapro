@@ -24,7 +24,8 @@ export const requestVacationSchema = z.object({
   employeeId: z.string().uuid(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
-  daysTaken: z.number().positive(),
+  // Opcional: si no llega, se calculan los dias habiles (lunes a sabado sin festivos) entre las fechas.
+  daysTaken: z.number().positive().optional(),
 });
 export type RequestVacationInput = z.infer<typeof requestVacationSchema>;
 

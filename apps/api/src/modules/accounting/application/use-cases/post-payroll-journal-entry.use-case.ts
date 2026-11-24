@@ -6,6 +6,10 @@ import { PostJournalEntryUseCase } from "./post-journal-entry.use-case";
 
 const EMPLOYER_CONTRIBUTION_CODES = new Set(["HEALTH_EMPLOYER", "PENSION_EMPLOYER", "ARL", "CCF", "ICBF", "SENA"]);
 const PROVISION_CODES = new Set(["SEVERANCE", "SEVERANCE_INTEREST", "SERVICE_BONUS", "VACATION"]);
+/** Incapacidades (desde el dia 3) y licencias que el empleador paga y despues le recobra a la EPS/ARL. */
+const RECOVERABLE_CODES = new Set(["SICK_LEAVE_EPS", "WORK_INJURY_ARL", "MATERNITY_LEAVE", "PATERNITY_LEAVE"]);
+/** Vacaciones disfrutadas: se pagan contra la provision que ya se causo mes a mes. */
+const VACATION_PAY_CODE = "VACATION_PAY";
 
 const STANDARD_ACCOUNTS = {
   devengado: { code: "5105", name: "Gastos de personal - sueldos", type: "EXPENSE" as const },
@@ -18,6 +22,7 @@ const STANDARD_ACCOUNTS = {
   retencionFuenteSalarios: { code: "236505", name: "Retencion en la fuente - salarios y pagos laborales", type: "LIABILITY" as const },
   aportesPatronalesPasivo: { code: "2380", name: "Aportes patronales por pagar", type: "LIABILITY" as const },
   provisionesPasivo: { code: "2610", name: "Provisiones para obligaciones laborales", type: "LIABILITY" as const },
+  incapacidadesPorCobrar: { code: "138095", name: "Incapacidades y licencias por cobrar a EPS/ARL", type: "ASSET" as const },
 };
 
 export interface PayrollJournalEntryInput {
@@ -59,6 +64,8 @@ export class PostPayrollJournalEntryUseCase {
     let netPay = 0;
     let deduccionesEmpleado = 0;
     let retencionFuente = 0;
+    let porCobrarSeguridadSocial = 0;
+    let vacacionesDisfrutadas = 0;
 
     for (const detail of input.details) {
       devengado += detail.grossTotal;
@@ -68,9 +75,15 @@ export class PostPayrollJournalEntryUseCase {
         if (EMPLOYER_CONTRIBUTION_CODES.has(item.conceptCode)) aportesPatronales += item.amount;
         if (PROVISION_CODES.has(item.conceptCode)) provisiones += item.amount;
         if (item.conceptCode === "WITHHOLDING_TAX") retencionFuente += item.amount;
+        if (RECOVERABLE_CODES.has(item.conceptCode)) porCobrarSeguridadSocial += item.amount;
+        if (item.conceptCode === VACATION_PAY_CODE) vacacionesDisfrutadas += item.amount;
       }
     }
-    devengado = round2(devengado);
+    porCobrarSeguridadSocial = round2(porCobrarSeguridadSocial);
+    vacacionesDisfrutadas = round2(vacacionesDisfrutadas);
+    // El gasto de personal es lo devengado menos lo que paga la EPS/ARL y menos las vacaciones (ya
+    // estaban en el gasto via la provision).
+    devengado = round2(devengado - porCobrarSeguridadSocial - vacacionesDisfrutadas);
     aportesPatronales = round2(aportesPatronales);
     provisiones = round2(provisiones);
     netPay = round2(netPay);
@@ -87,6 +100,13 @@ export class PostPayrollJournalEntryUseCase {
       sourceId: input.payrollId,
       lines: [
         { accountId: accounts.devengado.id, debit: devengado, credit: 0, description: "Devengado" },
+        {
+          accountId: accounts.incapacidadesPorCobrar.id,
+          debit: porCobrarSeguridadSocial,
+          credit: 0,
+          description: "Incapacidades y licencias por cobrar a EPS/ARL",
+        },
+        { accountId: accounts.provisionesPasivo.id, debit: vacacionesDisfrutadas, credit: 0, description: "Vacaciones disfrutadas (contra la provision)" },
         {
           accountId: accounts.aportesPatronalesGasto.id,
           debit: aportesPatronales,

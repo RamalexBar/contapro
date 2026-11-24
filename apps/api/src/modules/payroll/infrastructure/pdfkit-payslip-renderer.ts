@@ -85,7 +85,12 @@ export async function renderPayslipPdf(data: PayslipPdfData): Promise<Buffer> {
   doc.text(`${data.employee.documentType}: ${data.employee.documentNumber}`);
   doc.text(`Cargo: ${data.employee.position}`);
   doc.text(`Tipo de contrato: ${CONTRACTS[data.employee.contractType] ?? data.employee.contractType}`);
-  doc.text(`Dias trabajados en el periodo: ${data.daysWorked}`);
+  if (data.noveltiesLabel) {
+    doc.text(`Dias del periodo: ${data.daysWorked} · Dias trabajados: ${data.workedDays}`);
+    doc.text(`Novedades: ${data.noveltiesLabel}`);
+  } else {
+    doc.text(`Dias trabajados en el periodo: ${data.daysWorked}`);
+  }
   doc.moveDown(1);
 
   renderLinesTable(doc, "Devengados", data.earnings, data.grossTotal, pageWidth);
