@@ -2,6 +2,7 @@ import { PrismaAuditLogRepository } from "../../audit/infrastructure/prisma-audi
 import { AuditService } from "../../audit/application/audit.service";
 import { PrismaSaleRepository } from "../sale/infrastructure/prisma-sale.repository";
 import { generateElectronicCreditNoteUseCase } from "../../electronic-invoicing/electronic-invoicing.container";
+import { postNoteJournalEntryUseCase } from "../../accounting/accounting.container";
 import { PrismaCreditNoteRepository } from "./infrastructure/prisma-credit-note.repository";
 import { CreateCreditNoteUseCase } from "./application/use-cases/create-credit-note.use-case";
 import { ListCreditNotesUseCase } from "./application/use-cases/list-credit-notes.use-case";
@@ -13,7 +14,7 @@ const repo = new PrismaCreditNoteRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
 /** Exportado: return.container.ts lo usa para emitir la nota credito de cada devolucion. */
-export const createCreditNoteUseCase = new CreateCreditNoteUseCase(repo, saleRepo, generateElectronicCreditNoteUseCase, auditService);
+export const createCreditNoteUseCase = new CreateCreditNoteUseCase(repo, saleRepo, generateElectronicCreditNoteUseCase, auditService, postNoteJournalEntryUseCase);
 
 export const creditNoteController = new CreditNoteController(
   createCreditNoteUseCase,

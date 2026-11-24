@@ -1,3 +1,4 @@
+import { PostNoteJournalEntryUseCase } from "./application/use-cases/post-note-journal-entry.use-case";
 import { PostManualInvoiceJournalEntryUseCase } from "./application/use-cases/post-manual-invoice-journal-entry.use-case";
 import { AnnualClosingUseCase } from "./application/use-cases/annual-closing.use-case";
 import { WithholdingReturnUseCase } from "./application/use-cases/withholding-return.use-case";
@@ -254,3 +255,6 @@ export const closingController = new ClosingController(
 
 /** Usado por manual-invoicing.container.ts: comprobante de cada factura manual. */
 export const postManualInvoiceJournalEntryUseCase = new PostManualInvoiceJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);
+
+/** Usado por credit-note y debit-note: comprobante de las notas libres. */
+export const postNoteJournalEntryUseCase = new PostNoteJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);

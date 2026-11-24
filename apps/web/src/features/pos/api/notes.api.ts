@@ -54,6 +54,8 @@ export interface NoteInput {
   conceptCode: string;
   reason: string;
   amount: number;
+  /** Solo nota credito: como se devuelve (vacio = abono a la cuenta del cliente, o efectivo si no hay cliente). */
+  settlement?: "CASH" | "TRANSFER" | "CREDIT_TO_ACCOUNT";
 }
 
 export interface NoteRecord {

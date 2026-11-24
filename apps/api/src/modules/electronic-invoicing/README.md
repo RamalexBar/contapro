@@ -341,6 +341,11 @@ como unico proveedor tecnologico.
       de la compra y la retencion por renglon solo si se practico sobre todo el subtotal.
     - **Conceptos de correccion** en `constants.ts` (`CREDIT_NOTE_CONCEPTS`/`DEBIT_NOTE_CONCEPTS`).
       `CreditNote.conceptCode`/`DebitNote.conceptCode` los guardan.
+    - **Contabilidad de las notas libres** (2026-11-24, `PostNoteJournalEntryUseCase`): nota credito = Debito 4175
+      (rebajas y descuentos en ventas) por la base y 2408 por el IVA, Credito Caja, Bancos o Clientes segun "como se
+      devuelve" (`settlement`); nota debito = Debito Clientes (o Caja sin cliente), Credito 421005 intereses, 4250
+      gastos de cobranza, 4135 cambio del valor (con IVA) o 4295 otros. Las notas de devoluciones las sigue
+      contabilizando la devolucion. La nota debito con cliente no crea cuenta por cobrar en Cobranza (solo el asiento a 1305).
     - Pendiente: notas de ajuste al documento soporte (`POST /v2/adjustment-notes/validate`, no hay
       flujo para corregir una compra todavia) y nomina electronica por Factus.
 

@@ -7,6 +7,13 @@ import type { GenerateElectronicCreditNoteUseCase } from "../../../../electronic
 import type { ThirdPartyDocumentLineInput } from "../../../../electronic-invoicing/domain/third-party-invoicing-client";
 import type { ISaleRepository } from "../../../sale/domain/sale.repository";
 import type { CreditNoteRecord, ICreditNoteRepository } from "../../domain/credit-note.repository";
+import type { NoteSettlement, PostNoteJournalEntryUseCase } from "../../../../accounting/application/use-cases/post-note-journal-entry.use-case";
+/** Base sin IVA de los renglones de una nota y su IVA (el resto hasta el valor total). */
+function splitNoteAmount(lines: ThirdPartyDocumentLineInput[], amount: number): { base: number; tax: number } {
+  const base = round2(lines.reduce((s, l) => s + l.quantity * l.unitPrice * (1 - (l.discountPercent ?? 0) / 100), 0));
+  return { base, tax: round2(amount - base) };
+}
+
 
 /** Ventas sobre las que tiene sentido una nota credito (ya facturadas, no anuladas). */
 const CREDITABLE_SALE_STATUSES = new Set(["COMPLETED", "RETURNED_PARTIAL", "RETURNED_FULL"]);
@@ -21,6 +28,8 @@ export interface CreateCreditNoteInput {
   reason: string;
   /** Valor total de la nota, con IVA. */
   amount: number;
+  /** Como se le devuelve al cliente; por defecto, abono a su cuenta si tiene cliente, o efectivo. */
+  settlement?: NoteSettlement;
 }
 
 export interface CreditNoteForReturnInput {
@@ -41,7 +50,8 @@ export class CreateCreditNoteUseCase {
     private readonly repo: ICreditNoteRepository,
     private readonly saleRepo: ISaleRepository,
     private readonly generateElectronicCreditNote: GenerateElectronicCreditNoteUseCase,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly postNoteJournal: PostNoteJournalEntryUseCase
   ) {}
 
   /** Nota credito libre sobre una venta: el valor se reparte entre las tarifas de IVA de la venta. */
@@ -56,13 +66,17 @@ export class CreateCreditNoteUseCase {
       throw new ValidationError(`La venta #${sale.number} solo admite notas credito por ${available} (total ${sale.total}, ya acreditado ${alreadyCredited})`);
     }
 
+    const settlement = input.settlement ?? (sale.customerId ? "CREDIT_TO_ACCOUNT" : "CASH");
+    if (settlement === "CREDIT_TO_ACCOUNT" && !sale.customerId) {
+      throw new ValidationError("La venta es de consumidor final: el valor solo se puede devolver en efectivo o por transferencia");
+    }
     const lines = noteLinesFromAmount({
       amount: input.amount,
       description: input.reason,
       saleLines: sale.items.map((i) => ({ taxPercent: i.taxPercent, total: i.total })),
       taxable: true,
     });
-    return this.issue({
+    const note = await this.issue({
       saleId: sale.id,
       branchId: sale.branchId,
       customerId: sale.customerId,
@@ -72,6 +86,30 @@ export class CreateCreditNoteUseCase {
       amount: round2(input.amount),
       lines,
     });
+
+    // Comprobante (rebaja en ventas + reverso de IVA). Las notas de devoluciones las contabiliza la devolucion.
+    try {
+      const { base, tax } = splitNoteAmount(lines, note.amount);
+      await this.postNoteJournal.execute({
+        kind: "CREDIT",
+        noteId: note.id,
+        branchId: sale.branchId,
+        date: note.createdAt,
+        base,
+        tax,
+        conceptCode: input.conceptCode,
+        settlement,
+        description: `Nota credito venta #${sale.number}: ${input.reason}`,
+      });
+    } catch (err) {
+      await this.audit.record({
+        action: "NOTE_ACCOUNTING_FAILED",
+        entityType: "CreditNote",
+        entityId: note.id,
+        description: `No se pudo contabilizar la nota credito: ${(err as Error).message}`,
+      });
+    }
+    return note;
   }
 
   /** Nota credito de una devolucion, con los productos devueltos como renglones. */

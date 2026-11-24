@@ -6,4 +6,5 @@ export const createCreditNoteSchema = z.object({
   conceptCode: z.enum(["3", "4", "5", "6"]),
   reason: z.string().trim().min(3).max(500),
   amount: z.number().positive(),
+  settlement: z.enum(["CASH", "TRANSFER", "CREDIT_TO_ACCOUNT"]).optional(),
 });

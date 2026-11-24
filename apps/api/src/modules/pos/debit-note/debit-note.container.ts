@@ -2,6 +2,7 @@ import { PrismaAuditLogRepository } from "../../audit/infrastructure/prisma-audi
 import { AuditService } from "../../audit/application/audit.service";
 import { PrismaSaleRepository } from "../sale/infrastructure/prisma-sale.repository";
 import { generateElectronicDebitNoteUseCase } from "../../electronic-invoicing/electronic-invoicing.container";
+import { postNoteJournalEntryUseCase } from "../../accounting/accounting.container";
 import { PrismaDebitNoteRepository } from "./infrastructure/prisma-debit-note.repository";
 import { CreateDebitNoteUseCase } from "./application/use-cases/create-debit-note.use-case";
 import { ListDebitNotesUseCase } from "./application/use-cases/list-debit-notes.use-case";
@@ -13,6 +14,6 @@ const repo = new PrismaDebitNoteRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
 export const debitNoteController = new DebitNoteController(
-  new CreateDebitNoteUseCase(repo, saleRepo, generateElectronicDebitNoteUseCase, auditService),
+  new CreateDebitNoteUseCase(repo, saleRepo, generateElectronicDebitNoteUseCase, auditService, postNoteJournalEntryUseCase),
   new ListDebitNotesUseCase(repo)
 );

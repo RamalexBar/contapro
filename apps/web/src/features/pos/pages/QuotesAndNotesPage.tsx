@@ -282,12 +282,13 @@ function NoteSection({
   const [conceptCode, setConceptCode] = useState(Object.keys(concepts)[0]!);
   const [reason, setReason] = useState("");
   const [amount, setAmount] = useState("");
+  const [settlement, setSettlement] = useState<"" | "CASH" | "TRANSFER" | "CREDIT_TO_ACCOUNT">("");
 
   const noteSales = (sales?.data ?? []).filter((s) => NOTE_SALE_STATUSES.has(s.status));
   const saleNumber = (id: string | null) => sales?.data.find((s) => s.id === id)?.number;
 
   const createMutation = useMutation({
-    mutationFn: () => createFn({ saleId, conceptCode, reason, amount: Number(amount) }),
+    mutationFn: () => createFn({ saleId, conceptCode, reason, amount: Number(amount), ...(kind === "credit" && settlement ? { settlement } : {}) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
       setReason("");
@@ -327,6 +328,14 @@ function NoteSection({
           </Select>
           <Input label="Motivo" value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} />
           <Input label="Valor total (con IVA)" type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          {kind === "credit" && (
+            <Select label="Cómo se devuelve" value={settlement} onChange={(e) => setSettlement(e.target.value as typeof settlement)}>
+              <option value="">Abono a la cuenta del cliente (o efectivo si es consumidor final)</option>
+              <option value="CREDIT_TO_ACCOUNT">Abono a la cuenta del cliente</option>
+              <option value="CASH">Efectivo</option>
+              <option value="TRANSFER">Transferencia</option>
+            </Select>
+          )}
           <div className="flex items-end">
             <Button type="submit" loading={createMutation.isPending} disabled={!saleId}>
               Emitir

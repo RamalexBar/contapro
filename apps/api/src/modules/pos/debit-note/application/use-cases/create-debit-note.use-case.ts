@@ -6,6 +6,14 @@ import { noteLinesFromAmount } from "../../../../electronic-invoicing/applicatio
 import type { GenerateElectronicDebitNoteUseCase } from "../../../../electronic-invoicing/application/use-cases/generate-electronic-debit-note.use-case";
 import type { ISaleRepository } from "../../../sale/domain/sale.repository";
 import type { DebitNoteRecord, IDebitNoteRepository } from "../../domain/debit-note.repository";
+import type { PostNoteJournalEntryUseCase } from "../../../../accounting/application/use-cases/post-note-journal-entry.use-case";
+import type { ThirdPartyDocumentLineInput } from "../../../../electronic-invoicing/domain/third-party-invoicing-client";
+/** Base sin IVA de los renglones de una nota y su IVA (el resto hasta el valor total). */
+function splitNoteAmount(lines: ThirdPartyDocumentLineInput[], amount: number): { base: number; tax: number } {
+  const base = round2(lines.reduce((s, l) => s + l.quantity * l.unitPrice * (1 - (l.discountPercent ?? 0) / 100), 0));
+  return { base, tax: round2(amount - base) };
+}
+
 
 const DEBITABLE_SALE_STATUSES = new Set(["COMPLETED", "RETURNED_PARTIAL", "RETURNED_FULL"]);
 
@@ -27,7 +35,8 @@ export class CreateDebitNoteUseCase {
     private readonly repo: IDebitNoteRepository,
     private readonly saleRepo: ISaleRepository,
     private readonly generateElectronicDebitNote: GenerateElectronicDebitNoteUseCase,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly postNoteJournal: PostNoteJournalEntryUseCase
   ) {}
 
   async execute(input: CreateDebitNoteInput): Promise<DebitNoteRecord> {
@@ -52,6 +61,36 @@ export class CreateDebitNoteUseCase {
       description: `Nota debito emitida por ${note.amount}: ${note.reason}`,
     });
 
+    const lines = noteLinesFromAmount({
+      amount,
+      description: input.reason,
+      saleLines: sale.items.map((i) => ({ taxPercent: i.taxPercent, total: i.total })),
+      taxable: input.conceptCode === "3",
+    });
+
+    // Comprobante: con cliente queda cargado a su cuenta (1305); sin cliente, cobrado de contado.
+    try {
+      const { base, tax } = splitNoteAmount(lines, amount);
+      await this.postNoteJournal.execute({
+        kind: "DEBIT",
+        noteId: note.id,
+        branchId: sale.branchId,
+        date: note.createdAt,
+        base,
+        tax,
+        conceptCode: input.conceptCode,
+        settlement: sale.customerId ? "CREDIT_TO_ACCOUNT" : "CASH",
+        description: `Nota debito venta #${sale.number}: ${input.reason}`,
+      });
+    } catch (err) {
+      await this.audit.record({
+        action: "NOTE_ACCOUNTING_FAILED",
+        entityType: "DebitNote",
+        entityId: note.id,
+        description: `No se pudo contabilizar la nota debito: ${(err as Error).message}`,
+      });
+    }
+
     try {
       const electronic = await this.generateElectronicDebitNote.execute({
         debitNoteId: note.id,
@@ -62,12 +101,7 @@ export class CreateDebitNoteUseCase {
         amount,
         reason: input.reason,
         conceptCode: input.conceptCode,
-        lines: noteLinesFromAmount({
-          amount,
-          description: input.reason,
-          saleLines: sale.items.map((i) => ({ taxPercent: i.taxPercent, total: i.total })),
-          taxable: input.conceptCode === "3",
-        }),
+        lines,
       });
       return { ...note, electronic: { fullNumber: electronic.fullNumber, status: electronic.status, rejectionReason: null } };
     } catch (err) {
