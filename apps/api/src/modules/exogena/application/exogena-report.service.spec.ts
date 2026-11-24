@@ -183,40 +183,12 @@ function makeService(opts: { purchases?: PurchaseRecord[]; sales?: SaleRecord[];
     new FakeCustomerRepository() as unknown as ICustomerRepository,
     new FakeAccountPayableRepository(opts.payables ?? []) as unknown as IAccountPayableRepository,
     new FakeAccountReceivableRepository(opts.receivables ?? []) as unknown as IAccountReceivableRepository,
-    new FakeWithholdingConceptRepository() as unknown as IWithholdingConceptRepository
+    new FakeWithholdingConceptRepository() as unknown as IWithholdingConceptRepository,
+    { yearData: async () => { throw new Error("not used"); }, payrollData: async () => { throw new Error("not used"); } }
   );
 }
 
 describe("ExogenaReportService", () => {
-  it("getFormat1001: agrega pago y retencion practicada por proveedor, dentro del año, marca incompleto sin municipio", async () => {
-    const purchases = [
-      makePurchase({ supplierId: SUPPLIER.id, total: 100_000, retentionTotal: 2500, createdAt: new Date(2026, 5, 1) }),
-      makePurchase({
-        id: "purchase-2",
-        supplierId: SUPPLIER_INCOMPLETE.id,
-        total: 50_000,
-        retentionTotal: 500,
-        withholdings: [{ withholdingConceptId: CONCEPT_NO_CODE.id, type: "RETEICA", base: 50_000, ratePercent: 1, amount: 500 }],
-        createdAt: new Date(2026, 5, 1),
-      }),
-      makePurchase({ id: "purchase-old", supplierId: SUPPLIER.id, total: 20_000, retentionTotal: 0, createdAt: new Date(2025, 5, 1) }),
-    ];
-    const service = makeService({ purchases });
-
-    const rows2026 = await service.getFormat1001(2026);
-    expect(rows2026).toHaveLength(2);
-    const supplier1Row = rows2026.find((r) => r.supplierId === SUPPLIER.id)!;
-    expect(supplier1Row.valorPago).toBe(100_000);
-    expect(supplier1Row.valorRetencionPracticada).toBe(2500);
-    expect(supplier1Row.conceptoPago).toBe("5002");
-    expect(supplier1Row.incompleto).toBe(false);
-    const supplier2Row = rows2026.find((r) => r.supplierId === SUPPLIER_INCOMPLETE.id)!;
-    expect(supplier2Row.incompleto).toBe(true);
-
-    const rows2025 = await service.getFormat1001(2025);
-    expect(rows2025).toEqual([expect.objectContaining({ supplierId: SUPPLIER.id, valorPago: 20_000 })]);
-  });
-
   it("getFormat1003: agrega base/retencion por proveedor y concepto, marca conceptoIncompleto sin dianConceptCode", async () => {
     const purchases = [
       makePurchase({ supplierId: SUPPLIER.id, createdAt: new Date(2026, 5, 1) }),
@@ -239,21 +211,6 @@ describe("ExogenaReportService", () => {
     const noCode = rows.find((r) => r.supplierId === SUPPLIER_INCOMPLETE.id)!;
     expect(noCode.conceptoRetencion).toBeNull();
     expect(noCode.conceptoIncompleto).toBe(true);
-  });
-
-  it("getFormat1007: agrega ingresos por cliente y excluye ventas sin cliente (consumidor final)", async () => {
-    const sales = [
-      makeSale({ customerId: CUSTOMER.id, subtotal: 80_000, createdAt: new Date(2026, 5, 1) }),
-      makeSale({ id: "sale-2", customerId: null, subtotal: 30_000, createdAt: new Date(2026, 5, 2) }),
-      makeSale({ id: "sale-old", customerId: CUSTOMER.id, subtotal: 10_000, createdAt: new Date(2025, 5, 1) }),
-    ];
-    const service = makeService({ sales });
-
-    const rows2026 = await service.getFormat1007(2026);
-    expect(rows2026).toEqual([expect.objectContaining({ customerId: CUSTOMER.id, valorIngreso: 80_000 })]);
-
-    const rows2025 = await service.getFormat1007(2025);
-    expect(rows2025).toEqual([expect.objectContaining({ customerId: CUSTOMER.id, valorIngreso: 10_000 })]);
   });
 
   it("getFormat1008: agrega saldo actual de cuentas por cobrar activas, sumando varias del mismo cliente", async () => {

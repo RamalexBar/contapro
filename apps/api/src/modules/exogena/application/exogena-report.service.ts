@@ -7,19 +7,25 @@ import type { ICustomerRepository, CustomerRecord } from "../../customers/domain
 import type { IAccountReceivableRepository } from "../../collections/domain/account-receivable.repository";
 import type { IWithholdingConceptRepository } from "../../accounting/domain/withholding-concept.repository";
 import type {
-  Format1001Row,
   Format1003Row,
-  Format1007Row,
   Format1008Row,
   Format1009Row,
   ThirdPartyInfo,
 } from "../domain/exogena-report.types";
+import type { IExogenaDataReader } from "../domain/exogena-data.reader";
+import {
+  buildFormat1001,
+  buildFormat1005,
+  buildFormat1006,
+  buildFormat1007,
+  buildFormat2276,
+  type Format1001Row,
+  type Format1005Row,
+  type Format1006Row,
+  type Format1007Row,
+  type Format2276Row,
+} from "./exogena-formats";
 
-/** Codigo DIAN de concepto de pago generico ("Compra de bienes y/o servicios") usado para TODAS
- * las filas del formato 1001 -- el catalogo de productos no clasifica compras por concepto DIAN
- * (5001 materias primas, 5002 servicios, etc.), asi que no hay forma de derivarlo por linea. Ver
- * README del modulo. */
-const DEFAULT_PAYMENT_CONCEPT_CODE = "5002";
 
 /**
  * Reporte de informacion exogena DIAN (item 37 de docs/ALCANCE.md). Mismo patron que
@@ -35,31 +41,28 @@ export class ExogenaReportService {
     private readonly customerRepo: ICustomerRepository,
     private readonly accountPayableRepo: IAccountPayableRepository,
     private readonly accountReceivableRepo: IAccountReceivableRepository,
-    private readonly withholdingConceptRepo: IWithholdingConceptRepository
+    private readonly withholdingConceptRepo: IWithholdingConceptRepository,
+    private readonly dataReader: IExogenaDataReader
   ) {}
 
+  /** Pagos por proveedor y concepto (5002 honorarios, 5004 servicios, 5005 arrendamientos, 5007 inventario...). */
   async getFormat1001(year: number): Promise<Format1001Row[]> {
-    const purchases = await this.purchaseRepo.listForYear(year);
-    const totals = new Map<string, { valorPago: number; valorRetencion: number }>();
-    for (const p of purchases) {
-      const agg = totals.get(p.supplierId) ?? { valorPago: 0, valorRetencion: 0 };
-      agg.valorPago = round2(agg.valorPago + p.total);
-      agg.valorRetencion = round2(agg.valorRetencion + p.retentionTotal);
-      totals.set(p.supplierId, agg);
-    }
+    return buildFormat1001(await this.dataReader.yearData(year));
+  }
 
-    const rows: Format1001Row[] = [];
-    for (const [supplierId, agg] of totals) {
-      const supplier = await this.supplierRepo.findByIdOrThrow(supplierId);
-      rows.push({
-        supplierId,
-        ...this.supplierInfo(supplier),
-        conceptoPago: DEFAULT_PAYMENT_CONCEPT_CODE,
-        valorPago: agg.valorPago,
-        valorRetencionPracticada: agg.valorRetencion,
-      });
-    }
-    return rows;
+  /** IVA descontable (compras) e IVA de devoluciones en ventas. */
+  async getFormat1005(year: number): Promise<Format1005Row[]> {
+    return buildFormat1005(await this.dataReader.yearData(year));
+  }
+
+  /** IVA generado e impuesto al consumo. */
+  async getFormat1006(year: number): Promise<Format1006Row[]> {
+    return buildFormat1006(await this.dataReader.yearData(year));
+  }
+
+  /** Ingresos rentas de trabajo por empleado. */
+  async getFormat2276(year: number): Promise<Format2276Row[]> {
+    return buildFormat2276(await this.dataReader.payrollData(year));
   }
 
   async getFormat1003(year: number): Promise<Format1003Row[]> {
@@ -96,23 +99,9 @@ export class ExogenaReportService {
     return rows;
   }
 
+  /** Ingresos por cliente, incluidos los de consumidor final (222222222 "CUANTIAS MENORES"). */
   async getFormat1007(year: number): Promise<Format1007Row[]> {
-    const sales = await this.saleRepo.listForYear(year);
-    const totals = new Map<string, number>();
-    for (const s of sales) {
-      // Ventas sin cliente identificado ("consumidor final") no son reportables a un tercero
-      // especifico -- se excluyen del reporte, mismo criterio que electronic-invoicing usa un
-      // identificador generico solo para la factura, no aplicable aqui.
-      if (!s.customerId) continue;
-      totals.set(s.customerId, round2((totals.get(s.customerId) ?? 0) + s.subtotal));
-    }
-
-    const rows: Format1007Row[] = [];
-    for (const [customerId, valorIngreso] of totals) {
-      const customer = await this.customerRepo.findByIdOrThrow(customerId);
-      rows.push({ customerId, ...this.customerInfo(customer), valorIngreso });
-    }
-    return rows;
+    return buildFormat1007(await this.dataReader.yearData(year));
   }
 
   async getFormat1008(): Promise<Format1008Row[]> {

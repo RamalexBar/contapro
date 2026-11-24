@@ -6,6 +6,7 @@ import { customerRepo } from "../customers/customer.container";
 import { accountReceivableRepo } from "../collections/collections.container";
 import { withholdingConceptRepository } from "../accounting/accounting.container";
 import { ExogenaReportService } from "./application/exogena-report.service";
+import { PrismaExogenaDataReader } from "./infrastructure/prisma-exogena-data.reader";
 import { ExogenaController } from "./interfaces/exogena.controller";
 
 // Instancias propias, no importadas de sus containers dueños (que no las exportan): mismo
@@ -23,7 +24,8 @@ const exogenaReportService = new ExogenaReportService(
   customerRepo,
   accountPayableRepo,
   accountReceivableRepo,
-  withholdingConceptRepository
+  withholdingConceptRepository,
+  new PrismaExogenaDataReader()
 );
 
 export const exogenaController = new ExogenaController(exogenaReportService);

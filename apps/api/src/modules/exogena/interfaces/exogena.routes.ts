@@ -18,3 +18,9 @@ exogenaRouter.get("/reports/exogena/1008", requirePermission("accounting.read"),
 exogenaRouter.get("/reports/exogena/1008/download", requirePermission("accounting.read"), exogenaController.downloadFormat1008);
 exogenaRouter.get("/reports/exogena/1009", requirePermission("accounting.read"), exogenaController.getFormat1009);
 exogenaRouter.get("/reports/exogena/1009/download", requirePermission("accounting.read"), exogenaController.downloadFormat1009);
+exogenaRouter.get("/reports/exogena/1005", requirePermission("accounting.read"), exogenaController.getFormat1005);
+exogenaRouter.get("/reports/exogena/1005/download", requirePermission("accounting.read"), exogenaController.downloadFormat1005);
+exogenaRouter.get("/reports/exogena/1006", requirePermission("accounting.read"), exogenaController.getFormat1006);
+exogenaRouter.get("/reports/exogena/1006/download", requirePermission("accounting.read"), exogenaController.downloadFormat1006);
+exogenaRouter.get("/reports/exogena/2276", requirePermission("accounting.read"), exogenaController.getFormat2276);
+exogenaRouter.get("/reports/exogena/2276/download", requirePermission("accounting.read"), exogenaController.downloadFormat2276);

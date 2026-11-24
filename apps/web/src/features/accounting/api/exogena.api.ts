@@ -1,62 +1,40 @@
 import { apiFetch, BASE_URL } from "../../../lib/api-client";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 
-export interface ThirdPartyInfo {
+/** Una fila de cualquier formato: identificacion del tercero y los valores del formato (ver la API). */
+export interface ExogenaRow {
   documentType: string;
   documentNumber: string;
-  name: string;
+  name?: string;
+  firstName?: string;
+  otherNames?: string;
+  firstSurname?: string;
+  secondSurname?: string;
   municipalityCode: string | null;
-  incompleto: boolean;
+  incompleto?: boolean;
+  conceptoIncompleto?: boolean;
+  [field: string]: string | number | boolean | null | undefined;
 }
 
-export interface Format1001Row extends ThirdPartyInfo {
-  supplierId: string;
-  conceptoPago: string;
-  valorPago: number;
-  valorRetencionPracticada: number;
-}
+export type ExogenaFormatCode = "1001" | "1003" | "1005" | "1006" | "1007" | "1008" | "1009" | "2276";
 
-export interface Format1003Row extends ThirdPartyInfo {
-  supplierId: string;
-  conceptoRetencion: string | null;
-  conceptoIncompleto: boolean;
-  valorBase: number;
-  valorRetencion: number;
-}
-
-export interface Format1007Row extends ThirdPartyInfo {
-  customerId: string;
-  valorIngreso: number;
-}
-
-export interface Format1008Row extends ThirdPartyInfo {
-  customerId: string;
-  saldo: number;
-}
-
-export interface Format1009Row extends ThirdPartyInfo {
-  supplierId: string;
-  saldo: number;
-}
-
-export type ExogenaFormatCode = "1001" | "1003" | "1007" | "1008" | "1009";
-
-const NEEDS_YEAR: Record<ExogenaFormatCode, boolean> = {
+/** 1008 y 1009 son saldos actuales; el resto, movimientos del año. */
+export const NEEDS_YEAR: Record<ExogenaFormatCode, boolean> = {
   "1001": true,
   "1003": true,
+  "1005": true,
+  "1006": true,
   "1007": true,
   "1008": false,
   "1009": false,
+  "2276": true,
 };
 
 function reportPath(format: ExogenaFormatCode, year: number): string {
   return `/reports/exogena/${format}${NEEDS_YEAR[format] ? `?year=${year}` : ""}`;
 }
 
-export function getExogenaReport(
-  format: ExogenaFormatCode,
-  year: number
-): Promise<{ data: (Format1001Row | Format1003Row | Format1007Row | Format1008Row | Format1009Row)[] }> {
+export function getExogenaReport(format: ExogenaFormatCode, year: number): Promise<{ data: ExogenaRow[] }> {
   return apiFetch(reportPath(format, year));
 }
 

@@ -4,6 +4,9 @@ import type { ExogenaReportService } from "../application/exogena-report.service
 import {
   generateFormat1001FlatFile,
   generateFormat1003FlatFile,
+  generateFormat1005FlatFile,
+  generateFormat1006FlatFile,
+  generateFormat2276FlatFile,
   generateFormat1007FlatFile,
   generateFormat1008FlatFile,
   generateFormat1009FlatFile,
@@ -40,6 +43,57 @@ export class ExogenaController {
       const year = parseYear(req);
       const rows = await this.service.getFormat1001(year);
       sendFlatFile(res, "1001", year, generateFormat1001FlatFile(rows));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getFormat1005 = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await this.service.getFormat1005(parseYear(req)) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  downloadFormat1005 = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const year = parseYear(req);
+      sendFlatFile(res, "1005", year, generateFormat1005FlatFile(await this.service.getFormat1005(year)));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getFormat1006 = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await this.service.getFormat1006(parseYear(req)) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  downloadFormat1006 = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const year = parseYear(req);
+      sendFlatFile(res, "1006", year, generateFormat1006FlatFile(await this.service.getFormat1006(year)));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getFormat2276 = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await this.service.getFormat2276(parseYear(req)) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  downloadFormat2276 = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const year = parseYear(req);
+      sendFlatFile(res, "2276", year, generateFormat2276FlatFile(await this.service.getFormat2276(year)));
     } catch (err) {
       next(err);
     }

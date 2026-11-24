@@ -9,14 +9,6 @@ export interface ThirdPartyInfo {
   incompleto: boolean;
 }
 
-export interface Format1001Row extends ThirdPartyInfo {
-  supplierId: string;
-  /** Codigo DIAN de concepto de pago -- generico fijo, ver README del modulo. */
-  conceptoPago: string;
-  valorPago: number;
-  valorRetencionPracticada: number;
-}
-
 export interface Format1003Row extends ThirdPartyInfo {
   supplierId: string;
   /** Codigo DIAN de concepto de retencion (WithholdingConcept.dianConceptCode). Null = sin
@@ -25,11 +17,6 @@ export interface Format1003Row extends ThirdPartyInfo {
   conceptoIncompleto: boolean;
   valorBase: number;
   valorRetencion: number;
-}
-
-export interface Format1007Row extends ThirdPartyInfo {
-  customerId: string;
-  valorIngreso: number;
 }
 
 export interface Format1008Row extends ThirdPartyInfo {
