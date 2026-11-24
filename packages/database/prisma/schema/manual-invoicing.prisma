@@ -22,8 +22,13 @@ model ManualInvoice {
   invoiceXmlUrl   String?
   createdAt       DateTime @default(now())
 
+  // Contabilidad y cartera (2026-11-24): toda factura manual es a credito hasta que se abona en Cobranza.
+  dueDate           DateTime?
+  journalEntryId    String?
+
   items             ManualInvoiceItem[]
   electronicInvoice ElectronicInvoice?
+  accountReceivable AccountReceivable?
 
   @@index([companyId, branchId, createdAt])
   @@map("manual_invoices")

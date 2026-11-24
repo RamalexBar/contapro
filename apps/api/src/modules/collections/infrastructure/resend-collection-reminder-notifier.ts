@@ -36,9 +36,9 @@ export class ResendCollectionReminderNotifier implements ICollectionReminderNoti
 }
 
 function buildSubject(n: CollectionReminderNotification): string {
-  if (n.daysBeforeDue > 0) return `Recordatorio: factura #${n.saleNumber} vence en ${n.daysBeforeDue} dia${n.daysBeforeDue === 1 ? "" : "s"}`;
-  if (n.daysBeforeDue === 0) return `Tu factura #${n.saleNumber} vence hoy`;
-  return `Factura #${n.saleNumber} vencida hace ${Math.abs(n.daysBeforeDue)} dia${Math.abs(n.daysBeforeDue) === 1 ? "" : "s"}`;
+  if (n.daysBeforeDue > 0) return `Recordatorio: factura ${n.documentLabel} vence en ${n.daysBeforeDue} dia${n.daysBeforeDue === 1 ? "" : "s"}`;
+  if (n.daysBeforeDue === 0) return `Tu factura ${n.documentLabel} vence hoy`;
+  return `Factura ${n.documentLabel} vencida hace ${Math.abs(n.daysBeforeDue)} dia${Math.abs(n.daysBeforeDue) === 1 ? "" : "s"}`;
 }
 
 function buildHtml(n: CollectionReminderNotification): string {
@@ -51,7 +51,7 @@ function buildHtml(n: CollectionReminderNotification): string {
         : `vencio el <strong>${dueDate}</strong> y sigue pendiente`;
   return `
     <p>Hola ${escapeHtml(n.customerName)},</p>
-    <p>Tu factura <strong>#${n.saleNumber}</strong> por <strong>${escapeHtml(formatCOP(n.amountDue))}</strong> ${urgency}.</p>
+    <p>Tu factura <strong>${escapeHtml(n.documentLabel)}</strong> por <strong>${escapeHtml(formatCOP(n.amountDue))}</strong> ${urgency}.</p>
     <p>Si ya realizaste el pago, puedes ignorar este mensaje.</p>
   `.trim();
 }

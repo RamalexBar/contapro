@@ -3,6 +3,8 @@ import { z } from "zod";
 export const createManualInvoiceSchema = z.object({
   branchId: z.string().uuid(),
   customerId: z.string().uuid().optional(),
+  /** Vencimiento de la cuenta por cobrar (con cliente; por defecto 30 dias). */
+  dueDate: z.coerce.date().optional(),
   items: z
     .array(
       z.object({

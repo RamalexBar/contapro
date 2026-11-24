@@ -1,3 +1,8 @@
+import { PostManualInvoiceJournalEntryUseCase } from "./application/use-cases/post-manual-invoice-journal-entry.use-case";
+import { AnnualClosingUseCase } from "./application/use-cases/annual-closing.use-case";
+import { WithholdingReturnUseCase } from "./application/use-cases/withholding-return.use-case";
+import { PrismaWithholdingReportReader } from "./infrastructure/prisma-withholding-report.reader";
+import { ClosingController } from "./interfaces/closing.controller";
 import { basePrisma } from "@erp/database";
 import { getTenantContext } from "../../shared/context/request-context";
 import { isCajaproComboPlan } from "../partner-api/application/use-cases/provision-partner-account.use-case";
@@ -240,3 +245,12 @@ export const regularizeInventoryAccountUseCase = new RegularizeInventoryAccountU
   cajaproComboChecker
 );
 export const inventoryReconciliationController = new InventoryReconciliationController(regularizeInventoryAccountUseCase);
+
+/** Cierre contable anual y formulario 350 (ver annual-closing.use-case.ts y withholding-return.use-case.ts). */
+export const closingController = new ClosingController(
+  new AnnualClosingUseCase(accountRepo, journalRepo, financialPeriodRepo, createEntryUseCase, postEntryUseCase, auditService),
+  new WithholdingReturnUseCase(new PrismaWithholdingReportReader(), accountRepo, journalRepo, createEntryUseCase, postEntryUseCase, auditService)
+);
+
+/** Usado por manual-invoicing.container.ts: comprobante de cada factura manual. */
+export const postManualInvoiceJournalEntryUseCase = new PostManualInvoiceJournalEntryUseCase(accountRepo, createEntryUseCase, postEntryUseCase);

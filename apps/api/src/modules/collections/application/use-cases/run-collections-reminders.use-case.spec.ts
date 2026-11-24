@@ -12,6 +12,8 @@ import { RunCollectionsRemindersUseCase } from "./run-collections-reminders.use-
 const RECEIVABLE: AccountReceivableRecord = {
   id: "receivable-1",
   customerId: "customer-1",
+  manualInvoiceId: null,
+  documentLabel: "#42",
   saleId: "sale-1",
   branchId: "branch-1",
   amount: 100000,

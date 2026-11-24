@@ -22,11 +22,16 @@ export class PrismaManualInvoiceRepository implements IManualInvoiceRepository {
         subtotal: data.subtotal,
         taxTotal: data.taxTotal,
         total: data.total,
+        dueDate: data.dueDate ?? null,
         items: { create: data.items },
       },
       include: { items: true },
     });
     return toRecord(row);
+  }
+
+  async setJournalEntryId(id: string, journalEntryId: string): Promise<void> {
+    await prisma.manualInvoice.updateMany({ where: { id, companyId: getTenantContext().companyId }, data: { journalEntryId } });
   }
 
   async findByIdOrThrow(id: string): Promise<ManualInvoiceRecord> {
@@ -57,6 +62,8 @@ function toRecord(row: {
   cufe: string | null;
   invoiceXmlUrl: string | null;
   createdAt: Date;
+  dueDate: Date | null;
+  journalEntryId: string | null;
   items: Array<{
     id: string;
     description: string;
@@ -80,6 +87,8 @@ function toRecord(row: {
     cufe: row.cufe,
     invoiceXmlUrl: row.invoiceXmlUrl,
     createdAt: row.createdAt,
+    dueDate: row.dueDate,
+    journalEntryId: row.journalEntryId,
     items: row.items.map((item) => ({
       id: item.id,
       description: item.description,

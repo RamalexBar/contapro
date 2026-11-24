@@ -64,6 +64,8 @@ export class RegisterExternalElectronicInvoiceUseCase {
       branchId: input.branchId,
       customerId,
       items: input.items,
+      // El POS externo contabiliza sus ventas con el cierre de turno: aqui solo se factura.
+      postAccounting: false,
     });
 
     try {

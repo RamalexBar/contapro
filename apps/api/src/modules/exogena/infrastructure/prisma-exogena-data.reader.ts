@@ -88,6 +88,7 @@ export class PrismaExogenaDataReader implements IExogenaDataReader {
       sales: sales.map((s) => ({ customerId: s.customerId, subtotal: n(s.subtotal), discountTotal: n(s.discountTotal), taxTotal: n(s.taxTotal) })),
       manualInvoices: manualInvoices.map((m) => ({
         customerId: m.customerId,
+        external: m.createdByUserId.startsWith("api:"),
         subtotal: n(m.subtotal),
         ivaTotal: round2(m.items.filter((i) => i.taxType !== "INC").reduce((s, i) => s + n(i.taxAmount), 0)),
         incTotal: round2(m.items.filter((i) => i.taxType === "INC").reduce((s, i) => s + n(i.taxAmount), 0)),

@@ -440,3 +440,42 @@ export function getInventoryReconciliation(): Promise<InventoryReconciliation> {
 export function regularizeInventoryAccount(): Promise<InventoryReconciliation> {
   return apiFetch("/inventory-reconciliation/regularize", { method: "POST" });
 }
+
+// ---- Cierre contable anual y formulario 350 (2026-11-24) ----
+
+export interface AnnualClosingPreview {
+  year: number;
+  alreadyClosed: boolean;
+  closingEntryNumber: number | null;
+  totalIncome: number;
+  totalExpenses: number;
+  netIncome: number;
+  lines: { accountId: string; code: string; name: string; debit: number; credit: number }[];
+}
+
+export function previewAnnualClosing(year: number): Promise<AnnualClosingPreview> {
+  return apiFetch(`/accounting/annual-closing?year=${year}`);
+}
+
+export function postAnnualClosing(year: number): Promise<{ id: string; number: number }> {
+  return apiFetch("/accounting/annual-closing", { method: "POST", body: { year } });
+}
+
+export interface WithholdingReturn {
+  year: number;
+  month: number;
+  rows: { line: string; label: string; base: number; amount: number; count: number }[];
+  totalRetefuente: number;
+  totalReteiva: number;
+  totalToPay: number;
+  reteicaInformative: number;
+  paymentEntryNumber: number | null;
+}
+
+export function getWithholdingReturn(year: number, month: number): Promise<WithholdingReturn> {
+  return apiFetch(`/reports/withholding-return?year=${year}&month=${month}`);
+}
+
+export function payWithholdingReturn(input: { year: number; month: number; paidFrom: "BANK" | "CASH"; paymentDate: string }): Promise<{ id: string; number: number }> {
+  return apiFetch("/reports/withholding-return/payment", { method: "POST", body: input });
+}

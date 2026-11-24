@@ -1,7 +1,11 @@
 export interface AccountReceivableRecord {
   id: string;
   customerId: string;
-  saleId: string;
+  /** Origen: una venta del POS a credito o una factura manual. */
+  saleId: string | null;
+  manualInvoiceId: string | null;
+  /** Numero de la factura para recordatorios: "#12" (venta del POS) o "SETP31" (factura manual). */
+  documentLabel: string;
   /** Se toma de Sale.branchId (AccountReceivable no tiene su propia sucursal) -- mismo criterio
    * que AccountPayable.branchId via Purchase.branchId. */
   branchId: string;
@@ -13,7 +17,8 @@ export interface AccountReceivableRecord {
 
 export interface CreateAccountReceivableData {
   customerId: string;
-  saleId: string;
+  saleId?: string;
+  manualInvoiceId?: string;
   amount: number;
   dueDate: Date;
 }

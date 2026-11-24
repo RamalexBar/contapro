@@ -2,6 +2,8 @@ import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-l
 import { AuditService } from "../audit/application/audit.service";
 import { companyProfileRepo } from "../company/company.container";
 import { generateElectronicInvoiceUseCase } from "../electronic-invoicing/electronic-invoicing.container";
+import { postManualInvoiceJournalEntryUseCase } from "../accounting/accounting.container";
+import { accountReceivableRepo } from "../collections/collections.container";
 import { PrismaManualInvoiceRepository } from "./infrastructure/prisma-manual-invoice.repository";
 import { CreateManualInvoiceUseCase } from "./application/use-cases/create-manual-invoice.use-case";
 import { GetManualInvoiceUseCase } from "./application/use-cases/get-manual-invoice.use-case";
@@ -14,7 +16,14 @@ const auditService = new AuditService(new PrismaAuditLogRepository());
 /** Exportados (no solo locales): public-api.container.ts los reusa tal cual para el endpoint
  * POST /public/v1/electronic-invoices -- una factura "solo factura" (sin POS/producto/inventario/
  * contabilizacion) es exactamente lo que ya hace este caso de uso, ver su README. */
-export const createUseCase = new CreateManualInvoiceUseCase(manualInvoiceRepo, companyProfileRepo, generateElectronicInvoiceUseCase, auditService);
+export const createUseCase = new CreateManualInvoiceUseCase(
+  manualInvoiceRepo,
+  companyProfileRepo,
+  generateElectronicInvoiceUseCase,
+  auditService,
+  postManualInvoiceJournalEntryUseCase,
+  accountReceivableRepo
+);
 export const getUseCase = new GetManualInvoiceUseCase(manualInvoiceRepo);
 const listUseCase = new ListManualInvoicesUseCase(manualInvoiceRepo);
 

@@ -35,6 +35,7 @@ export function ManualInvoicePage() {
 
   const [branchId, setBranchId] = useState("");
   const [customerId, setCustomerId] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [lines, setLines] = useState<LineItem[]>([{ ...EMPTY_LINE }]);
   const [invoice, setInvoice] = useState<ManualInvoiceRecord | null>(null);
 
@@ -47,6 +48,7 @@ export function ManualInvoicePage() {
       createManualInvoice({
         branchId,
         customerId: customerId || undefined,
+        dueDate: customerId && dueDate ? dueDate : undefined,
         items: lines
           .filter((l) => l.description.trim())
           .map((l) => ({ description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, taxPercent: l.taxPercent })),
@@ -118,7 +120,14 @@ export function ManualInvoicePage() {
               </option>
             ))}
           </Select>
+          {customerId && (
+            <Input label="Vence (opcional, 30 días si se deja vacío)" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          )}
         </div>
+        <p className="text-xs text-slate-500">
+          La factura se contabiliza (ingreso e IVA). Con cliente queda en Cuentas por cobrar hasta que se abone; sin cliente
+          (consumidor final) se registra de contado.
+        </p>
 
         <div className="space-y-3">
           {lines.map((line, i) => (

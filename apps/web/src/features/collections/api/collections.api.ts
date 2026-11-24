@@ -3,7 +3,10 @@ import { apiFetch, openPdfInNewTab } from "../../../lib/api-client";
 export interface AccountReceivableRecord {
   id: string;
   customerId: string;
-  saleId: string;
+  saleId: string | null;
+  manualInvoiceId: string | null;
+  /** "#12" (venta del POS) o "SETP31" (factura manual). */
+  documentLabel: string;
   branchId: string;
   amount: number;
   balance: number;

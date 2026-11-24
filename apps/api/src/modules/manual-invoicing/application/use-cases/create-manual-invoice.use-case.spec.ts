@@ -1,3 +1,5 @@
+import type { ManualInvoiceJournalEntryInput, PostManualInvoiceJournalEntryUseCase } from "../../../accounting/application/use-cases/post-manual-invoice-journal-entry.use-case";
+import type { CreateAccountReceivableData, IAccountReceivableRepository } from "../../../collections/domain/account-receivable.repository";
 import { describe, expect, it, vi } from "vitest";
 import { tenantStorage } from "../../../../shared/context/request-context";
 import { ValidationError } from "../../../../shared/errors/app-error";
@@ -49,8 +51,14 @@ class FakeManualInvoiceRepository implements IManualInvoiceRepository {
       cufe: null,
       invoiceXmlUrl: null,
       createdAt: new Date(),
+      dueDate: data.dueDate ?? null,
+      journalEntryId: null,
       items: data.items.map((item, i) => ({ id: `item-${i}`, ...item })),
     };
+  }
+  journalEntryIds: string[] = [];
+  async setJournalEntryId(_id: string, journalEntryId: string): Promise<void> {
+    this.journalEntryIds.push(journalEntryId);
   }
   async findByIdOrThrow(): Promise<ManualInvoiceRecord> {
     throw new Error("not implemented");
@@ -78,6 +86,25 @@ function withTenantContext<T>(fn: () => Promise<T>): Promise<T> {
   );
 }
 
+/** Contabilidad y cartera falsas: guardan lo que recibieron. */
+function accountingFakes() {
+  const journal: ManualInvoiceJournalEntryInput[] = [];
+  const receivables: CreateAccountReceivableData[] = [];
+  const postJournal = {
+    execute: vi.fn(async (input: ManualInvoiceJournalEntryInput) => {
+      journal.push(input);
+      return { id: "je-1", number: 7 };
+    }),
+  } as unknown as PostManualInvoiceJournalEntryUseCase;
+  const arRepo = {
+    create: vi.fn(async (data: CreateAccountReceivableData) => {
+      receivables.push(data);
+      return {};
+    }),
+  } as unknown as IAccountReceivableRepository;
+  return { journal, receivables, deps: [postJournal, arRepo] as const };
+}
+
 describe("CreateManualInvoiceUseCase", () => {
   it("rejects when the company profile is incomplete, listing the missing fields", async () => {
     const manualInvoiceRepo = new FakeManualInvoiceRepository();
@@ -87,7 +114,8 @@ describe("CreateManualInvoiceUseCase", () => {
       manualInvoiceRepo,
       companyProfileRepo as unknown as ICompanyProfileRepository,
       generateElectronicInvoice,
-      new AuditService(new FakeAuditLogRepository())
+      new AuditService(new FakeAuditLogRepository()),
+      ...accountingFakes().deps
     );
 
     await expect(
@@ -108,7 +136,8 @@ describe("CreateManualInvoiceUseCase", () => {
       manualInvoiceRepo,
       companyProfileRepo as unknown as ICompanyProfileRepository,
       generateElectronicInvoice,
-      new AuditService(auditRepo)
+      new AuditService(auditRepo),
+      ...accountingFakes().deps
     );
 
     const invoice = await withTenantContext(() =>
@@ -150,7 +179,8 @@ describe("CreateManualInvoiceUseCase", () => {
       manualInvoiceRepo,
       companyProfileRepo as unknown as ICompanyProfileRepository,
       generateElectronicInvoice,
-      new AuditService(auditRepo)
+      new AuditService(auditRepo),
+      ...accountingFakes().deps
     );
 
     const invoice = await withTenantContext(() =>
@@ -159,5 +189,49 @@ describe("CreateManualInvoiceUseCase", () => {
 
     expect(invoice.id).toBe("manual-invoice-1");
     expect(auditRepo.entries.some((e) => e.action === "ELECTRONIC_INVOICE_GENERATION_FAILED")).toBe(true);
+  });
+
+  it("posts income, IVA and INC and opens a receivable when the invoice has a customer", async () => {
+    const manualInvoiceRepo = new FakeManualInvoiceRepository();
+    const fakes = accountingFakes();
+    const useCase = new CreateManualInvoiceUseCase(
+      manualInvoiceRepo,
+      new FakeCompanyProfileRepository(COMPLETE_PROFILE) as unknown as ICompanyProfileRepository,
+      { execute: vi.fn().mockResolvedValue({}) } as unknown as GenerateElectronicInvoiceUseCase,
+      new AuditService(new FakeAuditLogRepository()),
+      ...fakes.deps
+    );
+
+    await withTenantContext(() =>
+      useCase.execute({
+        branchId: "branch-1",
+        customerId: "customer-1",
+        dueDate: new Date("2026-12-31T00:00:00Z"),
+        items: [
+          { description: "Consultoria", quantity: 1, unitPrice: 100000, taxPercent: 19 },
+          { description: "Almuerzo", quantity: 1, unitPrice: 50000, taxPercent: 8, taxType: "INC" },
+        ],
+      })
+    );
+
+    expect(fakes.journal[0]).toEqual(expect.objectContaining({ subtotal: 150000, ivaTotal: 19000, incTotal: 4000, onCredit: true }));
+    expect(manualInvoiceRepo.journalEntryIds).toEqual(["je-1"]);
+    expect(fakes.receivables).toEqual([{ customerId: "customer-1", manualInvoiceId: "manual-invoice-1", amount: 173000, dueDate: new Date("2026-12-31T00:00:00Z") }]);
+  });
+
+  it("does not post accounting for invoices of an external POS (postAccounting false), already posted by its shift close", async () => {
+    const fakes = accountingFakes();
+    const useCase = new CreateManualInvoiceUseCase(
+      new FakeManualInvoiceRepository(),
+      new FakeCompanyProfileRepository(COMPLETE_PROFILE) as unknown as ICompanyProfileRepository,
+      { execute: vi.fn().mockResolvedValue({}) } as unknown as GenerateElectronicInvoiceUseCase,
+      new AuditService(new FakeAuditLogRepository()),
+      ...fakes.deps
+    );
+    await withTenantContext(() =>
+      useCase.execute({ branchId: "branch-1", customerId: "customer-1", postAccounting: false, items: [{ description: "x", quantity: 1, unitPrice: 1000, taxPercent: 19 }] })
+    );
+    expect(fakes.journal).toHaveLength(0);
+    expect(fakes.receivables).toHaveLength(0);
   });
 });

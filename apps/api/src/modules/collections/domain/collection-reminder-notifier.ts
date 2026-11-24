@@ -1,7 +1,8 @@
 export interface CollectionReminderNotification {
   customerName: string;
   customerEmail: string;
-  saleNumber: number;
+  /** "#12" o "SETP31". */
+  documentLabel: string;
   amountDue: number;
   dueDate: Date;
   /** Positivo = antes de vencer, 0 = vence hoy, negativo = dias de mora. */

@@ -9,8 +9,11 @@ model AccountReceivable {
   id         String   @id @default(uuid())
   companyId  String
   customerId String
-  saleId     String   @unique
-  sale       Sale     @relation(fields: [saleId], references: [id])
+  // Origen: una venta del POS a credito o una factura manual (una de las dos).
+  saleId     String?  @unique
+  sale       Sale?    @relation(fields: [saleId], references: [id])
+  manualInvoiceId String? @unique
+  manualInvoice   ManualInvoice? @relation(fields: [manualInvoiceId], references: [id])
   amount     Decimal  @db.Decimal(14, 2)
   balance    Decimal  @db.Decimal(14, 2)
   dueDate    DateTime

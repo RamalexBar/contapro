@@ -11,13 +11,18 @@ import type {
   RegisterReceivablePaymentResult,
 } from "../domain/account-receivable.repository";
 
-const INCLUDE = { sale: { select: { branchId: true } } } as const;
+const INCLUDE = {
+  sale: { select: { branchId: true, number: true } },
+  manualInvoice: { select: { branchId: true, electronicInvoice: { select: { fullNumber: true } } } },
+} as const;
 
 type AccountReceivableRow = {
   id: string;
   customerId: string;
-  saleId: string;
-  sale: { branchId: string };
+  saleId: string | null;
+  manualInvoiceId: string | null;
+  sale: { branchId: string; number: number } | null;
+  manualInvoice: { branchId: string; electronicInvoice: { fullNumber: string } | null } | null;
   amount: unknown;
   balance: unknown;
   dueDate: Date;
@@ -29,7 +34,9 @@ function toRecord(row: AccountReceivableRow): AccountReceivableRecord {
     id: row.id,
     customerId: row.customerId,
     saleId: row.saleId,
-    branchId: row.sale.branchId,
+    manualInvoiceId: row.manualInvoiceId,
+    branchId: row.sale?.branchId ?? row.manualInvoice?.branchId ?? "",
+    documentLabel: row.sale ? `#${row.sale.number}` : (row.manualInvoice?.electronicInvoice?.fullNumber ?? "manual"),
     amount: Number(row.amount),
     balance: Number(row.balance),
     dueDate: row.dueDate,
@@ -63,7 +70,8 @@ export class PrismaAccountReceivableRepository implements IAccountReceivableRepo
       data: {
         companyId: getTenantContext().companyId,
         customerId: data.customerId,
-        saleId: data.saleId,
+        saleId: data.saleId ?? null,
+        manualInvoiceId: data.manualInvoiceId ?? null,
         amount: data.amount,
         balance: data.amount,
         dueDate: data.dueDate,

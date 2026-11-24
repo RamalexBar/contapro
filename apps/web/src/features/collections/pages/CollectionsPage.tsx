@@ -79,7 +79,7 @@ export function CollectionsPage() {
     <AppLayout>
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Cuentas por cobrar</h1>
       <p className="mb-4 text-sm text-slate-500">
-        Ventas a credito (metodo de pago CREDIT en el punto de venta). Se pueden cobrar en persona
+        Ventas a credito (metodo de pago CREDIT en el punto de venta) y facturas manuales con cliente. Se pueden cobrar en persona
         (abono) o generando un link de pago en linea (Wompi) para que el cliente pague directo.
       </p>
 
@@ -110,6 +110,7 @@ export function CollectionsPage() {
             <TableHead>
               <tr>
                 <Th>Cliente</Th>
+                <Th>Factura</Th>
                 <Th>Saldo</Th>
                 <Th>Vencimiento</Th>
                 <Th>Estado</Th>
@@ -122,6 +123,7 @@ export function CollectionsPage() {
                 return (
                 <TableRow key={ar.id}>
                   <Td>{customerName(ar.customerId)}</Td>
+                  <Td>{ar.saleId ? `Venta ${ar.documentLabel}` : `Factura ${ar.documentLabel}`}</Td>
                   <Td>{formatCOP(ar.balance)}</Td>
                   <Td>{ar.dueDate.slice(0, 10)}</Td>
                   <Td>

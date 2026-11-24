@@ -148,8 +148,8 @@ export interface Format1006Row extends ThirdPartyInfo {
 export function buildFormat1006(data: ExogenaYearData): Format1006Row[] {
   const customers = new Map(data.customers.map((c) => [c.id, c]));
   const rows = new Map<string, Format1006Row>();
-  const add = (customerId: string | null, iva: number, inc: number) => {
-    if (iva <= 0 && inc <= 0) return;
+  const addSigned = (customerId: string | null, iva: number, inc: number) => {
+    if (iva === 0 && inc === 0) return;
     const key = customerId ?? UNIDENTIFIED_KEY;
     const row =
       rows.get(key) ??
@@ -164,9 +164,17 @@ export function buildFormat1006(data: ExogenaYearData): Format1006Row[] {
     row.impuestoConsumo = round2(row.impuestoConsumo + inc);
     rows.set(key, row);
   };
+  const add = (customerId: string | null, iva: number, inc: number) => {
+    if (iva > 0 || inc > 0) addSigned(customerId, iva, inc);
+  };
   for (const s of data.sales) add(s.customerId, s.taxTotal, 0);
-  for (const m of data.manualInvoices) add(m.customerId, m.ivaTotal, m.incTotal);
   for (const s of data.shiftCloses) add(null, s.iva, s.inc);
+  for (const m of data.manualInvoices) {
+    if (m.external && !m.customerId) continue; // ya esta en el cierre de turno
+    add(m.customerId, m.ivaTotal, m.incTotal);
+    // Factura de un POS externo con cliente: se identifica, y sale del total sin identificar del cierre.
+    if (m.external) addSigned(null, -m.ivaTotal, -m.incTotal);
+  }
   return [...rows.values()];
 }
 
@@ -208,8 +216,12 @@ export function buildFormat1007(data: ExogenaYearData): Format1007Row[] {
     rows.set(key, row);
   };
   for (const s of data.sales) add(s.customerId, s.subtotal, s.discountTotal);
-  for (const m of data.manualInvoices) add(m.customerId, m.subtotal, 0);
   for (const s of data.shiftCloses) add(null, s.base, s.returnsBase);
+  for (const m of data.manualInvoices) {
+    if (m.external && !m.customerId) continue; // ya esta en el cierre de turno
+    add(m.customerId, m.subtotal, 0);
+    if (m.external) add(null, -m.subtotal, 0);
+  }
   for (const r of data.returns) add(r.customerId, 0, r.base);
   for (const n of data.creditNotes) add(n.customerId, 0, n.base);
   return [...rows.values()];

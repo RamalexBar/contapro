@@ -379,8 +379,8 @@ compras y centros de costo, todo implementado.**
 1. Flujo de caja como Estado de Flujo de Efectivo formal (metodo indirecto desde el Estado de
    Resultados) — hoy es un resumen directo simplificado.
 2. Retenciones en el documento soporte electronico de compras (ver punto 9 de "Implementado").
-3. Flujo de "declarar/pagar" las retenciones practicadas a la DIAN — las cuentas 236540/236801/
-   236705 solo acumulan saldo (ver punto 9).
+3. ~~Flujo de declarar/pagar las retenciones~~: hecho el 2026-11-24 (ver "Formulario 350" abajo). La
+   ReteICA (236801) se declara al municipio y sigue sin flujo de pago.
 4. Centro de costo solo se puede etiquetar en comprobantes manuales y gastos operativos — no en
    venta/compra/nomina/devolucion/abono/cobro/ajuste de caja (ver punto 10, decision de alcance
    explicita). Balance General y Flujo de caja tampoco filtran por centro de costo.
@@ -391,6 +391,35 @@ compras y centros de costo, todo implementado.**
    comprobantes, o viceversa) — soportarlo requeriria que `BankReconciliationItem` deje de ser un
    par 1:1, tocando tambien `AddBankReconciliationMatchData`/el endpoint de match, no solo el
    sugeridor.
+
+## Cierre contable anual — 2026-11-24
+
+`AnnualClosingUseCase` (`GET/POST /accounting/annual-closing`, Contabilidad -> Periodos -> "Cierre contable anual"):
+un comprobante del 31 de diciembre (`type CLOSING`, `sourceType AnnualClosing`, `sourceId` = año) que deja en cero
+cada cuenta de ingresos (debito) y de gastos y costos (credito) con su saldo del año, y lleva la diferencia a **3605
+Utilidad del ejercicio** o **3610 Perdida del ejercicio**. Antes no existia: el Balance acumulaba "resultados sin
+cerrar" de todos los años.
+- Uno por año; para rehacerlo se anula el comprobante en el Libro Diario (`buildClosingLines` ignora cierres previos).
+- Diciembre tiene que estar abierto y sin borradores (el comprobante lleva fecha del 31). Hacerlo despues de
+  registrar el impuesto de renta.
+- El Estado de Resultados (y por tanto los estados NIIF) excluye este comprobante: el año cerrado sigue mostrando sus
+  ingresos y gastos. El Balance ya no muestra "sin cerrar" para ese año y muestra 3605/3610.
+- El traslado de 3605 a utilidades acumuladas (3705) o su distribucion se registra a mano en el año siguiente.
+- Verificado en vivo (local): perdida 2026 a 3610, Estado de Resultados igual antes y despues, segundo cierre
+  rechazado, anular y rehacer.
+
+## Formulario 350 (retenciones del mes) — 2026-11-24
+
+`WithholdingReturnUseCase` (`GET /reports/withholding-return?year&month`, `POST .../payment`; Contabilidad ->
+Reportes -> "Formulario 350"): agrupa las retenciones que la empresa practico en el mes por renglon (rentas de
+trabajo desde la nomina aprobada y las prestaciones, honorarios, servicios, arrendamientos, compras, otros pagos y
+retencion de IVA) con su base, y el total a pagar redondeado a miles (art. 868 E.T.). La ReteICA se muestra aparte
+(se declara al municipio). Es una guia para diligenciar el formulario: no incluye autorretenciones ni retenciones
+asumidas.
+- **Pago**: Debito 236540 (compras), 236505 (rentas de trabajo) y 236705 (IVA) por lo practicado, Credito Bancos o
+  Caja por el valor redondeado, y la diferencia a ajuste al peso (5395 / 4295). Uno por mes (`sourceType
+  WithholdingReturn350`), anulable desde el Libro Diario.
+- Verificado en vivo (local): noviembre 2026, rentas de trabajo 2.147.000 + servicios 18.000, comprobante cuadrado.
 
 ## Bases minimas y declarante en las retenciones de compras — 2026-11-24
 

@@ -28,6 +28,8 @@ export interface ManualInvoiceRecord {
 export interface CreateManualInvoiceInput {
   branchId: string;
   customerId?: string;
+  /** Vencimiento de la cuenta por cobrar (YYYY-MM-DD). */
+  dueDate?: string;
   items: Array<{ description: string; quantity: number; unitPrice: number; taxPercent: number }>;
 }
 

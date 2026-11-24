@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { tenantContextMiddleware } from "../../../shared/middlewares/tenant-context.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
-import { accountingController, inventoryReconciliationController, vatSummaryController } from "../accounting.container";
+import { accountingController, closingController, inventoryReconciliationController, vatSummaryController } from "../accounting.container";
 
 export const accountingRouter = Router();
 accountingRouter.use(tenantContextMiddleware);
@@ -196,3 +196,9 @@ accountingRouter.post(
   requirePermission("accounting.manage"),
   inventoryReconciliationController.regularize
 );
+
+// Cierre contable anual (traslado de resultados a 3605/3610) y formulario 350.
+accountingRouter.get("/accounting/annual-closing", requirePermission("accounting.read"), closingController.previewAnnualClosing);
+accountingRouter.post("/accounting/annual-closing", requirePermission("accounting.manage"), closingController.postAnnualClosing);
+accountingRouter.get("/reports/withholding-return", requirePermission("accounting.read"), closingController.getWithholdingReturn);
+accountingRouter.post("/reports/withholding-return/payment", requirePermission("accounting.manage"), closingController.payWithholdingReturn);

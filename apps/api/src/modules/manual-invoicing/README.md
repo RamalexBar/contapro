@@ -29,12 +29,12 @@ PayrollDetail), con el mismo XOR contra `saleId` a nivel de base de datos.
 
 ## Limitaciones conocidas (deliberadamente fuera de alcance de esta iteracion)
 
-- **Sin asiento contable**: a diferencia de una venta del POS (`PostSaleJournalEntryUseCase`), una
-  factura manual no contabiliza nada. Si se necesita mas adelante, seria un caso de uso nuevo
-  reusando el `ChartOfAccounts`/`JournalEntry` existentes, no una reescritura de este modulo.
-- **Sin cartera/cobranza**: no crea `AccountReceivable` ni se integra con `modules/collections` —
-  no hay concepto de "pago" o "vencimiento" para una factura manual todavia, solo el documento y su
-  representacion fiscal ante la DIAN.
+- ~~Sin asiento contable ni cartera~~ (resuelto 2026-11-24): `PostManualInvoiceJournalEntryUseCase` contabiliza
+  Debito 1305 Clientes (o 1105 Caja si no tiene cliente) / Credito 4135, 2408 IVA y 240810 impuesto al consumo, y con
+  cliente se crea la `AccountReceivable` (`manualInvoiceId`, vencimiento `dueDate`, 30 dias por defecto) que se abona
+  en Cobranza. Las facturas de la API publica (POS externo) pasan `postAccounting: false`: su venta ya la contabiliza
+  el cierre de turno, y hacerlo aqui duplicaria el ingreso. Si contabilizar falla (ej. mes cerrado), la factura queda
+  creada y se audita `MANUAL_INVOICE_ACCOUNTING_FAILED`.
 - **Sin descuentos ni retenciones por linea**: a diferencia de `CreateSaleUseCase`, no hay
   `discountPercent` ni `SaleWithholding` — si se necesitan, agregarlos siguiendo el mismo patron
   que el POS.

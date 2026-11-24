@@ -1,3 +1,4 @@
+import { ANNUAL_CLOSING_SOURCE } from "./use-cases/annual-closing.use-case";
 import { round2 } from "@erp/shared-utils";
 import type { IChartOfAccountsRepository } from "../domain/chart-of-accounts.repository";
 import type { IJournalEntryRepository, PostedLineAggregate } from "../domain/journal-entry.repository";
@@ -206,7 +207,11 @@ export class AccountingReportsService {
 
   async getIncomeStatement(from: Date, to: Date, costCenterId?: string, branchId?: string): Promise<IncomeStatement> {
     const accounts = await this.accountRepo.list();
-    const lines = await this.journalRepo.listPostedLines({ from, to, costCenterId, branchId });
+    // El comprobante de cierre anual deja los resultados en cero: se excluye para que el año cerrado
+    // siga mostrando sus ingresos y gastos (ver annual-closing.use-case.ts).
+    const lines = (await this.journalRepo.listPostedLines({ from, to, costCenterId, branchId })).filter(
+      (l) => l.sourceType !== ANNUAL_CLOSING_SOURCE
+    );
     const byAccount = this.aggregateByAccount(lines);
 
     const income: AccountBalance[] = [];

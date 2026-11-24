@@ -42,7 +42,7 @@ describe("1005 / 1006 — IVA", () => {
       { customerId: "c1", subtotal: 200_000, discountTotal: 0, taxTotal: 38_000 },
       { customerId: null, subtotal: 100_000, discountTotal: 10_000, taxTotal: 17_100 },
     ],
-    manualInvoices: [{ customerId: "c1", subtotal: 300_000, ivaTotal: 0, incTotal: 24_000 }],
+    manualInvoices: [{ customerId: "c1", subtotal: 300_000, ivaTotal: 0, incTotal: 24_000, external: false }],
     shiftCloses: [{ base: 400_000, iva: 76_000, inc: 0, returnsBase: 10_000, returnsIva: 1_900 }],
     returns: [
       { customerId: "c1", base: 50_000, tax: 9_500 },
@@ -73,6 +73,24 @@ describe("1005 / 1006 — IVA", () => {
     expect(rows.find((r) => r.documentNumber === "222222222")).toEqual(
       expect.objectContaining({ valorIngreso: 500_000, devolucionesRebajasDescuentos: 40_000 })
     );
+  });
+});
+
+describe("facturas de un POS externo (combo Cajapro)", () => {
+  it("do not double count the shift close: the customer is identified and leaves the unidentified total", () => {
+    const year = data({
+      shiftCloses: [{ base: 400_000, iva: 76_000, inc: 0, returnsBase: 0, returnsIva: 0 }],
+      manualInvoices: [
+        { customerId: "c1", subtotal: 100_000, ivaTotal: 19_000, incTotal: 0, external: true },
+        { customerId: null, subtotal: 50_000, ivaTotal: 9_500, incTotal: 0, external: true },
+      ],
+    });
+    const income = buildFormat1007(year);
+    expect(income.find((r) => r.documentNumber === "800111222")?.valorIngreso).toBe(100_000);
+    expect(income.find((r) => r.documentNumber === "222222222")?.valorIngreso).toBe(300_000);
+    const vat = buildFormat1006(year);
+    expect(vat.find((r) => r.documentNumber === "800111222")?.ivaGenerado).toBe(19_000);
+    expect(vat.find((r) => r.documentNumber === "222222222")?.ivaGenerado).toBe(57_000);
   });
 });
 

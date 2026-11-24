@@ -1,3 +1,4 @@
+import { AnnualClosingCard, WithholdingReturnReport } from "../components/ClosingAndTaxCards";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listAllBranches } from "../../inventory/api/branch.api";
@@ -71,7 +72,7 @@ const WITHHOLDING_TYPES: { value: WithholdingType; label: string }[] = [
 ];
 
 type Section = "accounts" | "entries" | "reports" | "periods" | "withholding" | "cost-centers";
-type ReportTab = "balance" | "thirdparty" | "income" | "cashflow" | "ledger" | "vat" | "niif" | "inventory";
+type ReportTab = "balance" | "thirdparty" | "income" | "cashflow" | "ledger" | "vat" | "withholding350" | "niif" | "inventory";
 const REPORT_TAB_LABELS: Record<ReportTab, string> = {
   balance: "Balance General",
   thirdparty: "Balance de prueba x tercero",
@@ -79,6 +80,7 @@ const REPORT_TAB_LABELS: Record<ReportTab, string> = {
   cashflow: "Flujo de caja",
   ledger: "Libro mayor",
   vat: "Resumen de IVA",
+  withholding350: "Formulario 350",
   niif: "Estados NIIF",
   inventory: "Conciliación inventario (1435)",
 };
@@ -899,6 +901,7 @@ function EntriesSection({ canManage }: { canManage: boolean }) {
 }
 
 function ReportsSection() {
+  const canManageReports = useAuthStore((s) => s.hasPermission("accounting.manage"));
   const [reportTab, setReportTab] = useState<ReportTab>("balance");
   const [asOf, setAsOf] = useState(todayStr());
   const [from, setFrom] = useState(monthAgoStr());
@@ -940,14 +943,14 @@ function ReportsSection() {
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          {(["balance", "thirdparty", "income", "cashflow", "ledger", "vat", "niif", "inventory"] as ReportTab[]).map((tab) => (
+          {(["balance", "thirdparty", "income", "cashflow", "ledger", "vat", "withholding350", "niif", "inventory"] as ReportTab[]).map((tab) => (
             <Button key={tab} size="sm" variant={reportTab === tab ? "primary" : "secondary"} onClick={() => setReportTab(tab)}>
               {REPORT_TAB_LABELS[tab]}
             </Button>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {(reportBranches?.data.length ?? 0) > 1 && reportTab !== "cashflow" && reportTab !== "inventory" && (
+          {(reportBranches?.data.length ?? 0) > 1 && reportTab !== "cashflow" && reportTab !== "inventory" && reportTab !== "withholding350" && (
             <Select aria-label="Sucursal" value={reportBranchId} onChange={(e) => setReportBranchId(e.target.value)}>
               <option value="">Todas las sucursales</option>
               {reportBranches?.data.map((b) => (
@@ -963,7 +966,7 @@ function ReportsSection() {
           </Button>
         </div>
       </div>
-      {reportBranchId && reportTab !== "cashflow" && reportTab !== "inventory" && (
+      {reportBranchId && reportTab !== "cashflow" && reportTab !== "inventory" && reportTab !== "withholding350" && (
         <p className="text-sm text-slate-500">
           Sucursal: <span className="font-medium text-slate-700">{reportBranches?.data.find((b) => b.id === reportBranchId)?.name}</span>. Solo los
           movimientos registrados en esa sucursal (ventas, compras, caja y gastos de esa sede).
@@ -1100,6 +1103,7 @@ function ReportsSection() {
 
       {reportTab === "thirdparty" && <TrialBalanceByThirdPartyReport branchId={branchFilter} />}
       {reportTab === "inventory" && <InventoryReconciliationReport />}
+      {reportTab === "withholding350" && <WithholdingReturnReport canManage={canManageReports} />}
       {reportTab === "vat" && <VatSummaryReport branchId={branchFilter} />}
       {reportTab === "niif" && <NiifStatementsReport branchId={branchFilter} />}
 
@@ -1180,6 +1184,7 @@ function PeriodsSection({ canManage }: { canManage: boolean }) {
 
   return (
     <div className="space-y-6">
+      <AnnualClosingCard canManage={canManage} />
       {canManage && (
         <Card title="Cerrar periodo contable">
           <p className="mb-3 text-sm text-slate-500">

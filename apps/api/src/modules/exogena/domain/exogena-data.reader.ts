@@ -21,7 +21,11 @@ export interface ExogenaYearData {
   purchases: ExogenaPurchase[];
   /** Ventas del POS no anuladas: subtotal antes de descuento. */
   sales: Array<{ customerId: string | null; subtotal: number; discountTotal: number; taxTotal: number }>;
-  manualInvoices: Array<{ customerId: string | null; subtotal: number; ivaTotal: number; incTotal: number }>;
+  /**
+   * external = emitida por la API publica para un POS externo: esa venta ya esta en su cierre de turno
+   * (shiftCloses, sin cliente), asi que solo aporta la identidad del cliente, no un ingreso adicional.
+   */
+  manualInvoices: Array<{ customerId: string | null; subtotal: number; ivaTotal: number; incTotal: number; external: boolean }>;
   /** Cierres de turno de un POS externo (combo Cajapro): ventas a consumidor final. */
   shiftCloses: Array<{ base: number; iva: number; inc: number; returnsBase: number; returnsIva: number }>;
   /** Devoluciones (base sin IVA y su IVA), con el cliente de la venta. */

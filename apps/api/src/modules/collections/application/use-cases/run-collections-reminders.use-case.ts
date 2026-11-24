@@ -10,15 +10,15 @@ import { normalizeToE164 } from "../../../whatsapp/application/normalize-phone";
  * asumido, documentado igual que REMINDER_DAYS en run-subscription-lifecycle.use-case.ts. */
 const REMINDER_DAYS = [3, 1, 0, -3, -7];
 
-function buildWhatsAppMessage(customerName: string, saleNumber: number, amountDue: number, daysBeforeDue: number): string {
+function buildWhatsAppMessage(customerName: string, documentLabel: string, amountDue: number, daysBeforeDue: number): string {
   const amount = amountDue.toLocaleString("es-CO");
   if (daysBeforeDue < 0) {
-    return `Hola ${customerName}, tu factura #${saleNumber} por $${amount} esta vencida hace ${-daysBeforeDue} dias. Por favor ponte al dia.`;
+    return `Hola ${customerName}, tu factura ${documentLabel} por $${amount} esta vencida hace ${-daysBeforeDue} dias. Por favor ponte al dia.`;
   }
   if (daysBeforeDue === 0) {
-    return `Hola ${customerName}, tu factura #${saleNumber} por $${amount} vence hoy.`;
+    return `Hola ${customerName}, tu factura ${documentLabel} por $${amount} vence hoy.`;
   }
-  return `Hola ${customerName}, tu factura #${saleNumber} por $${amount} vence en ${daysBeforeDue} dias.`;
+  return `Hola ${customerName}, tu factura ${documentLabel} por $${amount} vence en ${daysBeforeDue} dias.`;
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -57,10 +57,7 @@ export class RunCollectionsRemindersUseCase {
       if (alreadySent) continue;
 
       try {
-        const [customer, sale] = await Promise.all([
-          this.customerRepo.findByIdOrThrow(receivable.customerId),
-          this.saleRepo.findByIdOrThrow(receivable.saleId),
-        ]);
+        const customer = await this.customerRepo.findByIdOrThrow(receivable.customerId);
 
         // Cascada: WhatsApp primero si hay telefono (mayor tasa de apertura), cae a email si
         // falla o no esta configurado (ver modules/whatsapp/README.md) -- nunca bloquea, mismo
@@ -72,7 +69,7 @@ export class RunCollectionsRemindersUseCase {
             recipient = normalizeToE164(customer.phone);
             await this.whatsAppSender.sendText(
               recipient,
-              buildWhatsAppMessage(customer.name, sale.number, receivable.balance, daysUntilDue)
+              buildWhatsAppMessage(customer.name, receivable.documentLabel, receivable.balance, daysUntilDue)
             );
             channelUsed = "WHATSAPP";
           } catch {
@@ -87,7 +84,7 @@ export class RunCollectionsRemindersUseCase {
           await this.notifier.send({
             customerName: customer.name,
             customerEmail: customer.email,
-            saleNumber: sale.number,
+            documentLabel: receivable.documentLabel,
             amountDue: receivable.balance,
             dueDate: receivable.dueDate,
             daysBeforeDue: daysUntilDue,

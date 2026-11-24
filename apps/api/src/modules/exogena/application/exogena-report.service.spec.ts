@@ -215,8 +215,8 @@ describe("ExogenaReportService", () => {
 
   it("getFormat1008: agrega saldo actual de cuentas por cobrar activas, sumando varias del mismo cliente", async () => {
     const receivables: AccountReceivableRecord[] = [
-      { id: "ar-1", customerId: CUSTOMER.id, saleId: "sale-1", branchId: "branch-1", amount: 30_000, balance: 30_000, dueDate: new Date(), status: "PENDING" },
-      { id: "ar-2", customerId: CUSTOMER.id, saleId: "sale-2", branchId: "branch-1", amount: 5_000, balance: 5_000, dueDate: new Date(), status: "PARTIAL" },
+      { id: "ar-1", customerId: CUSTOMER.id, saleId: "sale-1", manualInvoiceId: null, documentLabel: "#1", branchId: "branch-1", amount: 30_000, balance: 30_000, dueDate: new Date(), status: "PENDING" },
+      { id: "ar-2", customerId: CUSTOMER.id, saleId: "sale-2", manualInvoiceId: null, documentLabel: "#2", branchId: "branch-1", amount: 5_000, balance: 5_000, dueDate: new Date(), status: "PARTIAL" },
     ];
     const service = makeService({ receivables });
 

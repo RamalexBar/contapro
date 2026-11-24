@@ -21,6 +21,8 @@ export interface CreateManualInvoiceData {
   subtotal: number;
   taxTotal: number;
   total: number;
+  /** Vencimiento de la cuenta por cobrar (con cliente). */
+  dueDate?: Date | null;
   items: ManualInvoiceItemInput[];
 }
 
@@ -36,11 +38,14 @@ export interface ManualInvoiceRecord {
   cufe: string | null;
   invoiceXmlUrl: string | null;
   createdAt: Date;
+  dueDate: Date | null;
+  journalEntryId: string | null;
   items: ManualInvoiceItemRecord[];
 }
 
 export interface IManualInvoiceRepository {
   create(data: CreateManualInvoiceData): Promise<ManualInvoiceRecord>;
+  setJournalEntryId(id: string, journalEntryId: string): Promise<void>;
   findByIdOrThrow(id: string): Promise<ManualInvoiceRecord>;
   list(): Promise<ManualInvoiceRecord[]>;
 }
