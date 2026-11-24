@@ -242,7 +242,12 @@ model CreditNote {
   companyId  String
   branchId   String
   saleId     String?
-  customerId String
+  // Null = consumidor final (venta sin cliente, ej. una devolucion del POS).
+  customerId String?
+  // Devolucion que origino la nota (null = nota libre: descuento, ajuste de precio...).
+  returnId   String?  @unique
+  // Concepto de correccion DIAN (1 devolucion parcial, 2 anulacion, 3 rebaja, 4 ajuste de precio, 5 pronto pago, 6 volumen).
+  conceptCode String  @default("1")
   reason     String
   amount     Decimal  @db.Decimal(14, 2)
   status     String   @default("ISSUED")
@@ -261,7 +266,9 @@ model DebitNote {
   id         String   @id @default(uuid())
   companyId  String
   branchId   String
-  customerId String
+  customerId String?
+  // Concepto de correccion DIAN (1 intereses, 2 gastos por cobrar, 3 cambio del valor, 4 otros).
+  conceptCode String  @default("4")
   saleId     String?
   reason     String
   amount     Decimal  @db.Decimal(14, 2)

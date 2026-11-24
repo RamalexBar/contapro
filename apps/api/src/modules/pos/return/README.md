@@ -49,6 +49,22 @@ una devolucion sobre una venta `COMPLETED` o `RETURNED_PARTIAL`:
    pagos original de la venta -- un reembolso puede salir por un medio distinto al que se pago,
    asi que se pide explicito.
 4. Audita `RETURN_CREATED`.
+5. **Nota credito electronica** (2026-11-24): toda devolucion de una venta facturada exige nota
+   credito ante la DIAN (una factura emitida no se puede anular). `CreateCreditNoteUseCase.executeForReturn`
+   crea la `CreditNote` (con `returnId`) y su documento electronico con los productos devueltos como
+   renglones: concepto `1` (devolucion parcial) o `2` (anulacion) cuando una sola devolucion deja la
+   venta `RETURNED_FULL`; el medio de pago sale del `refundMethod`. Con Factus se emite por su API
+   (ver `electronic-invoicing/README.md` punto 16). No bloquea la devolucion: si falla, queda auditado
+   y se reenvia desde Cotizaciones, notas y devoluciones. `GET /returns` trae el estado (`creditNote`).
+
+**Descuentos (corregido 2026-11-24)**: el valor devuelto se calcula igual que la venta: el descuento de
+la linea reduce la base gravada. Antes se devolvia el precio de lista de un producto vendido con
+descuento (ej. 1 de 2 unidades a $11.000 con 10 %: devolvia $13.090 en vez de $11.781) y el asiento
+reversaba un ingreso mayor al que se habia registrado.
+
+**Anular una venta facturada** (2026-11-24): `CancelSaleUseCase` rechaza anular una venta cuya factura
+electronica esta `ACCEPTED` o `PENDING_SUBMISSION` y pide hacer una devolucion total, que genera la nota
+credito y reversa inventario, caja y contabilidad (anular no reversa nada de eso).
 
 `GET /returns` (permiso `sale.read`, mismo que usa `credit-note`), filtro opcional `?saleId=`.
 

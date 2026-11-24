@@ -126,6 +126,8 @@ model ElectronicCreditNote {
   rejectionReason  String?
   submittedAt      DateTime?
   respondedAt      DateTime?
+  // Solicitud enviada al proveedor tecnologico (JSON), para reenviarla igual si fallo la conexion.
+  providerRequest  String?   @db.Text
 
   @@unique([companyId, prefix, number])
   @@index([companyId, branchId, createdAt])
@@ -163,6 +165,8 @@ model ElectronicDebitNote {
   rejectionReason  String?
   submittedAt      DateTime?
   respondedAt      DateTime?
+  // Solicitud enviada al proveedor tecnologico (JSON), para reenviarla igual si fallo la conexion.
+  providerRequest  String?   @db.Text
 
   @@unique([companyId, prefix, number])
   @@index([companyId, branchId, createdAt])
@@ -206,6 +210,8 @@ model ElectronicSupportDocument {
   rejectionReason  String?
   submittedAt      DateTime?
   respondedAt      DateTime?
+  // Solicitud enviada al proveedor tecnologico (JSON), para reenviarla igual si fallo la conexion.
+  providerRequest  String?   @db.Text
 
   @@unique([companyId, prefix, number])
   @@index([companyId, branchId, createdAt])

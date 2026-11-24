@@ -2,6 +2,8 @@ import { PrismaAuditLogRepository } from "../../audit/infrastructure/prisma-audi
 import { AuditService } from "../../audit/application/audit.service";
 import { postReturnJournalEntryUseCase } from "../../accounting/accounting.container";
 import { PrismaSaleRepository } from "../sale/infrastructure/prisma-sale.repository";
+import { PrismaProductRepository } from "../../inventory/product/infrastructure/prisma-product.repository";
+import { createCreditNoteUseCase } from "../credit-note/credit-note.container";
 import { PrismaReturnRepository } from "./infrastructure/prisma-return.repository";
 import { CreateReturnUseCase } from "./application/use-cases/create-return.use-case";
 import { ListReturnsUseCase } from "./application/use-cases/list-returns.use-case";
@@ -15,6 +17,6 @@ const returnRepo = new PrismaReturnRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
 export const returnController = new ReturnController(
-  new CreateReturnUseCase(returnRepo, saleRepo, postReturnJournalEntryUseCase, auditService),
+  new CreateReturnUseCase(returnRepo, saleRepo, postReturnJournalEntryUseCase, auditService, createCreditNoteUseCase, new PrismaProductRepository()),
   new ListReturnsUseCase(returnRepo)
 );

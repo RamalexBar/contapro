@@ -48,6 +48,8 @@ export interface ElectronicInvoiceWithXml extends ElectronicInvoiceRecord {
   signedXmlContent: string | null;
   dianTrackingId: string | null;
   rejectionReason: string | null;
+  /** Numero legal asignado por el proveedor tecnologico (Factus), si se emitio por ahi. */
+  providerNumber: string | null;
 }
 
 export interface ApplyThirdPartyInvoiceResultInput {

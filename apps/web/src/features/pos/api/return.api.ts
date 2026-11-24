@@ -22,6 +22,8 @@ export interface ReturnRecord {
   status: string;
   total: number;
   createdAt: string;
+  /** Documento electronico de la nota credito de la devolucion. */
+  creditNote?: { fullNumber: string; status: string; rejectionReason: string | null } | null;
   items: Array<{
     id: string;
     saleItemId: string;

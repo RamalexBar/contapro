@@ -249,10 +249,9 @@ como unico proveedor tecnologico.
       de la venta (`findSourceBillingInfo`), y usa el precio neto de cada linea del XML local.
     - Limite conocido: la API de ventas falla ("El comprobante no cuadra") si el pago en efectivo
       supera el total; el POS web no lo sufre porque envia el total y calcula el vuelto en pantalla.
-    - Notas credito/debito, documento soporte, nomina electronica y eventos RADIAN **no** usan
-      Factus todavia — solo se implemento y probo `POST /v2/bills/validate` + descarga de XML, el
-      resto de su API (mucho mas amplia que la del proveedor anterior evaluado, MATIAS) queda
-      documentada por Factus pero sin verificar en este codebase.
+    - Notas credito/debito y documento soporte **si** usan Factus desde el 2026-11-24 (ver punto
+      16). Nomina electronica y eventos RADIAN todavia no: Factus los ofrece (`POST /v2/payrolls`),
+      pero no estan conectados.
 
     **Activacion 100% automatica** (`SetElectronicInvoicingProviderUseCase`,
     `domain/factus-account-provisioner.ts`, `infrastructure/factus-account-provisioning.service.ts`,
@@ -302,6 +301,49 @@ como unico proveedor tecnologico.
     tiene ninguna suscripcion activa) — el trial es gratis y no deberia poder gastar la bolsa de
     documentos que Contapro ya pago. TRIAL sigue pudiendo facturar por DIRECT sin restriccion.
 
+16. **Notas credito/debito y documento soporte por Factus** (2026-11-24). Antes solo la factura
+    salia por Factus: una empresa con FACTUS que hacia una devolucion, una nota o una compra a un no
+    obligado a facturar generaba el documento por el camino directo (sin verificar, sin
+    credenciales), es decir, sin validez ante la DIAN.
+
+    - **Endpoints de Factus** (verificados en su sandbox el 2026-11-24, CRTE1933/ND618/SEDS984001650 con
+      curl y CRTE1934/CRTE1935/ND619/SEDS984001651 a traves del flujo real de Contapro):
+      `POST /v2/credit-notes/validate`, `POST /v2/debit-notes/validate`,
+      `POST /v2/support-documents/validate` y su `GET /v2/{tipo}/{numero}/download-xml`.
+      `FactusInvoicingClient.submitNote/submitSupportDocument`, payloads en `buildNotePayload` y
+      `buildSupportDocumentPayload`.
+    - **Referencia a la factura**: por `bill_number`, el numero legal que Factus le dio
+      (`ElectronicInvoiceWithXml.providerNumber`, leido de `dianResponseXml`). La factura tiene que
+      estar ACCEPTED por Factus; si no, la nota falla con un mensaje claro (y queda auditada).
+    - **Rango de numeracion**: se consulta en cada envio (`GET /v2/numbering-ranges?filter[document]=22|23|24`)
+      y se usa el primero activo y no vencido. Las notas no tienen resolucion DIAN (el rango se crea
+      solo con prefijo en el panel de Factus); el documento soporte si. Sin rango activo, el error
+      dice que hay que crearlo en Factus.
+    - **Numeracion en Contapro**: Factus decide el numero legal. Para guardar el documento antes
+      del envio, Contapro usa una numeracion interna (`CPNC`/`CPND`/`CPDS`,
+      `resolutionNumber = "INTERNA-PROVEEDOR"`, creada sola la primera vez, ver
+      `findResolutionForClaim` en `numbering-claim.ts`) que el camino directo nunca usa. Al
+      aceptarse, prefijo/numero/fullNumber pasan a ser los de Factus (`applyThirdPartyResult`).
+    - **Reenvio sin duplicar**: la solicitud enviada se guarda (`providerRequest`) antes de enviarla;
+      el reenvio manda la misma, con el mismo `reference_code`, y Factus devuelve el documento que
+      ya habia creado (probado: una nota marcada REJECTED a mano se reenvio y volvio CRTE1934, no una
+      nueva).
+    - **Reglas que impuso el sandbox** (la documentacion dice otra cosa): la nota debito exige
+      `customer`; el proveedor de un documento soporte residente en Colombia va siempre con tipo 31
+      (NIT; el de una persona natural es su cedula) y un digito de verificacion valido; los impuestos
+      del documento soporte solo admiten el codigo 01. Las notificaciones de la DIAN en `data.errors`
+      (ej. "correo no informado") llegan aun con el documento validado y no son un rechazo.
+    - **Renglones**: devolucion = los productos devueltos con su precio, descuento y tarifa (mismo
+      codigo `ITEM-n` que la factura); nota libre = el valor repartido entre las tarifas de IVA de la
+      venta (`noteLinesFromAmount`); nota debito por intereses o gastos de cobranza = un renglon
+      excluido de IVA (solo "3 Cambio del valor" lleva IVA); documento soporte = los productos que
+      entraron al inventario o un renglon por el subtotal, con la tarifa estandar mas cercana al IVA
+      de la compra y la retencion por renglon solo si se practico sobre todo el subtotal.
+    - **Conceptos de correccion** en `constants.ts` (`CREDIT_NOTE_CONCEPTS`/`DEBIT_NOTE_CONCEPTS`).
+      `CreditNote.conceptCode`/`DebitNote.conceptCode` los guardan.
+    - Pendiente: notas de ajuste al documento soporte (`POST /v2/adjustment-notes/validate`, no hay
+      flujo para corregir una compra todavia) y nomina electronica por Factus.
+
 ## Como probar localmente sin credenciales DIAN
 
 No hace falta un certificado real para ejercitar todo el camino de firma:
@@ -348,13 +390,14 @@ credenciales de habilitacion reales.
    - Los codigos de esquema 06/07/08 usados en `<cac:WithholdingTaxTotal>` para
      RteFuente/ReteIVA/ReteICA (`ubl-invoice-xml-builder.ts`) — misma clase de estimacion sin
      confirmar que el resto de este punto.
-6. **CUDE de notas**: el orden de concatenacion (`application/cude-generator.ts`) y los
+6. **CUDE de notas (solo camino directo; con Factus el CUDE es el suyo)**: el orden de concatenacion (`application/cude-generator.ts`) y los
    codigos de tipo de nota (`DIAN_NOTE_TYPE_CODE` en `application/constants.ts`, "91"/"92") son
    la misma clase de estimacion sin verificar que el CUFE — confirmar contra el Anexo Tecnico
    antes de un envio real.
 7. `DIAN_SOFTWARE_ID`/`DIAN_SOFTWARE_PIN` se envian en el sobre SOAP tal como estan documentados
    publicamente, pero su ubicacion/formato exacto dentro del sobre esta sin confirmar.
-8. **Documento soporte (CUDS) — la parte MENOS verificada de todo el modulo**:
+8. **Documento soporte (CUDS) por el camino directo — la parte MENOS verificada de todo el modulo**
+   (con Factus, desde el 2026-11-24, el XML y el CUDS son los de Factus y estan verificados en su sandbox):
    - El **esquema XML** en `application/ubl-support-document-xml-builder.ts` reutiliza la forma
      UBL "Invoice" como aproximacion (mismo `InvoiceTypeCode` "05" que se cita habitualmente para
      este tipo de documento, pero sin confirmar contra el XSD/Anexo Tecnico real de documento

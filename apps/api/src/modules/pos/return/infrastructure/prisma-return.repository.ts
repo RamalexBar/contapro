@@ -50,6 +50,7 @@ export class PrismaReturnRepository implements IReturnRepository {
   async create(data: CreateReturnData): Promise<ReturnRecord> {
     const companyId = getTenantContext().companyId;
     let costTotal = 0;
+    let saleStatus = "";
 
     const row = await prisma.$transaction(async (tx) => {
       // findFirst queda auto-scoped por companyId via el tenant extension (ver
@@ -175,6 +176,7 @@ export class PrismaReturnRepository implements IReturnRepository {
       const allFullyReturned = sale.items.every((si) => (finalReturnedByItem.get(si.id) ?? 0) >= Number(si.quantity));
       const anyReturned = sale.items.some((si) => (finalReturnedByItem.get(si.id) ?? 0) > 0);
       const newStatus = allFullyReturned ? "RETURNED_FULL" : anyReturned ? "RETURNED_PARTIAL" : sale.status;
+      saleStatus = newStatus;
       if (newStatus !== sale.status) {
         await tx.sale.update({ where: { id: data.saleId }, data: { status: newStatus } });
       }
@@ -182,7 +184,7 @@ export class PrismaReturnRepository implements IReturnRepository {
       return created;
     });
 
-    return toRecord(row, costTotal);
+    return { ...toRecord(row, costTotal), saleStatus };
   }
 
   async list(filters: { saleId?: string; take?: number; skip?: number }): Promise<ReturnRecord[]> {
@@ -193,6 +195,11 @@ export class PrismaReturnRepository implements IReturnRepository {
       take: filters.take ?? 50,
       skip: filters.skip ?? 0,
     });
-    return rows.map(toRecord);
+    const notes = await prisma.creditNote.findMany({
+      where: { returnId: { in: rows.map((r) => r.id) } },
+      select: { returnId: true, electronicCreditNote: { select: { fullNumber: true, status: true, rejectionReason: true } } },
+    });
+    const noteByReturn = new Map(notes.map((n) => [n.returnId, n.electronicCreditNote]));
+    return rows.map((row) => ({ ...toRecord(row), creditNote: noteByReturn.get(row.id) ?? null }));
   }
 }

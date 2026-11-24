@@ -7,10 +7,13 @@ import type { ICertificateLoader } from "../../domain/certificate-loader";
 import type { ICompanyReader } from "../../domain/company-reader.repository";
 import type { ElectronicCreditNoteRecord, IElectronicCreditNoteRepository } from "../../domain/electronic-credit-note.repository";
 import type { IElectronicInvoiceRepository } from "../../domain/electronic-invoice.repository";
+import type { IThirdPartyInvoicingClient, ThirdPartyDocumentLineInput, ThirdPartyNoteInput } from "../../domain/third-party-invoicing-client";
 import type { IXmlSigner } from "../../domain/xml-signer";
-import { DIAN_GENERIC_FINAL_CONSUMER, DIAN_NOTE_TYPE_CODE } from "../constants";
+import { DIAN_NOTE_TYPE_CODE, type CreditNoteConceptCode } from "../constants";
 import { generateCude } from "../cude-generator";
 import { signAndQueueElectronicDocument } from "../sign-and-queue-electronic-document";
+import { serializeProviderRequest, submitThirdPartyDocument } from "../submit-third-party-document";
+import { buyerOf, toThirdPartyCustomer } from "../third-party-customer";
 import { buildUblNoteXml } from "../ubl-note-xml-builder";
 
 export interface GenerateElectronicCreditNoteInput {
@@ -19,17 +22,25 @@ export interface GenerateElectronicCreditNoteInput {
   customerId: string | null;
   saleId: string | null;
   issueDate: Date;
+  /** Valor total de la nota, con impuestos. */
   amount: number;
   reason: string;
+  conceptCode: CreditNoteConceptCode;
+  /** Renglones con su tarifa (devolucion: los productos devueltos; nota libre: ver noteLinesFromAmount). */
+  lines: ThirdPartyDocumentLineInput[];
+  /** Medio de pago DIAN de la devolucion del dinero (10 efectivo, 47 transferencia...). */
+  paymentMethodCode?: string;
 }
 
 /**
- * Analogo a GenerateElectronicInvoiceUseCase, para notas credito. A diferencia de facturas, una
- * nota credito electronica DIAN debe referenciar el CUFE de la factura original -- si la nota no
- * tiene saleId, o la venta referenciada todavia no tiene factura electronica (sin certificado,
- * o fallo su generacion), lanza en vez de generar (el llamador, CreateCreditNoteUseCase, atrapa
- * esto en su propio try/catch y audita el fallo, mismo patron que create-sale.use-case.ts usa
- * para generateElectronicInvoice).
+ * Nota credito electronica: siempre referencia la factura de la venta (la DIAN no admite una nota
+ * credito suelta en este flujo). Lanza si la venta no tiene factura; el llamador
+ * (CreateCreditNoteUseCase) lo atrapa y audita, igual que create-sale.use-case.ts con la factura.
+ *
+ * - Empresa con FACTUS: la factura tuvo que quedar ACCEPTED por Factus (se referencia por el numero
+ *   legal que Factus le dio). Factus numera, firma y transmite la nota; el consecutivo interno de
+ *   Contapro queda reemplazado por el suyo. Verificado en el sandbox el 2026-11-24.
+ * - Envio directo: XML UBL propio firmado con el certificado, sin verificar contra la DIAN real.
  */
 export class GenerateElectronicCreditNoteUseCase {
   constructor(
@@ -39,7 +50,8 @@ export class GenerateElectronicCreditNoteUseCase {
     private readonly customerRepo: ICustomerRepository,
     private readonly audit: AuditService,
     private readonly certificateLoader: ICertificateLoader,
-    private readonly xmlSigner: IXmlSigner
+    private readonly xmlSigner: IXmlSigner,
+    private readonly providerClient: IThirdPartyInvoicingClient
   ) {}
 
   async execute(input: GenerateElectronicCreditNoteInput): Promise<ElectronicCreditNoteRecord> {
@@ -54,14 +66,18 @@ export class GenerateElectronicCreditNoteUseCase {
 
     const ctx = getTenantContext();
     const company = await this.companyReader.findByIdOrThrow(ctx.companyId);
-    const customer = input.customerId ? await this.customerRepo.findByIdOrThrow(input.customerId) : null;
+    const viaThirdParty = company.electronicInvoicingProvider === "FACTUS";
+    if (viaThirdParty && (referencedInvoice.status !== "ACCEPTED" || !referencedInvoice.providerNumber)) {
+      throw new ValidationError(
+        `La factura ${referencedInvoice.fullNumber} de esta venta no esta autorizada por Factus (estado ${referencedInvoice.status}): reenviela antes de emitir la nota credito`
+      );
+    }
 
-    const buyer = customer
-      ? { documentType: customer.documentType, documentNumber: customer.documentNumber, name: customer.name }
-      : DIAN_GENERIC_FINAL_CONSUMER;
+    const customer = input.customerId ? await this.customerRepo.findByIdOrThrow(input.customerId) : null;
+    const buyer = buyerOf(customer);
+    const taxAmount = Math.round(input.lines.reduce((s, l) => s + l.quantity * l.unitPrice * (1 - (l.discountPercent ?? 0) / 100) * (l.taxPercent / 100), 0) * 100) / 100;
 
     let generatedXmlContent = "";
-
     const note = await this.creditNoteRepo.claimNumberAndGenerate(
       {
         creditNoteId: input.creditNoteId,
@@ -71,17 +87,19 @@ export class GenerateElectronicCreditNoteUseCase {
         customerDocumentNumber: buyer.documentNumber,
         customerName: buyer.name,
         amount: input.amount,
-        taxAmount: 0,
+        taxAmount,
         reason: input.reason,
         referenceCufe: referencedInvoice.cufe,
         environment: env.DIAN_ENVIRONMENT,
+        viaThirdParty,
       },
       (fullNumber) => {
+        // Con Factus este CUDE y XML son provisionales: los reemplazan los reales del proveedor.
         const cude = generateCude({
           fullNumber,
           issueDate: input.issueDate,
           amount: input.amount,
-          taxAmount: 0,
+          taxAmount,
           issuerNit: company.nit.replace(/\D/g, ""),
           buyerDocumentNumber: buyer.documentNumber,
           technicalKey: env.DIAN_TECHNICAL_KEY,
@@ -89,7 +107,6 @@ export class GenerateElectronicCreditNoteUseCase {
           noteTypeCode: DIAN_NOTE_TYPE_CODE.CREDIT,
           referenceCufe: referencedInvoice.cufe,
         });
-
         const xmlContent = buildUblNoteXml("CREDIT", {
           fullNumber,
           cude,
@@ -99,10 +116,9 @@ export class GenerateElectronicCreditNoteUseCase {
           issuer: { nit: company.nit, legalName: company.legalName },
           buyer,
           amount: input.amount,
-          taxAmount: 0,
+          taxAmount,
           reason: input.reason,
         });
-
         generatedXmlContent = xmlContent;
         return { cude, xmlContent };
       }
@@ -112,9 +128,41 @@ export class GenerateElectronicCreditNoteUseCase {
       action: "ELECTRONIC_CREDIT_NOTE_GENERATED",
       entityType: "CreditNote",
       entityId: input.creditNoteId,
-      description: `Nota credito electronica generada localmente: ${note.fullNumber} (CUDE ${note.cude.slice(0, 12)}...)`,
-      metadata: { fullNumber: note.fullNumber, cude: note.cude, referenceCufe: referencedInvoice.cufe },
+      description: `Nota credito electronica generada: ${note.fullNumber}`,
+      metadata: { fullNumber: note.fullNumber, referenceCufe: referencedInvoice.cufe },
     });
+
+    if (viaThirdParty) {
+      const request: ThirdPartyNoteInput = {
+        kind: "CREDIT",
+        referenceCode: `${note.fullNumber}-${input.issueDate.getTime().toString(36)}`,
+        billNumber: referencedInvoice.providerNumber!,
+        conceptCode: input.conceptCode,
+        issueDate: input.issueDate,
+        observation: input.reason,
+        customer: toThirdPartyCustomer(buyer, customer),
+        lines: input.lines,
+        total: input.amount,
+        paymentMethodCode: input.paymentMethodCode,
+      };
+      await this.creditNoteRepo.saveProviderRequest(note.id, serializeProviderRequest(request));
+      const result = await submitThirdPartyDocument({
+        encryptedCredential: company.factusCredentialsEncrypted,
+        submit: (credentials) => this.providerClient.submitNote(credentials, request),
+        apply: (r) => this.creditNoteRepo.applyThirdPartyResult(note.id, r),
+        audit: this.audit,
+        entityType: "CreditNote",
+        entityId: input.creditNoteId,
+        label: "Nota credito",
+        internalNumber: note.fullNumber,
+        failedAction: "ELECTRONIC_CREDIT_NOTE_GENERATION_FAILED",
+      });
+      if (result?.status === "ACCEPTED") {
+        return { ...note, fullNumber: result.number, cude: result.uniqueCode, status: "ACCEPTED" };
+      }
+      if (result?.status === "REJECTED") return { ...note, status: "REJECTED" };
+      return note;
+    }
 
     if (env.DIAN_CERTIFICATE_PATH) {
       await signAndQueueElectronicDocument({

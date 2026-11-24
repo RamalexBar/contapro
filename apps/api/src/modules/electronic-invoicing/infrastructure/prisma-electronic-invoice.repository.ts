@@ -15,6 +15,17 @@ import type {
 } from "../domain/electronic-document-submission.repository";
 import { claimNextDocumentNumber } from "../application/numbering-claim";
 
+/** Numero legal que asigno el proveedor tecnologico (data.number de su respuesta), si la hubo. */
+export function providerDocumentNumber(rawResponse: string | null): string | null {
+  if (!rawResponse || !rawResponse.trimStart().startsWith("{")) return null;
+  try {
+    const n = (JSON.parse(rawResponse) as { data?: { number?: unknown } }).data?.number;
+    return typeof n === "string" && n ? n : null;
+  } catch {
+    return null;
+  }
+}
+
 function toRecord(row: {
   id: string;
   saleId: string | null;
@@ -127,6 +138,7 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
       signedXmlContent: row.signedXmlContent,
       dianTrackingId: row.dianTrackingId,
       rejectionReason: row.rejectionReason,
+      providerNumber: providerDocumentNumber(row.dianResponseXml),
     };
   }
 
@@ -164,6 +176,7 @@ export class PrismaElectronicInvoiceRepository implements IElectronicInvoiceRepo
       signedXmlContent: row.signedXmlContent,
       dianTrackingId: row.dianTrackingId,
       rejectionReason: row.rejectionReason,
+      providerNumber: providerDocumentNumber(row.dianResponseXml),
     };
   }
 

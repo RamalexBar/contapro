@@ -39,6 +39,10 @@ export interface ReturnRecord {
   // calculado por PrismaReturnRepository con el mismo costo ponderado que ya usaba para
   // reingresar el stock -- ver post-return-journal-entry.
   costTotal: number;
+  /** Estado de la venta despues de esta devolucion (solo lo devuelve create). */
+  saleStatus?: string;
+  /** Documento electronico de la nota credito de la devolucion (solo lo devuelve list). */
+  creditNote?: { fullNumber: string; status: string; rejectionReason: string | null } | null;
 }
 
 export interface IReturnRepository {

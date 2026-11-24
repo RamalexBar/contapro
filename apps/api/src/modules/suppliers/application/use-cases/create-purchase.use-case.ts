@@ -124,6 +124,8 @@ export class CreatePurchaseUseCase {
     // Antes de la compra: si crear un producto falla, todavia no hay compra ni comprobante a medias.
     const createdProductIds: string[] = [];
     const receiptItems: { productId: string; quantity: number; unitCost: number }[] = [];
+    // Nombre de cada renglon para el documento soporte (null = producto existente, se busca solo si hace falta).
+    const itemNames: (string | null)[] = [];
     if (items.length > 0) {
       const taken = await this.inventory.productRepo.listTakenIdentifiers();
       const nextSku = createSkuSequence(taken.skus);
@@ -150,6 +152,7 @@ export class CreatePurchaseUseCase {
           createdProductIds.push(product.id);
         }
         receiptItems.push({ productId: productId!, quantity: item.quantity, unitCost: item.unitCost });
+        itemNames.push(item.newProduct ? item.newProduct.name.trim() : null);
       }
     }
 
@@ -199,6 +202,10 @@ export class CreatePurchaseUseCase {
       // compradora, debe generar el documento soporte. No bloquea el registro de la compra si
       // falla (ej. sin resolucion de numeracion vigente para documento soporte).
       try {
+        const names: string[] = [];
+        for (const [i, name] of itemNames.entries()) {
+          names.push(name ?? (await this.inventory.productRepo.findById(receiptItems[i]!.productId))?.toProps?.name ?? "Producto");
+        }
         await this.generateElectronicSupportDocument.execute({
           purchaseId: purchase.id,
           branchId: purchase.branchId,
@@ -207,6 +214,14 @@ export class CreatePurchaseUseCase {
           subtotal: purchase.subtotal,
           taxTotal: purchase.taxTotal,
           total: purchase.total,
+          supplierReference: purchase.invoiceNumber,
+          lines: supportDocumentLines(purchase, receiptItems, names, data.destinationAccount ? "Servicio" : "Compra"),
+          // La retencion va en cada renglon (asi la recibe Factus): solo cuando se practico sobre
+          // todo el subtotal; una base parcial no se puede repartir por renglon sin inventar.
+          withholdings: purchase.withholdings
+            .filter((w) => Math.abs(w.base - purchase.subtotal) <= 1)
+            .map((w) => ({ type: w.type, ratePercent: w.ratePercent })),
+          dueDate: purchase.dueDate,
         });
       } catch (err) {
         await this.audit.record({
@@ -261,4 +276,35 @@ export class CreatePurchaseUseCase {
       }
     }
   }
+}
+
+/** Tarifa de IVA de la compra (las compras guardan solo el IVA total): la estandar mas cercana. */
+export function purchaseTaxRate(subtotal: number, taxTotal: number): number {
+  if (subtotal <= 0 || taxTotal <= 0) return 0;
+  const effective = (taxTotal / subtotal) * 100;
+  const standard = [19, 5].find((rate) => Math.abs(effective - rate) <= 0.5);
+  return standard ?? round2(effective);
+}
+
+/**
+ * Renglones del documento soporte: los productos que entraron al inventario o, si la compra no
+ * trajo productos (un servicio), un solo renglon por el subtotal.
+ */
+export function supportDocumentLines(
+  purchase: { invoiceNumber: string; subtotal: number; taxTotal: number },
+  items: { quantity: number; unitCost: number }[],
+  names: string[],
+  kind: string
+) {
+  const taxPercent = purchaseTaxRate(purchase.subtotal, purchase.taxTotal);
+  if (items.length === 0) {
+    return [{ code: "DS-1", description: `${kind} segun soporte ${purchase.invoiceNumber}`, quantity: 1, unitPrice: round2(purchase.subtotal), taxPercent }];
+  }
+  return items.map((item, i) => ({
+    code: `DS-${i + 1}`,
+    description: names[i] ?? "Producto",
+    quantity: item.quantity,
+    unitPrice: item.unitCost,
+    taxPercent,
+  }));
 }

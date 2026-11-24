@@ -1,4 +1,5 @@
 import type { IElectronicDocumentSubmissionRepository } from "./electronic-document-submission.repository";
+import type { ThirdPartyDocumentResult } from "./third-party-invoicing-client";
 
 export interface GenerateElectronicCreditNoteData {
   creditNoteId: string;
@@ -12,6 +13,8 @@ export interface GenerateElectronicCreditNoteData {
   reason: string;
   referenceCufe: string;
   environment: "HABILITACION" | "PRODUCCION";
+  /** Se envia por un proveedor tecnologico: numeracion interna (ver findResolutionForClaim). */
+  viaThirdParty: boolean;
 }
 
 export interface ElectronicCreditNoteRecord {
@@ -32,6 +35,8 @@ export interface ElectronicCreditNoteWithXml extends ElectronicCreditNoteRecord 
   signedXmlContent: string | null;
   dianTrackingId: string | null;
   rejectionReason: string | null;
+  /** Solicitud enviada al proveedor tecnologico (JSON), si se envio por ahi. */
+  providerRequest: string | null;
 }
 
 /** Analogo a IElectronicInvoiceRepository, para notas credito. Ver ese archivo para el porque
@@ -43,4 +48,10 @@ export interface IElectronicCreditNoteRepository extends IElectronicDocumentSubm
   ): Promise<ElectronicCreditNoteRecord>;
 
   findByCreditNoteId(creditNoteId: string): Promise<ElectronicCreditNoteWithXml | null>;
+
+  /** Resultado de un proveedor tecnologico: numero legal, CUDE y XML firmado reales, o el rechazo. */
+  applyThirdPartyResult(id: string, result: ThirdPartyDocumentResult): Promise<void>;
+
+  /** Guarda la solicitud al proveedor antes de enviarla, para que el reenvio mande la misma. */
+  saveProviderRequest(id: string, request: string): Promise<void>;
 }

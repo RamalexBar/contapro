@@ -48,6 +48,7 @@ describe("mapInvoiceToRideData", () => {
   });
   const doc: ElectronicInvoiceWithXml = {
     id: "inv-1",
+    providerNumber: null,
     saleId: "sale-1",
     manualInvoiceId: null,
     branchId: "branch-1",
@@ -107,6 +108,7 @@ describe("mapNoteToRideData", () => {
   });
   const doc: ElectronicCreditNoteWithXml = {
     id: "cn-1",
+    providerRequest: null,
     creditNoteId: "note-1",
     branchId: "branch-1",
     prefix: "NC",
@@ -145,6 +147,7 @@ describe("mapSupportDocumentToRideData", () => {
   });
   const doc: ElectronicSupportDocumentWithXml = {
     id: "sd-1",
+    providerRequest: null,
     purchaseId: "purchase-1",
     branchId: "branch-1",
     prefix: "DS",

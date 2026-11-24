@@ -9,6 +9,7 @@ import { priceListRepository } from "../../inventory/price-list/price-list.conta
 import { customerRepo } from "../../customers/customer.container";
 import { webhookDispatcherService } from "../../webhooks/webhooks.container";
 import { PrismaSaleRepository } from "./infrastructure/prisma-sale.repository";
+import { PrismaElectronicInvoiceRepository } from "../../electronic-invoicing/infrastructure/prisma-electronic-invoice.repository";
 import { PrismaDiscountLimitRepository } from "./infrastructure/prisma-discount-limit.repository";
 import { CreateSaleUseCase } from "./application/use-cases/create-sale.use-case";
 import { AuthorizeDiscountUseCase } from "./application/use-cases/authorize-discount.use-case";
@@ -49,7 +50,7 @@ export const saleController = new SaleController(
     accountReceivableRepo,
     auditService
   ),
-  new CancelSaleUseCase(saleRepo, accountReceivableRepo, auditService),
+  new CancelSaleUseCase(saleRepo, accountReceivableRepo, auditService, new PrismaElectronicInvoiceRepository()),
   new GetSaleUseCase(saleRepo),
   new ListSalesUseCase(saleRepo)
 );

@@ -1,5 +1,13 @@
 import { env } from "../../../config/env";
-import type { IThirdPartyInvoicingClient, ThirdPartyInvoiceInput, ThirdPartyInvoiceResult } from "../domain/third-party-invoicing-client";
+import type {
+  IThirdPartyInvoicingClient,
+  ThirdPartyDocumentLineInput,
+  ThirdPartyDocumentResult,
+  ThirdPartyInvoiceInput,
+  ThirdPartyInvoiceResult,
+  ThirdPartyNoteInput,
+  ThirdPartySupportDocumentInput,
+} from "../domain/third-party-invoicing-client";
 import { authenticateFactus, type FactusOAuthCredentials } from "./factus-auth";
 
 /**
@@ -248,7 +256,221 @@ export function buildBillPayload(input: ThirdPartyInvoiceInput, numberingRangeId
   };
 }
 
+/** Codigos de documento de los rangos de numeracion de Factus. */
+const RANGE_DOCUMENT_CODE = { CREDIT: "22", DEBIT: "23", SUPPORT: "24" } as const;
+const NOTE_CUSTOMIZATION_WITH_INVOICE = { CREDIT: "20", DEBIT: "30" } as const;
+const NOTE_PATH = { CREDIT: "credit-notes", DEBIT: "debit-notes" } as const;
+const NOTE_LABEL = { CREDIT: "notas credito", DEBIT: "notas debito", SUPPORT: "documento soporte" } as const;
+
+/** Impuesto de un renglon de nota: IVA o INC con tarifa, exento = IVA 0 %, el resto excluido. */
+function documentLineTaxes(line: ThirdPartyDocumentLineInput): Record<string, unknown>[] {
+  if (line.taxPercent > 0) return [{ code: line.taxType === "INC" ? TAX_CODE_INC : TAX_CODE_IVA, rate: line.taxPercent.toFixed(2) }];
+  if (line.taxType === "EXEMPT") return [{ code: TAX_CODE_IVA, rate: "0.00" }];
+  return [{ is_excluded: true }];
+}
+
+function documentLine(line: ThirdPartyDocumentLineInput): Record<string, unknown> {
+  return {
+    code_reference: line.code,
+    name: line.description,
+    quantity: line.quantity.toFixed(2),
+    discount_rate: (line.discountPercent ?? 0).toFixed(2),
+    price: money(line.unitPrice),
+    unit_measure_code: UNIT_MEASURE_UNIT,
+    standard_code: STANDARD_CODE_TAXPAYER_ADOPTED,
+  };
+}
+
+/**
+ * Nota credito (POST /v2/credit-notes/validate) o debito (POST /v2/debit-notes/validate) que
+ * referencia una factura de Factus por su numero (bill_number). Verificado en el sandbox el
+ * 2026-11-24: la nota debito exige customer aunque la documentacion diga que es opcional.
+ */
+export function buildNotePayload(input: ThirdPartyNoteInput, numberingRangeId: number): Record<string, unknown> {
+  return {
+    reference_code: input.referenceCode,
+    correction_concept_code: input.conceptCode,
+    customization_id: NOTE_CUSTOMIZATION_WITH_INVOICE[input.kind],
+    bill_number: input.billNumber,
+    numbering_range_id: numberingRangeId,
+    observation: input.observation.slice(0, 500),
+    ...(input.kind === "DEBIT" ? { send_email: Boolean(input.customer.email) } : {}),
+    payment_details: [
+      {
+        payment_form: PAYMENT_FORM_CASH,
+        payment_method_code: input.paymentMethodCode ?? PAYMENT_METHOD_CODE.CASH,
+        reference_code: `${input.referenceCode}-pago`,
+        amount: money(input.total),
+      },
+    ],
+    customer: buildCustomer(input.customer),
+    items: input.lines.map((line) => ({ ...documentLine(line), taxes: documentLineTaxes(line) })),
+  };
+}
+
+/**
+ * Documento soporte (POST /v2/support-documents/validate). Reglas del sandbox (2026-11-24): el
+ * proveedor residente en Colombia va siempre con tipo 31 (NIT; el de una persona natural es su
+ * cedula) y un digito de verificacion valido; los impuestos solo admiten el codigo 01 (IVA).
+ */
+export function buildSupportDocumentPayload(input: ThirdPartySupportDocumentInput, numberingRangeId: number): Record<string, unknown> {
+  const provider = input.provider;
+  const { identification, dv } = splitNit(provider.documentNumber);
+  // Los NIT de personas juridicas tienen 9 digitos y empiezan por 8 o 9; el de una persona natural
+  // es su cedula, asi que un "NIT" con otra forma se trata como persona natural.
+  const isCompany = provider.documentType.trim().toUpperCase() === "NIT" && /^[89]\d{8}$/.test(identification);
+
+  const totalCents = cents(input.total);
+  const creditCents = Math.min(cents(input.creditAmount ?? 0), totalCents);
+  const payments: Record<string, string>[] = [];
+  if (totalCents - creditCents > 0) {
+    payments.push({ payment_form: PAYMENT_FORM_CASH, payment_method_code: PAYMENT_METHOD_CODE.CASH, amount: ((totalCents - creditCents) / 100).toFixed(2) });
+  }
+  if (creditCents > 0) {
+    const due = input.dueDate ?? new Date(input.issueDate.getTime() + DEFAULT_CREDIT_DAYS * 86_400_000);
+    payments.push({ payment_form: PAYMENT_FORM_CREDIT, payment_method_code: PAYMENT_METHOD_CREDIT, amount: (creditCents / 100).toFixed(2), due_date: dateOnly(due) });
+  }
+
+  return {
+    reference_code: input.referenceCode,
+    numbering_range_id: numberingRangeId,
+    observation: input.observation.slice(0, 500),
+    payment_details: payments.map((p, i) => ({ ...p, reference_code: `${input.referenceCode}-pago${i + 1}` })),
+    provider: {
+      identification_document_code: DOCUMENT_TYPE_CODE.NIT,
+      identification,
+      dv,
+      names: provider.name,
+      ...(isCompany ? { company: provider.name } : {}),
+      legal_organization_code: isCompany ? "1" : "2",
+      address: provider.address ?? "No informado",
+      email: provider.email ?? undefined,
+      phone: provider.phone ?? undefined,
+      country_code: "CO",
+      municipality_code: provider.municipalityCode ?? undefined,
+    },
+    items: input.lines.map((line) => {
+      const withholdings = input.withholdings
+        .filter((w) => w.ratePercent > 0 && WITHHOLDING_CODE[w.type] && (w.type !== "RETEIVA" || line.taxPercent > 0))
+        .map((w) => ({ code: WITHHOLDING_CODE[w.type], rate: w.ratePercent.toFixed(2) }));
+      return {
+        ...documentLine(line),
+        taxes: line.taxPercent > 0 ? [{ code: TAX_CODE_IVA, rate: line.taxPercent.toFixed(2) }] : [{ code: TAX_CODE_IVA, rate: "0.00", is_excluded: true }],
+        ...(withholdings.length > 0 ? { withholding_taxes: withholdings } : {}),
+      };
+    }),
+  };
+}
+
+interface FactusDocumentResponse {
+  status?: string;
+  message?: string;
+  data?: {
+    number?: string;
+    cude?: string;
+    cuds?: string;
+    is_validated?: boolean;
+    totals?: { total?: string };
+    errors?: Record<string, string> | string[];
+  };
+  errors?: Record<string, string[]>;
+}
+
+/** Interpreta la respuesta de crear una nota o documento soporte. Exportada para las pruebas. */
+export function parseDocumentResponse(httpStatus: number, rawResponse: string, expectedTotal: number): ThirdPartyDocumentResult {
+  if (httpStatus === 401 || httpStatus === 403 || httpStatus >= 500) {
+    throw new Error(`Factus respondio ${httpStatus}: ${rawResponse.slice(0, 500)}`);
+  }
+  let parsed: FactusDocumentResponse;
+  try {
+    parsed = JSON.parse(rawResponse) as FactusDocumentResponse;
+  } catch {
+    throw new Error(`Factus devolvio una respuesta no-JSON (status ${httpStatus}): ${rawResponse.slice(0, 500)}`);
+  }
+
+  const data = parsed.data;
+  const uniqueCode = data?.cude ?? data?.cuds ?? "";
+  if (httpStatus === 201 && data?.is_validated && data.number && uniqueCode) {
+    // Un reference_code repetido devuelve el documento anterior: si el total no cuadra, no es este.
+    const returnedTotal = Number(data.totals?.total);
+    if (data.totals?.total !== undefined && Math.abs(returnedTotal - expectedTotal) > 1) {
+      throw new Error(`Factus devolvio otro documento (${data.number}, total ${returnedTotal}) en vez de crear este (total ${expectedTotal})`);
+    }
+    return { status: "ACCEPTED", number: data.number, uniqueCode, signedXmlContent: "", rawResponse };
+  }
+
+  // En un rechazo, el detalle por campo viene en errors (objeto); en un documento validado,
+  // data.errors es la lista de notificaciones de la DIAN, que no son el motivo del rechazo.
+  const fieldErrors = parsed.errors ?? (data?.errors && !Array.isArray(data.errors) ? data.errors : undefined);
+  const details = fieldErrors ? Object.values(fieldErrors).flat().join(" ") : "";
+  const rejectionReason = [parsed.message, details].filter(Boolean).join(": ") || `Respuesta inesperada de Factus (status ${httpStatus})`;
+  return { status: "REJECTED", number: data?.number ?? "", uniqueCode, signedXmlContent: "", rejectionReason, rawResponse };
+}
+
 export class FactusInvoicingClient implements IThirdPartyInvoicingClient {
+  async submitNote(credentialsJson: string, input: ThirdPartyNoteInput): Promise<ThirdPartyDocumentResult> {
+    const credentials: FactusCredentials = JSON.parse(credentialsJson);
+    const accessToken = await authenticateFactus(credentials);
+    const rangeId = await this.activeRangeId(accessToken, input.kind);
+    const path = NOTE_PATH[input.kind];
+    return this.createDocument(accessToken, path, buildNotePayload(input, rangeId), input.total);
+  }
+
+  async submitSupportDocument(credentialsJson: string, input: ThirdPartySupportDocumentInput): Promise<ThirdPartyDocumentResult> {
+    const credentials: FactusCredentials = JSON.parse(credentialsJson);
+    const accessToken = await authenticateFactus(credentials);
+    const rangeId = await this.activeRangeId(accessToken, "SUPPORT");
+    return this.createDocument(accessToken, "support-documents", buildSupportDocumentPayload(input, rangeId), input.total);
+  }
+
+  /**
+   * El rango activo del tipo de documento en la cuenta de Factus de la empresa. Las notas no tienen
+   * resolucion DIAN (el rango se crea con solo un prefijo); el documento soporte si.
+   */
+  private async activeRangeId(accessToken: string, kind: keyof typeof RANGE_DOCUMENT_CODE): Promise<number> {
+    const res = await fetch(`${env.FACTUS_BASE_URL}/v2/numbering-ranges?filter%5Bdocument%5D=${RANGE_DOCUMENT_CODE[kind]}`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    });
+    const raw = await res.text();
+    if (!res.ok) throw new Error(`Factus respondio ${res.status} al consultar los rangos de numeracion: ${raw.slice(0, 300)}`);
+    let ranges: { id?: number; is_active?: boolean; is_expired?: boolean }[] = [];
+    try {
+      ranges = (JSON.parse(raw) as { data?: { data?: typeof ranges } }).data?.data ?? [];
+    } catch {
+      throw new Error(`Factus devolvio una respuesta no-JSON al consultar los rangos de numeracion: ${raw.slice(0, 300)}`);
+    }
+    const active = ranges.find((r) => r.id && r.is_active && !r.is_expired);
+    if (!active?.id) {
+      throw new Error(`La cuenta de Factus no tiene un rango de numeracion activo para ${NOTE_LABEL[kind]}. Creelo en el panel de Factus.`);
+    }
+    return active.id;
+  }
+
+  private async createDocument(accessToken: string, path: string, body: Record<string, unknown>, expectedTotal: number): Promise<ThirdPartyDocumentResult> {
+    const res = await fetch(`${env.FACTUS_BASE_URL}/v2/${path}/validate`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = parseDocumentResponse(res.status, await res.text(), expectedTotal);
+    if (result.status !== "ACCEPTED") return result;
+    // Igual que en la factura: si la descarga del XML falla, el documento ya quedo emitido.
+    return { ...result, signedXmlContent: await this.downloadXml(accessToken, path, result.number) };
+  }
+
+  private async downloadXml(accessToken: string, path: string, documentNumber: string): Promise<string> {
+    const res = await fetch(`${env.FACTUS_BASE_URL}/v2/${path}/${documentNumber}/download-xml`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    });
+    if (!res.ok) return "";
+    try {
+      const base64 = (JSON.parse(await res.text()) as FactusXmlResponse).data?.xml_base_64_encoded;
+      return base64 ? Buffer.from(base64, "base64").toString("utf-8") : "";
+    } catch {
+      return "";
+    }
+  }
+
   async submitInvoice(credentialsJson: string, input: ThirdPartyInvoiceInput): Promise<ThirdPartyInvoiceResult> {
     const credentials: FactusCredentials = JSON.parse(credentialsJson);
 

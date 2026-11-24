@@ -1,4 +1,5 @@
 import type { IElectronicDocumentSubmissionRepository } from "./electronic-document-submission.repository";
+import type { ThirdPartyDocumentResult } from "./third-party-invoicing-client";
 
 export interface GenerateElectronicSupportDocumentData {
   purchaseId: string;
@@ -11,6 +12,8 @@ export interface GenerateElectronicSupportDocumentData {
   taxTotal: number;
   total: number;
   environment: "HABILITACION" | "PRODUCCION";
+  /** Se envia por un proveedor tecnologico: numeracion interna (ver findResolutionForClaim). */
+  viaThirdParty: boolean;
 }
 
 export interface ElectronicSupportDocumentRecord {
@@ -31,6 +34,8 @@ export interface ElectronicSupportDocumentWithXml extends ElectronicSupportDocum
   signedXmlContent: string | null;
   dianTrackingId: string | null;
   rejectionReason: string | null;
+  /** Solicitud enviada al proveedor tecnologico (JSON), si se envio por ahi. */
+  providerRequest: string | null;
 }
 
 /** Analogo a IElectronicInvoiceRepository/IElectronicCreditNoteRepository, para documentos
@@ -42,4 +47,10 @@ export interface IElectronicSupportDocumentRepository extends IElectronicDocumen
   ): Promise<ElectronicSupportDocumentRecord>;
 
   findByPurchaseId(purchaseId: string): Promise<ElectronicSupportDocumentWithXml | null>;
+
+  /** Resultado de un proveedor tecnologico: numero legal, codigo unico y XML firmado reales, o el rechazo. */
+  applyThirdPartyResult(id: string, result: ThirdPartyDocumentResult): Promise<void>;
+
+  /** Guarda la solicitud al proveedor antes de enviarla, para que el reenvio mande la misma. */
+  saveProviderRequest(id: string, request: string): Promise<void>;
 }

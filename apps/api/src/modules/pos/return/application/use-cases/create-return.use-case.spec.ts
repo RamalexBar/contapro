@@ -8,6 +8,7 @@ import type {
   PostReturnJournalEntryUseCase,
   ReturnJournalEntryInput,
 } from "../../../../accounting/application/use-cases/post-return-journal-entry.use-case";
+import type { CreateCreditNoteUseCase, CreditNoteForReturnInput } from "../../../credit-note/application/use-cases/create-credit-note.use-case";
 import { CreateReturnUseCase } from "./create-return.use-case";
 
 const SALE: SaleRecord = {
@@ -81,9 +82,11 @@ class FakeSaleRepository implements ISaleRepository {
 
 class FakeReturnRepository implements IReturnRepository {
   created: CreateReturnData[] = [];
+  constructor(private readonly saleStatusAfter = "RETURNED_PARTIAL") {}
   async create(data: CreateReturnData): Promise<ReturnRecord> {
     this.created.push(data);
     return {
+      saleStatus: this.saleStatusAfter,
       id: `return-${this.created.length}`,
       branchId: data.branchId,
       saleId: data.saleId,
@@ -121,16 +124,24 @@ function withTenantContext<T>(fn: () => Promise<T>): Promise<T> {
   );
 }
 
-function makeUseCase(overrides: { sale?: SaleRecord } = {}) {
+function makeUseCase(overrides: { sale?: SaleRecord; saleStatusAfter?: string } = {}) {
   const saleRepo = new FakeSaleRepository(overrides.sale);
-  const returnRepo = new FakeReturnRepository();
+  const returnRepo = new FakeReturnRepository(overrides.saleStatusAfter);
   const auditRepo = new FakeAuditLogRepository();
   const postReturnJournalEntry = { execute: vi.fn() } as unknown as PostReturnJournalEntryUseCase & {
     execute: (input: ReturnJournalEntryInput) => Promise<null>;
   };
   postReturnJournalEntry.execute = vi.fn().mockResolvedValue(null);
-  const useCase = new CreateReturnUseCase(returnRepo, saleRepo, postReturnJournalEntry, new AuditService(auditRepo));
-  return { useCase, returnRepo, auditRepo, postReturnJournalEntry };
+  const creditNotes: CreditNoteForReturnInput[] = [];
+  const createCreditNote = {
+    executeForReturn: vi.fn(async (input: CreditNoteForReturnInput) => {
+      creditNotes.push(input);
+      return {} as never;
+    }),
+  } as unknown as CreateCreditNoteUseCase;
+  const productReader = { findById: async () => ({ toProps: { name: "Licuadora" } }) };
+  const useCase = new CreateReturnUseCase(returnRepo, saleRepo, postReturnJournalEntry, new AuditService(auditRepo), createCreditNote, productReader);
+  return { useCase, returnRepo, auditRepo, postReturnJournalEntry, creditNotes };
 }
 
 describe("CreateReturnUseCase", () => {
@@ -215,5 +226,72 @@ describe("CreateReturnUseCase", () => {
       expect.objectContaining({ subtotal: 100_000, taxTotal: 19_000, total: 119_000, refundMethod: "CASH", costOfGoodsSold: 60_000 })
     );
     expect(result.id).toBe("return-1");
+  });
+
+  it("refunds the discounted price, not the list price, of an item sold with a discount", async () => {
+    const discounted: SaleRecord = {
+      ...SALE,
+      discountTotal: 20_000,
+      taxTotal: 34_200,
+      total: 214_200,
+      items: [{ ...SALE.items[0]!, discountPercent: 10, taxAmount: 34_200, total: 214_200 }],
+    };
+    const { useCase, returnRepo, postReturnJournalEntry, creditNotes } = makeUseCase({ sale: discounted });
+
+    await withTenantContext(() =>
+      useCase.execute({
+        saleId: SALE.id,
+        reason: "No le gusto",
+        refundMethod: "CASH",
+        items: [{ saleItemId: "sale-item-1", quantity: 1, restockedToBranch: true }],
+      })
+    );
+
+    // 100.000 - 10 % = 90.000 de base + 17.100 de IVA = 107.100 (antes devolvia 119.000).
+    expect(returnRepo.created[0]).toEqual(expect.objectContaining({ total: 107_100 }));
+    expect(postReturnJournalEntry.execute).toHaveBeenCalledWith(expect.objectContaining({ subtotal: 90_000, taxTotal: 17_100, total: 107_100 }));
+    expect(creditNotes[0]!.lines).toEqual([
+      expect.objectContaining({ code: "ITEM-1", description: "Licuadora", quantity: 1, unitPrice: 100_000, discountPercent: 10, taxPercent: 19 }),
+    ]);
+    expect(creditNotes[0]!.amount).toBe(107_100);
+  });
+
+  it("issues a partial-return credit note (concept 1) with the refund payment method", async () => {
+    const { useCase, creditNotes } = makeUseCase();
+
+    await withTenantContext(() =>
+      useCase.execute({
+        saleId: SALE.id,
+        reason: "Producto defectuoso",
+        refundMethod: "TRANSFER",
+        items: [{ saleItemId: "sale-item-1", quantity: 1, restockedToBranch: true }],
+      })
+    );
+
+    expect(creditNotes).toEqual([
+      expect.objectContaining({
+        returnId: "return-1",
+        saleId: "sale-1",
+        customerId: "customer-1",
+        conceptCode: "1",
+        amount: 119_000,
+        paymentMethodCode: "47",
+      }),
+    ]);
+  });
+
+  it("uses concept 2 (anulacion) when a single return gives back the whole sale", async () => {
+    const { useCase, creditNotes } = makeUseCase({ saleStatusAfter: "RETURNED_FULL" });
+
+    await withTenantContext(() =>
+      useCase.execute({
+        saleId: SALE.id,
+        reason: "Se arrepintio",
+        refundMethod: "CASH",
+        items: [{ saleItemId: "sale-item-1", quantity: 2, restockedToBranch: true }],
+      })
+    );
+
+    expect(creditNotes[0]).toEqual(expect.objectContaining({ conceptCode: "2", amount: 238_000 }));
   });
 });

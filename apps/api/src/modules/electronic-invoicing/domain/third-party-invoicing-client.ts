@@ -84,4 +84,70 @@ export interface ThirdPartyInvoiceResult {
  */
 export interface IThirdPartyInvoicingClient {
   submitInvoice(apiToken: string, input: ThirdPartyInvoiceInput): Promise<ThirdPartyInvoiceResult>;
+  /** Nota credito o debito que referencia una factura ya emitida por el mismo proveedor. */
+  submitNote(apiToken: string, input: ThirdPartyNoteInput): Promise<ThirdPartyDocumentResult>;
+  /** Documento soporte en adquisiciones a no obligados a facturar. */
+  submitSupportDocument(apiToken: string, input: ThirdPartySupportDocumentInput): Promise<ThirdPartyDocumentResult>;
+}
+
+/** Renglon de una nota o documento soporte. unitPrice es antes de descuento e impuesto. */
+export interface ThirdPartyDocumentLineInput {
+  code: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent?: number;
+  taxPercent: number;
+  /** IVA (por defecto) | INC | EXEMPT | EXCLUDED */
+  taxType?: string;
+}
+
+export interface ThirdPartyNoteInput {
+  kind: "CREDIT" | "DEBIT";
+  /** Estable para el mismo documento: un reenvio devuelve el documento ya creado, no uno nuevo. */
+  referenceCode: string;
+  /** Numero legal de la factura referenciada, el que asigno el proveedor (ej. "SETP990042087"). */
+  billNumber: string;
+  /** Concepto de correccion DIAN (credito 1-6, debito 1-4, ver constants.ts). */
+  conceptCode: string;
+  issueDate: Date;
+  observation: string;
+  customer: ThirdPartyInvoiceCustomerInput;
+  lines: ThirdPartyDocumentLineInput[];
+  /** Total esperado con impuestos: se compara con el que calcula el proveedor. */
+  total: number;
+  /** Medio de pago DIAN de la devolucion o del cobro (10 efectivo, 47 transferencia...). */
+  paymentMethodCode?: string;
+}
+
+export interface ThirdPartySupportDocumentInput {
+  referenceCode: string;
+  issueDate: Date;
+  observation: string;
+  provider: {
+    documentType: string;
+    documentNumber: string;
+    name: string;
+    address: string | null;
+    email: string | null;
+    phone: string | null;
+    municipalityCode: string | null;
+  };
+  lines: ThirdPartyDocumentLineInput[];
+  total: number;
+  withholdings: ThirdPartyWithholdingInput[];
+  /** Parte a credito (cuenta por pagar) y su vencimiento; sin ella, todo de contado. */
+  creditAmount?: number;
+  dueDate?: Date | null;
+}
+
+export interface ThirdPartyDocumentResult {
+  status: "ACCEPTED" | "REJECTED";
+  /** Numero legal asignado por el proveedor (vacio si REJECTED). */
+  number: string;
+  /** CUDE (notas) o CUDS (documento soporte) real. */
+  uniqueCode: string;
+  signedXmlContent: string;
+  rejectionReason?: string;
+  rawResponse: string;
 }

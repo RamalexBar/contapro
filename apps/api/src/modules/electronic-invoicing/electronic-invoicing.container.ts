@@ -100,21 +100,27 @@ const resubmitCreditNoteUseCase = new ResubmitElectronicCreditNoteUseCase(
   electronicCreditNoteRepo,
   certificateLoader,
   xmlSigner,
-  auditService
+  auditService,
+  companyReader,
+  factusInvoicingClient
 );
 const getDebitNoteUseCase = new GetElectronicDebitNoteUseCase(electronicDebitNoteRepo);
 const resubmitDebitNoteUseCase = new ResubmitElectronicDebitNoteUseCase(
   electronicDebitNoteRepo,
   certificateLoader,
   xmlSigner,
-  auditService
+  auditService,
+  companyReader,
+  factusInvoicingClient
 );
 const getSupportDocumentUseCase = new GetElectronicSupportDocumentUseCase(electronicSupportDocumentRepo);
 const resubmitSupportDocumentUseCase = new ResubmitElectronicSupportDocumentUseCase(
   electronicSupportDocumentRepo,
   certificateLoader,
   xmlSigner,
-  auditService
+  auditService,
+  companyReader,
+  factusInvoicingClient
 );
 const getPayrollUseCase = new GetElectronicPayrollUseCase(electronicPayrollRepo);
 // Instancia propia, no importada de sale.container.ts: ese container importa
@@ -184,7 +190,8 @@ export const generateElectronicCreditNoteUseCase = new GenerateElectronicCreditN
   customerRepo,
   auditService,
   certificateLoader,
-  xmlSigner
+  xmlSigner,
+  factusInvoicingClient
 );
 
 /** Usado por debit-note.container.ts, analogo a generateElectronicCreditNoteUseCase. */
@@ -195,7 +202,8 @@ export const generateElectronicDebitNoteUseCase = new GenerateElectronicDebitNot
   customerRepo,
   auditService,
   certificateLoader,
-  xmlSigner
+  xmlSigner,
+  factusInvoicingClient
 );
 
 /** Usado por suppliers.container.ts para generar el CUDS/XML local (y firmar si hay certificado
@@ -206,7 +214,8 @@ export const generateElectronicSupportDocumentUseCase = new GenerateElectronicSu
   supplierRepo,
   auditService,
   certificateLoader,
-  xmlSigner
+  xmlSigner,
+  factusInvoicingClient
 );
 
 /** Usado por payroll.container.ts para generar el CUNE/XML local (y firmar si hay certificado

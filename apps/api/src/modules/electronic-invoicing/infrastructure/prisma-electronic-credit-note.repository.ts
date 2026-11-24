@@ -1,6 +1,6 @@
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
-import { ConflictError } from "../../../shared/errors/app-error";
+import type { ThirdPartyDocumentResult } from "../domain/third-party-invoicing-client";
 import type {
   ElectronicCreditNoteRecord,
   ElectronicCreditNoteWithXml,
@@ -11,7 +11,7 @@ import type {
   ElectronicDocumentAwaitingStatus,
   ElectronicDocumentPendingSubmission,
 } from "../domain/electronic-document-submission.repository";
-import { claimNextDocumentNumber } from "../application/numbering-claim";
+import { claimNextDocumentNumber, findResolutionForClaim, splitProviderNumber } from "../application/numbering-claim";
 
 function toRecord(row: {
   id: string;
@@ -46,24 +46,14 @@ export class PrismaElectronicCreditNoteRepository implements IElectronicCreditNo
     build: (fullNumber: string, prefix: string, number: number) => { cude: string; xmlContent: string }
   ): Promise<ElectronicCreditNoteRecord> {
     const companyId = getTenantContext().companyId;
-    const now = new Date();
 
     const row = await prisma.$transaction(async (tx) => {
-      const resolution = await tx.invoiceNumberingResolution.findFirst({
-        where: {
-          companyId,
-          documentType: "NOTA_CREDITO",
-          isActive: true,
-          validFrom: { lte: now },
-          validUntil: { gte: now },
-          OR: [{ branchId: data.branchId }, { branchId: null }],
-        },
-        orderBy: [{ branchId: "desc" }, { createdAt: "desc" }],
+      const resolution = await findResolutionForClaim(tx, {
+        companyId,
+        branchId: data.branchId,
+        documentType: "NOTA_CREDITO",
+        viaThirdParty: data.viaThirdParty,
       });
-
-      if (!resolution) {
-        throw new ConflictError("No hay una resolucion de numeracion DIAN vigente para notas credito en esta sucursal");
-      }
 
       const { number, fullNumber } = await claimNextDocumentNumber(tx, resolution);
 
@@ -112,7 +102,42 @@ export class PrismaElectronicCreditNoteRepository implements IElectronicCreditNo
       signedXmlContent: row.signedXmlContent,
       dianTrackingId: row.dianTrackingId,
       rejectionReason: row.rejectionReason,
+      providerRequest: row.providerRequest,
     };
+  }
+
+  async saveProviderRequest(id: string, request: string): Promise<void> {
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicCreditNote.updateMany({ where: { id, companyId }, data: { providerRequest: request } });
+  }
+
+  async applyThirdPartyResult(id: string, result: ThirdPartyDocumentResult): Promise<void> {
+    const companyId = getTenantContext().companyId;
+    const now = new Date();
+    if (result.status === "REJECTED") {
+      await prisma.electronicCreditNote.updateMany({
+        where: { id, companyId },
+        data: { status: "REJECTED", dianResponseXml: result.rawResponse, rejectionReason: result.rejectionReason ?? null, submittedAt: now, respondedAt: now },
+      });
+      return;
+    }
+    // El numero legal y el CUDE son los del proveedor; el consecutivo interno queda reemplazado.
+    const legal = splitProviderNumber(result.number);
+    const note = await prisma.electronicCreditNote.findFirst({ where: { id, companyId }, select: { creditNoteId: true } });
+    await prisma.electronicCreditNote.updateMany({
+      where: { id, companyId },
+      data: {
+        status: "ACCEPTED",
+        cude: result.uniqueCode,
+        ...(legal ? { prefix: legal.prefix, number: legal.number, fullNumber: result.number } : {}),
+        ...(result.signedXmlContent ? { xmlContent: result.signedXmlContent, signedXmlContent: result.signedXmlContent } : {}),
+        dianResponseXml: result.rawResponse,
+        rejectionReason: null,
+        submittedAt: now,
+        respondedAt: now,
+      },
+    });
+    if (note) await prisma.creditNote.updateMany({ where: { id: note.creditNoteId, companyId }, data: { cude: result.uniqueCode } });
   }
 
   // updateMany (no update): sin scoping propio quedaria expuesto a un id de otra empresa. Estos

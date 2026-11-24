@@ -1,6 +1,6 @@
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
-import { ConflictError } from "../../../shared/errors/app-error";
+import type { ThirdPartyDocumentResult } from "../domain/third-party-invoicing-client";
 import type {
   ElectronicSupportDocumentRecord,
   ElectronicSupportDocumentWithXml,
@@ -11,7 +11,7 @@ import type {
   ElectronicDocumentAwaitingStatus,
   ElectronicDocumentPendingSubmission,
 } from "../domain/electronic-document-submission.repository";
-import { claimNextDocumentNumber } from "../application/numbering-claim";
+import { claimNextDocumentNumber, findResolutionForClaim, splitProviderNumber } from "../application/numbering-claim";
 
 function toRecord(row: {
   id: string;
@@ -46,24 +46,14 @@ export class PrismaElectronicSupportDocumentRepository implements IElectronicSup
     build: (fullNumber: string, prefix: string, number: number) => { cuds: string; xmlContent: string }
   ): Promise<ElectronicSupportDocumentRecord> {
     const companyId = getTenantContext().companyId;
-    const now = new Date();
 
     const row = await prisma.$transaction(async (tx) => {
-      const resolution = await tx.invoiceNumberingResolution.findFirst({
-        where: {
-          companyId,
-          documentType: "DOCUMENTO_SOPORTE",
-          isActive: true,
-          validFrom: { lte: now },
-          validUntil: { gte: now },
-          OR: [{ branchId: data.branchId }, { branchId: null }],
-        },
-        orderBy: [{ branchId: "desc" }, { createdAt: "desc" }],
+      const resolution = await findResolutionForClaim(tx, {
+        companyId,
+        branchId: data.branchId,
+        documentType: "DOCUMENTO_SOPORTE",
+        viaThirdParty: data.viaThirdParty,
       });
-
-      if (!resolution) {
-        throw new ConflictError("No hay una resolucion de numeracion DIAN vigente para documentos soporte en esta sucursal");
-      }
 
       const { number, fullNumber } = await claimNextDocumentNumber(tx, resolution);
 
@@ -113,12 +103,47 @@ export class PrismaElectronicSupportDocumentRepository implements IElectronicSup
       signedXmlContent: row.signedXmlContent,
       dianTrackingId: row.dianTrackingId,
       rejectionReason: row.rejectionReason,
+      providerRequest: row.providerRequest,
     };
   }
 
   // updateMany (no update): sin scoping propio quedaria expuesto a un id de otra empresa. Estos
   // 4 metodos siempre corren con TenantContext disponible (request HTTP o el contexto sintetico
   // por empresa que establece dian-submission-poller.ts).
+  async saveProviderRequest(id: string, request: string): Promise<void> {
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicSupportDocument.updateMany({ where: { id, companyId }, data: { providerRequest: request } });
+  }
+
+  async applyThirdPartyResult(id: string, result: ThirdPartyDocumentResult): Promise<void> {
+    const companyId = getTenantContext().companyId;
+    const now = new Date();
+    if (result.status === "REJECTED") {
+      await prisma.electronicSupportDocument.updateMany({
+        where: { id, companyId },
+        data: { status: "REJECTED", dianResponseXml: result.rawResponse, rejectionReason: result.rejectionReason ?? null, submittedAt: now, respondedAt: now },
+      });
+      return;
+    }
+    // El numero legal y el codigo unico son los del proveedor; el consecutivo interno queda reemplazado.
+    const legal = splitProviderNumber(result.number);
+    const doc = await prisma.electronicSupportDocument.findFirst({ where: { id, companyId }, select: { purchaseId: true } });
+    await prisma.electronicSupportDocument.updateMany({
+      where: { id, companyId },
+      data: {
+        status: "ACCEPTED",
+        cuds: result.uniqueCode,
+        ...(legal ? { prefix: legal.prefix, number: legal.number, fullNumber: result.number } : {}),
+        ...(result.signedXmlContent ? { xmlContent: result.signedXmlContent, signedXmlContent: result.signedXmlContent } : {}),
+        dianResponseXml: result.rawResponse,
+        rejectionReason: null,
+        submittedAt: now,
+        respondedAt: now,
+      },
+    });
+    if (doc) await prisma.purchase.updateMany({ where: { id: doc.purchaseId, companyId }, data: { cuds: result.uniqueCode } });
+  }
+
   async markSigned(id: string, signedXmlContent: string): Promise<void> {
     const companyId = getTenantContext().companyId;
     await prisma.electronicSupportDocument.updateMany({

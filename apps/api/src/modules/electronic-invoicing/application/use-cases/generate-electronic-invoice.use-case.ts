@@ -12,6 +12,7 @@ import { DIAN_GENERIC_FINAL_CONSUMER } from "../constants";
 import { generateCufe } from "../cufe-generator";
 import { signAndQueueElectronicDocument } from "../sign-and-queue-electronic-document";
 import { buildUblInvoiceXml } from "../ubl-invoice-xml-builder";
+import { toThirdPartyCustomer } from "../third-party-customer";
 
 export interface GenerateElectronicInvoiceItemInput {
   description: string;
@@ -211,22 +212,7 @@ export class GenerateElectronicInvoiceUseCase {
         subtotal: input.subtotal,
         taxTotal: input.taxTotal,
         total: input.total,
-        customer: {
-          documentType: buyer.documentType,
-          documentNumber: buyer.documentNumber,
-          name: buyer.name,
-          email: customer?.email ?? null,
-          phone: customer?.phone ?? null,
-          address: customer?.address ?? null,
-          postalCode: customer?.dianPostalCode ?? null,
-          countryId: customer?.dianCountryId ?? null,
-          // Factus exige el municipio del comprador; el formulario de clientes pide el codigo DANE.
-          cityId: customer?.dianCityId ?? customer?.municipalityCode ?? null,
-          identityDocumentId: customer?.dianIdentityDocumentId ?? null,
-          typeOrganizationId: customer?.dianTypeOrganizationId ?? null,
-          taxRegimeId: customer?.dianTaxRegimeId ?? null,
-          taxLevelId: customer?.dianTaxLevelId ?? null,
-        },
+        customer: toThirdPartyCustomer(buyer, customer),
         lines: input.items.map((item, i) => ({
           description: item.description,
           // Contapro no propaga un codigo de producto hasta este use-case todavia -- ver

@@ -14,13 +14,20 @@ import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { listProducts } from "../../inventory/api/product.api";
 import { listCustomers } from "../../customers/api/customer.api";
 import {
+  CREDIT_NOTE_CONCEPT_LABELS,
+  CREDIT_NOTE_CONCEPTS,
+  DEBIT_NOTE_CONCEPTS,
   createCreditNote,
   createDebitNote,
   createQuote,
   listCreditNotes,
   listDebitNotes,
   listQuotes,
+  printNotePdf,
   printQuotePdf,
+  resubmitNote,
+  type NoteInput,
+  type NoteRecord,
 } from "../api/notes.api";
 import { getElectronicInvoiceBySale, getSale, listSales, type ElectronicInvoiceStatus } from "../api/sale.api";
 
@@ -59,8 +66,6 @@ const QUOTE_STATUS_TONE: Record<string, "neutral" | "success" | "warning" | "dan
   EXPIRED: "danger",
   CONVERTED: "success",
 };
-
-const NOTE_STATUS_LABEL: Record<string, string> = { ISSUED: "Emitida" };
 
 const SALE_STATUS_LABEL: Record<string, string> = {
   DRAFT: "Borrador",
@@ -232,83 +237,119 @@ function QuoteSection() {
   );
 }
 
+/** Estado ante la DIAN de una nota o de la nota credito de una devolucion. */
+function NoteDianStatus({ electronic }: { electronic: { fullNumber: string; status: string; rejectionReason: string | null } | null | undefined }) {
+  if (!electronic) return <Badge tone="neutral">Sin documento electrónico</Badge>;
+  const status = electronic.status as ElectronicInvoiceStatus["status"];
+  return (
+    <span title={electronic.rejectionReason ?? undefined}>
+      <Badge tone={DIAN_STATUS_TONE[status] ?? "neutral"}>{DIAN_STATUS_LABEL[status] ?? electronic.status}</Badge>
+    </span>
+  );
+}
+
+/** Ventas sobre las que se puede emitir una nota (ya facturadas, no anuladas). */
+const NOTE_SALE_STATUSES = new Set(["COMPLETED", "RETURNED_PARTIAL", "RETURNED_FULL"]);
+
 function NoteSection({
+  kind,
   title,
   createPermission,
+  concepts,
+  conceptLabels,
   createFn,
   listFn,
-  queryKey,
+  help,
 }: {
+  kind: "credit" | "debit";
   title: string;
   createPermission: string;
-  createFn: (input: { branchId: string; customerId: string; saleId?: string; reason: string; amount: number }) => Promise<unknown>;
-  listFn: () => Promise<{ data: { id: string; amount: number; reason: string; status: string; createdAt: string }[] }>;
-  queryKey: string;
+  concepts: Record<string, string>;
+  conceptLabels: Record<string, string>;
+  createFn: (input: NoteInput) => Promise<NoteRecord>;
+  listFn: () => Promise<{ data: NoteRecord[] }>;
+  help: string;
 }) {
   const queryClient = useQueryClient();
-  const user = useAuthStore((s) => s.user);
+  const queryKey = `${kind}-notes`;
   const canCreate = useAuthStore((s) => s.hasPermission(createPermission));
   const canRead = useAuthStore((s) => s.hasPermission("sale.read"));
 
-  const { data: customers } = useQuery({
-    queryKey: ["customers"],
-    queryFn: () => listCustomers(),
-    enabled: canCreate,
-  });
+  const { data: sales } = useQuery({ queryKey: ["sales"], queryFn: listSales, enabled: canCreate || canRead });
   const { data: notes } = useQuery({ queryKey: [queryKey], queryFn: listFn, enabled: canRead });
 
-  const [customerId, setCustomerId] = useState("");
   const [saleId, setSaleId] = useState("");
+  const [conceptCode, setConceptCode] = useState(Object.keys(concepts)[0]!);
   const [reason, setReason] = useState("");
   const [amount, setAmount] = useState("");
 
+  const noteSales = (sales?.data ?? []).filter((s) => NOTE_SALE_STATUSES.has(s.status));
+  const saleNumber = (id: string | null) => sales?.data.find((s) => s.id === id)?.number;
+
   const createMutation = useMutation({
-    mutationFn: () =>
-      createFn({
-        branchId: user!.branchId!,
-        customerId,
-        saleId: saleId || undefined,
-        reason,
-        amount: Number(amount),
-      }),
+    mutationFn: () => createFn({ saleId, conceptCode, reason, amount: Number(amount) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      setSaleId("");
       setReason("");
       setAmount("");
     },
+  });
+  const resubmitMutation = useMutation({
+    mutationFn: (noteId: string) => resubmitNote(kind, noteId),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: [queryKey] }),
   });
 
   return (
     <Card title={title} className="mb-6">
       {canCreate && (
         <form
-          className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5"
+          className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5"
           onSubmit={(e) => {
             e.preventDefault();
             createMutation.mutate();
           }}
         >
-          <Select label="Cliente" value={customerId} onChange={(e) => setCustomerId(e.target.value)} required>
-            <option value="">Seleccionar...</option>
-            {customers?.data.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+          <p className="col-span-full text-sm text-slate-500">{help}</p>
+          <Select label="Venta facturada" value={saleId} onChange={(e) => setSaleId(e.target.value)} required>
+            <option value="">Seleccionar venta...</option>
+            {noteSales.map((s) => (
+              <option key={s.id} value={s.id}>
+                Venta #{s.number} - {formatCOP(s.total)}
               </option>
             ))}
           </Select>
-          <Input placeholder="ID de venta (opcional)" value={saleId} onChange={(e) => setSaleId(e.target.value)} />
-          <Input placeholder="Motivo" value={reason} onChange={(e) => setReason(e.target.value)} required />
-          <Input placeholder="Monto" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-          <Button type="submit" loading={createMutation.isPending}>
-            Emitir
-          </Button>
+          <Select label="Concepto DIAN" value={conceptCode} onChange={(e) => setConceptCode(e.target.value)} required>
+            {Object.entries(concepts).map(([code, label]) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+          </Select>
+          <Input label="Motivo" value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} />
+          <Input label="Valor total (con IVA)" type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <div className="flex items-end">
+            <Button type="submit" loading={createMutation.isPending} disabled={!saleId}>
+              Emitir
+            </Button>
+          </div>
           {createMutation.isError && (
             <Alert tone="danger" className="col-span-full">
               {(createMutation.error as Error).message}
             </Alert>
           )}
+          {createMutation.data && (
+            <Alert tone={createMutation.data.electronic?.status === "ACCEPTED" ? "success" : "warning"} className="col-span-full">
+              {createMutation.data.electronic?.status === "ACCEPTED"
+                ? `Nota emitida y aceptada por la DIAN: ${createMutation.data.electronic.fullNumber}`
+                : "La nota quedó registrada pero el documento electrónico no se aceptó. Revise el estado abajo o en Auditoría y reenvíela."}
+            </Alert>
+          )}
         </form>
+      )}
+      {resubmitMutation.isError && (
+        <Alert tone="danger" className="mb-3">
+          {(resubmitMutation.error as Error).message}
+        </Alert>
       )}
       {canRead &&
         (notes?.data.length === 0 ? (
@@ -317,18 +358,43 @@ function NoteSection({
           <Table>
             <TableHead>
               <tr>
+                <Th>Fecha</Th>
+                <Th>Número</Th>
+                <Th>Venta</Th>
+                <Th>Concepto</Th>
                 <Th>Motivo</Th>
-                <Th>Monto</Th>
-                <Th>Estado</Th>
+                <Th>Valor</Th>
+                <Th>DIAN</Th>
+                <Th />
               </tr>
             </TableHead>
             <TableBody>
               {notes?.data.map((n) => (
                 <TableRow key={n.id}>
+                  <Td>{n.createdAt.slice(0, 10)}</Td>
+                  <Td>{n.electronic?.status === "ACCEPTED" ? n.electronic.fullNumber : "—"}</Td>
+                  <Td>{saleNumber(n.saleId) ? `#${saleNumber(n.saleId)}` : "—"}</Td>
+                  <Td>{conceptLabels[n.conceptCode] ?? n.conceptCode}</Td>
                   <Td>{n.reason}</Td>
                   <Td>{formatCOP(n.amount)}</Td>
                   <Td>
-                    <Badge tone="success">{NOTE_STATUS_LABEL[n.status] ?? n.status}</Badge>
+                    <NoteDianStatus electronic={n.electronic} />
+                  </Td>
+                  <Td>
+                    {n.electronic?.status === "ACCEPTED" ? (
+                      <Button size="sm" variant="secondary" onClick={() => printNotePdf(kind, n.id)}>
+                        PDF
+                      </Button>
+                    ) : n.electronic && canCreate ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={resubmitMutation.isPending && resubmitMutation.variables === n.id}
+                        onClick={() => resubmitMutation.mutate(n.id)}
+                      >
+                        Reenviar
+                      </Button>
+                    ) : null}
                   </Td>
                 </TableRow>
               ))}
@@ -505,6 +571,7 @@ function ReturnSection() {
                 <Th>Motivo</Th>
                 <Th>Total</Th>
                 <Th>Estado</Th>
+                <Th>Nota crédito DIAN</Th>
                 <Th>Fecha</Th>
               </tr>
             </TableHead>
@@ -515,6 +582,10 @@ function ReturnSection() {
                   <Td>{formatCOP(r.total)}</Td>
                   <Td>
                     <Badge tone="success">{RETURN_STATUS_LABEL[r.status] ?? r.status}</Badge>
+                  </Td>
+                  <Td>
+                    {r.creditNote?.status === "ACCEPTED" ? <span className="mr-2 text-xs text-slate-500">{r.creditNote.fullNumber}</span> : null}
+                    <NoteDianStatus electronic={r.creditNote} />
                   </Td>
                   <Td>{r.createdAt.slice(0, 10)}</Td>
                 </TableRow>
@@ -532,18 +603,24 @@ export function QuotesAndNotesPage() {
       <h1 className="mb-4 text-lg font-semibold text-slate-900">Cotizaciones, notas y devoluciones</h1>
       <QuoteSection />
       <NoteSection
-        title="Notas credito"
+        kind="credit"
+        title="Notas crédito"
         createPermission="creditnote.create"
+        concepts={CREDIT_NOTE_CONCEPTS}
+        conceptLabels={CREDIT_NOTE_CONCEPT_LABELS}
         createFn={createCreditNote}
         listFn={listCreditNotes}
-        queryKey="credit-notes"
+        help="Para un descuento o ajuste de precio sobre una venta ya facturada. Si el cliente devuelve productos, use Devoluciones: genera la nota crédito y además reintegra inventario y dinero."
       />
       <NoteSection
-        title="Notas debito"
+        kind="debit"
+        title="Notas débito"
         createPermission="debitnote.create"
+        concepts={DEBIT_NOTE_CONCEPTS}
+        conceptLabels={DEBIT_NOTE_CONCEPTS}
         createFn={createDebitNote}
         listFn={listDebitNotes}
-        queryKey="debit-notes"
+        help="Para cobrar un valor adicional sobre una venta ya facturada (intereses, gastos de cobranza, cambio de precio). Solo el cambio del valor lleva IVA."
       />
       <ReturnSection />
     </AppLayout>
