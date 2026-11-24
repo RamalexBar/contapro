@@ -128,7 +128,7 @@ class FakeProductRepository {
   }
 }
 
-function makeUseCase(concepts?: WithholdingConceptRecord[], opts: { supplier?: SupplierRecord; uvt?: number } = {}) {
+function makeUseCase(concepts?: WithholdingConceptRecord[], opts: { supplier?: SupplierRecord; uvt?: number; agent?: boolean } = {}) {
   const purchaseRepo = new FakePurchaseRepository();
   let createdCount = 0;
   const createProduct = {
@@ -155,7 +155,7 @@ function makeUseCase(concepts?: WithholdingConceptRecord[], opts: { supplier?: S
       createProduct: createProduct as unknown as CreateProductUseCase,
       receiveGoods: receiveGoods as unknown as ReceiveGoodsUseCase,
     },
-    opts.uvt ? { uvtForYear: async () => opts.uvt! } : null
+    opts.uvt || opts.agent !== undefined ? { uvtForYear: async () => opts.uvt ?? null, isWithholdingAgent: async () => opts.agent ?? true } : null
   );
 
   return { useCase, purchaseRepo, postPurchaseJournalEntry, createProduct, receiveGoods };
@@ -397,5 +397,14 @@ describe("CreatePurchaseUseCase — productos al inventario", () => {
     );
     expect(repo2.created[0]).toEqual(expect.objectContaining({ retentionTotal: 18_000 })); // 6 % por no declarante
     expect(purchaseRepo.created[0]).toEqual(expect.objectContaining({ retentionTotal: 0 }));
+  });
+
+  it("does not withhold anything when the company is not a withholding agent (art. 368 E.T.)", async () => {
+    const { useCase, purchaseRepo } = makeUseCase(undefined, { agent: false });
+    const result = await withTenantContext(() =>
+      useCase.execute({ ...BASE_INPUT, withholdings: [{ withholdingConceptId: RETEICA_CONCEPT.id, base: 100_000 }] })
+    );
+    expect(purchaseRepo.created[0]).toEqual(expect.objectContaining({ retentionTotal: 0, withholdings: [] }));
+    expect(result.skippedWithholdings[0]).toMatch(/no es agente de retencion/);
   });
 });

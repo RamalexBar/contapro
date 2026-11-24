@@ -1,3 +1,5 @@
+import { basePrisma } from "@erp/database";
+import { getTenantContext } from "../../../shared/context/request-context";
 import { PrismaPayrollParameterRepository } from "../../payroll/infrastructure/prisma-payroll-parameter.repository";
 import type { IUvtProvider } from "../application/use-cases/create-purchase.use-case";
 
@@ -14,5 +16,10 @@ export class PayrollParameterUvtProvider implements IUvtProvider {
     } catch {
       return null;
     }
+  }
+
+  async isWithholdingAgent(): Promise<boolean> {
+    const company = await basePrisma.company.findFirst({ where: { id: getTenantContext().companyId }, select: { withholdingAgent: true } });
+    return company?.withholdingAgent ?? true;
   }
 }

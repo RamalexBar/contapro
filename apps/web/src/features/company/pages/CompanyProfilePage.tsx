@@ -55,6 +55,7 @@ interface FormState {
   municipality: string;
   department: string;
   municipalityCode: string;
+  withholdingAgent: boolean;
   receiptHeader: string;
   receiptFooter: string;
   logoUrl: string | null;
@@ -78,6 +79,7 @@ const EMPTY_FORM: FormState = {
   municipality: "",
   department: "",
   municipalityCode: "",
+  withholdingAgent: true,
   receiptHeader: "",
   receiptFooter: "",
   logoUrl: null,
@@ -232,6 +234,7 @@ export function CompanyProfilePage() {
       municipality: data.municipality ?? "",
       department: data.department ?? "",
       municipalityCode: data.municipalityCode ?? "",
+      withholdingAgent: data.withholdingAgent ?? true,
       receiptHeader: data.receiptHeader ?? "",
       receiptFooter: data.receiptFooter ?? "",
       logoUrl: data.logoUrl,
@@ -259,6 +262,7 @@ export function CompanyProfilePage() {
         municipality: form.municipality || null,
         department: form.department || null,
         municipalityCode: form.municipalityCode || null,
+        withholdingAgent: form.withholdingAgent,
         receiptHeader: form.receiptHeader || null,
         receiptFooter: form.receiptFooter || null,
         logoUrl: form.logoUrl,
@@ -409,6 +413,15 @@ export function CompanyProfilePage() {
                   </Choice>
                 ))}
               </div>
+            </div>
+            <div>
+              <Choice type="checkbox" checked={form.withholdingAgent} onChange={() => !disabled && setForm((prev) => ({ ...prev, withholdingAgent: !prev.withholdingAgent }))}>
+                <span className="font-medium">Agente de retención</span> (art. 368 E.T.)
+              </Choice>
+              <p className="mt-1 text-xs text-slate-500">
+                Las sociedades lo son. Una persona natural lo es si el año anterior tuvo patrimonio o ingresos brutos de más de
+                30.000 UVT; el régimen SIMPLE no practica retenciones en compras. Si no está marcada, las compras no llevan retenciones.
+              </p>
             </div>
           </Section>
 

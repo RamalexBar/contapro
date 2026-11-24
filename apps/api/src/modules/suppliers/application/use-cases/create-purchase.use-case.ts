@@ -43,9 +43,11 @@ export type CreatePurchaseInput = Omit<CreatePurchaseData, "retentionTotal" | "w
   items?: PurchaseItemInput[];
 };
 
-/** UVT del año (sale de los parametros legales que mantiene el panel de plataforma). */
+/** UVT del año (parametros legales del panel de plataforma) y si la empresa es agente de retencion. */
 export interface IUvtProvider {
   uvtForYear(year: number): Promise<number | null>;
+  /** false = no practica retenciones (art. 368 E.T.). Sin el dato, se asume que si. */
+  isWithholdingAgent?(): Promise<boolean>;
 }
 
 export type CreatePurchaseResult = PurchaseRecord & {
@@ -110,7 +112,9 @@ export class CreatePurchaseUseCase {
     const computedWithholdings: ComputedPurchaseWithholding[] = [];
     const skippedWithholdings: string[] = [];
     const uvt = data.withholdings.length > 0 && this.uvtProvider ? await this.uvtProvider.uvtForYear(new Date().getFullYear()) : null;
-    for (const w of data.withholdings) {
+    // Si la empresa no es agente de retencion, ninguna retencion se practica.
+    const isAgent = data.withholdings.length > 0 && this.uvtProvider?.isWithholdingAgent ? await this.uvtProvider.isWithholdingAgent() : true;
+    for (const w of isAgent ? data.withholdings : []) {
       const concept = await this.withholdingConceptRepo.findByIdOrThrow(w.withholdingConceptId);
       if (!concept.isActive) {
         throw new ValidationError(`El concepto de retencion ${concept.code} esta inactivo`);
@@ -257,6 +261,9 @@ export class CreatePurchaseUseCase {
       }
     }
 
+    if (!isAgent && data.withholdings.length > 0) {
+      skippedWithholdings.push("La empresa no es agente de retencion (Datos de la empresa): no se practican retenciones");
+    }
     return { ...purchase, goodsReceiptId, createdProductIds, skippedWithholdings };
   }
 

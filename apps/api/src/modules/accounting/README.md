@@ -444,8 +444,11 @@ Antes cada retencion se practicaba sobre cualquier valor y con una sola tarifa. 
   vista previa de la compra con la misma regla (`previewPurchaseWithholding`). ICA se muestra tambien en
   "por mil".
 - Ventas: no cambia. Las retenciones de una venta las practica el cliente; Contapro solo las registra.
-- Pendiente: agente retenedor (si la empresa no es agente de retencion, no deberia retener) y bases de
-  ReteICA por municipio.
+- **Agente de retencion** (2026-11-24, `Company.withholdingAgent`, Datos de la empresa): si la empresa no lo es
+  (art. 368 E.T.: persona natural con menos de 30.000 UVT de patrimonio o ingresos, regimen SIMPLE), las compras no
+  llevan retenciones y la respuesta lo explica en `skippedWithholdings`. Default true. No afecta la retencion de
+  nomina.
+- Pendiente: bases de ReteICA por municipio.
 
 ## Resumen de IVA (formulario 300) — 2026-10-24
 

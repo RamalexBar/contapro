@@ -15,6 +15,7 @@ export interface CompanyProfile {
   municipality: string | null;
   department: string | null;
   municipalityCode: string | null;
+  withholdingAgent: boolean;
   economicActivity: string | null;
   whatsapp: string | null;
   website: string | null;
@@ -48,6 +49,7 @@ export interface UpdateCompanyProfileInput {
   municipality?: string | null;
   department?: string | null;
   municipalityCode?: string | null;
+  withholdingAgent?: boolean;
 }
 
 export function getCompanyProfile(): Promise<CompanyProfile> {

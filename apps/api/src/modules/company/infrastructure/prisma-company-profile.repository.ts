@@ -41,6 +41,7 @@ function toRecord(row: {
   municipality: string | null;
   department: string | null;
   municipalityCode: string | null;
+  withholdingAgent: boolean;
   economicActivity: string | null;
   whatsapp: string | null;
   website: string | null;
@@ -64,6 +65,7 @@ function toRecord(row: {
     municipality: row.municipality,
     department: row.department,
     municipalityCode: row.municipalityCode,
+    withholdingAgent: row.withholdingAgent,
     economicActivity: row.economicActivity,
     whatsapp: row.whatsapp,
     website: row.website,

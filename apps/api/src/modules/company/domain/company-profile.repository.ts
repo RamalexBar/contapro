@@ -17,6 +17,8 @@ export interface CompanyProfileRecord {
   municipality: string | null;
   department: string | null;
   municipalityCode: string | null;
+  /** Agente de retencion (art. 368 E.T.): si es false, las compras no llevan retenciones. */
+  withholdingAgent: boolean;
   economicActivity: string | null;
   whatsapp: string | null;
   website: string | null;
@@ -48,6 +50,7 @@ export interface UpdateCompanyProfileData {
   municipality?: string | null;
   department?: string | null;
   municipalityCode?: string | null;
+  withholdingAgent?: boolean;
 }
 
 export interface ICompanyProfileRepository {

@@ -38,4 +38,5 @@ export const updateCompanyProfileSchema = z.object({
   municipality: z.string().min(1).nullable().optional(),
   department: z.string().min(1).nullable().optional(),
   municipalityCode: z.string().min(1).nullable().optional(),
+  withholdingAgent: z.boolean().optional(),
 });

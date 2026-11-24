@@ -32,6 +32,9 @@ model Company {
   // menos de 10 SMMLV). La marca la empresa en Nomina -> Configuracion: depende de su situacion
   // tributaria (ver PayrollCompanyOptions en payroll-calculator.ts).
   payrollExemptArt1141      Boolean @default(false)
+  // Agente de retencion (art. 368 E.T.): si no lo es (persona natural por debajo de 30.000 UVT, regimen
+  // SIMPLE), no practica retenciones en sus compras. Default true: la mayoria son sociedades.
+  withholdingAgent          Boolean @default(true)
   payrollElectronicSequence Int     @default(0)
   payrollElectronicPrefix   String?
   // ---- Proveedor tecnologico DIAN (ver modules/electronic-invoicing/README.md) ----
