@@ -5,6 +5,7 @@ import type { PostPurchaseJournalEntryUseCase } from "../../../accounting/applic
 import type { GenerateElectronicSupportDocumentUseCase } from "../../../electronic-invoicing/application/use-cases/generate-electronic-support-document.use-case";
 import type { IWithholdingConceptRepository } from "../../../accounting/domain/withholding-concept.repository";
 import { sumWithholdingsByType } from "../../../accounting/application/sum-withholdings-by-type";
+import { resolvePurchaseWithholding } from "../../../accounting/application/resolve-purchase-withholding";
 import type { ISupplierRepository } from "../../domain/supplier.repository";
 import type { ComputedPurchaseWithholding, CreatePurchaseData, IPurchaseRepository, PurchaseRecord } from "../../domain/purchase.repository";
 import type { IProductRepository } from "../../../inventory/product/domain/product.repository";
@@ -42,7 +43,14 @@ export type CreatePurchaseInput = Omit<CreatePurchaseData, "retentionTotal" | "w
   items?: PurchaseItemInput[];
 };
 
+/** UVT del año (sale de los parametros legales que mantiene el panel de plataforma). */
+export interface IUvtProvider {
+  uvtForYear(year: number): Promise<number | null>;
+}
+
 export type CreatePurchaseResult = PurchaseRecord & {
+  /** Retenciones pedidas que no se practicaron (la base no alcanza el minimo), con el motivo. */
+  skippedWithholdings: string[];
   /** Recepcion de mercancia creada con la compra -- null si la compra no trajo productos. */
   goodsReceiptId: string | null;
   createdProductIds: string[];
@@ -82,7 +90,8 @@ export class CreatePurchaseUseCase {
     private readonly postPurchaseJournalEntry: PostPurchaseJournalEntryUseCase,
     private readonly generateElectronicSupportDocument: GenerateElectronicSupportDocumentUseCase,
     private readonly audit: AuditService,
-    private readonly inventory: PurchaseInventoryDeps
+    private readonly inventory: PurchaseInventoryDeps,
+    private readonly uvtProvider: IUvtProvider | null = null
   ) {}
 
   async execute(data: CreatePurchaseInput): Promise<CreatePurchaseResult> {
@@ -99,6 +108,8 @@ export class CreatePurchaseUseCase {
     // le paga (ver PrismaPurchaseRepository.create, AccountPayable queda neto).
     let retentionTotal = 0;
     const computedWithholdings: ComputedPurchaseWithholding[] = [];
+    const skippedWithholdings: string[] = [];
+    const uvt = data.withholdings.length > 0 && this.uvtProvider ? await this.uvtProvider.uvtForYear(new Date().getFullYear()) : null;
     for (const w of data.withholdings) {
       const concept = await this.withholdingConceptRepo.findByIdOrThrow(w.withholdingConceptId);
       if (!concept.isActive) {
@@ -107,13 +118,25 @@ export class CreatePurchaseUseCase {
       if (w.base > data.subtotal) {
         throw new ValidationError(`La base de retencion (${w.base}) no puede superar el subtotal de la compra (${data.subtotal})`);
       }
-      const amount = calculateTax(w.base, concept.ratePercent);
+      // Base minima en UVT y tarifa de no declarante (ver resolve-purchase-withholding.ts).
+      const decision = resolvePurchaseWithholding({
+        concept,
+        base: w.base,
+        purchaseSubtotal: data.subtotal,
+        supplierDeclarant: supplier.incomeTaxDeclarant,
+        uvt,
+      });
+      if (!decision.applies) {
+        skippedWithholdings.push(decision.reason ?? concept.code);
+        continue;
+      }
+      const amount = calculateTax(w.base, decision.ratePercent);
       retentionTotal = round2(retentionTotal + amount);
       computedWithholdings.push({
         withholdingConceptId: concept.id,
         type: concept.type,
         base: w.base,
-        ratePercent: concept.ratePercent,
+        ratePercent: decision.ratePercent,
         amount,
       });
     }
@@ -234,7 +257,7 @@ export class CreatePurchaseUseCase {
       }
     }
 
-    return { ...purchase, goodsReceiptId, createdProductIds };
+    return { ...purchase, goodsReceiptId, createdProductIds, skippedWithholdings };
   }
 
   /** Todo se revisa antes de crear nada (productos, compra o comprobante). */

@@ -313,9 +313,17 @@ function AccountsSection({ canManage }: { canManage: boolean }) {
 function WithholdingSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["withholding-concepts"], queryFn: listWithholdingConcepts });
-  const [form, setForm] = useState({ code: "", name: "", type: "RETEFUENTE" as WithholdingType, ratePercent: "", dianConceptCode: "" });
+  const emptyForm = { code: "", name: "", type: "RETEFUENTE" as WithholdingType, ratePercent: "", dianConceptCode: "", minBaseUvt: "", nonDeclarantRatePercent: "" };
+  const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", ratePercent: "", dianConceptCode: "" });
+  const [editForm, setEditForm] = useState({ name: "", ratePercent: "", dianConceptCode: "", minBaseUvt: "", nonDeclarantRatePercent: "" });
+  const uvt = data?.uvt ?? null;
+  /** "10 UVT ($523.740)" o "Sin minimo". */
+  const minBaseLabel = (minBaseUvt: number) =>
+    minBaseUvt > 0 ? `${minBaseUvt} UVT${uvt ? ` (${formatCOP(minBaseUvt * uvt)})` : ""}` : "Sin minimo";
+  /** En ICA los municipios hablan de tarifa por mil: 1 % = 10 por mil. */
+  const rateLabel = (type: WithholdingType, ratePercent: number) =>
+    type === "RETEICA" ? `${ratePercent}% (${Math.round(ratePercent * 10 * 100) / 100} por mil)` : `${ratePercent}%`;
 
   function invalidate() {
     return queryClient.invalidateQueries({ queryKey: ["withholding-concepts"] });
@@ -329,10 +337,12 @@ function WithholdingSection({ canManage }: { canManage: boolean }) {
         type: form.type,
         ratePercent: Number(form.ratePercent),
         dianConceptCode: form.dianConceptCode || undefined,
+        minBaseUvt: form.minBaseUvt ? Number(form.minBaseUvt) : 0,
+        nonDeclarantRatePercent: form.nonDeclarantRatePercent ? Number(form.nonDeclarantRatePercent) : null,
       }),
     onSuccess: () => {
       invalidate();
-      setForm({ code: "", name: "", type: "RETEFUENTE", ratePercent: "", dianConceptCode: "" });
+      setForm(emptyForm);
     },
   });
 
@@ -342,6 +352,8 @@ function WithholdingSection({ canManage }: { canManage: boolean }) {
         name: editForm.name,
         ratePercent: Number(editForm.ratePercent),
         dianConceptCode: editForm.dianConceptCode || undefined,
+        minBaseUvt: editForm.minBaseUvt ? Number(editForm.minBaseUvt) : 0,
+        nonDeclarantRatePercent: editForm.nonDeclarantRatePercent ? Number(editForm.nonDeclarantRatePercent) : null,
       }),
     onSuccess: () => {
       invalidate();
@@ -359,8 +371,10 @@ function WithholdingSection({ canManage }: { canManage: boolean }) {
       {canManage && (
         <Card title="Nuevo concepto de retencion">
           <p className="mb-3 text-sm text-slate-500">
-            Cada venta o compra puede aplicar uno o mas de estos conceptos. Las tarifas de ReteFuente/ReteIVA de
-            fabrica son valores comunes de mercado; ajusta la de ICA a la tarifa real de tu municipio/actividad.
+            Cada venta o compra puede aplicar uno o mas de estos conceptos. Los de fabrica traen las bases y tarifas
+            del Decreto 572 de 2025 (compras desde 10 UVT al 2,5 %, servicios desde 2 UVT al 4 %; 3,5 % y 6 % si el
+            proveedor no declara renta). En una compra, la retencion solo se practica si la base alcanza el minimo.
+            Ajusta la de ICA a la tarifa de tu municipio (en %; 1 % = 10 por mil).
           </p>
           <form
             className="grid grid-cols-2 gap-3 sm:grid-cols-5"
@@ -391,6 +405,22 @@ function WithholdingSection({ canManage }: { canManage: boolean }) {
               value={form.dianConceptCode}
               onChange={(e) => setForm({ ...form, dianConceptCode: e.target.value })}
             />
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Base minima en UVT (0 = sin minimo)"
+              value={form.minBaseUvt}
+              onChange={(e) => setForm({ ...form, minBaseUvt: e.target.value })}
+            />
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Tarifa no declarante % (opcional)"
+              value={form.nonDeclarantRatePercent}
+              onChange={(e) => setForm({ ...form, nonDeclarantRatePercent: e.target.value })}
+            />
             <Button type="submit" loading={createMutation.isPending}>
               Crear
             </Button>
@@ -414,6 +444,8 @@ function WithholdingSection({ canManage }: { canManage: boolean }) {
                 <Th>Nombre</Th>
                 <Th>Tipo</Th>
                 <Th>Tarifa</Th>
+                <Th>No declarante</Th>
+                <Th>Base minima</Th>
                 <Th>Codigo DIAN</Th>
                 <Th>Estado</Th>
                 <Th></Th>
@@ -442,6 +474,28 @@ function WithholdingSection({ canManage }: { canManage: boolean }) {
                     </Td>
                     <Td>
                       <Input
+                        type="number"
+                        step="0.01"
+                        className="w-20"
+                        placeholder="—"
+                        value={editForm.nonDeclarantRatePercent}
+                        onChange={(e) => setEditForm({ ...editForm, nonDeclarantRatePercent: e.target.value })}
+                      />
+                    </Td>
+                    <Td>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="w-20"
+                          value={editForm.minBaseUvt}
+                          onChange={(e) => setEditForm({ ...editForm, minBaseUvt: e.target.value })}
+                        />
+                        UVT
+                      </div>
+                    </Td>
+                    <Td>
+                      <Input
                         className="w-24"
                         value={editForm.dianConceptCode}
                         onChange={(e) => setEditForm({ ...editForm, dianConceptCode: e.target.value })}
@@ -464,7 +518,9 @@ function WithholdingSection({ canManage }: { canManage: boolean }) {
                     <Td className="font-medium text-slate-900">{c.code}</Td>
                     <Td>{c.name}</Td>
                     <Td>{WITHHOLDING_TYPES.find((t) => t.value === c.type)?.label ?? c.type}</Td>
-                    <Td>{c.ratePercent}%</Td>
+                    <Td>{rateLabel(c.type, c.ratePercent)}</Td>
+                    <Td>{c.nonDeclarantRatePercent !== null ? `${c.nonDeclarantRatePercent}%` : "—"}</Td>
+                    <Td>{minBaseLabel(c.minBaseUvt)}</Td>
                     <Td className={c.dianConceptCode ? "" : "text-warning-600"}>{c.dianConceptCode ?? "Sin asignar"}</Td>
                     <Td>
                       <ActiveBadge active={c.isActive} />
@@ -477,7 +533,13 @@ function WithholdingSection({ canManage }: { canManage: boolean }) {
                             variant="secondary"
                             onClick={() => {
                               setEditingId(c.id);
-                              setEditForm({ name: c.name, ratePercent: String(c.ratePercent), dianConceptCode: c.dianConceptCode ?? "" });
+                              setEditForm({
+                                name: c.name,
+                                ratePercent: String(c.ratePercent),
+                                dianConceptCode: c.dianConceptCode ?? "",
+                                minBaseUvt: String(c.minBaseUvt),
+                                nonDeclarantRatePercent: c.nonDeclarantRatePercent !== null ? String(c.nonDeclarantRatePercent) : "",
+                              });
                             }}
                           >
                             Editar

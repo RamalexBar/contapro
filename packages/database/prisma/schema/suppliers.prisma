@@ -17,6 +17,9 @@ model Supplier {
   // (ver electronic-invoicing.prisma). Default true = proveedor formal/registrado, el caso
   // comun, para que proveedores existentes no generen documentos soporte sin marcarlo.
   isObligatedToInvoice Boolean @default(true)
+  // Declarante del impuesto de renta: cambia la tarifa de retencion de algunos conceptos (servicios
+  // 4 % vs 6 %, compras 2,5 % vs 3,5 %). Las personas juridicas siempre declaran.
+  incomeTaxDeclarant Boolean @default(true)
   // Item 37 de docs/ALCANCE.md (informacion exogena DIAN): tipo de documento del tercero
   // (NIT/CC/CE). Default "NIT" -- la mayoria de proveedores son personas juridicas, y hasta
   // ahora se asumia NIT implicitamente en todo el modulo (ver electronic-invoicing/README.md).

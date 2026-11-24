@@ -30,6 +30,7 @@ class FakeSupplierRepository implements Partial<ISupplierRepository> {
       address: null,
       isActive: true,
       isObligatedToInvoice: data.isObligatedToInvoice ?? true,
+      incomeTaxDeclarant: true,
       documentType: data.documentType ?? "NIT",
       municipalityCode: null,
     };

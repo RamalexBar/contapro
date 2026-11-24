@@ -21,6 +21,8 @@ export class PrismaWithholdingConceptRepository implements IWithholdingConceptRe
           type: data.type,
           ratePercent: data.ratePercent,
           dianConceptCode: data.dianConceptCode,
+          minBaseUvt: data.minBaseUvt ?? 0,
+          nonDeclarantRatePercent: data.nonDeclarantRatePercent ?? null,
         },
       });
       return this.toRecord(row);
@@ -48,7 +50,13 @@ export class PrismaWithholdingConceptRepository implements IWithholdingConceptRe
     await this.findByIdOrThrow(id);
     const row = await prisma.withholdingConcept.update({
       where: { id },
-      data: { name: data.name, ratePercent: data.ratePercent, dianConceptCode: data.dianConceptCode },
+      data: {
+        name: data.name,
+        ratePercent: data.ratePercent,
+        dianConceptCode: data.dianConceptCode,
+        minBaseUvt: data.minBaseUvt,
+        nonDeclarantRatePercent: data.nonDeclarantRatePercent,
+      },
     });
     return this.toRecord(row);
   }
@@ -67,6 +75,8 @@ export class PrismaWithholdingConceptRepository implements IWithholdingConceptRe
     ratePercent: Prisma.Decimal;
     isActive: boolean;
     dianConceptCode: string | null;
+    minBaseUvt: Prisma.Decimal;
+    nonDeclarantRatePercent: Prisma.Decimal | null;
   }): WithholdingConceptRecord {
     return {
       id: row.id,
@@ -76,6 +86,8 @@ export class PrismaWithholdingConceptRepository implements IWithholdingConceptRe
       ratePercent: Number(row.ratePercent),
       isActive: row.isActive,
       dianConceptCode: row.dianConceptCode,
+      minBaseUvt: Number(row.minBaseUvt),
+      nonDeclarantRatePercent: row.nonDeclarantRatePercent === null ? null : Number(row.nonDeclarantRatePercent),
     };
   }
 }

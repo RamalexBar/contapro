@@ -8,6 +8,7 @@ suppliersRouter.use(tenantContextMiddleware);
 
 suppliersRouter.get("/suppliers", requirePermission("suppliers.read"), suppliersController.listSuppliers);
 suppliersRouter.post("/suppliers", requirePermission("suppliers.manage"), suppliersController.createSupplier);
+suppliersRouter.patch("/suppliers/:id", requirePermission("suppliers.manage"), suppliersController.updateSupplier);
 
 suppliersRouter.post("/purchases", requirePermission("suppliers.manage"), suppliersController.createPurchase);
 suppliersRouter.post("/purchases/extract", requirePermission("suppliers.manage"), suppliersController.extractPurchaseInvoice);

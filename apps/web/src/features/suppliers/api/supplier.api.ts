@@ -12,6 +12,8 @@ export interface SupplierRecord {
   isObligatedToInvoice: boolean;
   documentType: string;
   municipalityCode: string | null;
+  /** Declarante de renta: cambia la tarifa de retencion (servicios 4 % vs 6 %...). */
+  incomeTaxDeclarant: boolean;
 }
 
 export interface CreateSupplierInput {
@@ -24,6 +26,7 @@ export interface CreateSupplierInput {
   isObligatedToInvoice?: boolean;
   documentType?: string;
   municipalityCode?: string;
+  incomeTaxDeclarant?: boolean;
 }
 
 export interface PurchaseRecord {
@@ -91,13 +94,17 @@ export function createSupplier(input: CreateSupplierInput): Promise<SupplierReco
   return apiFetch("/suppliers", { method: "POST", body: input });
 }
 
+export function updateSupplier(id: string, input: Partial<CreateSupplierInput>): Promise<SupplierRecord> {
+  return apiFetch(`/suppliers/${id}`, { method: "PATCH", body: input });
+}
+
 export function listPurchases(): Promise<{ data: PurchaseRecord[] }> {
   return apiFetch("/purchases");
 }
 
 export function createPurchase(
   input: CreatePurchaseInput
-): Promise<PurchaseRecord & { goodsReceiptId: string | null; createdProductIds: string[] }> {
+): Promise<PurchaseRecord & { goodsReceiptId: string | null; createdProductIds: string[]; skippedWithholdings: string[] }> {
   return apiFetch("/purchases", { method: "POST", body: input });
 }
 

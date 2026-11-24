@@ -18,6 +18,7 @@ const SUPPLIER: SupplierRecord = {
   address: null,
   isActive: true,
   isObligatedToInvoice: true,
+  incomeTaxDeclarant: true,
   documentType: "NIT",
   municipalityCode: "11001",
 };
@@ -69,6 +70,8 @@ const CONCEPT_WITH_CODE: WithholdingConceptRecord = {
   ratePercent: 2.5,
   isActive: true,
   dianConceptCode: "1301",
+  minBaseUvt: 0,
+  nonDeclarantRatePercent: null,
 };
 const CONCEPT_NO_CODE: WithholdingConceptRecord = {
   id: "concept-2",
@@ -78,6 +81,8 @@ const CONCEPT_NO_CODE: WithholdingConceptRecord = {
   ratePercent: 1,
   isActive: true,
   dianConceptCode: null,
+  minBaseUvt: 0,
+  nonDeclarantRatePercent: null,
 };
 
 class FakeWithholdingConceptRepository implements Partial<IWithholdingConceptRepository> {

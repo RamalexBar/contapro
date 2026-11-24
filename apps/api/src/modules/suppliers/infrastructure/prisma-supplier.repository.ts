@@ -2,7 +2,7 @@ import { Prisma } from "@erp/database";
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { ConflictError, NotFoundError } from "../../../shared/errors/app-error";
-import type { CreateSupplierData, ISupplierRepository, SupplierRecord } from "../domain/supplier.repository";
+import type { CreateSupplierData, ISupplierRepository, SupplierRecord, UpdateSupplierData } from "../domain/supplier.repository";
 
 function toRecord(row: {
   id: string;
@@ -16,6 +16,7 @@ function toRecord(row: {
   isObligatedToInvoice: boolean;
   documentType: string;
   municipalityCode: string | null;
+  incomeTaxDeclarant: boolean;
 }): SupplierRecord {
   return {
     id: row.id,
@@ -29,6 +30,7 @@ function toRecord(row: {
     isObligatedToInvoice: row.isObligatedToInvoice,
     documentType: row.documentType,
     municipalityCode: row.municipalityCode,
+    incomeTaxDeclarant: row.incomeTaxDeclarant,
   };
 }
 
@@ -47,6 +49,7 @@ export class PrismaSupplierRepository implements ISupplierRepository {
           isObligatedToInvoice: data.isObligatedToInvoice ?? true,
           documentType: data.documentType,
           municipalityCode: data.municipalityCode,
+          incomeTaxDeclarant: data.incomeTaxDeclarant ?? true,
         },
       });
       return toRecord(row);
@@ -65,6 +68,33 @@ export class PrismaSupplierRepository implements ISupplierRepository {
       take: 100,
     });
     return rows.map(toRecord);
+  }
+
+  async update(id: string, data: UpdateSupplierData): Promise<SupplierRecord> {
+    await this.findByIdOrThrow(id); // confirma que es de la empresa (update por id no queda scoped)
+    try {
+      const row = await prisma.supplier.update({
+        where: { id },
+        data: {
+          name: data.name,
+          nit: data.nit,
+          contactName: data.contactName,
+          phone: data.phone,
+          email: data.email,
+          address: data.address,
+          isObligatedToInvoice: data.isObligatedToInvoice,
+          documentType: data.documentType,
+          municipalityCode: data.municipalityCode,
+          incomeTaxDeclarant: data.incomeTaxDeclarant,
+        },
+      });
+      return toRecord(row);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        throw new ConflictError(`Ya existe un proveedor con el NIT ${data.nit}`);
+      }
+      throw err;
+    }
   }
 
   async findByIdOrThrow(id: string): Promise<SupplierRecord> {

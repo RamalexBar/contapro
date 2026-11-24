@@ -35,6 +35,11 @@ model WithholdingConcept {
   // por empresa. Nullable: sin asignar, el reporte marca las filas de este concepto como
   // "conceptoIncompleto" en vez de fallar.
   dianConceptCode String?
+  // Base minima en UVT desde la que se practica (Decreto 572 de 2025: compras 10, servicios 2,
+  // honorarios 0). Por debajo no se retiene. 0 = desde cualquier valor.
+  minBaseUvt Decimal @db.Decimal(10, 2) @default(0)
+  // Tarifa para proveedores que NO declaran renta (ej. servicios 6 % en vez de 4 %). Null = la misma.
+  nonDeclarantRatePercent Decimal? @db.Decimal(5, 2)
 
   saleWithholdings     SaleWithholding[]
   purchaseWithholdings PurchaseWithholding[]

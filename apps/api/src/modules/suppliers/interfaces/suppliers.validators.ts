@@ -23,7 +23,10 @@ export const createSupplierSchema = z.object({
   // se omite.
   documentType: z.enum(["NIT", "CC", "CE"]).optional(),
   municipalityCode: z.string().optional(),
+  incomeTaxDeclarant: z.boolean().optional(),
 });
+
+export const updateSupplierSchema = createSupplierSchema.partial();
 
 // Renglon de la factura que entra al inventario junto con la compra (ver CreatePurchaseUseCase):
 // un producto existente o uno nuevo que se crea en el mismo paso, nunca los dos.

@@ -43,9 +43,8 @@ prevalidador oficial.
 6. **Terceros sin `municipalityCode`/`documentType` real** se incluyen igual en el reporte, solo
    marcados `incompleto: true` en el JSON de previsualización — no bloquea la generación por datos
    faltantes en terceros creados antes de este ítem.
-7. **Sin pantalla de edición general de terceros**: `documentType`/`municipalityCode` se piden en
-   el alta de proveedor/cliente, pero ni `suppliers` ni `customers` tienen edición general hoy —
-   completar estos campos en terceros ya existentes requiere corregirlos directo en base de datos
-   hasta que exista esa pantalla.
+7. ~~Sin pantalla de edición general de terceros~~: clientes y proveedores ya se pueden editar
+   (`PATCH /customers/:id`, y `PATCH /suppliers/:id` desde el 2026-11-24), así que `documentType` y
+   `municipalityCode` de terceros antiguos se corrigen desde la web.
 8. **Formato 1007 excluye ventas sin cliente identificado** ("consumidor final") — no son
    reportables a un tercero específico.

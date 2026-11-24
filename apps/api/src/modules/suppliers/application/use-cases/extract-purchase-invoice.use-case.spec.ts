@@ -33,6 +33,9 @@ class FakeSupplierRepo implements ISupplierRepository {
   findByNit(): Promise<SupplierRecord | null> {
     throw new Error("not used in this spec");
   }
+  update(): Promise<SupplierRecord> {
+    throw new Error("not used in this spec");
+  }
 }
 
 interface FakeProduct {
@@ -75,6 +78,7 @@ function makeSupplier(overrides: Partial<SupplierRecord> = {}): SupplierRecord {
     address: null,
     isActive: true,
     isObligatedToInvoice: true,
+    incomeTaxDeclarant: true,
     documentType: "NIT",
     municipalityCode: null,
     ...overrides,

@@ -1,3 +1,4 @@
+import { PayrollParameterUvtProvider } from "../../suppliers/infrastructure/payroll-parameter-uvt-provider";
 import { buildNiifFinancialPosition, buildNiifProfitOrLoss } from "../application/niif-statements";
 import type { NextFunction, Request, Response } from "express";
 import { endOfDayInBogota, startOfDayInBogota } from "@erp/shared-utils";
@@ -58,6 +59,8 @@ import {
 function queryBranchId(req: Request): string | undefined {
   return typeof req.query.branchId === "string" && req.query.branchId ? req.query.branchId : undefined;
 }
+
+const uvtProvider = new PayrollParameterUvtProvider();
 
 export class AccountingController {
   constructor(
@@ -429,7 +432,8 @@ export class AccountingController {
 
   listWithholdingConcepts = async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      res.json({ data: await this.listWithholdingConceptsUseCase.execute() });
+      // uvt: para que la web muestre la base minima en pesos y calcule la vista previa con la misma regla.
+      res.json({ data: await this.listWithholdingConceptsUseCase.execute(), uvt: await uvtProvider.uvtForYear(new Date().getFullYear()) });
     } catch (err) {
       next(err);
     }

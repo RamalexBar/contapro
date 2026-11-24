@@ -122,6 +122,10 @@ export const createWithholdingConceptSchema = z.object({
   // Item 37 de docs/ALCANCE.md (informacion exogena DIAN, formato 1003): codigo numerico DIAN de
   // concepto de retencion (ej. 1301 compras, 1302 servicios).
   dianConceptCode: z.string().optional(),
+  /** Base minima en UVT desde la que se retiene (0 = desde cualquier valor). */
+  minBaseUvt: z.number().min(0).max(100000).optional(),
+  /** Tarifa si el proveedor no declara renta (null = la misma). */
+  nonDeclarantRatePercent: z.number().min(0).max(100).nullable().optional(),
 });
 export type CreateWithholdingConceptInput = z.infer<typeof createWithholdingConceptSchema>;
 
@@ -129,6 +133,8 @@ export const updateWithholdingConceptSchema = z.object({
   name: z.string().min(1).optional(),
   ratePercent: z.number().min(0).max(100).optional(),
   dianConceptCode: z.string().optional(),
+  minBaseUvt: z.number().min(0).max(100000).optional(),
+  nonDeclarantRatePercent: z.number().min(0).max(100).nullable().optional(),
 });
 export type UpdateWithholdingConceptInput = z.infer<typeof updateWithholdingConceptSchema>;
 

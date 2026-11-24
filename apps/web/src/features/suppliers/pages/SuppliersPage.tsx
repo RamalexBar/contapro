@@ -12,11 +12,12 @@ import { Badge } from "../../../components/ui/Badge";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
-import { listWithholdingConcepts } from "../../accounting/api/accounting.api";
+import { listWithholdingConcepts, previewPurchaseWithholding } from "../../accounting/api/accounting.api";
 import {
   cancelPurchase,
   createPurchase,
   createSupplier,
+  updateSupplier,
   extractPurchaseInvoice,
   listAccountsPayable,
   listPurchases,
@@ -69,27 +70,61 @@ function todayStr(): string {
 function SuppliersSection() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["suppliers"], queryFn: () => listSuppliers() });
-  const [form, setForm] = useState({
+  const emptyForm = {
     name: "",
     nit: "",
     contactName: "",
     phone: "",
+    email: "",
+    address: "",
     isObligatedToInvoice: true,
+    incomeTaxDeclarant: true,
     documentType: "NIT",
     municipalityCode: "",
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+  // Proveedor que se esta editando (null = crear uno nuevo).
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const createMutation = useMutation({
-    mutationFn: () => createSupplier({ ...form, municipalityCode: form.municipalityCode || undefined }),
+    mutationFn: () => {
+      const input = {
+        ...form,
+        contactName: form.contactName || undefined,
+        phone: form.phone || undefined,
+        email: form.email || undefined,
+        address: form.address || undefined,
+        municipalityCode: form.municipalityCode || undefined,
+      };
+      return editingId ? updateSupplier(editingId, input) : createSupplier(input);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      setForm({ name: "", nit: "", contactName: "", phone: "", isObligatedToInvoice: true, documentType: "NIT", municipalityCode: "" });
+      setForm(emptyForm);
+      setEditingId(null);
     },
   });
 
+  function startEdit(s: SupplierRecord) {
+    createMutation.reset();
+    setEditingId(s.id);
+    setForm({
+      name: s.name,
+      nit: s.nit,
+      contactName: s.contactName ?? "",
+      phone: s.phone ?? "",
+      email: s.email ?? "",
+      address: s.address ?? "",
+      isObligatedToInvoice: s.isObligatedToInvoice,
+      incomeTaxDeclarant: s.incomeTaxDeclarant,
+      documentType: s.documentType,
+      municipalityCode: s.municipalityCode ?? "",
+    });
+  }
+
   return (
     <div className="space-y-6">
-      <Card title="Nuevo proveedor">
+      <Card title={editingId ? "Editar proveedor" : "Nuevo proveedor"}>
         <form
           className="grid grid-cols-2 gap-3 sm:grid-cols-4"
           onSubmit={(e) => {
@@ -106,6 +141,8 @@ function SuppliersSection() {
           <Input placeholder="NIT / documento" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} required />
           <Input placeholder="Contacto" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
           <Input placeholder="Telefono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input placeholder="Correo" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <Input placeholder="Direccion" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <MunicipalitySelect label="" value={form.municipalityCode} onChange={(m) => setForm({ ...form, municipalityCode: m?.code ?? "" })} />
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
@@ -115,9 +152,31 @@ function SuppliersSection() {
             />
             Obligado a facturar electronicamente
           </label>
-          <Button type="submit" loading={createMutation.isPending}>
-            Crear
-          </Button>
+          <label className="flex items-center gap-2 text-sm text-slate-700" title="Si no declara renta, algunas retenciones tienen otra tarifa (servicios 6 % en vez de 4 %)">
+            <input
+              type="checkbox"
+              checked={form.incomeTaxDeclarant}
+              onChange={(e) => setForm({ ...form, incomeTaxDeclarant: e.target.checked })}
+            />
+            Declarante de renta
+          </label>
+          <div className="flex gap-2">
+            <Button type="submit" loading={createMutation.isPending}>
+              {editingId ? "Guardar cambios" : "Crear"}
+            </Button>
+            {editingId && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setEditingId(null);
+                  setForm(emptyForm);
+                }}
+              >
+                Cancelar
+              </Button>
+            )}
+          </div>
         </form>
         {createMutation.isError && (
           <Alert tone="danger" className="mt-2">
@@ -137,7 +196,9 @@ function SuppliersSection() {
                 <Th>NIT</Th>
                 <Th>Contacto</Th>
                 <Th>Obligado a facturar</Th>
+                <Th>Declarante</Th>
                 <Th>Municipio (DANE)</Th>
+                <Th />
               </tr>
             </TableHead>
             <TableBody>
@@ -147,8 +208,14 @@ function SuppliersSection() {
                   <Td>{s.nit}</Td>
                   <Td>{s.contactName ?? "-"}</Td>
                   <Td>{s.isObligatedToInvoice ? "Si" : "No"}</Td>
+                  <Td>{s.incomeTaxDeclarant ? "Si" : "No"}</Td>
                   <Td>
                     {s.municipalityCode ?? <Badge tone="warning">Sin asignar</Badge>}
+                  </Td>
+                  <Td className="text-right">
+                    <Button size="sm" variant="secondary" onClick={() => startEdit(s)}>
+                      Editar
+                    </Button>
                   </Td>
                 </TableRow>
               ))}
@@ -237,12 +304,16 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
   }
 
   const total = (Number(form.subtotal) || 0) + (Number(form.taxTotal) || 0);
-  const retentionTotal = round2(
-    withholdings.reduce((sum, w) => {
-      const concept = activeConcepts.find((c) => c.id === w.withholdingConceptId);
-      return sum + (concept ? calculateTax(w.base, concept.ratePercent) : 0);
-    }, 0)
-  );
+  const selectedSupplier = suppliers.find((s) => s.id === form.supplierId);
+  const uvt = withholdingConcepts?.uvt ?? null;
+  // Misma regla que el servidor: base minima en UVT y tarifa de no declarante.
+  const withholdingPreview = withholdings.map((w) => {
+    const concept = activeConcepts.find((c) => c.id === w.withholdingConceptId);
+    if (!concept) return { applies: false, ratePercent: 0, minimum: 0, amount: 0 };
+    const p = previewPurchaseWithholding(concept, w.base, Number(form.subtotal) || 0, selectedSupplier?.incomeTaxDeclarant ?? true, uvt);
+    return { ...p, amount: p.applies ? calculateTax(w.base, p.ratePercent) : 0 };
+  });
+  const retentionTotal = round2(withholdingPreview.reduce((sum, p) => sum + p.amount, 0));
   const netTotal = round2(total - retentionTotal);
   const linesIncomplete = lines.some((l) => lineProblem(l) !== null);
   const linesOff = lines.length > 0 && !linesMatchSubtotal(lines, Number(form.subtotal) || 0);
@@ -270,9 +341,10 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
       }
       const created = purchase.createdProductIds.length;
       setRegisteredMessage(
-        purchase.goodsReceiptId
+        (purchase.goodsReceiptId
           ? `Compra ${purchase.invoiceNumber} registrada y contabilizada. ${lines.length === 1 ? "1 producto entro" : `${lines.length} productos entraron`} al inventario${created > 0 ? ` (${created === 1 ? "1 nuevo" : `${created} nuevos`})` : ""}.`
-          : `Compra ${purchase.invoiceNumber} registrada y contabilizada (sin movimiento de inventario).`
+          : `Compra ${purchase.invoiceNumber} registrada y contabilizada (sin movimiento de inventario).`) +
+          (purchase.skippedWithholdings.length > 0 ? ` No se practicaron: ${purchase.skippedWithholdings.join("; ")}.` : "")
       );
       setLines([]);
       setForm({ supplierId: "", invoiceNumber: "", subtotal: "", taxTotal: "", dueDate: todayStr(), currency: "COP", exchangeRate: "" });
@@ -475,6 +547,11 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
                   className="w-28"
                   onChange={(e) => setWithholdings((prev) => prev.map((row, idx) => (idx === i ? { ...row, base: Number(e.target.value) } : row)))}
                 />
+                <span className={`w-48 text-xs ${withholdingPreview[i]?.applies ? "text-slate-600" : "text-warning-600"}`}>
+                  {withholdingPreview[i]?.applies
+                    ? `${withholdingPreview[i]!.ratePercent}% = ${formatCOP(withholdingPreview[i]!.amount)}`
+                    : `No aplica: base minima ${formatCOP(withholdingPreview[i]?.minimum ?? 0)}`}
+                </span>
                 <button
                   type="button"
                   className="text-xs text-danger-500 hover:underline"
@@ -484,6 +561,9 @@ function PurchasesSection({ suppliers }: { suppliers: SupplierRecord[] }) {
                 </button>
               </div>
             ))}
+            {selectedSupplier && !selectedSupplier.incomeTaxDeclarant && withholdings.length > 0 && (
+              <p className="mb-2 text-xs text-slate-500">El proveedor no declara renta: se usa la tarifa de no declarante donde el concepto la tiene.</p>
+            )}
             {retentionTotal > 0 && (
               <p className="text-sm text-slate-600">
                 Retencion total: <span className="text-danger-600">-{formatCOP(retentionTotal)}</span> · Neto a pagar al proveedor:{" "}

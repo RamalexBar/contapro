@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import type { CreateSupplierUseCase } from "../application/use-cases/create-supplier.use-case";
+import type { UpdateSupplierUseCase } from "../application/use-cases/update-supplier.use-case";
 import type { ListSuppliersUseCase } from "../application/use-cases/list-suppliers.use-case";
 import type { CreatePurchaseUseCase } from "../application/use-cases/create-purchase.use-case";
 import type { ListPurchasesUseCase } from "../application/use-cases/list-purchases.use-case";
@@ -26,6 +27,7 @@ import {
   createPurchaseOrderSchema,
   createPurchaseSchema,
   createSupplierSchema,
+  updateSupplierSchema,
   extractPurchaseInvoiceSchema,
   receiveGoodsSchema,
   registerSupplierPaymentSchema,
@@ -49,7 +51,8 @@ export class SuppliersController {
     private readonly cancelPurchaseUseCase: CancelPurchaseUseCase,
     private readonly extractPurchaseInvoiceUseCase: ExtractPurchaseInvoiceUseCase,
     private readonly supplierRepo: ISupplierRepository,
-    private readonly accountPayableRepo: IAccountPayableRepository
+    private readonly accountPayableRepo: IAccountPayableRepository,
+    private readonly updateSupplierUseCase: UpdateSupplierUseCase
   ) {}
 
   private async getCompanyOrThrow() {
@@ -62,6 +65,15 @@ export class SuppliersController {
     try {
       const body = createSupplierSchema.parse(req.body);
       res.status(201).json(await this.createSupplierUseCase.execute(body));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateSupplier = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = updateSupplierSchema.parse(req.body);
+      res.json(await this.updateSupplierUseCase.execute(req.params.id, body));
     } catch (err) {
       next(err);
     }

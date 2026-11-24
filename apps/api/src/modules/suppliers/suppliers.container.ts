@@ -1,4 +1,6 @@
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
+import { PayrollParameterUvtProvider } from "./infrastructure/payroll-parameter-uvt-provider";
+import { UpdateSupplierUseCase } from "./application/use-cases/update-supplier.use-case";
 import { AuditService } from "../audit/application/audit.service";
 import {
   postPurchaseJournalEntryUseCase,
@@ -55,7 +57,8 @@ export const createPurchaseUseCase = new CreatePurchaseUseCase(
   postPurchaseJournalEntryUseCase,
   generateElectronicSupportDocumentUseCase,
   auditService,
-  { productRepo, createProduct: createProductUseCase, receiveGoods: receiveGoodsUseCase }
+  { productRepo, createProduct: createProductUseCase, receiveGoods: receiveGoodsUseCase },
+  new PayrollParameterUvtProvider()
 );
 
 export const registerSupplierPaymentUseCase = new RegisterSupplierPaymentUseCase(
@@ -96,5 +99,6 @@ export const suppliersController = new SuppliersController(
   cancelPurchaseUseCase,
   new ExtractPurchaseInvoiceUseCase(invoiceExtractionService, supplierRepo, productRepo),
   supplierRepo,
-  accountPayableRepo
+  accountPayableRepo,
+  new UpdateSupplierUseCase(supplierRepo, auditService)
 );

@@ -392,6 +392,32 @@ compras y centros de costo, todo implementado.**
    par 1:1, tocando tambien `AddBankReconciliationMatchData`/el endpoint de match, no solo el
    sugeridor.
 
+## Bases minimas y declarante en las retenciones de compras — 2026-11-24
+
+Antes cada retencion se practicaba sobre cualquier valor y con una sola tarifa. Ahora
+(`resolve-purchase-withholding.ts`, usado por `CreatePurchaseUseCase`):
+
+- **Base minima** por concepto (`WithholdingConcept.minBaseUvt`): por debajo no se retiene y la compra
+  devuelve `skippedWithholdings` con el motivo. En la ReteIVA el minimo se mide sobre la compra antes de
+  IVA. El UVT sale de los parametros legales del año (`PayrollParameter.uvt`, panel de plataforma); sin
+  fila para el año se practica sin medir el minimo.
+- **Declarante de renta** (`Supplier.incomeTaxDeclarant`, default true): si el proveedor no declara y el
+  concepto tiene `nonDeclarantRatePercent`, se usa esa tarifa. Solo en retencion en la fuente.
+- **Valores de fabrica** (Decreto 572 de 2025): compras 10 UVT 2,5 % / 3,5 %; servicios 2 UVT 4 % / 6 %;
+  honorarios sin minimo 11 % / 10 %; arrendamientos 10 UVT 3,5 %; ReteIVA 15 % desde 10 UVT (compras,
+  `IVA-RETE`) o 2 UVT (servicios, `IVA-RETE-SERV`, concepto nuevo). La migracion
+  `20261124170000_withholding_bases_declarant` los cargo en los conceptos de fabrica de todas las empresas
+  sin tocar tarifas editadas. **Ojo**: el Consejo de Estado suspendio los arts. 2-8 del decreto el 7 de mayo
+  de 2026 y levanto la suspension el 2 de junio; segun fuentes secundarias (Gerencie, Siempre al Dia) rige
+  otra vez desde el 1 de julio de 2026. Confirmar con el contador; por eso son datos editables
+  (Contabilidad -> Retenciones), no constantes.
+- `GET /withholding-concepts` devuelve tambien `uvt`: la web muestra la base minima en pesos y calcula la
+  vista previa de la compra con la misma regla (`previewPurchaseWithholding`). ICA se muestra tambien en
+  "por mil".
+- Ventas: no cambia. Las retenciones de una venta las practica el cliente; Contapro solo las registra.
+- Pendiente: agente retenedor (si la empresa no es agente de retencion, no deberia retener) y bases de
+  ReteICA por municipio.
+
 ## Resumen de IVA (formulario 300) — 2026-10-24
 
 `GET /reports/vat-summary?from=AAAA-MM-DD&to=AAAA-MM-DD[&branchId=]` (permiso `accounting.read`), pestaña

@@ -8,12 +8,16 @@ import type { Prisma } from "@prisma/client";
  * docs/ALCANCE.md, item 29).
  */
 export const DEFAULT_WITHHOLDING_CONCEPTS = [
-  { code: "RF-COMPRAS", name: "Compras generales", type: "RETEFUENTE" as const, ratePercent: 2.5 },
-  { code: "RF-SERVICIOS", name: "Servicios generales", type: "RETEFUENTE" as const, ratePercent: 4 },
-  { code: "RF-HONORARIOS", name: "Honorarios", type: "RETEFUENTE" as const, ratePercent: 11 },
-  { code: "RF-ARRENDAMIENTOS", name: "Arrendamientos", type: "RETEFUENTE" as const, ratePercent: 3.5 },
-  { code: "ICA-GENERAL", name: "ICA (ajustar tarifa a tu municipio/actividad)", type: "RETEICA" as const, ratePercent: 1 },
-  { code: "IVA-RETE", name: "Retencion de IVA", type: "RETEIVA" as const, ratePercent: 15 },
+  // Bases en UVT y tarifas del Decreto 572 de 2025 (vigente de nuevo desde el 1 de julio de 2026, tras
+  // la suspension del Consejo de Estado entre mayo y junio de 2026). nonDeclarantRatePercent = tarifa
+  // si el proveedor no declara renta. Editables por la empresa.
+  { code: "RF-COMPRAS", name: "Compras generales", type: "RETEFUENTE" as const, ratePercent: 2.5, minBaseUvt: 10, nonDeclarantRatePercent: 3.5 },
+  { code: "RF-SERVICIOS", name: "Servicios generales", type: "RETEFUENTE" as const, ratePercent: 4, minBaseUvt: 2, nonDeclarantRatePercent: 6 },
+  { code: "RF-HONORARIOS", name: "Honorarios", type: "RETEFUENTE" as const, ratePercent: 11, minBaseUvt: 0, nonDeclarantRatePercent: 10 },
+  { code: "RF-ARRENDAMIENTOS", name: "Arrendamientos", type: "RETEFUENTE" as const, ratePercent: 3.5, minBaseUvt: 10, nonDeclarantRatePercent: null },
+  { code: "ICA-GENERAL", name: "ICA (ajustar tarifa a tu municipio/actividad)", type: "RETEICA" as const, ratePercent: 1, minBaseUvt: 0, nonDeclarantRatePercent: null },
+  { code: "IVA-RETE", name: "Retencion de IVA (compras)", type: "RETEIVA" as const, ratePercent: 15, minBaseUvt: 10, nonDeclarantRatePercent: null },
+  { code: "IVA-RETE-SERV", name: "Retencion de IVA (servicios)", type: "RETEIVA" as const, ratePercent: 15, minBaseUvt: 2, nonDeclarantRatePercent: null },
 ];
 
 /**

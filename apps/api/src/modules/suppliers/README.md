@@ -228,6 +228,13 @@ movimiento (`kardex-writer.ts`, funcion compartida `recordKardexEntry`).
   lectura de código (mismo patrón que los demás sitios, ya verificados) pero no se probó en vivo
   porque los datos de la empresa demo solo tienen una sucursal.
 
+## Edicion de proveedores y declarante de renta (2026-11-24)
+
+`PATCH /suppliers/:id` (permiso `suppliers.manage`, `UpdateSupplierUseCase`, audita `SUPPLIER_UPDATED` con los
+campos cambiados): antes un proveedor no se podia corregir sin tocar la base, y de sus datos salen la exogena
+y el documento soporte. `Supplier.incomeTaxDeclarant` cambia la tarifa de retencion (ver
+`accounting/README.md`, "Bases minimas y declarante"). Web: boton Editar en Proveedores.
+
 ## Que falta implementar
 
 1. ~~`StockMovement` por lote consumido en una venta FIFO (para trazabilidad fina)~~ --

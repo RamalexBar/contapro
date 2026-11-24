@@ -23,14 +23,16 @@ const SUPPLIER: SupplierRecord = {
   address: null,
   isActive: true,
   isObligatedToInvoice: true,
+  incomeTaxDeclarant: true,
   documentType: "NIT",
   municipalityCode: null,
 };
 
 class FakeSupplierRepository implements Partial<ISupplierRepository> {
+  constructor(private readonly supplier: SupplierRecord = SUPPLIER) {}
   async findByIdOrThrow(id: string): Promise<SupplierRecord> {
     if (id !== SUPPLIER.id) throw new Error("not found");
-    return SUPPLIER;
+    return this.supplier;
   }
 }
 
@@ -42,6 +44,8 @@ const RETEICA_CONCEPT: WithholdingConceptRecord = {
   ratePercent: 1,
   isActive: true,
   dianConceptCode: null,
+  minBaseUvt: 0,
+  nonDeclarantRatePercent: null,
 };
 
 class FakeWithholdingConceptRepository implements Partial<IWithholdingConceptRepository> {
@@ -124,7 +128,7 @@ class FakeProductRepository {
   }
 }
 
-function makeUseCase(concepts?: WithholdingConceptRecord[]) {
+function makeUseCase(concepts?: WithholdingConceptRecord[], opts: { supplier?: SupplierRecord; uvt?: number } = {}) {
   const purchaseRepo = new FakePurchaseRepository();
   let createdCount = 0;
   const createProduct = {
@@ -141,7 +145,7 @@ function makeUseCase(concepts?: WithholdingConceptRecord[]) {
 
   const useCase = new CreatePurchaseUseCase(
     purchaseRepo as unknown as IPurchaseRepository,
-    new FakeSupplierRepository() as unknown as ISupplierRepository,
+    new FakeSupplierRepository(opts.supplier) as unknown as ISupplierRepository,
     new FakeWithholdingConceptRepository(concepts) as unknown as IWithholdingConceptRepository,
     postPurchaseJournalEntry,
     generateElectronicSupportDocument,
@@ -150,7 +154,8 @@ function makeUseCase(concepts?: WithholdingConceptRecord[]) {
       productRepo: new FakeProductRepository() as unknown as IProductRepository,
       createProduct: createProduct as unknown as CreateProductUseCase,
       receiveGoods: receiveGoods as unknown as ReceiveGoodsUseCase,
-    }
+    },
+    opts.uvt ? { uvtForYear: async () => opts.uvt! } : null
   );
 
   return { useCase, purchaseRepo, postPurchaseJournalEntry, createProduct, receiveGoods };
@@ -358,5 +363,39 @@ describe("CreatePurchaseUseCase — productos al inventario", () => {
         })
       )
     ).rejects.toThrow(/servicios/);
+  });
+
+  it("skips withholdings below the minimum base and uses the non-declarant rate (Decreto 572 de 2025)", async () => {
+    const services: WithholdingConceptRecord = {
+      ...RETEICA_CONCEPT,
+      id: "concept-services",
+      code: "RF-SERVICIOS",
+      type: "RETEFUENTE",
+      ratePercent: 4,
+      minBaseUvt: 2,
+      nonDeclarantRatePercent: 6,
+    };
+    const purchasesConcept: WithholdingConceptRecord = { ...services, id: "concept-purchases", code: "RF-COMPRAS", ratePercent: 2.5, minBaseUvt: 10, nonDeclarantRatePercent: 3.5 };
+    const { useCase, purchaseRepo } = makeUseCase([services, purchasesConcept], { supplier: { ...SUPPLIER, incomeTaxDeclarant: false }, uvt: 52_374 });
+
+    const result = await withTenantContext(() =>
+      useCase.execute({
+        ...BASE_INPUT,
+        withholdings: [
+          { withholdingConceptId: services.id, base: 100_000 }, // 100.000 < 2 UVT (104.748)
+          { withholdingConceptId: purchasesConcept.id, base: 100_000 }, // < 10 UVT
+        ],
+      })
+    );
+
+    expect(result.skippedWithholdings).toHaveLength(2);
+    expect(result.retentionTotal ?? 0).toBe(0);
+
+    const { useCase: second, purchaseRepo: repo2 } = makeUseCase([services], { supplier: { ...SUPPLIER, incomeTaxDeclarant: false }, uvt: 52_374 });
+    await withTenantContext(() =>
+      second.execute({ ...BASE_INPUT, subtotal: 300_000, taxTotal: 0, total: 300_000, withholdings: [{ withholdingConceptId: services.id, base: 300_000 }] })
+    );
+    expect(repo2.created[0]).toEqual(expect.objectContaining({ retentionTotal: 18_000 })); // 6 % por no declarante
+    expect(purchaseRepo.created[0]).toEqual(expect.objectContaining({ retentionTotal: 0 }));
   });
 });

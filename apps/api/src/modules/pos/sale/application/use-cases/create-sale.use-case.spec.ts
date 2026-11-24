@@ -103,6 +103,8 @@ const RETEFUENTE_CONCEPT: WithholdingConceptRecord = {
   ratePercent: 2.5,
   isActive: true,
   dianConceptCode: null,
+  minBaseUvt: 0,
+  nonDeclarantRatePercent: null,
 };
 
 class FakeWithholdingConceptRepository implements Partial<IWithholdingConceptRepository> {

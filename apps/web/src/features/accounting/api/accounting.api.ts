@@ -246,6 +246,10 @@ export interface WithholdingConceptRecord {
   ratePercent: number;
   isActive: boolean;
   dianConceptCode: string | null;
+  /** Base minima en UVT desde la que se practica (0 = desde cualquier valor). */
+  minBaseUvt: number;
+  /** Tarifa si el proveedor no declara renta (null = la misma). */
+  nonDeclarantRatePercent: number | null;
 }
 
 export interface CreateWithholdingConceptInput {
@@ -254,15 +258,34 @@ export interface CreateWithholdingConceptInput {
   type: WithholdingType;
   ratePercent: number;
   dianConceptCode?: string;
+  minBaseUvt?: number;
+  nonDeclarantRatePercent?: number | null;
 }
 
 export interface UpdateWithholdingConceptInput {
   name?: string;
   ratePercent?: number;
   dianConceptCode?: string;
+  minBaseUvt?: number;
+  nonDeclarantRatePercent?: number | null;
 }
 
-export function listWithholdingConcepts(): Promise<{ data: WithholdingConceptRecord[] }> {
+/** Misma regla que el servidor (resolve-purchase-withholding.ts): base minima y tarifa de no declarante. */
+export function previewPurchaseWithholding(
+  concept: WithholdingConceptRecord,
+  base: number,
+  purchaseSubtotal: number,
+  supplierDeclarant: boolean,
+  uvt: number | null
+): { applies: boolean; ratePercent: number; minimum: number } {
+  const ratePercent =
+    concept.type === "RETEFUENTE" && !supplierDeclarant && concept.nonDeclarantRatePercent !== null ? concept.nonDeclarantRatePercent : concept.ratePercent;
+  const minimum = uvt ? concept.minBaseUvt * uvt : 0;
+  const measured = concept.type === "RETEIVA" ? purchaseSubtotal : base;
+  return { applies: !(minimum > 0 && measured < minimum), ratePercent, minimum };
+}
+
+export function listWithholdingConcepts(): Promise<{ data: WithholdingConceptRecord[]; uvt: number | null }> {
   return apiFetch("/withholding-concepts");
 }
 
