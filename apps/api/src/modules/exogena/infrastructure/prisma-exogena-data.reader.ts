@@ -18,7 +18,7 @@ export class PrismaExogenaDataReader implements IExogenaDataReader {
     const to = new Date(year + 1, 0, 1);
     const inYear = { gte: from, lt: to };
 
-    const [purchases, sales, manualInvoices, shiftCloses, returns, creditNotes] = await Promise.all([
+    const [purchases, sales, manualInvoices, shiftCloses, returns, creditNotes, expenses] = await Promise.all([
       prisma.purchase.findMany({
         where: { status: "REGISTERED", createdAt: inYear },
         include: { withholdings: { include: { withholdingConcept: { select: { code: true, type: true } } } } },
@@ -31,6 +31,7 @@ export class PrismaExogenaDataReader implements IExogenaDataReader {
       prisma.externalShiftClose.findMany({ where: { status: "POSTED", createdAt: inYear }, select: { taxSummary: true } }),
       prisma.return.findMany({ where: { createdAt: inYear }, include: { items: true } }),
       prisma.creditNote.findMany({ where: { returnId: null, createdAt: inYear }, select: { saleId: true, customerId: true, amount: true } }),
+      prisma.expense.findMany({ where: { status: "REGISTERED", date: inYear }, include: { expenseCategory: { select: { code: true } } } }),
     ]);
 
     // Tipo de compra segun la cuenta que debito su comprobante: 1435 inventario, 15xx activo fijo, resto gasto.
@@ -84,6 +85,14 @@ export class PrismaExogenaDataReader implements IExogenaDataReader {
         taxTotal: n(p.taxTotal),
         kind: kindOf(p.journalEntryId),
         withholdings: p.withholdings.map((w) => ({ type: w.withholdingConcept.type as "RETEFUENTE" | "RETEICA" | "RETEIVA", conceptCode: w.withholdingConcept.code, amount: n(w.amount) })),
+      })),
+      expenses: expenses.map((e) => ({
+        payeeName: e.payeeName,
+        payeeDocumentType: e.payeeDocumentType,
+        payeeDocumentNumber: e.payeeDocumentNumber,
+        categoryCode: e.expenseCategory.code,
+        subtotal: n(e.subtotal),
+        taxTotal: n(e.taxTotal),
       })),
       sales: sales.map((s) => ({ customerId: s.customerId, subtotal: n(s.subtotal), discountTotal: n(s.discountTotal), taxTotal: n(s.taxTotal) })),
       manualInvoices: manualInvoices.map((m) => ({

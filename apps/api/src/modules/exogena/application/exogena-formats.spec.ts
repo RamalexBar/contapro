@@ -7,10 +7,27 @@ const LAWYER = { id: "s2", documentType: "CC", documentNumber: "10881234", name:
 const CUSTOMER = { id: "c1", documentType: "NIT", documentNumber: "800111222", name: "Hotel Sol", municipalityCode: "66001" };
 
 function data(overrides: Partial<ExogenaYearData> = {}): ExogenaYearData {
-  return { purchases: [], sales: [], manualInvoices: [], shiftCloses: [], returns: [], creditNotes: [], suppliers: [SUPPLIER, LAWYER], customers: [CUSTOMER], ...overrides };
+  return { purchases: [], expenses: [], sales: [], manualInvoices: [], shiftCloses: [], returns: [], creditNotes: [], suppliers: [SUPPLIER, LAWYER], customers: [CUSTOMER], ...overrides };
 }
 
 describe("1001 — pagos o abonos en cuenta", () => {
+  it("reports expenses: identified payee merges with the same NIT, no document goes to cuantias menores", () => {
+    const rows = buildFormat1001(
+      data({
+        purchases: [{ supplierId: "s1", subtotal: 100_000, taxTotal: 0, kind: "EXPENSE", withholdings: [] }],
+        expenses: [
+          { payeeName: "Distribuidora XYZ", payeeDocumentType: "NIT", payeeDocumentNumber: "900123456", categoryCode: "DIVERSOS", subtotal: 50_000, taxTotal: 0 },
+          { payeeName: "Arrendador", payeeDocumentType: "CC", payeeDocumentNumber: "1088999", categoryCode: "ARRIENDO", subtotal: 1_200_000, taxTotal: 0 },
+          { payeeName: "Tienda", payeeDocumentType: null, payeeDocumentNumber: null, categoryCode: "PAPELERIA", subtotal: 20_000, taxTotal: 0 },
+        ],
+      })
+    );
+    const xyz = rows.find((r) => r.documentNumber === "900123456" && r.conceptoPago === "5016")!;
+    expect(xyz).toEqual(expect.objectContaining({ supplierId: "s1", pagoDeducible: 150_000, municipalityCode: "11001" }));
+    expect(rows.find((r) => r.documentNumber === "1088999")).toEqual(expect.objectContaining({ conceptoPago: "5005", documentType: "CC", pagoDeducible: 1_200_000 }));
+    expect(rows.find((r) => r.name === "CUANTIAS MENORES")).toEqual(expect.objectContaining({ pagoDeducible: 20_000 }));
+  });
+
   it("uses the DIAN concept of what was bought, not 5002 (Honorarios) for everything", () => {
     expect(paymentConcept({ supplierId: "s", subtotal: 1, taxTotal: 0, kind: "INVENTORY", withholdings: [] })).toBe("5007");
     expect(paymentConcept({ supplierId: "s", subtotal: 1, taxTotal: 0, kind: "FIXED_ASSET", withholdings: [] })).toBe("5008");

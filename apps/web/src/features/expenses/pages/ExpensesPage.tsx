@@ -187,6 +187,8 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
   const [form, setForm] = useState({
     expenseCategoryId: "",
     payeeName: "",
+    payeeDocumentType: "NIT" as "NIT" | "CC" | "CE",
+    payeeDocumentNumber: "",
     description: "",
     date: todayStr(),
     subtotal: "",
@@ -210,12 +212,12 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
       const details = [
         extracted.description,
         extracted.documentNumber ? `Doc. ${extracted.documentNumber}` : null,
-        extracted.payeeNit ? `NIT ${extracted.payeeNit}` : null,
       ].filter(Boolean);
       setForm((prev) => ({
         ...prev,
         expenseCategoryId: suggestedCategory?.id ?? prev.expenseCategoryId,
         payeeName: extracted.payeeName ?? prev.payeeName,
+        payeeDocumentNumber: extracted.payeeNit ? extracted.payeeNit.replace(/[^\d-]/g, "") : prev.payeeDocumentNumber,
         description: details.length > 0 ? details.join(" · ") : prev.description,
         date: extracted.issueDate && /^\d{4}-\d{2}-\d{2}$/.test(extracted.issueDate) ? extracted.issueDate : prev.date,
         subtotal: extracted.subtotal != null ? String(extracted.subtotal) : prev.subtotal,
@@ -244,6 +246,7 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
         branchId: user!.branchId!,
         expenseCategoryId: form.expenseCategoryId,
         payeeName: form.payeeName,
+        ...(form.payeeDocumentNumber ? { payeeDocumentType: form.payeeDocumentType, payeeDocumentNumber: form.payeeDocumentNumber } : {}),
         description: form.description || undefined,
         date: form.date,
         subtotal,
@@ -258,6 +261,8 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
       setForm({
         expenseCategoryId: "",
         payeeName: "",
+        payeeDocumentType: "NIT",
+        payeeDocumentNumber: "",
         description: "",
         date: todayStr(),
         subtotal: "",
@@ -360,6 +365,14 @@ function ExpensesSection({ categories }: { categories: { id: string; name: strin
             onChange={(e) => setForm({ ...form, payeeName: e.target.value })}
             required
           />
+          <div className="flex gap-2" title="Para reportar el gasto identificado en la exogena (formato 1001)">
+            <Select className="w-24" value={form.payeeDocumentType} onChange={(e) => setForm({ ...form, payeeDocumentType: e.target.value as "NIT" | "CC" | "CE" })}>
+              <option value="NIT">NIT</option>
+              <option value="CC">CC</option>
+              <option value="CE">CE</option>
+            </Select>
+            <Input placeholder="Documento (opcional)" value={form.payeeDocumentNumber} onChange={(e) => setForm({ ...form, payeeDocumentNumber: e.target.value })} />
+          </div>
           <Input placeholder="Descripcion (opcional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input

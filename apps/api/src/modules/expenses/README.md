@@ -111,3 +111,5 @@ nada: el usuario revisa y registra con `POST /expenses`.
 - **Sin probar con soportes reales**: la cuenta de la API de Anthropic estaba sin saldo al
   construirlo. Tampoco se guarda la foto como adjunto del gasto (pendiente de decidir donde se
   almacenan los archivos).
+- **Documento del beneficiario** (2026-11-24, `payeeDocumentType`/`payeeDocumentNumber`): opcionales, NIT/CC/CE;
+  la lectura del soporte con IA llena el NIT. Se usan para reportar el gasto identificado en la exogena 1001/1005.

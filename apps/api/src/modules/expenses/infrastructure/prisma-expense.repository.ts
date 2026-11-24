@@ -9,6 +9,8 @@ function toRecord(row: {
   branchId: string;
   expenseCategoryId: string;
   payeeName: string;
+  payeeDocumentType: string | null;
+  payeeDocumentNumber: string | null;
   description: string | null;
   date: Date;
   subtotal: Prisma.Decimal;
@@ -26,6 +28,8 @@ function toRecord(row: {
     branchId: row.branchId,
     expenseCategoryId: row.expenseCategoryId,
     payeeName: row.payeeName,
+    payeeDocumentType: row.payeeDocumentType,
+    payeeDocumentNumber: row.payeeDocumentNumber,
     description: row.description,
     date: row.date,
     subtotal: Number(row.subtotal),
@@ -48,6 +52,8 @@ export class PrismaExpenseRepository implements IExpenseRepository {
         branchId: data.branchId,
         expenseCategoryId: data.expenseCategoryId,
         payeeName: data.payeeName,
+        payeeDocumentType: data.payeeDocumentNumber ? (data.payeeDocumentType ?? "NIT") : null,
+        payeeDocumentNumber: data.payeeDocumentNumber ?? null,
         description: data.description,
         date: data.date,
         subtotal: data.subtotal,

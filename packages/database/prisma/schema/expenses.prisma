@@ -30,6 +30,9 @@ model Expense {
   // Texto libre (arrendador, empresa de servicios) -- a proposito NO un Supplier (Supplier es
   // para proveedores de mercancia, ver suppliers/README.md).
   payeeName         String
+  // Documento del beneficiario (2026-11-24): sin el, el gasto no se puede reportar identificado en la exogena.
+  payeeDocumentType   String?
+  payeeDocumentNumber String?
   description       String?
   date              DateTime
   subtotal          Decimal         @db.Decimal(14, 2)

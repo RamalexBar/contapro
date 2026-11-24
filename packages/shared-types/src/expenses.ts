@@ -17,6 +17,13 @@ export const createExpenseSchema = z.object({
   branchId: z.string().uuid(),
   expenseCategoryId: z.string().uuid(),
   payeeName: z.string().min(1),
+  /** Documento del beneficiario (para la exogena 1001). Opcionales. */
+  payeeDocumentType: z.enum(["NIT", "CC", "CE"]).optional(),
+  payeeDocumentNumber: z
+    .string()
+    .transform((v) => v.replace(/[.\s]/g, ""))
+    .pipe(z.string().regex(/^\d{5,15}(-\d)?$/, "Escriba solo los numeros del documento"))
+    .optional(),
   description: z.string().optional(),
   date: z.coerce.date(),
   subtotal: z.number().nonnegative(),

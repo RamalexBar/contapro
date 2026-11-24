@@ -48,7 +48,8 @@ export function paymentConcept(purchase: ExogenaPurchase): string {
 }
 
 export interface Format1001Row extends ThirdPartyInfo {
-  supplierId: string;
+  /** Null en pagos registrados como gasto (el beneficiario no es un proveedor). */
+  supplierId: string | null;
   conceptoPago: string;
   /** Valor sin IVA: el IVA descontable va en el 1005, no aqui. */
   pagoDeducible: number;
@@ -62,27 +63,50 @@ export interface Format1001Row extends ThirdPartyInfo {
 }
 
 /** Los pagos de nomina no van aqui (par. 12): van en el 2276. Las retenciones de ICA tampoco (no son renta ni IVA). */
-export function buildFormat1001(data: Pick<ExogenaYearData, "purchases" | "suppliers">): Format1001Row[] {
+/** Concepto 1001 de un gasto segun su categoria (las de fabrica de Contapro). */
+const CONCEPT_BY_EXPENSE_CATEGORY: Record<string, string> = { ARRIENDO: "5005", HONORARIOS: "5002", SERVICIOS: "5004" };
+
+function emptyRow(supplierId: string | null, third: ThirdPartyInfo, concept: string): Format1001Row {
+  return {
+    supplierId,
+    ...third,
+    conceptoPago: concept,
+    pagoDeducible: 0,
+    pagoNoDeducible: 0,
+    ivaMayorValorCostoDeducible: 0,
+    ivaMayorValorCostoNoDeducible: 0,
+    retencionRentaPracticada: 0,
+    retencionRentaAsumida: 0,
+    retencionIvaResponsables: 0,
+    retencionIvaNoDomiciliados: 0,
+  };
+}
+
+/** Tercero de un gasto: identificado si se registro su documento; si no, "CUANTIAS MENORES". */
+function expensePayee(e: ExogenaYearData["expenses"][number]): ThirdPartyInfo {
+  if (!e.payeeDocumentNumber) return unidentified("CUANTIAS MENORES");
+  return { documentType: e.payeeDocumentType ?? "NIT", documentNumber: e.payeeDocumentNumber, name: e.payeeName, municipalityCode: null, incompleto: true };
+}
+
+export function buildFormat1001(data: Pick<ExogenaYearData, "purchases" | "suppliers"> & Partial<Pick<ExogenaYearData, "expenses">>): Format1001Row[] {
   const suppliers = new Map(data.suppliers.map((s) => [s.id, s]));
   const rows = new Map<string, Format1001Row>();
+  // Gastos: misma fila que una compra al mismo NIT y concepto. Sin documento van a cuantias menores.
+  for (const e of data.expenses ?? []) {
+    const concept = CONCEPT_BY_EXPENSE_CATEGORY[e.categoryCode] ?? "5016";
+    const payee = expensePayee(e);
+    const key = `${payee.documentNumber}|${concept}`;
+    const row = rows.get(key) ?? emptyRow(null, payee, concept);
+    row.pagoDeducible = round2(row.pagoDeducible + e.subtotal);
+    rows.set(key, row);
+  }
   for (const p of data.purchases) {
     const concept = paymentConcept(p);
-    const key = `${p.supplierId}|${concept}`;
-    const row =
-      rows.get(key) ??
-      ({
-        supplierId: p.supplierId,
-        ...info(suppliers.get(p.supplierId), p.supplierId),
-        conceptoPago: concept,
-        pagoDeducible: 0,
-        pagoNoDeducible: 0,
-        ivaMayorValorCostoDeducible: 0,
-        ivaMayorValorCostoNoDeducible: 0,
-        retencionRentaPracticada: 0,
-        retencionRentaAsumida: 0,
-        retencionIvaResponsables: 0,
-        retencionIvaNoDomiciliados: 0,
-      } satisfies Format1001Row);
+    const supplierInfo = info(suppliers.get(p.supplierId), p.supplierId);
+    const key = `${supplierInfo.documentNumber || p.supplierId}|${concept}`;
+    const row = rows.get(key) ?? emptyRow(p.supplierId, supplierInfo, concept);
+    // Si la fila la abrio un gasto, el proveedor (con municipio) completa los datos del tercero.
+    if (row.supplierId === null) Object.assign(row, { supplierId: p.supplierId, ...supplierInfo });
     row.pagoDeducible = round2(row.pagoDeducible + p.subtotal);
     for (const w of p.withholdings) {
       if (w.type === "RETEFUENTE") row.retencionRentaPracticada = round2(row.retencionRentaPracticada + w.amount);
@@ -117,9 +141,17 @@ export function buildFormat1005(data: ExogenaYearData): Format1005Row[] {
     return row;
   };
 
+  for (const e of data.expenses ?? []) {
+    if (e.taxTotal <= 0) continue;
+    const payee = expensePayee(e);
+    const key = payee.documentNumber === UNIDENTIFIED_DOCUMENT_NUMBER ? "E|unidentified" : `D|${payee.documentNumber}`;
+    const row = get(key, () => ({ thirdPartyId: null, ...payee, ivaDescontable: 0, ivaDevolucionesVentas: 0 }));
+    row.ivaDescontable = round2(row.ivaDescontable + e.taxTotal);
+  }
   for (const p of data.purchases) {
     if (p.taxTotal <= 0) continue;
-    const row = get(`S|${p.supplierId}`, () => ({ thirdPartyId: p.supplierId, ...info(suppliers.get(p.supplierId), p.supplierId), ivaDescontable: 0, ivaDevolucionesVentas: 0 }));
+    const supplierInfo = info(suppliers.get(p.supplierId), p.supplierId);
+    const row = get(supplierInfo.documentNumber ? `D|${supplierInfo.documentNumber}` : `S|${p.supplierId}`, () => ({ thirdPartyId: p.supplierId, ...supplierInfo, ivaDescontable: 0, ivaDevolucionesVentas: 0 }));
     row.ivaDescontable = round2(row.ivaDescontable + p.taxTotal);
   }
   const refunds = [...data.returns, ...data.creditNotes].map((r) => ({ customerId: r.customerId, tax: r.tax }));

@@ -38,8 +38,11 @@ como JSON de previsualización en `GET /reports/exogena/<formato>`:
   los formatos son funciones puras en `application/exogena-formats.ts`, con pruebas.
 - Sin verificar: el orden exacto de columnas de cada archivo plano (esta en los anexos tecnicos de la
   resolucion, no en su texto) y la clasificacion de cada concepto de nomina en las columnas del 2276.
-- Pendiente: los gastos (modulo Gastos) no entran al 1001 porque el beneficiario es texto libre sin NIT;
-  devoluciones en compras (IVA recuperado del 1006) no existen en Contapro.
+- **Gastos en 1001 y 1005** (2026-11-24): el gasto guarda tipo y numero de documento del beneficiario
+  (opcionales; la lectura con IA del soporte lo llena). Con documento sale identificado (y se suma a la fila de
+  un proveedor con el mismo NIT y concepto); sin documento va a CUANTIAS MENORES. Concepto por categoria:
+  ARRIENDO 5005, HONORARIOS 5002, SERVICIOS 5004, el resto 5016. El IVA del gasto va al 1005.
+- Pendiente: devoluciones en compras (IVA recuperado del 1006) no existen en Contapro.
 
 ## Limitaciones e items sin verificar (leer antes de un envío real)
 

@@ -19,6 +19,15 @@ export interface ExogenaPurchase {
 /** Ingresos y movimientos de IVA del año, de todas las fuentes de Contapro. */
 export interface ExogenaYearData {
   purchases: ExogenaPurchase[];
+  /** Gastos (modulo Gastos): el beneficiario es texto libre, con documento si se registro. */
+  expenses: Array<{
+    payeeName: string;
+    payeeDocumentType: string | null;
+    payeeDocumentNumber: string | null;
+    categoryCode: string;
+    subtotal: number;
+    taxTotal: number;
+  }>;
   /** Ventas del POS no anuladas: subtotal antes de descuento. */
   sales: Array<{ customerId: string | null; subtotal: number; discountTotal: number; taxTotal: number }>;
   /**

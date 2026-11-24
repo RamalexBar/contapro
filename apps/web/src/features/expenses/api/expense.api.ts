@@ -24,6 +24,8 @@ export interface ExpenseRecord {
   branchId: string;
   expenseCategoryId: string;
   payeeName: string;
+  payeeDocumentType: string | null;
+  payeeDocumentNumber: string | null;
   description: string | null;
   date: string;
   subtotal: number;
@@ -41,6 +43,8 @@ export interface CreateExpenseInput {
   branchId: string;
   expenseCategoryId: string;
   payeeName: string;
+  payeeDocumentType?: "NIT" | "CC" | "CE";
+  payeeDocumentNumber?: string;
   description?: string;
   date: string;
   subtotal: number;

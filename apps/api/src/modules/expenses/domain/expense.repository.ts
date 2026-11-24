@@ -2,6 +2,8 @@ export interface CreateExpenseData {
   branchId: string;
   expenseCategoryId: string;
   payeeName: string;
+  payeeDocumentType?: string;
+  payeeDocumentNumber?: string;
   description?: string;
   date: Date;
   subtotal: number;
@@ -17,6 +19,8 @@ export interface ExpenseRecord {
   branchId: string;
   expenseCategoryId: string;
   payeeName: string;
+  payeeDocumentType: string | null;
+  payeeDocumentNumber: string | null;
   description: string | null;
   date: Date;
   subtotal: number;

@@ -46,6 +46,8 @@ class FakeExpenseRepository implements Partial<IExpenseRepository> {
       branchId: data.branchId,
       expenseCategoryId: data.expenseCategoryId,
       payeeName: data.payeeName,
+      payeeDocumentType: data.payeeDocumentType ?? null,
+      payeeDocumentNumber: data.payeeDocumentNumber ?? null,
       description: data.description ?? null,
       date: data.date,
       subtotal: data.subtotal,
