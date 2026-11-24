@@ -1,3 +1,4 @@
+import { settlePayments } from "../settle-payments";
 import type { CreateSaleInput } from "@erp/shared-types";
 import { applyDiscount, calculateTax, round2 } from "@erp/shared-utils";
 import { getTenantContext } from "../../../../../shared/context/request-context";
@@ -125,10 +126,13 @@ export class CreateSaleUseCase {
     }
 
     const netTotal = round2(total - retentionTotal);
-    const paymentsTotal = round2(input.payments.reduce((sum, p) => sum + p.amount, 0));
-    if (!needsAuthorization && paymentsTotal < netTotal) {
-      throw new ValidationError(`Los pagos (${paymentsTotal}) no cubren el neto a cobrar de la venta (${netTotal})`);
+    const rawPaymentsTotal = round2(input.payments.reduce((sum, p) => sum + p.amount, 0));
+    if (!needsAuthorization && rawPaymentsTotal < netTotal) {
+      throw new ValidationError(`Los pagos (${rawPaymentsTotal}) no cubren el neto a cobrar de la venta (${netTotal})`);
     }
+    // El efectivo de mas es vuelto: se descuenta ANTES de guardar (ver settle-payments.ts).
+    const { payments } = settlePayments(input.payments, netTotal);
+    const paymentsTotal = round2(payments.reduce((sum, p) => sum + p.amount, 0));
 
     const paymentStatus = needsAuthorization
       ? "PENDING"
@@ -143,7 +147,7 @@ export class CreateSaleUseCase {
     // despues en AuthorizeDiscountUseCase. El dueDate pedido por el cajero (si lo hubo) se guarda
     // en Sale.requestedReceivableDueDate para que AuthorizeDiscountUseCase lo recupere al
     // completarse -- ver resolve-receivable-input.ts.
-    const receivable = needsAuthorization ? null : resolveReceivableInput(input.payments, input.customerId, input.dueDate);
+    const receivable = needsAuthorization ? null : resolveReceivableInput(payments, input.customerId, input.dueDate);
 
     const sale = await this.saleRepo.create({
       branchId: input.branchId,
@@ -158,7 +162,7 @@ export class CreateSaleUseCase {
       retentionTotal,
       paymentStatus,
       items: computedItems,
-      payments: input.payments,
+      payments,
       withholdings: computedWithholdings,
       receivable: receivable ?? undefined,
       requestedReceivableDueDate: needsAuthorization ? input.dueDate : undefined,

@@ -247,8 +247,9 @@ como unico proveedor tecnologico.
       (`ProfileExecutionID`), el QR de la DIAN y la resolucion (`sts:InvoiceControl`). El reenvio
       (`ResubmitElectronicInvoiceUseCase`) vuelve a leer cliente, pagos, vencimiento y retenciones
       de la venta (`findSourceBillingInfo`), y usa el precio neto de cada linea del XML local.
-    - Limite conocido: la API de ventas falla ("El comprobante no cuadra") si el pago en efectivo
-      supera el total; el POS web no lo sufre porque envia el total y calcula el vuelto en pantalla.
+    - ~~La API de ventas fallaba ("El comprobante no cuadra") si el pago en efectivo superaba el total~~:
+      corregido el 2026-11-24 (`pos/sale/application/settle-payments.ts`): el vuelto se descuenta del efectivo
+      antes de guardar la venta; un sobrante que no es efectivo se rechaza antes de guardar nada.
     - Notas credito/debito y documento soporte usan Factus desde el 2026-11-24 (punto 16), y la
       nomina electronica tambien (punto 17, sin verificar). Eventos RADIAN todavia no.
 

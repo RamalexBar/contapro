@@ -511,3 +511,22 @@ describe("CreateSaleUseCase — listas de precios (item 35 de docs/ALCANCE.md)",
     expect(sale.total).toBe(11_900);
   });
 });
+
+describe("CreateSaleUseCase — vuelto", () => {
+  it("saves the sale with the cash minus the change, so the journal entry balances and the sale is invoiced", async () => {
+    const { useCase, saleRepo, postSaleJournalEntry } = makeUseCase();
+
+    await withTenantContext(() => useCase.execute({ ...BASE_INPUT, payments: [{ method: "CASH", amount: 20_000 }], withholdings: [] }));
+
+    expect(saleRepo.created[0].payments).toEqual([{ method: "CASH", amount: 11_900 }]);
+    expect(postSaleJournalEntry.execute).toHaveBeenCalledWith(expect.objectContaining({ payments: [{ method: "CASH", amount: 11_900 }] }));
+  });
+
+  it("rejects a card overpayment before saving anything", async () => {
+    const { useCase, saleRepo } = makeUseCase();
+    await expect(
+      withTenantContext(() => useCase.execute({ ...BASE_INPUT, payments: [{ method: "CARD", amount: 20_000 }], withholdings: [] }))
+    ).rejects.toThrow(/no es efectivo/);
+    expect(saleRepo.created).toHaveLength(0);
+  });
+});
