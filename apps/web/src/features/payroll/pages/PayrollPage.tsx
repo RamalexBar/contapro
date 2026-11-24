@@ -29,6 +29,7 @@ import {
   listPayrolls,
   listPayslipWhatsAppDeliveries,
   payPayroll,
+  issueElectronicPayroll,
   resendPayslipWhatsApp,
   type PayrollItem,
 } from "../api/payroll.api";
@@ -161,6 +162,8 @@ export function PayrollPage() {
     mutationFn: (id: string) => payPayroll(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payrolls"] }),
   });
+  const electronicMutation = useMutation({ mutationFn: (id: string) => issueElectronicPayroll(id) });
+
   const downloadPayslipMutation = useMutation({
     mutationFn: ({ payslipId, fileName }: { payslipId: string; fileName: string }) =>
       downloadPayslipPdf(payslipId, fileName),
@@ -443,6 +446,16 @@ export function PayrollPage() {
             <TableBody>
               {payrolls?.data.map((payroll) => (
                 <Fragment key={payroll.id}>
+                  {electronicMutation.isError && (
+                    <Alert tone="danger" className="mb-3">{(electronicMutation.error as Error).message}</Alert>
+                  )}
+                  {electronicMutation.data && (
+                    <Alert tone={electronicMutation.data.failed > 0 || !electronicMutation.data.monthComplete ? "warning" : "success"} className="mb-3">
+                      {!electronicMutation.data.monthComplete
+                        ? "La nómina electrónica es mensual: se emite cuando todas las nóminas del mes (las dos quincenas) estén aprobadas."
+                        : `Nómina electrónica: ${electronicMutation.data.sent} enviada(s), ${electronicMutation.data.alreadyAccepted} ya autorizada(s), ${electronicMutation.data.failed} con error${electronicMutation.data.failed > 0 ? " (el motivo está en Auditoría)" : ""}.`}
+                    </Alert>
+                  )}
                   <TableRow>
                     <Td className="font-medium text-slate-900">
                       {payroll.month}/{payroll.year}
@@ -468,6 +481,16 @@ export function PayrollPage() {
                       {canApprove && payroll.status === "CALCULATED" && (
                         <Button size="sm" onClick={() => approveMutation.mutate(payroll.id)} loading={approveMutation.isPending}>
                           Aprobar
+                        </Button>
+                      )}
+                      {canApprove && (payroll.status === "APPROVED" || payroll.status === "PAID") && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => electronicMutation.mutate(payroll.id)}
+                          loading={electronicMutation.isPending && electronicMutation.variables === payroll.id}
+                        >
+                          Emitir nómina electrónica
                         </Button>
                       )}
                       {canPay && payroll.status === "APPROVED" && (

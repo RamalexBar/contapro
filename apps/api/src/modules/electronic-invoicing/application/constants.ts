@@ -53,8 +53,11 @@ export type DebitNoteConceptCode = keyof typeof DEBIT_NOTE_CONCEPTS;
  * despues sin tocar ningun call site. Default "1" si el contractType no tiene mapeo conocido.
  */
 export const DIAN_CONTRACT_TYPE_CODE: Record<string, string> = {
-  FIXED_TERM: "2",
-  INDEFINITE: "1",
+  // Tabla de tipos de contrato de la nomina electronica (Res. DIAN 000013/2021, la misma de Factus):
+  // 1 termino fijo, 2 indefinido, 3 obra o labor, 4 aprendizaje, 5 practicas. Antes del 2026-11-24
+  // fijo e indefinido estaban invertidos.
+  FIXED_TERM: "1",
+  INDEFINITE: "2",
   SERVICE: "3",
   LEARNING: "4",
 };

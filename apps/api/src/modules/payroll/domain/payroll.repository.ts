@@ -81,6 +81,8 @@ export interface IPayrollRepository {
   create(data: CreatePayrollData): Promise<PayrollRecord>;
   findByIdOrThrow(id: string): Promise<PayrollRecord>;
   findWithDetailsOrThrow(id: string): Promise<PayrollWithDetails>;
+  /** Todas las nominas de la empresa en ese mes (quincenas y sucursales), con su detalle. */
+  listMonthWithDetails(year: number, month: number): Promise<PayrollWithDetails[]>;
   findPayslipByIdOrThrow(id: string): Promise<PayslipDocumentRecord>;
   list(filter?: { year?: number; branchId?: string }): Promise<PayrollRecord[]>;
   /** Transaccional: borra el detalle previo (si es un recalculo) y persiste el nuevo. */

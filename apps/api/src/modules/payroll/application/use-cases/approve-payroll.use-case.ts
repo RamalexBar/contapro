@@ -1,10 +1,10 @@
 import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { PostPayrollJournalEntryUseCase } from "../../../accounting/application/use-cases/post-payroll-journal-entry.use-case";
-import type { GenerateElectronicPayrollUseCase } from "../../../electronic-invoicing/application/use-cases/generate-electronic-payroll.use-case";
 import type { IPayrollDeductionRepository } from "../../domain/payroll-deduction.repository";
 import type { IPayrollRepository, PayrollRecord } from "../../domain/payroll.repository";
 import type { SendPayslipWhatsAppUseCase } from "./send-payslip-whatsapp.use-case";
+import type { IssueElectronicPayrollUseCase } from "./issue-electronic-payroll.use-case";
 
 const DEDUCTION_CONCEPT_CODES = new Set(["LOAN_DEDUCTION", "GARNISHMENT"]);
 
@@ -13,7 +13,7 @@ export class ApprovePayrollUseCase {
     private readonly repo: IPayrollRepository,
     private readonly deductionRepo: IPayrollDeductionRepository,
     private readonly postPayrollJournalEntry: PostPayrollJournalEntryUseCase,
-    private readonly generateElectronicPayroll: GenerateElectronicPayrollUseCase,
+    private readonly issueElectronicPayroll: IssueElectronicPayrollUseCase,
     private readonly sendPayslipWhatsApp: SendPayslipWhatsAppUseCase,
     private readonly audit: AuditService
   ) {}
@@ -60,31 +60,10 @@ export class ApprovePayrollUseCase {
       })),
     });
 
-    // La DIAN genera nomina electronica POR EMPLEADO POR PERIODO, no una sola vez por la corrida
-    // completa -- un empleado fallando no debe frenar a los demas ni bloquear la aprobacion
-    // (mismo criterio no bloqueante que ventas/notas/compras).
-    for (const detail of withDetails.details) {
-      try {
-        await this.generateElectronicPayroll.execute({
-          payrollDetailId: detail.id,
-          employeeId: detail.employeeId,
-          periodStart: updated.startDate,
-          periodEnd: updated.endDate,
-          grossTotal: detail.grossTotal,
-          totalDeductions: detail.totalDeductions,
-          netPay: detail.netPay,
-          items: detail.items.map((i) => ({ conceptCode: i.conceptCode, amount: i.amount })),
-        });
-      } catch (err) {
-        await this.audit.record({
-          action: "ELECTRONIC_PAYROLL_GENERATION_FAILED",
-          entityType: "PayrollDetail",
-          entityId: detail.id,
-          description: `No se pudo generar la nomina electronica del empleado ${detail.employeeId}: ${(err as Error).message}`,
-          metadata: {},
-        });
-      }
+    // Nomina electronica: solo si con esta aprobacion el mes quedo completo (ver IssueElectronicPayrollUseCase).
+    await this.issueElectronicPayroll.issueMonth(updated.year, updated.month);
 
+    for (const detail of withDetails.details) {
       // sendPayslipWhatsApp ya audita/registra exito y fallo internamente (nunca lanza por un
       // fallo de envio real) -- este try/catch es solo una red de seguridad, mismo criterio que
       // arriba. detail.payslip siempre existe en este punto (se genera en el paso "calcular").
@@ -105,4 +84,5 @@ export class ApprovePayrollUseCase {
 
     return updated;
   }
+
 }

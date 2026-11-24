@@ -2,7 +2,8 @@ import { PrismaPayrollNoveltyReader } from "./infrastructure/prisma-payroll-nove
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
 import { postBenefitSettlementJournalEntryUseCase, postPayrollJournalEntryUseCase } from "../accounting/accounting.container";
-import { generateElectronicPayrollUseCase } from "../electronic-invoicing/electronic-invoicing.container";
+import { generateElectronicPayrollUseCase, resubmitPayrollUseCase } from "../electronic-invoicing/electronic-invoicing.container";
+import { IssueElectronicPayrollUseCase } from "./application/use-cases/issue-electronic-payroll.use-case";
 import { employeeRepo } from "../employees/employees.container";
 import { timeTrackingRepo } from "../timetracking/timetracking.container";
 import { PrismaPayrollParameterRepository } from "./infrastructure/prisma-payroll-parameter.repository";
@@ -48,6 +49,8 @@ export const sendPayslipWhatsAppUseCase = new SendPayslipWhatsAppUseCase(
 export const createPayrollParameterUseCase = new CreatePayrollParameterUseCase(payrollParameterRepo);
 export const listPayrollParametersUseCase = new ListPayrollParametersUseCase(payrollParameterRepo);
 
+const issueElectronicPayrollUseCase = new IssueElectronicPayrollUseCase(payrollRepo, generateElectronicPayrollUseCase, resubmitPayrollUseCase, auditService);
+
 export const payrollController = new PayrollController(
   payrollRepo,
   employeeRepo,
@@ -60,7 +63,7 @@ export const payrollController = new PayrollController(
     payrollRepo,
     payrollDeductionRepo,
     postPayrollJournalEntryUseCase,
-    generateElectronicPayrollUseCase,
+    issueElectronicPayrollUseCase,
     sendPayslipWhatsAppUseCase,
     auditService
   ),
@@ -70,7 +73,8 @@ export const payrollController = new PayrollController(
   new CancelPayrollDeductionUseCase(payrollDeductionRepo, auditService),
   whatsAppDeliveryLogRepo,
   sendPayslipWhatsAppUseCase,
-  new UpdatePayrollSettingsUseCase(companyReader, auditService)
+  new UpdatePayrollSettingsUseCase(companyReader, auditService),
+  issueElectronicPayrollUseCase
 );
 
 /** Prima de servicios, consolidacion de cesantias y liquidacion del contrato. */

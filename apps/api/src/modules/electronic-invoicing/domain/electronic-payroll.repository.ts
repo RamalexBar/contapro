@@ -1,4 +1,5 @@
 import type { IElectronicDocumentSubmissionRepository } from "./electronic-document-submission.repository";
+import type { ThirdPartyDocumentResult } from "./third-party-invoicing-client";
 
 export interface GenerateElectronicPayrollData {
   payrollDetailId: string;
@@ -31,6 +32,8 @@ export interface ElectronicPayrollWithXml extends ElectronicPayrollRecord {
   signedXmlContent: string | null;
   dianTrackingId: string | null;
   rejectionReason: string | null;
+  /** Solicitud enviada al proveedor tecnologico (JSON), si se envio por ahi. */
+  providerRequest: string | null;
 }
 
 /**
@@ -46,4 +49,12 @@ export interface IElectronicPayrollRepository extends IElectronicDocumentSubmiss
   ): Promise<ElectronicPayrollRecord>;
 
   findByPayrollDetailId(payrollDetailId: string): Promise<ElectronicPayrollWithXml | null>;
+
+  /** La nomina electronica es mensual: un documento por empleado por mes. */
+  findForEmployeeMonth(employeeId: string, year: number, month: number): Promise<{ payrollDetailId: string; status: string; fullNumber: string } | null>;
+
+  saveProviderRequest(id: string, request: string): Promise<void>;
+
+  /** Resultado de un proveedor tecnologico: numero legal, CUNE y XML firmado reales, o el rechazo. */
+  applyThirdPartyResult(id: string, result: ThirdPartyDocumentResult): Promise<void>;
 }

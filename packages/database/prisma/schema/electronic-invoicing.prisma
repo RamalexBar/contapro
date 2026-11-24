@@ -254,6 +254,8 @@ model ElectronicPayroll {
   rejectionReason  String?
   submittedAt      DateTime?
   respondedAt      DateTime?
+  // Solicitud enviada al proveedor tecnologico (JSON), para reenviarla igual si fallo la conexion.
+  providerRequest  String?   @db.Text
 
   @@unique([companyId, fullNumber])
   @@index([companyId, branchId, createdAt])

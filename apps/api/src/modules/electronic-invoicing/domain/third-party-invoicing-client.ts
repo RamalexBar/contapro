@@ -88,6 +88,53 @@ export interface IThirdPartyInvoicingClient {
   submitNote(apiToken: string, input: ThirdPartyNoteInput): Promise<ThirdPartyDocumentResult>;
   /** Documento soporte en adquisiciones a no obligados a facturar. */
   submitSupportDocument(apiToken: string, input: ThirdPartySupportDocumentInput): Promise<ThirdPartyDocumentResult>;
+  /** Nomina electronica de un empleado por un mes (uniqueCode = CUNE). */
+  submitPayroll(apiToken: string, input: ThirdPartyPayrollInput): Promise<ThirdPartyDocumentResult>;
+}
+
+/** Concepto liquidado en el mes, con los mismos codigos que PayrollItem (SALARY, VACATION_PAY...). */
+export interface ThirdPartyPayrollItem {
+  conceptCode: string;
+  /** Dias u horas, segun el concepto. */
+  quantity: number | null;
+  /** Porcentaje (aportes) o valor unitario (horas), segun el concepto: ver PayrollItem.rate. */
+  rate: number | null;
+  amount: number;
+  /** Para libranzas y otras deducciones. */
+  description?: string;
+}
+
+export interface ThirdPartyPayrollInput {
+  referenceCode: string;
+  year: number;
+  month: number;
+  /** MONTHLY = un pago al mes; BIWEEKLY = dos quincenas consolidadas en el mismo documento. */
+  periodicity: "MONTHLY" | "BIWEEKLY";
+  /** Fecha de cada pago del mes (una por nomina aprobada). */
+  paymentDates: Date[];
+  payment: { method: "CASH" | "TRANSFER"; bankName: string | null; accountNumber: string | null };
+  worker: {
+    documentType: string;
+    documentNumber: string;
+    firstName: string;
+    otherNames: string | null;
+    firstSurname: string;
+    secondSurname: string | null;
+    address: string;
+    municipalityCode: string;
+    integralSalary: boolean;
+    workerTypeCode: string;
+    workerSubtypeCode: string;
+    contractTypeCode: string;
+    employeeCode: string;
+    salary: number;
+    entryDate: Date;
+    retirementDate: Date | null;
+    daysWorked: number;
+  };
+  items: ThirdPartyPayrollItem[];
+  /** Neto esperado: se compara con el que calcula el proveedor. */
+  netPay: number;
 }
 
 /** Renglon de una nota o documento soporte. unitPrice es antes de descuento e impuesto. */

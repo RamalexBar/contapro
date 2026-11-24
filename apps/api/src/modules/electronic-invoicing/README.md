@@ -249,9 +249,8 @@ como unico proveedor tecnologico.
       de la venta (`findSourceBillingInfo`), y usa el precio neto de cada linea del XML local.
     - Limite conocido: la API de ventas falla ("El comprobante no cuadra") si el pago en efectivo
       supera el total; el POS web no lo sufre porque envia el total y calcula el vuelto en pantalla.
-    - Notas credito/debito y documento soporte **si** usan Factus desde el 2026-11-24 (ver punto
-      16). Nomina electronica y eventos RADIAN todavia no: Factus los ofrece (`POST /v2/payrolls`),
-      pero no estan conectados.
+    - Notas credito/debito y documento soporte usan Factus desde el 2026-11-24 (punto 16), y la
+      nomina electronica tambien (punto 17, sin verificar). Eventos RADIAN todavia no.
 
     **Activacion 100% automatica** (`SetElectronicInvoicingProviderUseCase`,
     `domain/factus-account-provisioner.ts`, `infrastructure/factus-account-provisioning.service.ts`,
@@ -343,6 +342,29 @@ como unico proveedor tecnologico.
       `CreditNote.conceptCode`/`DebitNote.conceptCode` los guardan.
     - Pendiente: notas de ajuste al documento soporte (`POST /v2/adjustment-notes/validate`, no hay
       flujo para corregir una compra todavia) y nomina electronica por Factus.
+
+17. **Nomina electronica por Factus** (2026-11-24) — **NO VERIFICADA**: el sandbox compartido de
+    Factus responde `403 "La empresa no tiene habilitada la creacion de este documento"` a cualquier
+    `POST /v2/payrolls`, incluso vacio, antes de validar los campos. Hay que pedirle a Factus que
+    habilite nomina en la cuenta (sandbox o la de produccion) para probarla de punta a punta.
+
+    - **Un documento por empleado por mes** (Res. DIAN 000013 de 2021): `IssueElectronicPayrollUseCase`
+      (modulo payroll) emite cuando el mes queda completo (aprobada la nomina que llega al ultimo dia y
+      ninguna del mes sin aprobar), sumando las quincenas (`buildMonthlyElectronicPayrolls`). Aprobar la
+      primera quincena no emite nada. Antes se generaba un documento por cada nomina aprobada.
+    - Boton **Emitir nomina electronica** (`POST /payrolls/:id/electronic-payroll`, nominas aprobadas):
+      emite lo que falte y reenvia lo rechazado; lo autorizado no se toca. Sirve para reintentar despues
+      de corregir un dato (ej. el codigo DANE de la empresa, obligatorio como lugar de trabajo).
+    - Payload (`buildPayrollPayload`, segun developers.factus.com.co/nomina/crear-y-validar): periodo
+      quincenal `4` o mensual `5` con una fecha de pago por nomina; trabajador con codigos DIAN; `suel`,
+      `tra`, `hora` (1 HED, 2 HEN, 3 RN, 5 recargo dominical, con su porcentaje), `vaca`, `inca` (1 comun,
+      3 laboral), `lice` (1 maternidad/paternidad, 3 no remunerada); deducciones `salu`, `pens`, `dedu`
+      (FSP), `rete`, `libr`, `otra`. Factus calcula los totales; el neto se compara con el de Contapro.
+    - Rango: `GET /v2/numbering-ranges/payrolls?filter[is_enabled]=true` (ids de texto), el primero activo
+      de tipo "Nomina" (no "Nota de Ajuste Nomina"). Este endpoint si respondio en el sandbox.
+    - Reenvio con la misma solicitud guardada (`ElectronicPayroll.providerRequest`), como las notas.
+    - Corregido de paso: `DIAN_CONTRACT_TYPE_CODE` tenia fijo e indefinido invertidos (fijo = 1, indefinido = 2).
+    - Pendiente: nota de ajuste de nomina (`POST /v2/adjustment-payrolls`) para corregir un mes ya emitido.
 
 ## Como probar localmente sin credenciales DIAN
 

@@ -214,6 +214,7 @@ describe("mapPayrollToRideData", () => {
   });
   const doc: ElectronicPayrollWithXml = {
     id: "pr-1",
+    providerRequest: null,
     payrollDetailId: "detail-1",
     branchId: "branch-1",
     prefix: null,

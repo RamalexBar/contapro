@@ -4,6 +4,7 @@ import type { CreatePayrollUseCase } from "../application/use-cases/create-payro
 import type { ListPayrollsUseCase } from "../application/use-cases/list-payrolls.use-case";
 import type { CalculatePayrollUseCase } from "../application/use-cases/calculate-payroll.use-case";
 import type { ApprovePayrollUseCase } from "../application/use-cases/approve-payroll.use-case";
+import type { IssueElectronicPayrollUseCase } from "../application/use-cases/issue-electronic-payroll.use-case";
 import type { PayPayrollUseCase } from "../application/use-cases/pay-payroll.use-case";
 import type { CreatePayrollDeductionUseCase } from "../application/use-cases/create-payroll-deduction.use-case";
 import type { ListPayrollDeductionsUseCase } from "../application/use-cases/list-payroll-deductions.use-case";
@@ -36,7 +37,8 @@ export class PayrollController {
     private readonly cancelDeductionUseCase: CancelPayrollDeductionUseCase,
     private readonly whatsAppDeliveryLogRepo: IWhatsAppDeliveryLogRepository,
     private readonly sendPayslipWhatsAppUseCase: SendPayslipWhatsAppUseCase,
-    private readonly payrollSettingsUseCase: UpdatePayrollSettingsUseCase
+    private readonly payrollSettingsUseCase: UpdatePayrollSettingsUseCase,
+    private readonly issueElectronicPayrollUseCase: IssueElectronicPayrollUseCase
   ) {}
 
   getSettings = async (_req: Request, res: Response, next: NextFunction) => {
@@ -117,6 +119,14 @@ export class PayrollController {
   calculate = async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(await this.calculatePayrollUseCase.execute(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  issueElectronic = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await this.issueElectronicPayrollUseCase.execute(req.params.id));
     } catch (err) {
       next(err);
     }

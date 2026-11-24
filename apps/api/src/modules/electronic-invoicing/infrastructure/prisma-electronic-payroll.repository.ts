@@ -1,5 +1,7 @@
 import { basePrisma } from "@erp/database";
 import { prisma } from "../../../shared/prisma/prisma-client";
+import type { ThirdPartyDocumentResult } from "../domain/third-party-invoicing-client";
+import { splitProviderNumber } from "../application/numbering-claim";
 import { getTenantContext } from "../../../shared/context/request-context";
 import type {
   ElectronicPayrollRecord,
@@ -109,7 +111,48 @@ export class PrismaElectronicPayrollRepository implements IElectronicPayrollRepo
       signedXmlContent: row.signedXmlContent,
       dianTrackingId: row.dianTrackingId,
       rejectionReason: row.rejectionReason,
+      providerRequest: row.providerRequest,
     };
+  }
+
+  async findForEmployeeMonth(employeeId: string, year: number, month: number): Promise<{ payrollDetailId: string; status: string; fullNumber: string } | null> {
+    return prisma.electronicPayroll.findFirst({
+      where: { payrollDetail: { employeeId, payroll: { year, month } } },
+      select: { payrollDetailId: true, status: true, fullNumber: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async saveProviderRequest(id: string, request: string): Promise<void> {
+    const companyId = getTenantContext().companyId;
+    await prisma.electronicPayroll.updateMany({ where: { id, companyId }, data: { providerRequest: request } });
+  }
+
+  async applyThirdPartyResult(id: string, result: ThirdPartyDocumentResult): Promise<void> {
+    const companyId = getTenantContext().companyId;
+    const now = new Date();
+    if (result.status === "REJECTED") {
+      await prisma.electronicPayroll.updateMany({
+        where: { id, companyId },
+        data: { status: "REJECTED", dianResponseXml: result.rawResponse, rejectionReason: result.rejectionReason ?? null, submittedAt: now, respondedAt: now },
+      });
+      return;
+    }
+    // Numero legal y CUNE de Factus; el consecutivo interno queda reemplazado.
+    const legal = splitProviderNumber(result.number);
+    await prisma.electronicPayroll.updateMany({
+      where: { id, companyId },
+      data: {
+        status: "ACCEPTED",
+        cune: result.uniqueCode,
+        ...(legal ? { prefix: legal.prefix, number: legal.number, fullNumber: result.number } : {}),
+        ...(result.signedXmlContent ? { xmlContent: result.signedXmlContent, signedXmlContent: result.signedXmlContent } : {}),
+        dianResponseXml: result.rawResponse,
+        rejectionReason: null,
+        submittedAt: now,
+        respondedAt: now,
+      },
+    });
   }
 
   // updateMany (no update): sin scoping propio quedaria expuesto a un id de otra empresa. Estos

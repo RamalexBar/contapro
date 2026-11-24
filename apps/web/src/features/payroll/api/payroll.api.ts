@@ -109,6 +109,18 @@ export function approvePayroll(id: string): Promise<PayrollRecord> {
   return apiFetch(`/payrolls/${id}/approve`, { method: "POST" });
 }
 
+export interface IssueElectronicPayrollResult {
+  monthComplete: boolean;
+  sent: number;
+  failed: number;
+  alreadyAccepted: number;
+}
+
+/** Emite (o reintenta) la nomina electronica del mes de esta nomina: un documento por empleado. */
+export function issueElectronicPayroll(id: string): Promise<IssueElectronicPayrollResult> {
+  return apiFetch(`/payrolls/${id}/electronic-payroll`, { method: "POST" });
+}
+
 export function payPayroll(id: string): Promise<PayrollRecord> {
   return apiFetch(`/payrolls/${id}/pay`, { method: "POST" });
 }

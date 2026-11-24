@@ -20,6 +20,8 @@ payrollRouter.get("/payrolls", requirePermission("payroll.read"), payrollControl
 payrollRouter.get("/payrolls/:id", requirePermission("payroll.read"), payrollController.getById);
 payrollRouter.post("/payrolls/:id/calculate", requirePermission("payroll.calculate"), payrollController.calculate);
 payrollRouter.post("/payrolls/:id/approve", requirePermission("payroll.approve"), payrollController.approve);
+// Emitir (o reintentar) la nomina electronica del mes de esta nomina.
+payrollRouter.post("/payrolls/:id/electronic-payroll", requirePermission("payroll.approve"), payrollController.issueElectronic);
 payrollRouter.post("/payrolls/:id/pay", requirePermission("payroll.pay"), payrollController.pay);
 
 payrollRouter.get("/payslips/:id", requirePermission("payroll.read"), payrollController.getPayslip);

@@ -42,6 +42,7 @@ const COMPANY: CompanyRecord = {
   factusCredentialsEncrypted: null,
   address: null,
   municipality: null,
+  municipalityCode: null,
   department: null,
   taxRegime: null,
   fiscalResponsibilities: null,

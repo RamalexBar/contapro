@@ -6,6 +6,7 @@ import type {
   ThirdPartyInvoiceInput,
   ThirdPartyInvoiceResult,
   ThirdPartyNoteInput,
+  ThirdPartyPayrollInput,
   ThirdPartySupportDocumentInput,
 } from "../domain/third-party-invoicing-client";
 import { authenticateFactus, type FactusOAuthCredentials } from "./factus-auth";
@@ -362,6 +363,133 @@ export function buildSupportDocumentPayload(input: ThirdPartySupportDocumentInpu
   };
 }
 
+/** Tipos de documento del trabajador en la nomina electronica (tabla de Factus/DIAN). */
+const PAYROLL_DOCUMENT_CODE: Record<string, string> = { RC: "11", TI: "12", CC: "13", TE: "21", CE: "22", NIT: "31", PASSPORT: "41", PA: "41", PEP: "47" };
+const PAYROLL_PERIOD_CODE = { BIWEEKLY: "4", MONTHLY: "5" } as const;
+
+const sumBy = (items: ThirdPartyPayrollInput["items"], codes: string[]) => {
+  const matched = items.filter((i) => codes.includes(i.conceptCode));
+  return {
+    amount: Math.round(matched.reduce((s, i) => s + i.amount, 0) * 100) / 100,
+    quantity: matched.reduce((s, i) => s + (i.quantity ?? 0), 0),
+    rate: matched.find((i) => i.rate !== null && i.rate !== undefined)?.rate ?? null,
+  };
+};
+
+/**
+ * Porcentaje de una hora extra o recargo. Las extras guardan el valor de la hora ordinaria en `rate`
+ * (valor = horas x hora x (1 + %)); el recargo nocturno, valor = horas x hora x %; el dominical guarda
+ * el % directamente (ver payroll-calculator.ts).
+ */
+function hourPercentage(conceptCode: string, total: { amount: number; quantity: number; rate: number | null }): number {
+  if (conceptCode === "SUNDAY_SURCHARGE") return total.rate ?? 0;
+  if (!total.rate || total.quantity <= 0) return 0;
+  const factor = total.amount / (total.quantity * total.rate);
+  return Math.round((conceptCode === "NIGHT_SURCHARGE" ? factor : factor - 1) * 10000) / 100;
+}
+
+/** Horas extra y recargos: codigos de la tabla de Factus (1 HED, 2 HEN, 3 RN, 5 recargo dominical/festivo). */
+const HOUR_TYPE_CODE: Record<string, string> = { OVERTIME_DAY: "1", OVERTIME_NIGHT: "2", NIGHT_SURCHARGE: "3", SUNDAY_SURCHARGE: "5" };
+
+/**
+ * Nomina electronica (POST /v2/payrolls). Un documento por empleado por mes: en nomina quincenal las
+ * dos quincenas llegan sumadas y `payment_dates` lleva las dos fechas de pago. Factus calcula los
+ * totales; el neto se compara despues con el de Contapro.
+ *
+ * NO VERIFICADO contra el sandbox (2026-11-24): la cuenta compartida de Factus responde "La empresa
+ * no tiene habilitada la creacion de este documento" a cualquier solicitud, antes de validar los
+ * campos. Armado siguiendo developers.factus.com.co/nomina/crear-y-validar y descripcion-de-campos.
+ */
+export function buildPayrollPayload(input: ThirdPartyPayrollInput, numberingRangeId: string): Record<string, unknown> {
+  const items = input.items;
+  const w = input.worker;
+  const accruals: Record<string, unknown> = { suel: { amount: money(sumBy(items, ["SALARY"]).amount) } };
+
+  const transport = sumBy(items, ["TRANSPORT_ALLOWANCE"]);
+  if (transport.amount > 0) accruals.tra = [{ amount: money(transport.amount), accrual_type_code: "1" }];
+
+  const hours = Object.entries(HOUR_TYPE_CODE)
+    .map(([code, type]) => ({ code, type, total: sumBy(items, [code]) }))
+    .filter((h) => h.total.amount > 0)
+    .map((h) => ({
+      quantity: h.total.quantity.toFixed(2),
+      percentage: hourPercentage(h.code, h.total).toFixed(2),
+      amount: money(h.total.amount),
+      accrual_type_code: h.type,
+    }));
+  if (hours.length > 0) accruals.hora = hours;
+
+  const vacation = sumBy(items, ["VACATION_PAY"]);
+  if (vacation.amount > 0) accruals.vaca = [{ quantity: Math.round(vacation.quantity), amount: money(vacation.amount), accrual_type_code: "1" }];
+
+  const incapacities = [
+    { total: sumBy(items, ["SICK_LEAVE_EMPLOYER", "SICK_LEAVE_EPS"]), type: "1" }, // comun
+    { total: sumBy(items, ["WORK_INJURY_ARL"]), type: "3" }, // laboral
+  ]
+    .filter((x) => x.total.amount > 0)
+    .map((x) => ({ quantity: Math.round(x.total.quantity), amount: money(x.total.amount), accrual_type_code: x.type }));
+  if (incapacities.length > 0) accruals.inca = incapacities;
+
+  const licenses: Record<string, unknown>[] = [];
+  for (const code of ["MATERNITY_LEAVE", "PATERNITY_LEAVE"]) {
+    const t = sumBy(items, [code]);
+    if (t.amount > 0) licenses.push({ quantity: Math.round(t.quantity), amount: money(t.amount), accrual_type_code: "1" });
+  }
+  const unpaid = sumBy(items, ["UNPAID_LEAVE"]);
+  if (unpaid.quantity > 0) licenses.push({ quantity: Math.round(unpaid.quantity), accrual_type_code: "3" });
+  if (licenses.length > 0) accruals.lice = licenses;
+
+  const health = sumBy(items, ["HEALTH_EMPLOYEE"]);
+  const pension = sumBy(items, ["PENSION_EMPLOYEE"]);
+  const deductions: Record<string, unknown> = {
+    salu: { percentage: (health.rate ?? 4).toFixed(2), amount: money(health.amount) },
+    pens: { percentage: (pension.rate ?? 4).toFixed(2), amount: money(pension.amount) },
+  };
+  const fsp = sumBy(items, ["SOLIDARITY_FUND"]);
+  if (fsp.amount > 0) deductions.dedu = [{ percentage: (fsp.rate ?? 1).toFixed(2), amount: money(fsp.amount), deduction_type_code: "1" }];
+  const withholding = sumBy(items, ["WITHHOLDING_TAX"]);
+  if (withholding.amount > 0) deductions.rete = { amount: money(withholding.amount) };
+  const loans = items.filter((i) => i.conceptCode === "LOAN_DEDUCTION" && i.amount > 0);
+  if (loans.length > 0) deductions.libr = loans.map((l) => ({ amount: money(l.amount), description: l.description || "Libranza" }));
+  const garnishments = items.filter((i) => i.conceptCode === "GARNISHMENT" && i.amount > 0);
+  if (garnishments.length > 0) deductions.otra = garnishments.map((g) => ({ amount: money(g.amount) }));
+
+  const transfer = input.payment.method === "TRANSFER" && input.payment.accountNumber;
+  return {
+    reference_code: input.referenceCode,
+    numbering_range_id: numberingRangeId,
+    settlement_period: { month: String(input.month), year: String(input.year), payroll_period_code: PAYROLL_PERIOD_CODE[input.periodicity] },
+    payment: {
+      payment_method_code: transfer ? PAYMENT_METHOD_CODE.TRANSFER : PAYMENT_METHOD_CODE.CASH,
+      ...(transfer ? { bank_name: input.payment.bankName ?? "No informado", account_type: "2", account_number: input.payment.accountNumber } : {}),
+      payment_dates: input.paymentDates.map(dateOnly),
+    },
+    worker: {
+      identification_document_code: PAYROLL_DOCUMENT_CODE[w.documentType.trim().toUpperCase()] ?? PAYROLL_DOCUMENT_CODE.CC,
+      identification_number: w.documentNumber,
+      first_name: w.firstName,
+      ...(w.otherNames ? { other_names: w.otherNames } : {}),
+      first_surname: w.firstSurname,
+      ...(w.secondSurname ? { second_surname: w.secondSurname } : {}),
+      address: w.address,
+      country_code: "CO",
+      municipality_code: w.municipalityCode,
+      has_integral_salary: w.integralSalary,
+      has_high_risk: false,
+      worker_type_code: w.workerTypeCode,
+      worker_subtype: w.workerSubtypeCode,
+      contract_type: w.contractTypeCode,
+      employee_code: w.employeeCode,
+      salary: money(w.salary),
+      entry_date: dateOnly(w.entryDate),
+      days_worked: Math.round(w.daysWorked),
+      ...(w.retirementDate ? { retirement_date: dateOnly(w.retirementDate) } : {}),
+    },
+    accruals,
+    deductions,
+  };
+}
+
 interface FactusDocumentResponse {
   status?: string;
   message?: string;
@@ -369,8 +497,11 @@ interface FactusDocumentResponse {
     number?: string;
     cude?: string;
     cuds?: string;
+    cune?: string;
     is_validated?: boolean;
     totals?: { total?: string };
+    /** Nomina: neto a pagar que calcula Factus. */
+    net_balance?: string;
     errors?: Record<string, string> | string[];
   };
   errors?: Record<string, string[]>;
@@ -389,11 +520,12 @@ export function parseDocumentResponse(httpStatus: number, rawResponse: string, e
   }
 
   const data = parsed.data;
-  const uniqueCode = data?.cude ?? data?.cuds ?? "";
+  const uniqueCode = data?.cude ?? data?.cuds ?? data?.cune ?? "";
   if (httpStatus === 201 && data?.is_validated && data.number && uniqueCode) {
     // Un reference_code repetido devuelve el documento anterior: si el total no cuadra, no es este.
-    const returnedTotal = Number(data.totals?.total);
-    if (data.totals?.total !== undefined && Math.abs(returnedTotal - expectedTotal) > 1) {
+    const reported = data.totals?.total ?? data.net_balance;
+    const returnedTotal = Number(reported);
+    if (reported !== undefined && Math.abs(returnedTotal - expectedTotal) > 1) {
       throw new Error(`Factus devolvio otro documento (${data.number}, total ${returnedTotal}) en vez de crear este (total ${expectedTotal})`);
     }
     return { status: "ACCEPTED", number: data.number, uniqueCode, signedXmlContent: "", rawResponse };
@@ -405,6 +537,11 @@ export function parseDocumentResponse(httpStatus: number, rawResponse: string, e
   const details = fieldErrors ? Object.values(fieldErrors).flat().join(" ") : "";
   const rejectionReason = [parsed.message, details].filter(Boolean).join(": ") || `Respuesta inesperada de Factus (status ${httpStatus})`;
   return { status: "REJECTED", number: data?.number ?? "", uniqueCode, signedXmlContent: "", rejectionReason, rawResponse };
+}
+
+/** "Nómina" (no "Nota de Ajuste Nómina"), sin importar las tildes. */
+export function isPayrollRange(document: string | undefined): boolean {
+  return (document ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase() === "nomina";
 }
 
 export class FactusInvoicingClient implements IThirdPartyInvoicingClient {
@@ -421,6 +558,45 @@ export class FactusInvoicingClient implements IThirdPartyInvoicingClient {
     const accessToken = await authenticateFactus(credentials);
     const rangeId = await this.activeRangeId(accessToken, "SUPPORT");
     return this.createDocument(accessToken, "support-documents", buildSupportDocumentPayload(input, rangeId), input.total);
+  }
+
+  async submitPayroll(credentialsJson: string, input: ThirdPartyPayrollInput): Promise<ThirdPartyDocumentResult> {
+    const credentials: FactusCredentials = JSON.parse(credentialsJson);
+    const accessToken = await authenticateFactus(credentials);
+    const rangeId = await this.activePayrollRangeId(accessToken);
+    // A diferencia de los demas documentos, la nomina se crea en /v2/payrolls (sin /validate).
+    const res = await fetch(`${env.FACTUS_BASE_URL}/v2/payrolls`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(buildPayrollPayload(input, rangeId)),
+    });
+    const raw = await res.text();
+    // 403 "La empresa no tiene habilitada la creacion de este documento": la cuenta de Factus no tiene
+    // nomina activa. Es un rechazo con un motivo claro, no una falla de conexion.
+    if (res.status === 403) {
+      return { status: "REJECTED", number: "", uniqueCode: "", signedXmlContent: "", rejectionReason: `Factus: ${raw.slice(0, 300)}`, rawResponse: raw };
+    }
+    const result = parseDocumentResponse(res.status, raw, input.netPay);
+    if (result.status !== "ACCEPTED") return result;
+    return { ...result, signedXmlContent: await this.downloadXml(accessToken, "payrolls", result.number) };
+  }
+
+  /** Rangos de nomina: endpoint propio con ids de texto; se usa el primero activo de tipo "Nomina". */
+  private async activePayrollRangeId(accessToken: string): Promise<string> {
+    const res = await fetch(`${env.FACTUS_BASE_URL}/v2/numbering-ranges/payrolls?filter%5Bis_enabled%5D=true`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    });
+    const raw = await res.text();
+    if (!res.ok) throw new Error(`Factus respondio ${res.status} al consultar los rangos de nomina: ${raw.slice(0, 300)}`);
+    let ranges: { id?: string; document?: string; is_active?: boolean | number }[] = [];
+    try {
+      ranges = (JSON.parse(raw) as { data?: { data?: typeof ranges } }).data?.data ?? [];
+    } catch {
+      throw new Error(`Factus devolvio una respuesta no-JSON al consultar los rangos de nomina: ${raw.slice(0, 300)}`);
+    }
+    const active = ranges.find((r) => r.id && Boolean(r.is_active) && isPayrollRange(r.document));
+    if (!active?.id) throw new Error("La cuenta de Factus no tiene un rango de numeracion activo para nomina. Creelo en el panel de Factus.");
+    return active.id;
   }
 
   /**

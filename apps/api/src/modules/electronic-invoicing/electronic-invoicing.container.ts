@@ -139,11 +139,14 @@ export const sendInvoiceWhatsAppUseCase = new SendInvoiceWhatsAppUseCase(
   companyReader,
   numberingResolutionRepo
 );
-const resubmitPayrollUseCase = new ResubmitElectronicPayrollUseCase(
+/** Exportado: payroll.container.ts lo usa para reenviar la nomina electronica del mes. */
+export const resubmitPayrollUseCase = new ResubmitElectronicPayrollUseCase(
   electronicPayrollRepo,
   certificateLoader,
   xmlSigner,
-  auditService
+  auditService,
+  companyReader,
+  factusInvoicingClient
 );
 
 export const electronicInvoicingController = new ElectronicInvoicingController(
@@ -226,7 +229,8 @@ export const generateElectronicPayrollUseCase = new GenerateElectronicPayrollUse
   employeeRepo,
   auditService,
   certificateLoader,
-  xmlSigner
+  xmlSigner,
+  factusInvoicingClient
 );
 
 /** Usado por server.ts para arrancar el poller de envio/consulta de estado a la DIAN (una

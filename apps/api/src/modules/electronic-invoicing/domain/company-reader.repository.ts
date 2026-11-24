@@ -13,6 +13,8 @@ export interface CompanyRecord {
    * (ver ride-data-mapper.ts, RideCompanyInfo) -- no viajan en el XML firmado. */
   address: string | null;
   municipality: string | null;
+  /** Codigo DANE del municipio (Datos de la empresa): lugar de trabajo en la nomina electronica. */
+  municipalityCode: string | null;
   department: string | null;
   taxRegime: string | null;
   fiscalResponsibilities: string | null;

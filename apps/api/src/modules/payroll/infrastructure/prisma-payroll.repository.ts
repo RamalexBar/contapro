@@ -41,6 +41,11 @@ export class PrismaPayrollRepository implements IPayrollRepository {
     return payroll;
   }
 
+  async listMonthWithDetails(year: number, month: number): Promise<PayrollWithDetails[]> {
+    const payrolls = await prisma.payroll.findMany({ where: { year, month }, select: { id: true }, orderBy: { startDate: "asc" } });
+    return Promise.all(payrolls.map((p) => this.findWithDetailsOrThrow(p.id)));
+  }
+
   async findWithDetailsOrThrow(id: string): Promise<PayrollWithDetails> {
     const payroll = await prisma.payroll.findFirst({
       where: { id },

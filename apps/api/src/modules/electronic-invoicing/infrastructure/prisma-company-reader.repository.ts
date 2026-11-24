@@ -21,6 +21,7 @@ export class PrismaCompanyReaderRepository implements ICompanyReader {
       factusCredentialsEncrypted: row.factusCredentialsEncrypted,
       address: row.address,
       municipality: row.municipality,
+      municipalityCode: row.municipalityCode,
       department: row.department,
       taxRegime: row.taxRegime,
       fiscalResponsibilities: row.fiscalResponsibilities,

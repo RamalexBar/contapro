@@ -65,10 +65,8 @@ export function serializeProviderRequest(input: object): string {
   return JSON.stringify(input);
 }
 
-export function parseProviderRequest<T>(raw: string, dateKeys: string[]): T {
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
-  for (const key of dateKeys) {
-    if (typeof parsed[key] === "string") parsed[key] = new Date(parsed[key] as string);
-  }
-  return parsed as T;
+/** Inverso de serializeProviderRequest: toda fecha ISO (tambien anidada o en listas) vuelve a ser Date. */
+export function parseProviderRequest<T>(raw: string, ..._dateKeyHints: unknown[]): T {
+  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+  return JSON.parse(raw, (_key, value) => (typeof value === "string" && iso.test(value) ? new Date(value) : value)) as T;
 }

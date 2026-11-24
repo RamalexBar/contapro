@@ -91,6 +91,14 @@ lee las novedades APROBADAS que se cruzan con el periodo (`PrismaPayrollNoveltyR
   contar desde el dia 1; no se descuenta el dominical por ausencia injustificada (art. 173 CST). La
   nomina electronica (camino directo) todavia no incluye estos conceptos; por Factus esta pendiente.
 
+## Nomina electronica (2026-11-24)
+
+Mensual, un documento por empleado: se emite sola al aprobar la nomina que completa el mes (las dos
+quincenas sumadas), o con el boton **Emitir nomina electronica** de una nomina aprobada (reintenta lo que
+fallo). Con Factus sale por su API (sin verificar todavia: la cuenta de pruebas no tiene nomina
+habilitada); exige el codigo DANE de la empresa en Datos de la empresa. Ver
+`electronic-invoicing/README.md` punto 17.
+
 ## Pago de prestaciones sociales (Nomina -> Prestaciones sociales)
 
 La nomina mensual solo PROVISIONA cesantias, intereses, prima y vacaciones. Su pago se hace aqui
