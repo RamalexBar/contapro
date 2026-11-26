@@ -40,3 +40,11 @@ PayrollDetail), con el mismo XOR contra `saleId` a nivel de base de datos.
   que el POS.
 - **Sin envio de RIDE por WhatsApp**: `SendInvoiceWhatsAppUseCase` sigue siendo exclusivo de
   ventas (`Sale.customerId`) — no se extendio a facturas manuales en esta iteracion.
+
+## Cliente nuevo desde la misma pantalla (2026-11-26)
+
+En la web, el selector de cliente tiene "+ Nuevo cliente": documento, nombre, correo y **municipio (obligatorio)**.
+Al crear la factura se crea primero el cliente (`POST /customers`) y la factura sale a su nombre. El municipio es
+obligatorio porque Factus/DIAN rechazan la factura a nombre de un cliente sin codigo de municipio ("El campo codigo
+municipio es obligatorio", visto en el sandbox); si se elige un cliente existente sin municipio, la pantalla avisa y no
+deja crear la factura. Con una sola sucursal, queda elegida sola.

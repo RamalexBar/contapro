@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { calculateTax, formatCOP, round2 } from "@erp/shared-utils";
 import { AppLayout } from "../../../components/ui/AppLayout";
 import { Card } from "../../../components/ui/Card";
@@ -9,9 +9,10 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
+import { MunicipalitySelect } from "../../../components/ui/MunicipalitySelect";
 import { getCompanyProfile } from "../../company/api/company.api";
 import { listBranches } from "../../inventory/api/branch.api";
-import { listCustomers } from "../../customers/api/customer.api";
+import { createCustomer, listCustomers } from "../../customers/api/customer.api";
 import { createManualInvoice, openManualInvoicePdf, type ManualInvoiceRecord } from "../api/manual-invoicing.api";
 
 interface LineItem {
@@ -20,6 +21,10 @@ interface LineItem {
   unitPrice: number;
   taxPercent: number;
 }
+
+/** Valor del selector de cliente que abre el formulario para crearlo ahi mismo. */
+const NEW_CUSTOMER = "__new__";
+const EMPTY_NEW_CUSTOMER = { documentType: "CC", documentNumber: "", name: "", email: "", municipalityCode: "" };
 
 const EMPTY_LINE: LineItem = { description: "", quantity: 1, unitPrice: 0, taxPercent: 19 };
 
@@ -38,25 +43,51 @@ export function ManualInvoicePage() {
   const [dueDate, setDueDate] = useState("");
   const [lines, setLines] = useState<LineItem[]>([{ ...EMPTY_LINE }]);
   const [invoice, setInvoice] = useState<ManualInvoiceRecord | null>(null);
+  const [newCustomer, setNewCustomer] = useState({ ...EMPTY_NEW_CUSTOMER });
+  const queryClient = useQueryClient();
+  const isNewCustomer = customerId === NEW_CUSTOMER;
+  // La DIAN (via Factus) rechaza la factura a nombre de un cliente sin municipio.
+  const selectedCustomer = customers?.data.find((c) => c.id === customerId);
+  const customerMissingMunicipality = Boolean(selectedCustomer && !selectedCustomer.municipalityCode);
+
+  // Con una sola sucursal no hay nada que elegir.
+  useEffect(() => {
+    if (!branchId && branches?.data.length === 1) setBranchId(branches.data[0]!.id);
+  }, [branches, branchId]);
 
   const subtotal = round2(lines.reduce((sum, l) => sum + round2(l.unitPrice * l.quantity), 0));
   const taxTotal = round2(lines.reduce((sum, l) => sum + calculateTax(round2(l.unitPrice * l.quantity), l.taxPercent), 0));
   const total = round2(subtotal + taxTotal);
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      createManualInvoice({
+    mutationFn: async () => {
+      // Cliente nuevo: se crea primero y la factura sale a su nombre.
+      let buyerId = customerId || undefined;
+      if (isNewCustomer) {
+        const created = await createCustomer({
+          documentType: newCustomer.documentType,
+          documentNumber: newCustomer.documentNumber.replace(/[.\s]/g, ""),
+          name: newCustomer.name.trim(),
+          email: newCustomer.email.trim() || undefined,
+          municipalityCode: newCustomer.municipalityCode,
+        });
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        buyerId = created.id;
+      }
+      return createManualInvoice({
         branchId,
-        customerId: customerId || undefined,
-        dueDate: customerId && dueDate ? dueDate : undefined,
+        customerId: buyerId,
+        dueDate: buyerId && dueDate ? dueDate : undefined,
         items: lines
           .filter((l) => l.description.trim())
           .map((l) => ({ description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, taxPercent: l.taxPercent })),
-      }),
+      });
+    },
     onSuccess: (result) => {
       setInvoice(result);
       setLines([{ ...EMPTY_LINE }]);
       setCustomerId("");
+      setNewCustomer({ ...EMPTY_NEW_CUSTOMER });
     },
   });
 
@@ -114,12 +145,39 @@ export function ManualInvoicePage() {
           </Select>
           <Select label="Cliente (opcional)" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
             <option value="">Consumidor final</option>
+            <option value={NEW_CUSTOMER}>+ Nuevo cliente</option>
             {customers?.data.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </Select>
+          {isNewCustomer && (
+            <div className="grid grid-cols-1 gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:col-span-2 sm:grid-cols-2">
+              <Select label="Tipo de documento" value={newCustomer.documentType} onChange={(e) => setNewCustomer({ ...newCustomer, documentType: e.target.value })}>
+                <option value="CC">Cédula de ciudadanía</option>
+                <option value="NIT">NIT</option>
+                <option value="CE">Cédula de extranjería</option>
+              </Select>
+              <Input label="Número de documento" value={newCustomer.documentNumber} onChange={(e) => setNewCustomer({ ...newCustomer, documentNumber: e.target.value })} required />
+              <Input label="Nombre o razón social" value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} required />
+              <Input label="Correo (opcional, le llega la factura)" type="email" value={newCustomer.email} onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })} />
+              <div className="sm:col-span-2">
+                <MunicipalitySelect
+                  required
+                  value={newCustomer.municipalityCode}
+                  hint="La DIAN lo exige para facturar a nombre de un cliente."
+                  onChange={(m) => setNewCustomer({ ...newCustomer, municipalityCode: m?.code ?? "" })}
+                />
+              </div>
+            </div>
+          )}
+          {customerMissingMunicipality && (
+            <Alert tone="warning" className="sm:col-span-2">
+              Este cliente no tiene municipio y la DIAN rechaza la factura sin él. Complételo en{" "}
+              <Link to="/customers" className="underline">Clientes</Link> o use «+ Nuevo cliente».
+            </Alert>
+          )}
           {customerId && (
             <Input label="Vence (opcional, 30 días si se deja vacío)" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           )}
@@ -196,7 +254,12 @@ export function ManualInvoicePage() {
         <Button
           className="mt-4"
           loading={createMutation.isPending}
-          disabled={!branchId || lines.every((l) => !l.description.trim())}
+          disabled={
+            !branchId ||
+            lines.every((l) => !l.description.trim()) ||
+            customerMissingMunicipality ||
+            (isNewCustomer && (!newCustomer.documentNumber.trim() || !newCustomer.name.trim() || !newCustomer.municipalityCode))
+          }
           onClick={() => createMutation.mutate()}
         >
           Crear factura
