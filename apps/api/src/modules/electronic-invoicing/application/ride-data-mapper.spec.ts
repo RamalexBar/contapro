@@ -68,7 +68,7 @@ describe("mapInvoiceToRideData", () => {
 
   it("extracts issuer, buyer, totals, and lines from the stored XML", () => {
     const ride = mapInvoiceToRideData(doc, emptyCompany, null);
-    expect(ride.documentTypeLabel).toBe("FACTURA ELECTRONICA DE VENTA");
+    expect(ride.documentTypeLabel).toBe("FACTURA ELECTRÓNICA DE VENTA");
     expect(ride.uniqueCode).toBe("a".repeat(96));
     expect(ride.issuer).toEqual({ nit: "900123456-7", legalName: "Minimarket La Esquina S.A.S." });
     expect(ride.counterparty).toEqual({ documentType: "CC", documentNumber: "1023456789", name: "Laura Gomez" });
@@ -126,7 +126,7 @@ describe("mapNoteToRideData", () => {
 
   it("synthesizes a single line from the note's reason", () => {
     const ride = mapNoteToRideData(doc, "CREDIT", emptyCompany, null);
-    expect(ride.documentTypeLabel).toBe("NOTA CREDITO ELECTRONICA");
+    expect(ride.documentTypeLabel).toBe("NOTA CRÉDITO ELECTRÓNICA");
     expect(ride.uniqueCode).toBe("b".repeat(96));
     expect(ride.total).toBe("26180.00");
     expect(ride.lines).toEqual([{ description: "Devolucion de mercancia", total: "26180.00" }]);
@@ -232,7 +232,7 @@ describe("mapPayrollToRideData", () => {
 
   it("extracts employer/employee, earnings, and deductions (including RetencionFuente fixed at 0)", () => {
     const ride = mapPayrollToRideData(doc, emptyCompany);
-    expect(ride.documentTypeLabel).toBe("NOMINA ELECTRONICA (COMPROBANTE INDIVIDUAL)");
+    expect(ride.documentTypeLabel).toBe("NÓMINA ELECTRÓNICA (COMPROBANTE INDIVIDUAL)");
     expect(ride.issuer).toEqual({ nit: "900123456-7", legalName: "Minimarket La Esquina S.A.S." });
     expect(ride.counterparty).toEqual({ documentType: "CC", documentNumber: "1023456789", name: "Laura Gomez" });
     expect(ride.total).toBe("1488000.00");

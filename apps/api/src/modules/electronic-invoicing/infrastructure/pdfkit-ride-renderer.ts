@@ -19,9 +19,22 @@ function formatMoney(value: string | number | undefined): string {
   return `$ ${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** dd/mm/aaaa, como se leen las fechas en Colombia. */
 function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const iso = date.toISOString().slice(0, 10);
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 }
+
+/** Estado del documento en palabras del cliente (no el codigo interno). */
+function statusLabel(status: string): string {
+  if (status === "ACCEPTED") return "Validada por la DIAN";
+  if (status === "REJECTED") return "Rechazada por la DIAN";
+  return "Pendiente de validacion DIAN";
+}
+
+/** Texto al pie de la representacion grafica (salvo que el documento traiga el suyo). */
+const DEFAULT_FOOTER =
+  "Representación gráfica de un documento electrónico. Puede verificar su validez con el CUFE en catalogo-vpfe.dian.gov.co.";
 
 /** Dibuja el logo si es una imagen valida; un logo corrupto no debe tumbar el PDF entero. */
 function drawLogo(doc: PDFKit.PDFDocument, logo: Buffer | undefined, x: number, y: number, box: [number, number]): boolean {
@@ -61,7 +74,7 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
     doc.save();
     doc.fillColor("#cccccc").fontSize(60).opacity(0.3);
     doc.rotate(-35, { origin: [doc.page.width / 2, doc.page.height / 2] });
-    doc.text("HABILITACION - NO VALIDO COMO DOCUMENTO FISCAL", 0, doc.page.height / 2 - 30, {
+    doc.text("PRUEBAS - NO VÁLIDO COMO DOCUMENTO FISCAL", 0, doc.page.height / 2 - 30, {
       width: doc.page.width,
       align: "center",
     });
@@ -95,15 +108,15 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
 
   const infoTop = doc.y;
   doc.fontSize(10).font("Helvetica");
-  doc.text(`Numero: ${data.fullNumber}`);
-  doc.text(`Fecha de emision: ${formatDate(data.issueDate)}`);
-  doc.text(`Ambiente: ${data.environment}`);
-  doc.text(`Estado: ${data.status}${data.signed ? " (firmado)" : " (sin firmar)"}`);
+  doc.text(`Número: ${data.fullNumber}`);
+  doc.text(`Fecha de emisión: ${formatDate(data.issueDate)}`);
+  if (data.environment === "HABILITACION") doc.text("Ambiente: pruebas (habilitación)");
+  doc.text(`Estado: ${statusLabel(data.status)}`);
   doc.text(`${data.uniqueCodeLabel}: ${data.uniqueCode}`, { width: pageWidth * 0.65 });
   if (data.resolution) {
     const r = data.resolution;
     doc.fontSize(8).font("Helvetica").fillColor("#444444").text(
-      `Resolucion DIAN No. ${r.resolutionNumber}: autoriza del ${r.prefix}${r.rangeFrom} al ${r.prefix}${r.rangeTo}, ` +
+      `Resolución DIAN No. ${r.resolutionNumber}: autoriza del ${r.prefix}${r.rangeFrom} al ${r.prefix}${r.rangeTo}, ` +
         `vigente del ${formatDate(r.validFrom)} al ${formatDate(r.validUntil)}`,
       { width: pageWidth * 0.65 }
     );
@@ -129,9 +142,9 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
 
     doc.font("Helvetica-Bold").fontSize(9);
     const headerY = doc.y;
-    doc.text("Descripcion", colDescription, headerY, { width: colQty - colDescription });
+    doc.text("Descripción", colDescription, headerY, { width: colQty - colDescription });
     doc.text("Cant.", colQty, headerY, { width: colUnit - colQty });
-    doc.text("V. Unit.", colUnit, headerY, { width: colTotal - colUnit });
+    doc.text("Valor unit.", colUnit, headerY, { width: colTotal - colUnit });
     doc.text("Total", colTotal, headerY, { width: PAGE_MARGIN + pageWidth - colTotal });
     doc.moveDown(0.3);
     doc.moveTo(PAGE_MARGIN, doc.y).lineTo(PAGE_MARGIN + pageWidth, doc.y).strokeColor("#cccccc").stroke();
@@ -152,18 +165,12 @@ export async function renderRidePdf(data: RideDocumentData): Promise<Buffer> {
   const totalsX = PAGE_MARGIN + pageWidth * 0.6;
   doc.font("Helvetica").fontSize(10);
   if (data.subtotal !== undefined) doc.text(`Subtotal: ${formatMoney(data.subtotal)}`, totalsX, doc.y, { width: pageWidth * 0.4 });
-  if (data.taxTotal !== undefined) doc.text(`Impuestos/Deducciones: ${formatMoney(data.taxTotal)}`, totalsX, doc.y, { width: pageWidth * 0.4 });
+  if (data.taxTotal !== undefined) doc.text(`Impuestos: ${formatMoney(data.taxTotal)}`, totalsX, doc.y, { width: pageWidth * 0.4 });
   doc.font("Helvetica-Bold").text(`Total: ${formatMoney(data.total)}`, totalsX, doc.y, { width: pageWidth * 0.4 });
 
   doc.moveDown(2);
   doc.fontSize(7).font("Helvetica").fillColor("#666666");
-  doc.text(
-    "Representacion grafica no oficial. El codigo QR y este layout no estan validados contra el " +
-      "Anexo Tecnico DIAN vigente -- ver README del modulo de facturacion electronica.",
-    PAGE_MARGIN,
-    doc.y,
-    { width: pageWidth }
-  );
+  doc.text(data.footerNote ?? DEFAULT_FOOTER, PAGE_MARGIN, doc.y, { width: pageWidth });
 
   doc.end();
   return done;
@@ -235,7 +242,7 @@ export async function renderThermalReceiptPdf(data: RideDocumentData): Promise<B
 
   if (data.environment === "HABILITACION") {
     doc.fontSize(7).font("Helvetica-Bold").fillColor("#999999");
-    doc.text("AMBIENTE DE HABILITACION - NO VALIDO COMO FACTURA", { width: pageWidth, align: "center" });
+    doc.text("AMBIENTE DE PRUEBAS - NO VÁLIDO COMO FACTURA", { width: pageWidth, align: "center" });
     doc.fillColor("black");
     doc.moveDown(0.3);
   }
@@ -281,7 +288,7 @@ export async function renderThermalReceiptPdf(data: RideDocumentData): Promise<B
   doc.moveDown(0.3);
 
   if (data.subtotal !== undefined) twoCol("Subtotal", formatMoney(data.subtotal));
-  if (data.taxTotal !== undefined) twoCol("Impuestos/Deducciones", formatMoney(data.taxTotal));
+  if (data.taxTotal !== undefined) twoCol("Impuestos", formatMoney(data.taxTotal));
   twoCol("TOTAL", formatMoney(data.total), { bold: true, size: 9 });
   doc.moveDown(0.4);
 
@@ -295,7 +302,7 @@ export async function renderThermalReceiptPdf(data: RideDocumentData): Promise<B
     doc.moveDown(0.4);
   }
   doc.fontSize(6).fillColor("#666666").text(
-    data.footerNote ?? "Representacion grafica no oficial, sin validar contra el Anexo Tecnico DIAN.",
+    data.footerNote ?? DEFAULT_FOOTER,
     { width: pageWidth, align: "center" }
   );
   doc.fillColor("black").fontSize(8).font("Helvetica-Bold").text(issuer.receiptFooter || "GRACIAS POR SU COMPRA", { width: pageWidth, align: "center" });

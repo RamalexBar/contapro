@@ -225,7 +225,7 @@ export function mapInvoiceToRideData(doc: ElectronicInvoiceWithXml, company: Rid
   // legales (el fullNumber local solo fue la referencia que Contapro le envio).
   const fullNumber = parsed.documentNumber ?? doc.fullNumber;
   return {
-    documentTypeLabel: "FACTURA ELECTRONICA DE VENTA",
+    documentTypeLabel: "FACTURA ELECTRÓNICA DE VENTA",
     fullNumber,
     uniqueCodeLabel: "CUFE",
     uniqueCode: doc.cufe,
@@ -234,7 +234,7 @@ export function mapInvoiceToRideData(doc: ElectronicInvoiceWithXml, company: Rid
     status: doc.status,
     signed: doc.signedXmlContent !== null,
     issuer: withCompanyInfo({ nit: parsed.supplier.documentNumber, legalName: parsed.supplier.name }, company),
-    counterpartyLabel: "Adquiriente",
+    counterpartyLabel: "Adquirente",
     counterparty: parsed.customer,
     lines: parsed.lines,
     subtotal: parsed.subtotal,
@@ -256,7 +256,7 @@ export function mapNoteToRideData(
   const total = parsed.total ?? "0.00";
   const uniqueCode = doc.cude;
   return {
-    documentTypeLabel: kind === "CREDIT" ? "NOTA CREDITO ELECTRONICA" : "NOTA DEBITO ELECTRONICA",
+    documentTypeLabel: kind === "CREDIT" ? "NOTA CRÉDITO ELECTRÓNICA" : "NOTA DÉBITO ELECTRÓNICA",
     fullNumber: doc.fullNumber,
     uniqueCodeLabel: "CUDE",
     uniqueCode,
@@ -265,7 +265,7 @@ export function mapNoteToRideData(
     status: doc.status,
     signed: doc.signedXmlContent !== null,
     issuer: withCompanyInfo({ nit: parsed.supplier.documentNumber, legalName: parsed.supplier.name }, company),
-    counterpartyLabel: "Adquiriente",
+    counterpartyLabel: "Adquirente",
     counterparty: parsed.customer,
     lines: reason ? [{ description: reason, total }] : [],
     subtotal: parsed.subtotal,
@@ -284,7 +284,7 @@ export function mapSupportDocumentToRideData(doc: ElectronicSupportDocumentWithX
   const parsed = extractUblDocument(doc.xmlContent);
   const total = parsed.total ?? "0.00";
   return {
-    documentTypeLabel: "DOCUMENTO SOPORTE ELECTRONICO",
+    documentTypeLabel: "DOCUMENTO SOPORTE ELECTRÓNICO",
     fullNumber: doc.fullNumber,
     uniqueCodeLabel: "CUDS",
     uniqueCode: doc.cuds,
@@ -310,7 +310,7 @@ export function mapPayrollToRideData(doc: ElectronicPayrollWithXml, company: Rid
   const parsed = extractPayrollDocument(doc.xmlContent);
   const netPay = parsed.netPay ?? "0.00";
   return {
-    documentTypeLabel: "NOMINA ELECTRONICA (COMPROBANTE INDIVIDUAL)",
+    documentTypeLabel: "NÓMINA ELECTRÓNICA (COMPROBANTE INDIVIDUAL)",
     fullNumber: doc.fullNumber,
     uniqueCodeLabel: "CUNE",
     uniqueCode: doc.cune,

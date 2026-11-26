@@ -80,3 +80,8 @@ export function resendSaleWhatsApp(saleId: string): Promise<void> {
 export function printThermalReceipt(saleId: string): Promise<void> {
   return openPdfInNewTab(`/electronic-invoicing/sales/${saleId}/pdf?format=thermal`);
 }
+
+/** La misma factura en tamaño carta, para enviarla o imprimirla en una impresora normal. */
+export function openLetterInvoice(saleId: string): Promise<void> {
+  return openPdfInNewTab(`/electronic-invoicing/sales/${saleId}/pdf`);
+}

@@ -12,7 +12,7 @@ import { listProducts } from "../../inventory/api/product.api";
 import { ProductThumb } from "../../inventory/components/ProductPhoto";
 import { getActiveSession, listCashRegisters } from "../../cash/api/cash.api";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
-import { authorizeDiscount, createSale, listSaleWhatsAppDeliveries, printThermalReceipt, resendSaleWhatsApp, type SaleResponse } from "../api/sale.api";
+import { authorizeDiscount, createSale, listSaleWhatsAppDeliveries, openLetterInvoice, printThermalReceipt, resendSaleWhatsApp, type SaleResponse } from "../api/sale.api";
 import { DiscountAuthorizationModal } from "../components/DiscountAuthorizationModal";
 import { listWithholdingConcepts } from "../../accounting/api/accounting.api";
 import { listCustomers } from "../../customers/api/customer.api";
@@ -180,6 +180,9 @@ export function POSPage() {
 
   const printMutation = useMutation({
     mutationFn: (saleId: string) => printThermalReceipt(saleId),
+  });
+  const letterMutation = useMutation({
+    mutationFn: (saleId: string) => openLetterInvoice(saleId),
   });
 
   const authorizeMutation = useMutation({
@@ -550,8 +553,11 @@ export function POSPage() {
                 >
                   Imprimir tirilla
                 </Button>
-                {printMutation.isError && (
-                  <span className="text-xs text-danger-600">No se pudo generar la tirilla. Intenta de nuevo.</span>
+                <Button variant="secondary" loading={letterMutation.isPending} onClick={() => letterMutation.mutate(sale.id)}>
+                  Factura tamaño carta
+                </Button>
+                {(printMutation.isError || letterMutation.isError) && (
+                  <span className="text-xs text-danger-600">No se pudo generar el PDF. Intenta de nuevo.</span>
                 )}
               </div>
               {sale.customerId && <SaleWhatsAppStatus saleId={sale.id} />}
