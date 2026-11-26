@@ -21,7 +21,7 @@ const REASONS: Record<string, string> = {
 const CONTRACTS: Record<string, string> = {
   INDEFINITE: "Termino indefinido",
   FIXED_TERM: "Termino fijo",
-  SERVICE: "Prestacion de servicios",
+  SERVICE: "Obra o labor",
   LEARNING: "Aprendizaje",
 };
 

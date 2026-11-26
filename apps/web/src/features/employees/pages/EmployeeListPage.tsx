@@ -24,7 +24,7 @@ import {
 const CONTRACT_TYPES = [
   { value: "INDEFINITE", label: "Indefinido" },
   { value: "FIXED_TERM", label: "Termino fijo" },
-  { value: "SERVICE", label: "Prestacion de servicios" },
+  { value: "SERVICE", label: "Obra o labor" },
   { value: "LEARNING", label: "Aprendizaje" },
 ];
 

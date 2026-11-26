@@ -22,7 +22,7 @@ const PAGE_MARGIN = 50;
 const CONTRACTS: Record<string, string> = {
   INDEFINITE: "Termino indefinido",
   FIXED_TERM: "Termino fijo",
-  SERVICE: "Prestacion de servicios",
+  SERVICE: "Obra o labor",
   LEARNING: "Aprendizaje",
 };
 
