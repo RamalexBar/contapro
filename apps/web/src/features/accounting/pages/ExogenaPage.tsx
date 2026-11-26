@@ -11,6 +11,7 @@ import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
+import { TaxCertificatesCard } from "../components/TaxCertificatesCard";
 import { downloadExogenaFlatFile, getExogenaReport, NEEDS_YEAR, type ExogenaFormatCode, type ExogenaRow } from "../api/exogena.api";
 
 const FORMATS: { code: ExogenaFormatCode; label: string }[] = [
@@ -180,6 +181,8 @@ export function ExogenaPage() {
           </Table>
         )}
       </Card>
+
+      <TaxCertificatesCard />
     </AppLayout>
   );
 }

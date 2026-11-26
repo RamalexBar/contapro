@@ -13,7 +13,15 @@ export interface ExogenaPurchase {
   subtotal: number;
   taxTotal: number;
   kind: "INVENTORY" | "FIXED_ASSET" | "EXPENSE";
-  withholdings: Array<{ type: "RETEFUENTE" | "RETEICA" | "RETEIVA"; conceptCode: string; amount: number }>;
+  withholdings: Array<{
+    type: "RETEFUENTE" | "RETEICA" | "RETEIVA";
+    conceptCode: string;
+    amount: number;
+    /** Para los certificados de retencion: base, tarifa y nombre del concepto. */
+    base?: number;
+    ratePercent?: number;
+    conceptName?: string;
+  }>;
 }
 
 /** Ingresos y movimientos de IVA del año, de todas las fuentes de Contapro. */
@@ -54,6 +62,9 @@ export interface ExogenaEmployee {
   lastName: string;
   secondLastName: string | null;
   address: string | null;
+  /** Para el periodo del certificado de ingresos y retenciones. */
+  hireDate?: Date | null;
+  terminationDate?: Date | null;
 }
 
 /** Pagos laborales del año: items de nominas aprobadas y liquidaciones de prestaciones. */
@@ -71,7 +82,19 @@ export interface ExogenaPayrollData {
   }>;
 }
 
+/** Datos del agente retenedor que van en los certificados. */
+export interface CertificateIssuer {
+  legalName: string;
+  nit: string;
+  dv: string | null;
+  address: string | null;
+  municipality: string | null;
+  department: string | null;
+  municipalityCode: string | null;
+}
+
 export interface IExogenaDataReader {
   yearData(year: number): Promise<ExogenaYearData>;
   payrollData(year: number): Promise<ExogenaPayrollData>;
+  issuer(): Promise<CertificateIssuer>;
 }

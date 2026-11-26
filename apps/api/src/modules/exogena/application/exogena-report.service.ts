@@ -25,6 +25,8 @@ import {
   type Format1007Row,
   type Format2276Row,
 } from "./exogena-formats";
+import { buildIncomeCertificates, buildWithholdingCertificates, type IncomeCertificate, type WithholdingCertificate } from "./certificates";
+import type { CertificateIssuer } from "../domain/exogena-data.reader";
 
 
 /**
@@ -61,6 +63,20 @@ export class ExogenaReportService {
   }
 
   /** Ingresos rentas de trabajo por empleado. */
+  /** Certificados de retenciones a proveedores (art. 381 E.T.). */
+  async getWithholdingCertificates(year: number): Promise<WithholdingCertificate[]> {
+    return buildWithholdingCertificates(await this.dataReader.yearData(year), year);
+  }
+
+  /** Certificados de ingresos y retenciones de los empleados (formulario 220). */
+  async getIncomeCertificates(year: number): Promise<IncomeCertificate[]> {
+    return buildIncomeCertificates(await this.dataReader.payrollData(year), year);
+  }
+
+  getCertificateIssuer(): Promise<CertificateIssuer> {
+    return this.dataReader.issuer();
+  }
+
   async getFormat2276(year: number): Promise<Format2276Row[]> {
     return buildFormat2276(await this.dataReader.payrollData(year));
   }

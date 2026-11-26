@@ -573,6 +573,8 @@ cuando se implemente, mismo criterio que la lista de arriba:
     `Content-Type`/`Content-Disposition` correctos y contenido idéntico a la previsualización JSON,
     año sin datos devuelve lista vacía, `CAJERO` sin acceso (403). Los 207 tests previos no se
     rompieron (12 nuevos: `exogena-report.service.spec.ts`, `generate-flat-file.spec.ts`).
+    **2026-11-26**: certificados de retenciones a proveedores (art. 381 E.T.) y de ingresos y retenciones de
+    empleados (formulario 220), en PDF desde la misma pagina — ver README del modulo.
 38. ~~Comisiones de vendedores~~ — implementado en la iteración 38 (2026-08-06). Módulo nuevo
     `commissions`, independiente de `employees`/`payroll` (no todo vendedor tiene un `Employee`
     formal — `Sale.sellerUserId` es cualquier `User`, sin relación a `Employee`). `%` fijo por

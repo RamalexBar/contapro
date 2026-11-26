@@ -24,3 +24,10 @@ exogenaRouter.get("/reports/exogena/1006", requirePermission("accounting.read"),
 exogenaRouter.get("/reports/exogena/1006/download", requirePermission("accounting.read"), exogenaController.downloadFormat1006);
 exogenaRouter.get("/reports/exogena/2276", requirePermission("accounting.read"), exogenaController.getFormat2276);
 exogenaRouter.get("/reports/exogena/2276/download", requirePermission("accounting.read"), exogenaController.downloadFormat2276);
+
+// Certificados tributarios: retenciones a proveedores (art. 381 E.T.) e ingresos y retenciones de
+// empleados (formulario 220). El de empleados lo ve tambien quien maneja nomina.
+exogenaRouter.get("/reports/certificates/withholding", requirePermission("accounting.read"), exogenaController.listWithholdingCertificates);
+exogenaRouter.get("/reports/certificates/withholding/:supplierId/pdf", requirePermission("accounting.read"), exogenaController.withholdingCertificatePdf);
+exogenaRouter.get("/reports/certificates/income", requirePermission("payroll.read"), exogenaController.listIncomeCertificates);
+exogenaRouter.get("/reports/certificates/income/:employeeId/pdf", requirePermission("payroll.read"), exogenaController.incomeCertificatePdf);

@@ -1,7 +1,7 @@
 import { basePrisma } from "@erp/database";
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
-import type { ExogenaPayrollData, ExogenaPurchase, ExogenaYearData, IExogenaDataReader } from "../domain/exogena-data.reader";
+import type { ExogenaPayrollData, ExogenaPurchase, ExogenaYearData, IExogenaDataReader, CertificateIssuer } from "../domain/exogena-data.reader";
 
 const n = (value: unknown) => Number(value ?? 0);
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -21,7 +21,7 @@ export class PrismaExogenaDataReader implements IExogenaDataReader {
     const [purchases, sales, manualInvoices, shiftCloses, returns, creditNotes, expenses] = await Promise.all([
       prisma.purchase.findMany({
         where: { status: "REGISTERED", createdAt: inYear },
-        include: { withholdings: { include: { withholdingConcept: { select: { code: true, type: true } } } } },
+        include: { withholdings: { include: { withholdingConcept: { select: { code: true, type: true, name: true } } } } },
       }),
       prisma.sale.findMany({
         where: { status: { in: [...INCOME_SALE_STATUSES] }, createdAt: inYear },
@@ -84,7 +84,14 @@ export class PrismaExogenaDataReader implements IExogenaDataReader {
         subtotal: n(p.subtotal),
         taxTotal: n(p.taxTotal),
         kind: kindOf(p.journalEntryId),
-        withholdings: p.withholdings.map((w) => ({ type: w.withholdingConcept.type as "RETEFUENTE" | "RETEICA" | "RETEIVA", conceptCode: w.withholdingConcept.code, amount: n(w.amount) })),
+        withholdings: p.withholdings.map((w) => ({
+          type: w.withholdingConcept.type as "RETEFUENTE" | "RETEICA" | "RETEIVA",
+          conceptCode: w.withholdingConcept.code,
+          conceptName: w.withholdingConcept.name,
+          amount: n(w.amount),
+          base: n(w.base),
+          ratePercent: n(w.ratePercent),
+        })),
       })),
       expenses: expenses.map((e) => ({
         payeeName: e.payeeName,
@@ -162,6 +169,8 @@ export class PrismaExogenaDataReader implements IExogenaDataReader {
         lastName: e.lastName,
         secondLastName: e.secondLastName,
         address: e.address,
+        hireDate: e.hireDate,
+        terminationDate: e.terminationDate,
       })),
       workplaceMunicipalityCode: company?.municipalityCode ?? null,
       items: details.flatMap((d) => d.items.map((i) => ({ employeeId: d.employeeId, conceptCode: i.conceptCode, amount: n(i.amount) }))),
@@ -176,5 +185,13 @@ export class PrismaExogenaDataReader implements IExogenaDataReader {
         };
       }),
     };
+  }
+
+  async issuer(): Promise<CertificateIssuer> {
+    const c = await basePrisma.company.findFirstOrThrow({
+      where: { id: getTenantContext().companyId },
+      select: { legalName: true, nit: true, dv: true, address: true, municipality: true, department: true, municipalityCode: true },
+    });
+    return c;
   }
 }

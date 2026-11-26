@@ -184,7 +184,7 @@ function makeService(opts: { purchases?: PurchaseRecord[]; sales?: SaleRecord[];
     new FakeAccountPayableRepository(opts.payables ?? []) as unknown as IAccountPayableRepository,
     new FakeAccountReceivableRepository(opts.receivables ?? []) as unknown as IAccountReceivableRepository,
     new FakeWithholdingConceptRepository() as unknown as IWithholdingConceptRepository,
-    { yearData: async () => { throw new Error("not used"); }, payrollData: async () => { throw new Error("not used"); } }
+    { yearData: async () => { throw new Error("not used"); }, payrollData: async () => { throw new Error("not used"); }, issuer: async () => { throw new Error("not used"); } }
   );
 }
 

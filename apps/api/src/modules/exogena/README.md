@@ -75,3 +75,21 @@ prevalidador oficial.
    `municipalityCode` de terceros antiguos se corrigen desde la web.
 8. ~~Formato 1007 excluye ventas sin cliente identificado~~: desde el 2026-11-24 van en el registro
    222222222 "CUANTIAS MENORES" (art. 1.3.5.4.1 par. 1).
+
+## Certificados tributarios (2026-11-26)
+
+Viven en este modulo porque usan los mismos datos que la exogena (`application/certificates.ts`,
+`infrastructure/pdfkit-certificate-renderer.ts`). UI: pagina de Exogena, tarjeta "Certificados tributarios".
+
+- **Retenciones a proveedores** (art. 381 E.T.): `GET /reports/certificates/withholding?year=` (lista) y
+  `GET /reports/certificates/withholding/:supplierId/pdf?year=`. Una linea por tipo (renta, IVA, ICA) y
+  concepto, con base, tarifa ("Varias" si el mismo concepto se practico a tarifas distintas) y valor retenido
+  en el año. Solo salen los proveedores con retenciones. Permiso `accounting.read`.
+- **Ingresos y retenciones de empleados** (formulario 220, art. 378 E.T.): `GET /reports/certificates/income?year=`
+  y `GET /reports/certificates/income/:employeeId/pdf?year=`. Mismas cifras que el 2276 (`buildFormat2276`),
+  asi los dos siempre cuadran, mas el total de ingresos brutos; el periodo se recorta a la fecha de ingreso y
+  retiro. Permiso `payroll.read`.
+- Los dos llevan la leyenda del art. 10 del Decreto 836 de 1991 (sin firma autografa).
+- **Limitaciones**: es un PDF con la informacion del formulario 220, no el formulario oficial de la DIAN
+  diligenciado casilla por casilla; no incluye aportes voluntarios ni AFC (Contapro no los maneja), ni los datos
+  a cargo del trabajador. Los certificados de ReteIVA son anuales (no por bimestre). Revisar con el contador.
