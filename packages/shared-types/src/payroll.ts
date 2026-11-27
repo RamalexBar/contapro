@@ -59,3 +59,12 @@ export const createPayrollDeductionSchema = z.object({
   startDate: z.coerce.date(),
 });
 export type CreatePayrollDeductionInput = z.infer<typeof createPayrollDeductionSchema>;
+
+/** Bonificacion no salarial de un empleado (entra en la nomina cuyo periodo contiene la fecha). */
+export const createPayrollBonusSchema = z.object({
+  employeeId: z.string().uuid(),
+  date: z.coerce.date(),
+  amount: z.number().positive(),
+  description: z.string().trim().min(1, "Escriba el motivo de la bonificacion"),
+});
+export type CreatePayrollBonusInput = z.infer<typeof createPayrollBonusSchema>;

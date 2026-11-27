@@ -262,7 +262,7 @@ export function buildFormat1007(data: ExogenaYearData): Format1007Row[] {
 // ---------- 2276: rentas de trabajo ----------
 
 const SALARY_CODES = new Set(["SALARY", "OVERTIME_DAY", "OVERTIME_NIGHT", "NIGHT_SURCHARGE", "SUNDAY_SURCHARGE", "TRANSPORT_ALLOWANCE"]);
-const OTHER_PAYMENT_CODES = new Set(["SICK_LEAVE_EMPLOYER", "SICK_LEAVE_EPS", "WORK_INJURY_ARL", "MATERNITY_LEAVE", "PATERNITY_LEAVE"]);
+const OTHER_PAYMENT_CODES = new Set(["SICK_LEAVE_EMPLOYER", "SICK_LEAVE_EPS", "WORK_INJURY_ARL", "MATERNITY_LEAVE", "PATERNITY_LEAVE", "NON_SALARY_BONUS"]);
 
 export interface Format2276Row {
   employeeId: string;

@@ -57,6 +57,12 @@ function input(overrides: Partial<ThirdPartyPayrollInput> = {}): ThirdPartyPayro
 }
 
 describe("buildPayrollPayload", () => {
+  it("sends non-salary bonuses as boni with Factus type code 2 (Bonificacion no salarial)", () => {
+    const base = input();
+    const p = buildPayrollPayload({ ...base, items: [...base.items, { conceptCode: "NON_SALARY_BONUS", quantity: 1, rate: 200_000, amount: 200_000 }] }, "r1") as Record<string, any>;
+    expect(p.accruals.boni).toEqual([{ amount: "200000.00", accrual_type_code: "2" }]);
+  });
+
   it("reports two fortnights as one monthly document with both payment dates and quincenal period", () => {
     const p = buildPayrollPayload(input(), "01kwz1btv0bhtfnge77pkeenj3") as Record<string, any>;
     expect(p.numbering_range_id).toBe("01kwz1btv0bhtfnge77pkeenj3");

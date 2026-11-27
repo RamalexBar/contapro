@@ -394,6 +394,35 @@ describe("calculateEmployeePayroll -- jornada, salario integral y soportes de re
   });
 });
 
+describe("calculateEmployeePayroll -- bonificaciones no salariales (art. 128 CST, art. 30 Ley 1393)", () => {
+  const amount = (result: ReturnType<typeof calculateEmployeePayroll>, code: string) =>
+    result.items.find((i) => i.conceptCode === code)?.amount;
+  const run = (bonus: number) =>
+    calculateEmployeePayroll(makeEmployee({ baseSalary: 3_000_000 }), makeParameter(), [], PERIOD_START, PERIOD_END, [], undefined, [], [
+      { amount: bonus, description: "Bono" },
+    ]);
+
+  it("below 40% of total pay: paid and withheld on, but no contributions, parafiscales or benefits on it", () => {
+    const result = run(500_000);
+    expect(result.grossTotal).toBe(3_500_000);
+    expect(amount(result, "NON_SALARY_BONUS")).toBe(500_000);
+    expect(result.summary.ibc).toBe(3_000_000);
+    expect(amount(result, "HEALTH_EMPLOYEE")).toBe(120_000);
+    expect(amount(result, "CCF")).toBe(120_000);
+    expect(amount(result, "SEVERANCE")).toBe(249_900);
+  });
+
+  it("above 40%: only the excess goes to the social-security base (IBC), never to parafiscales or benefits", () => {
+    // Total 6.000.000 -> limite 40% = 2.400.000 -> excedente 600.000 cotiza
+    const result = run(3_000_000);
+    expect(result.summary.nonSalaryExcess).toBe(600_000);
+    expect(result.summary.ibc).toBe(3_600_000);
+    expect(amount(result, "HEALTH_EMPLOYEE")).toBe(144_000);
+    expect(amount(result, "CCF")).toBe(120_000);
+    expect(amount(result, "SEVERANCE")).toBe(249_900);
+  });
+});
+
 describe("calculateEmployeePayroll -- quincenas y mes comercial", () => {
   const d = (iso: string) => new Date(iso + "T00:00:00.000Z");
   const hire = d("2024-01-10");

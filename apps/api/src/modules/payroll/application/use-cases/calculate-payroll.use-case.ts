@@ -1,4 +1,5 @@
 import { assertLegalSalaries } from "../salary-floor";
+import type { IPayrollBonusRepository } from "../../domain/payroll-bonus.repository";
 import { legalMonthlyHoursDivisor } from "../payroll-calculator";
 import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
@@ -22,7 +23,8 @@ export class CalculatePayrollUseCase {
     private readonly deductionRepo: IPayrollDeductionRepository,
     private readonly companyReader: ICompanyReader,
     private readonly audit: AuditService,
-    private readonly noveltyReader: IPayrollNoveltyReader
+    private readonly noveltyReader: IPayrollNoveltyReader,
+    private readonly bonusRepo?: IPayrollBonusRepository
   ) {}
 
   async execute(payrollId: string): Promise<PayrollRecord> {
@@ -46,8 +48,9 @@ export class CalculatePayrollUseCase {
       const timeEntries = await this.timeTrackingRepo.listClosedForPeriod(employee.id, payroll.startDate, payroll.endDate);
       const activeDeductions = await this.deductionRepo.listActiveForEmployee(employee.id);
       const novelties = await this.noveltyReader.listForPeriod(employee.id, payroll.startDate, payroll.endDate);
+      const bonuses = this.bonusRepo ? await this.bonusRepo.listActiveForPeriod(employee.id, payroll.startDate, payroll.endDate) : [];
       results.push(
-        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions, companyOptions, novelties)
+        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions, companyOptions, novelties, bonuses)
       );
     }
 

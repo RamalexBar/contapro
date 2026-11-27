@@ -1,3 +1,6 @@
+import { PrismaPayrollBonusRepository } from "./infrastructure/prisma-payroll-bonus.repository";
+import { CancelPayrollBonusUseCase, CreatePayrollBonusUseCase, ListPayrollBonusesUseCase } from "./application/use-cases/payroll-bonus.use-cases";
+import { PayrollBonusController } from "./interfaces/payroll-bonus.controller";
 import { PrismaPayrollNoveltyReader } from "./infrastructure/prisma-payroll-novelty.reader";
 import { PrismaAuditLogRepository } from "../audit/infrastructure/prisma-audit-log.repository";
 import { AuditService } from "../audit/application/audit.service";
@@ -31,6 +34,7 @@ import { SettleBenefitsUseCase } from "./application/use-cases/settle-benefits.u
 const payrollParameterRepo = new PrismaPayrollParameterRepository();
 const payrollRepo = new PrismaPayrollRepository();
 const payrollDeductionRepo = new PrismaPayrollDeductionRepository();
+const payrollBonusRepo = new PrismaPayrollBonusRepository();
 const companyReader = new PrismaCompanyReaderRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
@@ -58,7 +62,7 @@ export const payrollController = new PayrollController(
   listPayrollParametersUseCase,
   new CreatePayrollUseCase(payrollRepo, auditService),
   new ListPayrollsUseCase(payrollRepo),
-  new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, companyReader, auditService, new PrismaPayrollNoveltyReader()),
+  new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, companyReader, auditService, new PrismaPayrollNoveltyReader(), payrollBonusRepo),
   new ApprovePayrollUseCase(
     payrollRepo,
     payrollDeductionRepo,
@@ -84,4 +88,11 @@ export const benefitSettlementController = new BenefitSettlementController(
   benefitSettlementRepo,
   employeeRepo,
   companyReader
+);
+
+/** Bonificaciones no salariales (entran en la nomina del periodo de su fecha). */
+export const payrollBonusController = new PayrollBonusController(
+  new CreatePayrollBonusUseCase(payrollBonusRepo, employeeRepo, auditService),
+  new ListPayrollBonusesUseCase(payrollBonusRepo),
+  new CancelPayrollBonusUseCase(payrollBonusRepo, auditService)
 );

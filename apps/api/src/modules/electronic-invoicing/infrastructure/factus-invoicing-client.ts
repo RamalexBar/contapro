@@ -419,6 +419,10 @@ export function buildPayrollPayload(input: ThirdPartyPayrollInput, numberingRang
     }));
   if (hours.length > 0) accruals.hora = hours;
 
+  // Bonificaciones no salariales: accrual_type_code "2" = "Bonificacion no salarial" (tabla de Factus).
+  const bonuses = items.filter((i) => i.conceptCode === "NON_SALARY_BONUS" && i.amount > 0);
+  if (bonuses.length > 0) accruals.boni = bonuses.map((b) => ({ amount: money(b.amount), accrual_type_code: "2" }));
+
   const vacation = sumBy(items, ["VACATION_PAY"]);
   if (vacation.amount > 0) accruals.vaca = [{ quantity: Math.round(vacation.quantity), amount: money(vacation.amount), accrual_type_code: "1" }];
 

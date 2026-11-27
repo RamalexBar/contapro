@@ -138,6 +138,18 @@ un salario ordinario es menor al minimo (art. 145 CST) o uno integral menor a 13
   paga su porcentaje sobre 1 SMMLV), el auxilio de transporte completo, y que las horas extra de un trabajador de tiempo
   parcial se siguen contando despues de 8 horas diarias (no despues de su jornada pactada).
 
+**Bonificaciones no salariales** (2026-11-27, `PayrollBonus`, Nomina → Bonificaciones no salariales; `POST/GET
+/payroll-bonuses`, `POST /payroll-bonuses/:id/cancel`, permiso `payroll.calculate`): pago ocasional por empleado con fecha;
+entra en la nomina cuyo periodo la contiene como item `NON_SALARY_BONUS`.
+- Suma al devengado, al neto y a la base de retencion en la fuente (es ingreso laboral).
+- No suma a cesantias, intereses, prima, vacaciones, caja, ICBF ni SENA (art. 128 CST).
+- Solo el excedente sobre el 40% del total devengado (sin auxilio de transporte) suma al IBC de salud, pension y ARL
+  (art. 30 Ley 1393 de 2010); queda en `summary.nonSalaryExcess`.
+- Nomina electronica por Factus: `accruals.boni` con `accrual_type_code: "2"` ("Bonificacion no salarial" en sus tablas).
+  El XML DIAN directo no la incluye. Exogena 2276 y certificado 220: "otros pagos".
+- La fecha debe estar dentro del contrato; no se puede registrar ni cancelar en una nomina ya aprobada o pagada.
+- Que sea no salarial depende de que este pactado asi en el contrato (art. 128): Contapro no lo verifica.
+
 **Lo que NO calcula todavia** (para revisar con el contador):
 - Deduccion adicional de 72 UVT por dependiente (Ley 2277 de 2022) y procedimiento 2 de retencion.
 - Aprendices SENA (contrato de aprendizaje, cambiado por la Ley 2466 de 2025): no se liquidan aparte.

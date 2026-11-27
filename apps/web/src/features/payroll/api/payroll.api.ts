@@ -268,3 +268,27 @@ export async function downloadBenefitSettlementPdf(id: string, fileName: string)
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+// ---- Bonificaciones no salariales ----
+
+export interface PayrollBonusRecord {
+  id: string;
+  employeeId: string;
+  date: string;
+  amount: number;
+  description: string;
+  status: "ACTIVE" | "CANCELLED";
+  createdAt: string;
+}
+
+export function listPayrollBonuses(): Promise<{ data: PayrollBonusRecord[] }> {
+  return apiFetch("/payroll-bonuses");
+}
+
+export function createPayrollBonus(input: { employeeId: string; date: string; amount: number; description: string }): Promise<PayrollBonusRecord> {
+  return apiFetch("/payroll-bonuses", { method: "POST", body: input });
+}
+
+export function cancelPayrollBonus(id: string): Promise<PayrollBonusRecord> {
+  return apiFetch(`/payroll-bonuses/${id}/cancel`, { method: "POST" });
+}

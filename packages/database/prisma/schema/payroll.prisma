@@ -180,3 +180,22 @@ model BenefitSettlement {
   @@index([companyId, type])
   @@map("benefit_settlements")
 }
+
+/// Bonificacion NO salarial (art. 128 CST), ocasional: entra en la nomina cuyo periodo contiene `date`.
+/// No suma a prestaciones ni parafiscales; solo el excedente sobre el 40% del devengado cotiza salud y
+/// pension (art. 30 Ley 1393 de 2010). Ver apps/api/src/modules/payroll/README.md.
+model PayrollBonus {
+  id              String   @id @default(uuid())
+  companyId       String
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  date            DateTime
+  amount          Decimal  @db.Decimal(14, 2)
+  description     String
+  status          String   @default("ACTIVE") // ACTIVE, CANCELLED
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@index([companyId, employeeId, date])
+  @@map("payroll_bonuses")
+}

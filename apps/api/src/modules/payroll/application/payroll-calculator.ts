@@ -260,7 +260,8 @@ export function calculateEmployeePayroll(
   periodEnd: Date,
   activeDeductions: PayrollDeductionRecord[] = [],
   companyOptions: PayrollCompanyOptions = DEFAULT_COMPANY_OPTIONS,
-  novelties: PayrollNovelty[] = []
+  novelties: PayrollNovelty[] = [],
+  bonuses: Array<{ amount: number; description: string }> = []
 ): EmployeeCalculationResult {
   const daysWorked = daysWorkedInPeriod(periodStart, periodEnd, employee.hireDate, employee.terminationDate);
   const proration = daysWorked / DAYS_IN_PAYROLL_MONTH;
@@ -360,13 +361,22 @@ export function calculateEmployeePayroll(
   const variablePay = round2(overtimeDayAmount + overtimeNightAmount + nightSurchargeAmount + sundaySurchargeAmount);
   // Base salarial (constitutiva de salario): NO incluye auxilio de transporte. Las vacaciones si.
   const salarialBase = round2(salaryAmount + variablePay + vacationPay);
-  const grossTotal = round2(salarialBase + leavePay + transportAmount);
+
+  // Bonificaciones NO salariales (art. 128 CST): suman al pago y a la retencion en la fuente, pero no a
+  // prestaciones ni parafiscales. Solo lo que pase del 40% del total devengado cotiza salud, pension y ARL
+  // (art. 30 Ley 1393 de 2010; el auxilio de transporte no cuenta en ese total).
+  const nonSalaryBonus = round2(bonuses.reduce((s, b) => s + b.amount, 0));
+  for (const b of bonuses) items.push({ conceptCode: "NON_SALARY_BONUS", quantity: 1, rate: b.amount, amount: round2(b.amount) });
+  const totalRemuneration = round2(salarialBase + leavePay + nonSalaryBonus);
+  const nonSalaryExcess = round2(Math.max(0, nonSalaryBonus - 0.4 * totalRemuneration));
+
+  const grossTotal = round2(salarialBase + leavePay + transportAmount + nonSalaryBonus);
 
   // IBC para salud, pension y FSP: lo devengado (incluidas incapacidades y licencias), minimo 1 SMMLV
   // y maximo 25 SMMLV, proporcional a los dias remunerados (art. 18 Ley 100 de 1993, art. 5 Ley 797
   // de 2003). Los dias de licencia no remunerada no cotizan salud.
   const minimumWageForDays = parameter.minimumWage * (paidDays / DAYS_IN_PAYROLL_MONTH);
-  const ibcSource = round2(salarialBase + leavePay);
+  const ibcSource = round2(salarialBase + leavePay + nonSalaryExcess);
   const contributionBase = isIntegral ? round2(salarialBase * 0.7) : salarialBase;
   const ibcBase = isIntegral ? round2(ibcSource * 0.7) : ibcSource;
   const ibc = paidDays > 0 ? round2(Math.min(Math.max(ibcBase, minimumWageForDays), 25 * minimumWageForDays)) : 0;
@@ -374,7 +384,7 @@ export function calculateEmployeePayroll(
   const earningsInMinimumWages = parameter.minimumWage * proration > 0 ? salarialBase / (parameter.minimumWage * proration) : 0;
   // ARL: solo por los dias trabajados (en vacaciones, incapacidad o licencia no hay riesgo que cubrir).
   const minimumWageForWorkedDays = parameter.minimumWage * (workedDays / DAYS_IN_PAYROLL_MONTH);
-  const arlSource = round2(dailyRate * workedDays + variablePay);
+  const arlSource = round2(dailyRate * workedDays + variablePay + nonSalaryExcess);
   const arlBase = workedDays > 0 ? round2(Math.min(Math.max(isIntegral ? arlSource * 0.7 : arlSource, minimumWageForWorkedDays), 25 * minimumWageForWorkedDays)) : 0;
 
   const healthEmployee = round2(ibc * (parameter.healthEmployeePercent / 100));
@@ -497,6 +507,8 @@ export function calculateEmployeePayroll(
       daysWorked,
       workedDays,
       ibc,
+      /** Parte de las bonificaciones no salariales que paso del 40% y si cotizo (art. 30 Ley 1393). */
+      nonSalaryExcess,
       salaryType: isIntegral ? "INTEGRAL" : "ORDINARY",
       exemptArt1141: exempt,
       devengados: {
@@ -512,6 +524,7 @@ export function calculateEmployeePayroll(
         workInjuryArl: nov.sickLaborArlAmount,
         maternityLeave: nov.maternityAmount,
         paternityLeave: nov.paternityAmount,
+        nonSalaryBonus,
         total: grossTotal,
       },
       novedades: {

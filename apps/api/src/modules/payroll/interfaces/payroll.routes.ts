@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { tenantContextMiddleware } from "../../../shared/middlewares/tenant-context.middleware";
 import { requirePermission } from "../../../shared/middlewares/require-permission.middleware";
-import { benefitSettlementController, payrollController } from "../payroll.container";
+import { benefitSettlementController, payrollController, payrollBonusController } from "../payroll.container";
 
 export const payrollRouter = Router();
 payrollRouter.use(tenantContextMiddleware);
@@ -44,6 +44,11 @@ payrollRouter.post(
   requirePermission("payroll.deduction.manage"),
   payrollController.cancelDeduction
 );
+
+// Bonificaciones no salariales: las registra quien calcula la nomina (cambian su valor).
+payrollRouter.post("/payroll-bonuses", requirePermission("payroll.calculate"), payrollBonusController.create);
+payrollRouter.get("/payroll-bonuses", requirePermission("payroll.read"), payrollBonusController.list);
+payrollRouter.post("/payroll-bonuses/:id/cancel", requirePermission("payroll.calculate"), payrollBonusController.cancel);
 
 // Prestaciones sociales: prima semestral, consolidacion de cesantias y liquidacion del contrato.
 // Calcular la vista previa usa el permiso de calcular nomina; confirmar (guarda y contabiliza), el de aprobar.

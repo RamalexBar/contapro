@@ -13,6 +13,7 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { useAuthStore } from "../../auth/hooks/useAuthStore";
 import { PayrollParametersCard } from "../components/PayrollParametersCard";
 import { BenefitSettlementsCard } from "../components/BenefitSettlementsCard";
+import { PayrollBonusesCard } from "../components/PayrollBonusesCard";
 import { listEmployees } from "../../employees/api/employee.api";
 import {
   approvePayroll,
@@ -294,6 +295,8 @@ export function PayrollPage() {
           )}
         </Card>
       )}
+
+      <PayrollBonusesCard canManage={canCalculate} />
 
       {(canManageDeductions || (deductions?.data.length ?? 0) > 0) && (
         <Card className="mb-6">

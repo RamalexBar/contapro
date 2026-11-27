@@ -93,6 +93,7 @@ const EARNING_LABELS: Record<string, string> = {
   workInjuryArl: "Incapacidad laboral (ARL)",
   maternityLeave: "Licencia de maternidad",
   paternityLeave: "Licencia de paternidad",
+  nonSalaryBonus: "Bonificacion no salarial",
 };
 
 const DEDUCTION_LABELS: Record<string, string> = {
