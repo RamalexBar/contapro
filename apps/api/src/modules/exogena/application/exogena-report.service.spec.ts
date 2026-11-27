@@ -226,7 +226,7 @@ describe("ExogenaReportService", () => {
 
   it("getFormat1009: agrega saldo actual de cuentas por pagar activas por proveedor", async () => {
     const payables: AccountPayableRecord[] = [
-      { id: "ap-1", supplierId: SUPPLIER.id, purchaseId: "purchase-1", branchId: "branch-1", amount: 10_000, balance: 10_000, dueDate: new Date(), status: "PENDING" },
+      { id: "ap-1", supplierId: SUPPLIER.id, purchaseId: "purchase-1", branchId: "branch-1", documentLabel: "Factura F-1", amount: 10_000, balance: 10_000, dueDate: new Date(), status: "PENDING" },
     ];
     const service = makeService({ payables });
 

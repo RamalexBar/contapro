@@ -5,6 +5,8 @@ export interface AccountPayableRecord {
   /** Se toma de Purchase.branchId (AccountPayable no tiene su propia sucursal) -- se usa para
    * contabilizar el abono en la sucursal correcta. */
   branchId: string;
+  /** Factura del proveedor que origino la cuenta ("Factura FE-123"). */
+  documentLabel: string;
   amount: number;
   balance: number;
   dueDate: Date;
@@ -30,7 +32,29 @@ export interface ReversePaymentsResult {
   reversedPayments: SupplierPaymentRecord[];
 }
 
+
+/** Un recibo del historial (para reimprimirlo). */
+export interface PaymentHistoryRow {
+  id: string;
+  paidAt: Date;
+  amount: number;
+  method: string;
+  status: string;
+  supplierName: string;
+  supplierDocument: string;
+  /** Documento que se abono (venta, factura). */
+  documentLabel: string;
+}
+
+export interface PaymentHistoryFilter {
+  from?: Date;
+  to?: Date;
+  supplierId?: string;
+}
+
 export interface IAccountPayableRepository {
+  /** Historial de comprobantes de pago a proveedores, el mas reciente primero. */
+  listPayments(filter: PaymentHistoryFilter): Promise<PaymentHistoryRow[]>;
   list(filter?: { status?: string }): Promise<AccountPayableRecord[]>;
   findByIdOrThrow(id: string): Promise<AccountPayableRecord>;
   /** Usado por el boton "Imprimir" del recibo de abono (GET /supplier-payments/:id/pdf) --

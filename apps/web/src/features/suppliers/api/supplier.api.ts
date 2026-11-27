@@ -168,3 +168,11 @@ export function registerSupplierPayment(
 export function printSupplierPaymentPdf(paymentId: string): Promise<void> {
   return openPdfInNewTab(`/supplier-payments/${paymentId}/pdf`);
 }
+
+/** Historial de comprobantes de pago a proveedores (para reimprimir). */
+export async function listSupplierPayments(range: { from: string; to: string }) {
+  const res = await apiFetch<{ data: Array<{ id: string; paidAt: string; amount: number; method: string; status: string; supplierName: string; supplierDocument: string; documentLabel: string }> }>(
+    `/supplier-payments?from=${range.from}&to=${range.to}`
+  );
+  return res.data.map((p) => ({ ...p, partyName: p.supplierName, partyDocument: p.supplierDocument }));
+}

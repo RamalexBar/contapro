@@ -2,6 +2,7 @@ import { basePrisma } from "@erp/database";
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { getTenantContext } from "../../../shared/context/request-context";
 import { NotFoundError, ValidationError } from "../../../shared/errors/app-error";
+import type { PaymentHistoryFilter, PaymentHistoryRow } from "../domain/account-receivable.repository";
 import type {
   AccountReceivablePaymentRecord,
   AccountReceivableRecord,
@@ -226,5 +227,38 @@ export class PrismaAccountReceivableRepository implements IAccountReceivableRepo
 
   async createReminderLog(accountReceivableId: string, daysBeforeDue: number, channel: string): Promise<void> {
     await prisma.accountReceivableReminderLog.create({ data: { accountReceivableId, daysBeforeDue, channel } });
+  }
+
+  async listPayments(filter: PaymentHistoryFilter): Promise<PaymentHistoryRow[]> {
+    // Los abonos no tienen companyId: se filtran por la empresa de su cuenta por cobrar.
+    const rows = await prisma.accountReceivablePayment.findMany({
+      where: {
+        status: { not: "PENDING" },
+        paidAt: { gte: filter.from, lte: filter.to },
+        accountReceivable: { companyId: getTenantContext().companyId, customerId: filter.customerId },
+      },
+      include: { accountReceivable: { select: { customerId: true, ...INCLUDE } } },
+      orderBy: { paidAt: "desc" },
+      take: 300,
+    });
+    const customerIds = [...new Set(rows.map((r) => r.accountReceivable.customerId))];
+    const customers = customerIds.length
+      ? await prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, name: true, documentType: true, documentNumber: true } })
+      : [];
+    const byId = new Map(customers.map((c) => [c.id, c]));
+    return rows.map((r) => {
+      const c = byId.get(r.accountReceivable.customerId);
+      const ar = r.accountReceivable;
+      return {
+        id: r.id,
+        paidAt: r.paidAt,
+        amount: Number(r.amount),
+        method: r.method,
+        status: r.status,
+        customerName: c?.name ?? "-",
+        customerDocument: c ? `${c.documentType} ${c.documentNumber}` : "",
+        documentLabel: ar.sale ? `Venta #${ar.sale.number}` : (ar.manualInvoice?.electronicInvoice?.fullNumber ?? "Factura manual"),
+      };
+    });
   }
 }

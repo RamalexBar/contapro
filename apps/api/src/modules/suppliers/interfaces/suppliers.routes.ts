@@ -27,4 +27,5 @@ suppliersRouter.get("/goods-receipts/:id", requirePermission("suppliers.read"), 
 
 suppliersRouter.get("/accounts-payable", requirePermission("suppliers.read"), suppliersController.listAccountsPayable);
 suppliersRouter.post("/accounts-payable/:id/payments", requirePermission("suppliers.manage"), suppliersController.registerSupplierPayment);
+suppliersRouter.get("/supplier-payments", requirePermission("suppliers.read"), suppliersController.listSupplierPayments);
 suppliersRouter.get("/supplier-payments/:id/pdf", requirePermission("suppliers.read"), suppliersController.getSupplierPaymentPdf);

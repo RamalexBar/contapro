@@ -251,3 +251,8 @@ y el documento soporte. `Supplier.incomeTaxDeclarant` cambia la tarifa de retenc
    completo (antes no existia en absoluto, a pesar de que este README y `cancel-sale.use-case.ts`
    lo mencionaban como si ya funcionara). Restaura stock y contabiliza, pero crea un **lote
    nuevo** en vez de reinsertar en el lote FIFO original consumido (ver punto 1).
+
+## Historial de pagos a proveedores (2026-11-27)
+
+`GET /supplier-payments?from=&to=&supplierId=` (permiso `suppliers.read`), en Proveedores → Cuentas por pagar →
+Historial de pagos a proveedores, con boton para reimprimir. El PDF muestra el NIT del proveedor y la factura abonada.

@@ -1,5 +1,7 @@
+import { getTenantContext } from "../../../shared/context/request-context";
 import { prisma } from "../../../shared/prisma/prisma-client";
 import { NotFoundError, ValidationError } from "../../../shared/errors/app-error";
+import type { PaymentHistoryFilter, PaymentHistoryRow } from "../domain/account-payable.repository";
 import type {
   AccountPayableRecord,
   IAccountPayableRepository,
@@ -12,7 +14,7 @@ type AccountPayableRow = {
   id: string;
   supplierId: string;
   purchaseId: string;
-  purchase: { branchId: string };
+  purchase: { branchId: string; invoiceNumber: string };
   amount: unknown;
   balance: unknown;
   dueDate: Date;
@@ -25,6 +27,7 @@ function toRecord(row: AccountPayableRow): AccountPayableRecord {
     supplierId: row.supplierId,
     purchaseId: row.purchaseId,
     branchId: row.purchase.branchId,
+    documentLabel: `Factura ${row.purchase.invoiceNumber}`,
     amount: Number(row.amount),
     balance: Number(row.balance),
     dueDate: row.dueDate,
@@ -32,7 +35,7 @@ function toRecord(row: AccountPayableRow): AccountPayableRecord {
   };
 }
 
-const INCLUDE = { purchase: { select: { branchId: true } } } as const;
+const INCLUDE = { purchase: { select: { branchId: true, invoiceNumber: true } } } as const;
 
 function toPaymentRecord(row: {
   id: string;
@@ -141,6 +144,36 @@ export class PrismaAccountPayableRepository implements IAccountPayableRepository
       return {
         accountPayable: toRecord(updated),
         reversedPayments: activePayments.map((p) => toPaymentRecord({ ...p, status: "REVERSED" })),
+      };
+    });
+  }
+
+  async listPayments(filter: PaymentHistoryFilter): Promise<PaymentHistoryRow[]> {
+    const rows = await prisma.supplierPayment.findMany({
+      where: {
+        paidAt: { gte: filter.from, lte: filter.to },
+        accountPayable: { companyId: getTenantContext().companyId, supplierId: filter.supplierId },
+      },
+      include: { accountPayable: { select: { supplierId: true, purchase: { select: { invoiceNumber: true } } } } },
+      orderBy: { paidAt: "desc" },
+      take: 300,
+    });
+    const supplierIds = [...new Set(rows.map((r) => r.accountPayable.supplierId))];
+    const suppliers = supplierIds.length
+      ? await prisma.supplier.findMany({ where: { id: { in: supplierIds } }, select: { id: true, name: true, documentType: true, nit: true } })
+      : [];
+    const byId = new Map(suppliers.map((s) => [s.id, s]));
+    return rows.map((r) => {
+      const s = byId.get(r.accountPayable.supplierId);
+      return {
+        id: r.id,
+        paidAt: r.paidAt,
+        amount: Number(r.amount),
+        method: r.method,
+        status: r.status,
+        supplierName: s?.name ?? "-",
+        supplierDocument: s ? `${s.documentType} ${s.nit}` : "",
+        documentLabel: `Factura ${r.accountPayable.purchase.invoiceNumber}`,
       };
     });
   }

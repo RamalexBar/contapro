@@ -45,7 +45,29 @@ export interface ReceivablePaymentWithCompany {
   companyId: string;
 }
 
+
+/** Un recibo del historial (para reimprimirlo). */
+export interface PaymentHistoryRow {
+  id: string;
+  paidAt: Date;
+  amount: number;
+  method: string;
+  status: string;
+  customerName: string;
+  customerDocument: string;
+  /** Documento que se abono (venta, factura). */
+  documentLabel: string;
+}
+
+export interface PaymentHistoryFilter {
+  from?: Date;
+  to?: Date;
+  customerId?: string;
+}
+
 export interface IAccountReceivableRepository {
+  /** Historial de recibos de cobro (abonos registrados o fallidos), el mas reciente primero. */
+  listPayments(filter: PaymentHistoryFilter): Promise<PaymentHistoryRow[]>;
   /** Creada dentro de la transaccion de PrismaSaleRepository.create() cuando la venta trae un
    * pago CREDIT -- este metodo lo usa solo AuthorizeDiscountUseCase, para el caso en que la
    * venta necesito autorizacion de descuento y por eso no se creo al momento de CreateSaleUseCase

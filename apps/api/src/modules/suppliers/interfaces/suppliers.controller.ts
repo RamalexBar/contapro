@@ -1,3 +1,4 @@
+import { parseDateRange, paymentMethodLabel } from "../../../shared/http/payment-history-query";
 import type { NextFunction, Request, Response } from "express";
 import type { CreateSupplierUseCase } from "../application/use-cases/create-supplier.use-case";
 import type { UpdateSupplierUseCase } from "../application/use-cases/update-supplier.use-case";
@@ -232,6 +233,16 @@ export class SuppliersController {
     }
   };
 
+  /** Historial de comprobantes de pago a proveedores, para reimprimir cualquiera. */
+  listSupplierPayments = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const supplierId = typeof req.query.supplierId === "string" && req.query.supplierId ? req.query.supplierId : undefined;
+      res.json({ data: await this.accountPayableRepo.listPayments({ ...parseDateRange(req), supplierId }) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getSupplierPaymentPdf = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const payment = await this.accountPayableRepo.findPaymentByIdOrThrow(req.params.id);
@@ -243,8 +254,10 @@ export class SuppliersController {
         title: "Recibo de pago a proveedor",
         fields: [
           { label: "Proveedor", value: supplier.name },
+          { label: "Documento", value: `${supplier.documentType} ${supplier.nit}` },
+          { label: "Abono a", value: accountPayable.documentLabel },
           { label: "Fecha de pago", value: payment.paidAt.toISOString().slice(0, 10) },
-          { label: "Medio de pago", value: payment.method },
+          { label: "Medio de pago", value: paymentMethodLabel(payment.method) },
           { label: "Estado", value: payment.status === "REVERSED" ? "Reversado" : "Registrado" },
         ],
         totalLabel: "Monto pagado",

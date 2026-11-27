@@ -12,10 +12,12 @@ import { Alert } from "../../../components/ui/Alert";
 import { Spinner } from "../../../components/ui/Spinner";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { listCustomers } from "../../customers/api/customer.api";
+import { PaymentHistoryCard } from "../../../components/ui/PaymentHistoryCard";
 import {
   createReceivableCheckout,
   listAccountsReceivable,
   printReceivablePaymentPdf,
+  listReceivablePayments,
   registerReceivablePayment,
 } from "../api/collections.api";
 
@@ -186,6 +188,14 @@ export function CollectionsPage() {
           </Table>
         )}
       </Card>
+
+      <PaymentHistoryCard
+        title="Historial de recibos de caja"
+        queryKey="receivable-payments"
+        partyLabel="Cliente"
+        fetchPayments={listReceivablePayments}
+        printPayment={printReceivablePaymentPdf}
+      />
     </AppLayout>
   );
 }

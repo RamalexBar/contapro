@@ -1,3 +1,4 @@
+import { PaymentHistoryCard } from "../../../components/ui/PaymentHistoryCard";
 import { useRef, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { calculateTax, formatCOP, formatCurrency, round2 } from "@erp/shared-utils";
@@ -23,6 +24,7 @@ import {
   listPurchases,
   listSuppliers,
   printSupplierPaymentPdf,
+  listSupplierPayments,
   registerSupplierPayment,
   type ExtractPurchaseInvoiceResult,
   type PurchaseWithholdingInput,
@@ -757,7 +759,18 @@ export function SuppliersPage({ initialSection = "suppliers" }: { initialSection
 
       {section === "suppliers" && <SuppliersSection />}
       {section === "purchases" && <PurchasesSection suppliers={suppliers?.data ?? []} />}
-      {section === "payable" && <AccountsPayableSection suppliers={suppliers?.data ?? []} />}
+      {section === "payable" && (
+        <>
+          <AccountsPayableSection suppliers={suppliers?.data ?? []} />
+          <PaymentHistoryCard
+            title="Historial de pagos a proveedores"
+            queryKey="supplier-payments"
+            partyLabel="Proveedor"
+            fetchPayments={listSupplierPayments}
+            printPayment={printSupplierPaymentPdf}
+          />
+        </>
+      )}
     </AppLayout>
   );
 }

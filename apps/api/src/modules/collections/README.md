@@ -124,3 +124,10 @@ esta configurado en este entorno).
    firmado a mano, mismo alcance que la verificacion existente de Wompi en `saas-admin`).
 3. Documento soporte / facturacion electronica no lleva ninguna mencion de que una venta se pago
    (parcialmente) a credito -- fuera de alcance de este item.
+
+## Historial de recibos de caja (2026-11-27)
+
+`GET /receivable-payments?from=AAAA-MM-DD&to=AAAA-MM-DD&customerId=` (permiso `collection.read`): abonos registrados o
+fallidos (no los pagos en linea pendientes), con cliente, documento y factura abonada, para reimprimir cualquiera desde
+Cobranza → Historial de recibos de caja. El PDF del recibo ahora muestra el documento del cliente, la venta o factura
+abonada y el medio de pago en español. Los recibos no llevan numero consecutivo propio.

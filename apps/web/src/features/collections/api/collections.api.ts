@@ -42,3 +42,11 @@ export function printReceivablePaymentPdf(paymentId: string): Promise<void> {
 export function createReceivableCheckout(accountReceivableId: string): Promise<{ checkoutUrl: string; reference: string; amount: number }> {
   return apiFetch(`/accounts-receivable/${accountReceivableId}/checkout`, { method: "POST", body: {} });
 }
+
+/** Historial de recibos de cobro (para reimprimir). */
+export async function listReceivablePayments(range: { from: string; to: string }) {
+  const res = await apiFetch<{ data: Array<{ id: string; paidAt: string; amount: number; method: string; status: string; customerName: string; customerDocument: string; documentLabel: string }> }>(
+    `/receivable-payments?from=${range.from}&to=${range.to}`
+  );
+  return res.data.map((p) => ({ ...p, partyName: p.customerName, partyDocument: p.customerDocument }));
+}

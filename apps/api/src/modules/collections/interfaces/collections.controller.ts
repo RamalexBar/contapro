@@ -1,3 +1,4 @@
+import { parseDateRange, paymentMethodLabel } from "../../../shared/http/payment-history-query";
 import type { NextFunction, Request, Response } from "express";
 import { basePrisma } from "@erp/database";
 import { formatCOP } from "@erp/shared-utils";
@@ -50,6 +51,16 @@ export class CollectionsController {
     }
   };
 
+  /** Historial de recibos de cobro, para reimprimir cualquiera (no solo el ultimo). */
+  listPayments = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const customerId = typeof req.query.customerId === "string" && req.query.customerId ? req.query.customerId : undefined;
+      res.json({ data: await this.accountReceivableRepo.listPayments({ ...parseDateRange(req), customerId }) });
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getPaymentPdf = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const payment = await this.accountReceivableRepo.findPaymentByIdOrThrow(req.params.id);
@@ -65,8 +76,10 @@ export class CollectionsController {
         title: "Recibo de cobro a cliente",
         fields: [
           { label: "Cliente", value: customer.name },
+          { label: "Documento", value: `${customer.documentType} ${customer.documentNumber}` },
+          { label: "Abono a", value: receivable.documentLabel.startsWith("#") ? `Venta ${receivable.documentLabel}` : `Factura ${receivable.documentLabel}` },
           { label: "Fecha de pago", value: payment.paidAt.toISOString().slice(0, 10) },
-          { label: "Medio de pago", value: payment.method },
+          { label: "Medio de pago", value: paymentMethodLabel(payment.method) },
           { label: "Estado", value: payment.status === "REGISTERED" ? "Registrado" : payment.status },
         ],
         totalLabel: "Monto cobrado",
