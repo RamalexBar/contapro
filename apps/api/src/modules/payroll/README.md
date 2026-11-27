@@ -124,6 +124,10 @@ La nomina mensual solo PROVISIONA cesantias, intereses, prima y vacaciones. Su p
   con el salario ordinario sin promedio de recargos; no calcula la indemnizacion moratoria (art. 65)
   ni la sancion por no consignar cesantias a tiempo.
 
+**Piso del salario** (2026-11-27, `application/salary-floor.ts`): calcular la nomina falla, nombrando a los empleados, si
+un salario ordinario es menor al minimo (art. 145 CST) o uno integral menor a 13 SMMLV (art. 132). Los aprendices
+(LEARNING) quedan por fuera. Como no hay tiempo parcial, un salario menor al minimo no se puede liquidar.
+
 **Lo que NO calcula todavia** (para revisar con el contador):
 - Deduccion adicional de 72 UVT por dependiente (Ley 2277 de 2022) y procedimiento 2 de retencion.
 - Aprendices SENA (contrato de aprendizaje, cambiado por la Ley 2466 de 2025): no se liquidan aparte.

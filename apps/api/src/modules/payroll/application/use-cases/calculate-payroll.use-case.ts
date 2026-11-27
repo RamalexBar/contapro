@@ -1,3 +1,4 @@
+import { assertLegalSalaries } from "../salary-floor";
 import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IEmployeeRepository } from "../../../employees/domain/employee.repository";
@@ -36,14 +37,8 @@ export class CalculatePayrollUseCase {
     const companyOptions = { exemptArt1141: company.payrollExemptArt1141 };
     const employees = await this.employeeRepo.listActiveForPeriod(payroll.branchId, payroll.startDate, payroll.endDate);
 
-    // Salario integral: minimo 10 SMMLV + 30% de factor prestacional = 13 SMMLV (art. 132 CST).
-    const invalidIntegral = employees.filter((e) => e.salaryType === "INTEGRAL" && e.baseSalary < 13 * parameter.minimumWage);
-    if (invalidIntegral.length > 0) {
-      throw new ValidationError(
-        `El salario integral no puede ser menor a 13 salarios minimos ($${(13 * parameter.minimumWage).toLocaleString("es-CO")}): ` +
-          invalidIntegral.map((e) => `${e.firstName} ${e.lastName}`).join(", ")
-      );
-    }
+    // Pisos legales: salario minimo (ordinario) y 13 SMMLV (integral).
+    assertLegalSalaries(employees, parameter.minimumWage);
 
     const results: EmployeeCalculationResult[] = [];
     for (const employee of employees) {
