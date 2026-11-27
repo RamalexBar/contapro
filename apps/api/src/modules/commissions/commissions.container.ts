@@ -3,6 +3,7 @@ import { AuditService } from "../audit/application/audit.service";
 import { PrismaSaleRepository } from "../pos/sale/infrastructure/prisma-sale.repository";
 import { PrismaUserDirectoryRepository } from "../rbac/infrastructure/prisma-user-directory.repository";
 import { postCommissionJournalEntryUseCase } from "../accounting/accounting.container";
+import { employeeRepo } from "../employees/employees.container";
 import { PrismaSalesCommissionSchemeRepository } from "./infrastructure/prisma-sales-commission-scheme.repository";
 import { PrismaCommissionSettlementRepository } from "./infrastructure/prisma-commission-settlement.repository";
 import { CreateSalesCommissionSchemeUseCase } from "./application/use-cases/create-sales-commission-scheme.use-case";
@@ -33,7 +34,9 @@ export const commissionsController = new CommissionsController(
   new ListSellersUseCase(userDirectoryRepo),
   new CalculateCommissionsUseCase(saleRepo, schemeRepo, settlementRepo, auditService),
   new ListCommissionSettlementsUseCase(settlementRepo),
-  new PayCommissionSettlementUseCase(settlementRepo, userDirectoryRepo, postCommissionJournalEntryUseCase, auditService),
+  new PayCommissionSettlementUseCase(settlementRepo, userDirectoryRepo, postCommissionJournalEntryUseCase, auditService, async (userId) =>
+    Boolean(await employeeRepo.findByUserId(userId))
+  ),
   settlementRepo,
   userDirectoryRepo
 );

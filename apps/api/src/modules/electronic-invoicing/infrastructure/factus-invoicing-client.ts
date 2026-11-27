@@ -419,6 +419,9 @@ export function buildPayrollPayload(input: ThirdPartyPayrollInput, numberingRang
     }));
   if (hours.length > 0) accruals.hora = hours;
 
+  const commissions = sumBy(items, ["COMMISSION"]);
+  if (commissions.amount > 0) accruals.comi = [{ amount: money(commissions.amount) }];
+
   // Bonificaciones no salariales: accrual_type_code "2" = "Bonificacion no salarial" (tabla de Factus).
   const bonuses = items.filter((i) => i.conceptCode === "NON_SALARY_BONUS" && i.amount > 0);
   if (bonuses.length > 0) accruals.boni = bonuses.map((b) => ({ amount: money(b.amount), accrual_type_code: "2" }));

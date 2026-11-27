@@ -15,13 +15,19 @@ export class PayCommissionSettlementUseCase {
     private readonly settlementRepo: ICommissionSettlementRepository,
     private readonly userDirectoryRepo: IUserDirectoryRepository,
     private readonly postCommissionJournalEntry: PostCommissionJournalEntryUseCase,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    /** true si el vendedor esta vinculado a un empleado: su comision es salario y va en la nomina. */
+    private readonly isEmployee: (userId: string) => Promise<boolean> = async () => false
   ) {}
 
   async execute(input: PayCommissionSettlementInput): Promise<CommissionSettlementRecord> {
     const settlement = await this.settlementRepo.findByIdOrThrow(input.id);
     if (settlement.status !== "CALCULATED") {
       throw new ValidationError(`La liquidacion ya esta en estado ${settlement.status}, no se puede pagar de nuevo`);
+    }
+
+    if (await this.isEmployee(settlement.sellerUserId)) {
+      throw new ValidationError("Este vendedor es empleado: su comision es salario y se paga en la nomina del mes");
     }
 
     const users = await this.userDirectoryRepo.list();

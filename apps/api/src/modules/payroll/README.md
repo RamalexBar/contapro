@@ -150,6 +150,14 @@ entra en la nomina cuyo periodo la contiene como item `NON_SALARY_BONUS`.
 - La fecha debe estar dentro del contrato; no se puede registrar ni cancelar en una nomina ya aprobada o pagada.
 - Que sea no salarial depende de que este pactado asi en el contrato (art. 128): Contapro no lo verifica.
 
+**Comisiones de vendedores empleados** (2026-11-27, `domain/payroll-commission.reader.ts`): si el vendedor de una
+liquidacion de Comisiones esta vinculado a un empleado (`Employee.userId`), su comision del mes entra en la nomina como
+item `COMMISSION`: es salario (art. 127 CST), asi que suma al IBC, parafiscales, prestaciones y retencion. Nomina
+mensual: entra en la del mes; quincenal: en la segunda quincena. Al aprobar se verifica que las comisiones no hayan
+cambiado desde el calculo (si no, pide recalcular) y quedan PAID con `CommissionSettlement.payrollId` (su gasto va en
+el comprobante de la nomina). El pago por aparte en Comisiones (`POST /commissions/settlements/:id/pay`) queda
+bloqueado para empleados; sigue para vendedores que no son empleados. Factus: `accruals.comi`. Exogena 2276: salarios.
+
 **Lo que NO calcula todavia** (para revisar con el contador):
 - Deduccion adicional de 72 UVT por dependiente (Ley 2277 de 2022) y procedimiento 2 de retencion.
 - Aprendices SENA (contrato de aprendizaje, cambiado por la Ley 2466 de 2025): no se liquidan aparte.

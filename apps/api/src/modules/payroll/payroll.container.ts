@@ -1,3 +1,4 @@
+import { PrismaPayrollCommissionReader } from "./infrastructure/prisma-payroll-commission.reader";
 import { PrismaPayrollBonusRepository } from "./infrastructure/prisma-payroll-bonus.repository";
 import { CancelPayrollBonusUseCase, CreatePayrollBonusUseCase, ListPayrollBonusesUseCase } from "./application/use-cases/payroll-bonus.use-cases";
 import { PayrollBonusController } from "./interfaces/payroll-bonus.controller";
@@ -35,6 +36,7 @@ const payrollParameterRepo = new PrismaPayrollParameterRepository();
 const payrollRepo = new PrismaPayrollRepository();
 const payrollDeductionRepo = new PrismaPayrollDeductionRepository();
 const payrollBonusRepo = new PrismaPayrollBonusRepository();
+const payrollCommissionReader = new PrismaPayrollCommissionReader();
 const companyReader = new PrismaCompanyReaderRepository();
 const auditService = new AuditService(new PrismaAuditLogRepository());
 
@@ -62,14 +64,15 @@ export const payrollController = new PayrollController(
   listPayrollParametersUseCase,
   new CreatePayrollUseCase(payrollRepo, auditService),
   new ListPayrollsUseCase(payrollRepo),
-  new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, companyReader, auditService, new PrismaPayrollNoveltyReader(), payrollBonusRepo),
+  new CalculatePayrollUseCase(payrollRepo, employeeRepo, timeTrackingRepo, payrollParameterRepo, payrollDeductionRepo, companyReader, auditService, new PrismaPayrollNoveltyReader(), payrollBonusRepo, payrollCommissionReader),
   new ApprovePayrollUseCase(
     payrollRepo,
     payrollDeductionRepo,
     postPayrollJournalEntryUseCase,
     issueElectronicPayrollUseCase,
     sendPayslipWhatsAppUseCase,
-    auditService
+    auditService,
+    payrollCommissionReader
   ),
   new PayPayrollUseCase(payrollRepo, auditService),
   new CreatePayrollDeductionUseCase(payrollDeductionRepo, employeeRepo, auditService),

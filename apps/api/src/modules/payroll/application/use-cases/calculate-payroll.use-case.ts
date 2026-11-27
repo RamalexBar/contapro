@@ -1,5 +1,6 @@
 import { assertLegalSalaries } from "../salary-floor";
 import type { IPayrollBonusRepository } from "../../domain/payroll-bonus.repository";
+import { payrollIncludesMonthCommissions, type IPayrollCommissionReader } from "../../domain/payroll-commission.reader";
 import { legalMonthlyHoursDivisor } from "../payroll-calculator";
 import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
@@ -24,7 +25,8 @@ export class CalculatePayrollUseCase {
     private readonly companyReader: ICompanyReader,
     private readonly audit: AuditService,
     private readonly noveltyReader: IPayrollNoveltyReader,
-    private readonly bonusRepo?: IPayrollBonusRepository
+    private readonly bonusRepo?: IPayrollBonusRepository,
+    private readonly commissionReader?: IPayrollCommissionReader
   ) {}
 
   async execute(payrollId: string): Promise<PayrollRecord> {
@@ -49,8 +51,13 @@ export class CalculatePayrollUseCase {
       const activeDeductions = await this.deductionRepo.listActiveForEmployee(employee.id);
       const novelties = await this.noveltyReader.listForPeriod(employee.id, payroll.startDate, payroll.endDate);
       const bonuses = this.bonusRepo ? await this.bonusRepo.listActiveForPeriod(employee.id, payroll.startDate, payroll.endDate) : [];
+      const commissions =
+        this.commissionReader && payrollIncludesMonthCommissions(payroll)
+          ? await this.commissionReader.pendingForEmployee(employee.id, payroll.year, payroll.month)
+          : [];
+      const commissionAmount = commissions.reduce((s, c) => s + c.amount, 0);
       results.push(
-        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions, companyOptions, novelties, bonuses)
+        calculateEmployeePayroll(employee, parameter, timeEntries, payroll.startDate, payroll.endDate, activeDeductions, companyOptions, novelties, bonuses, commissionAmount)
       );
     }
 

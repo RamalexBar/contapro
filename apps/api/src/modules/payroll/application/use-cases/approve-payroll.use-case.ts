@@ -5,6 +5,8 @@ import type { IPayrollDeductionRepository } from "../../domain/payroll-deduction
 import type { IPayrollRepository, PayrollRecord } from "../../domain/payroll.repository";
 import type { SendPayslipWhatsAppUseCase } from "./send-payslip-whatsapp.use-case";
 import type { IssueElectronicPayrollUseCase } from "./issue-electronic-payroll.use-case";
+import { round2 } from "@erp/shared-utils";
+import { payrollIncludesMonthCommissions, type IPayrollCommissionReader } from "../../domain/payroll-commission.reader";
 
 const DEDUCTION_CONCEPT_CODES = new Set(["LOAN_DEDUCTION", "GARNISHMENT"]);
 
@@ -15,7 +17,8 @@ export class ApprovePayrollUseCase {
     private readonly postPayrollJournalEntry: PostPayrollJournalEntryUseCase,
     private readonly issueElectronicPayroll: IssueElectronicPayrollUseCase,
     private readonly sendPayslipWhatsApp: SendPayslipWhatsAppUseCase,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly commissionReader?: IPayrollCommissionReader
   ) {}
 
   async execute(id: string): Promise<PayrollRecord> {
@@ -24,7 +27,23 @@ export class ApprovePayrollUseCase {
       throw new ValidationError(`Solo se puede aprobar una nomina en estado CALCULATED (actual: ${payroll.status})`);
     }
 
+    // Comisiones: las del mes deben ser las mismas con que se calculo (si se recalcularon despues, hay que
+    // recalcular la nomina); al aprobar quedan pagadas dentro de esta nomina.
+    const commissionIds: string[] = [];
+    if (this.commissionReader && payrollIncludesMonthCommissions(payroll)) {
+      const before = await this.repo.findWithDetailsOrThrow(id);
+      for (const detail of before.details) {
+        const pending = await this.commissionReader.pendingForEmployee(detail.employeeId, payroll.year, payroll.month);
+        const inPayroll = round2(detail.items.filter((i) => i.conceptCode === "COMMISSION").reduce((s, i) => s + i.amount, 0));
+        if (round2(pending.reduce((s, c) => s + c.amount, 0)) !== inPayroll) {
+          throw new ValidationError("Las comisiones del mes cambiaron despues de calcular la nomina: recalculela antes de aprobar");
+        }
+        commissionIds.push(...pending.map((c) => c.id));
+      }
+    }
+
     const updated = await this.repo.updateStatus(id, "APPROVED");
+    await this.commissionReader?.markPaidInPayroll(commissionIds, id);
 
     await this.audit.record({
       action: "PAYROLL_APPROVED",

@@ -87,6 +87,7 @@ const EARNING_LABELS: Record<string, string> = {
   overtimeNight: "Horas extra nocturnas",
   nightSurcharge: "Recargo nocturno",
   sundaySurcharge: "Recargo dominical/festivo",
+  commission: "Comisiones",
   vacationPay: "Vacaciones disfrutadas",
   sickLeaveEmployer: "Incapacidad (dias 1 y 2, empleador)",
   sickLeaveEps: "Incapacidad (EPS)",

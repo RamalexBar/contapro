@@ -261,7 +261,8 @@ export function calculateEmployeePayroll(
   activeDeductions: PayrollDeductionRecord[] = [],
   companyOptions: PayrollCompanyOptions = DEFAULT_COMPANY_OPTIONS,
   novelties: PayrollNovelty[] = [],
-  bonuses: Array<{ amount: number; description: string }> = []
+  bonuses: Array<{ amount: number; description: string }> = [],
+  commissionAmount = 0
 ): EmployeeCalculationResult {
   const daysWorked = daysWorkedInPeriod(periodStart, periodEnd, employee.hireDate, employee.terminationDate);
   const proration = daysWorked / DAYS_IN_PAYROLL_MONTH;
@@ -358,7 +359,12 @@ export function calculateEmployeePayroll(
     });
   }
 
-  const variablePay = round2(overtimeDayAmount + overtimeNightAmount + nightSurchargeAmount + sundaySurchargeAmount);
+  // Comisiones de ventas del mes: son salario (art. 127 CST), asi que entran como el resto de lo variable:
+  // IBC, parafiscales, prestaciones y retencion.
+  const commission = round2(Math.max(0, commissionAmount));
+  if (commission > 0) items.push({ conceptCode: "COMMISSION", quantity: 1, rate: commission, amount: commission });
+
+  const variablePay = round2(overtimeDayAmount + overtimeNightAmount + nightSurchargeAmount + sundaySurchargeAmount + commission);
   // Base salarial (constitutiva de salario): NO incluye auxilio de transporte. Las vacaciones si.
   const salarialBase = round2(salaryAmount + variablePay + vacationPay);
 
@@ -518,6 +524,7 @@ export function calculateEmployeePayroll(
         overtimeNight: overtimeNightAmount,
         nightSurcharge: nightSurchargeAmount,
         sundaySurcharge: sundaySurchargeAmount,
+        commission,
         vacationPay,
         sickLeaveEmployer: nov.sickGeneralEmployerAmount,
         sickLeaveEps: nov.sickGeneralEpsAmount,

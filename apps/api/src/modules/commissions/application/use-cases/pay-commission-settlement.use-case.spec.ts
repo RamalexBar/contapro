@@ -59,7 +59,7 @@ class FakeAuditLogRepository implements IAuditLogRepository {
   }
 }
 
-function makeUseCase(settlement: CommissionSettlementRecord, journalEntryResult: { id: string } | null = { id: "je-1" }) {
+function makeUseCase(settlement: CommissionSettlementRecord, journalEntryResult: { id: string } | null = { id: "je-1" }, sellerIsEmployee = false) {
   const settlementRepo = new FakeSettlementRepository(settlement);
   const auditRepo = new FakeAuditLogRepository();
   const postCommissionJournalEntry = { execute: vi.fn().mockResolvedValue(journalEntryResult) } as unknown as PostCommissionJournalEntryUseCase;
@@ -68,7 +68,8 @@ function makeUseCase(settlement: CommissionSettlementRecord, journalEntryResult:
     settlementRepo as unknown as ICommissionSettlementRepository,
     new FakeUserDirectoryRepository() as unknown as IUserDirectoryRepository,
     postCommissionJournalEntry,
-    new AuditService(auditRepo)
+    new AuditService(auditRepo),
+    async () => sellerIsEmployee
   );
 
   return { useCase, settlementRepo, postCommissionJournalEntry };
@@ -92,6 +93,14 @@ describe("PayCommissionSettlementUseCase", () => {
     );
     expect(result.status).toBe("PAID");
     expect(settlementRepo.marked[0].data.journalEntryId).toBe("je-1");
+  });
+
+  it("refuses to pay apart an employee seller: the commission is salary and goes in payroll", async () => {
+    const { useCase, postCommissionJournalEntry } = makeUseCase(SETTLEMENT_CALCULATED, { id: "je-1" }, true);
+    await expect(
+      withTenantContext(() => useCase.execute({ id: "settlement-1", branchId: "branch-1", paymentMethod: "CASH" }))
+    ).rejects.toThrow(/se paga en la nomina/);
+    expect(postCommissionJournalEntry.execute).not.toHaveBeenCalled();
   });
 
   it("rejects paying a settlement that is already PAID", async () => {

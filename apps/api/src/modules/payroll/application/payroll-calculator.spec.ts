@@ -394,6 +394,18 @@ describe("calculateEmployeePayroll -- jornada, salario integral y soportes de re
   });
 });
 
+describe("calculateEmployeePayroll -- comisiones de ventas (salario, art. 127 CST)", () => {
+  it("adds the month commission as salary: IBC, parafiscales and benefits all include it", () => {
+    const amount = (r: ReturnType<typeof calculateEmployeePayroll>, code: string) => r.items.find((i) => i.conceptCode === code)?.amount;
+    const result = calculateEmployeePayroll(makeEmployee({ baseSalary: 3_000_000 }), makeParameter(), [], PERIOD_START, PERIOD_END, [], undefined, [], [], 500_000);
+    expect(amount(result, "COMMISSION")).toBe(500_000);
+    expect(result.grossTotal).toBe(3_500_000);
+    expect(result.summary.ibc).toBe(3_500_000);
+    expect(amount(result, "CCF")).toBe(140_000);
+    expect(amount(result, "SEVERANCE")).toBeCloseTo(3_500_000 * 0.0833, 2);
+  });
+});
+
 describe("calculateEmployeePayroll -- bonificaciones no salariales (art. 128 CST, art. 30 Ley 1393)", () => {
   const amount = (result: ReturnType<typeof calculateEmployeePayroll>, code: string) =>
     result.items.find((i) => i.conceptCode === code)?.amount;

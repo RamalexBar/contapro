@@ -28,6 +28,9 @@ model CommissionSettlement {
   calculatedAt     DateTime  @default(now())
   paidAt           DateTime?
   journalEntryId   String?
+  // Si el vendedor es empleado, la comision se paga dentro de esta nomina (es salario) y su gasto va en
+  // el comprobante de la nomina, no en uno propio.
+  payrollId        String?
 
   @@unique([companyId, sellerUserId, year, month])
   @@index([companyId])
