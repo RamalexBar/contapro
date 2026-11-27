@@ -69,6 +69,7 @@ function makeEmployee(overrides: Partial<EmployeeRecord> = {}): EmployeeRecord {
     bankName: null,
     bankAccountNumber: null,
     salaryType: "ORDINARY",
+    weeklyHours: null,
     withholdingDependents: false,
     withholdingHousingInterest: 0,
     withholdingPrepaidHealth: 0,
@@ -327,6 +328,20 @@ describe("calculateEmployeePayroll -- jornada, salario integral y soportes de re
     expect(qty(result, "NIGHT_SURCHARGE")).toBe(3);
     expect(qty(result, "OVERTIME_NIGHT")).toBe(1);
     expect(result.items.some((i) => i.conceptCode === "OVERTIME_DAY")).toBe(false);
+  });
+
+  it("part-time: the hour is worth the salary over the agreed hours, not over the full legal week", () => {
+    // 21 h/semana: 875,453 / (21 x 5) = 8,337.65 por hora (jornada completa seria 875,453 / 210 = 4,168.82)
+    const result = calculateEmployeePayroll(
+      makeEmployee({ baseSalary: 875_453, weeklyHours: 21 }),
+      makeParameter(),
+      [entry("2026-07-07T18:00:00-05:00", "2026-07-07T22:00:00-05:00")],
+      PERIOD_START,
+      PERIOD_END,
+      []
+    );
+    const night = result.items.find((i) => i.conceptCode === "NIGHT_SURCHARGE")!;
+    expect(night.rate).toBeCloseTo(875_453 / 105, 2);
   });
 
   it("adds up several clock-ins on the same day before counting overtime", () => {

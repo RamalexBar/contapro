@@ -43,6 +43,7 @@ const EMPLOYEE_WITH_PHONE: EmployeeRecord = {
     withholdingHousingInterest: 0,
     withholdingPrepaidHealth: 0,
     withholdingVoluntaryPension: 0,
+    weeklyHours: null,
 };
 const EMPLOYEE_NO_PHONE: EmployeeRecord = { ...EMPLOYEE_WITH_PHONE, id: "employee-2", phone: null };
 

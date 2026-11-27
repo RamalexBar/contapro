@@ -39,6 +39,7 @@ type EmployeeRow = {
   bankName: string | null;
   bankAccountNumber: string | null;
   salaryType: string;
+  weeklyHours: number | null;
   withholdingDependents: boolean;
   withholdingHousingInterest: Prisma.Decimal;
   withholdingPrepaidHealth: Prisma.Decimal;
@@ -86,6 +87,7 @@ export class PrismaEmployeeRepository implements IEmployeeRepository {
           bankName: data.bankName,
           bankAccountNumber: data.bankAccountNumber,
           salaryType: data.salaryType,
+          weeklyHours: data.weeklyHours ?? null,
           withholdingDependents: data.withholdingDependents,
           withholdingHousingInterest: data.withholdingHousingInterest,
           withholdingPrepaidHealth: data.withholdingPrepaidHealth,

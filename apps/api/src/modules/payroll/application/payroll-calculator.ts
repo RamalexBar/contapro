@@ -266,7 +266,10 @@ export function calculateEmployeePayroll(
   const proration = daysWorked / DAYS_IN_PAYROLL_MONTH;
   const dailyRate = employee.baseSalary / DAYS_IN_PAYROLL_MONTH;
   const hoursDivisor = legalMonthlyHoursDivisor(periodEnd, parameter.monthlyHoursDivisor);
-  const hourlyRate = employee.baseSalary / hoursDivisor;
+  // Tiempo parcial: el valor de la hora sale de las horas pactadas (mismas 5 "semanas" por mes que el
+  // divisor legal: 42 h x 5 = 210), no de la jornada completa.
+  const partTimeHours = employee.weeklyHours != null && employee.weeklyHours * 5 < hoursDivisor ? employee.weeklyHours * 5 : null;
+  const hourlyRate = employee.baseSalary / (partTimeHours ?? hoursDivisor);
 
   const items: PayrollItemCalc[] = [];
 

@@ -1,4 +1,5 @@
 import { assertLegalSalaries } from "../salary-floor";
+import { legalMonthlyHoursDivisor } from "../payroll-calculator";
 import { ValidationError } from "../../../../shared/errors/app-error";
 import type { AuditService } from "../../../audit/application/audit.service";
 import type { IEmployeeRepository } from "../../../employees/domain/employee.repository";
@@ -38,7 +39,7 @@ export class CalculatePayrollUseCase {
     const employees = await this.employeeRepo.listActiveForPeriod(payroll.branchId, payroll.startDate, payroll.endDate);
 
     // Pisos legales: salario minimo (ordinario) y 13 SMMLV (integral).
-    assertLegalSalaries(employees, parameter.minimumWage);
+    assertLegalSalaries(employees, parameter.minimumWage, legalMonthlyHoursDivisor(payroll.endDate, parameter.monthlyHoursDivisor) / 5);
 
     const results: EmployeeCalculationResult[] = [];
     for (const employee of employees) {

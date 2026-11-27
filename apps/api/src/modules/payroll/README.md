@@ -128,6 +128,16 @@ La nomina mensual solo PROVISIONA cesantias, intereses, prima y vacaciones. Su p
 un salario ordinario es menor al minimo (art. 145 CST) o uno integral menor a 13 SMMLV (art. 132). Los aprendices
 (LEARNING) quedan por fuera. Como no hay tiempo parcial, un salario menor al minimo no se puede liquidar.
 
+**Tiempo parcial** (2026-11-27, `Employee.weeklyHours`, Empleados): horas pactadas por semana; vacio = jornada completa.
+- Piso del salario proporcional: SMMLV x horas / jornada maxima legal (42 h desde jul-2026, sale de `legalMonthlyHoursDivisor` / 5).
+- Valor de la hora (recargos y extras) = salario / (horas x 5), no salario / 210.
+- Salud, pension y ARL siguen cotizando sobre minimo 1 SMMLV (regla general, art. 18 Ley 100); caja, ICBF y SENA sobre
+  el salario real. **No** se implemento la cotizacion por semanas del Decreto 2616 de 2013 (opcional para el empleador).
+- Auxilio de transporte completo por los dias del mes en que esta vinculado (no proporcional a las horas).
+- Para el contador: confirmar quien asume la diferencia entre el salario y 1 SMMLV en salud y pension (hoy cada parte
+  paga su porcentaje sobre 1 SMMLV), el auxilio de transporte completo, y que las horas extra de un trabajador de tiempo
+  parcial se siguen contando despues de 8 horas diarias (no despues de su jornada pactada).
+
 **Lo que NO calcula todavia** (para revisar con el contador):
 - Deduccion adicional de 72 UVT por dependiente (Ley 2277 de 2022) y procedimiento 2 de retencion.
 - Aprendices SENA (contrato de aprendizaje, cambiado por la Ley 2466 de 2025): no se liquidan aparte.

@@ -26,6 +26,7 @@ export interface EmployeeRecord {
   bankName: string | null;
   bankAccountNumber: string | null;
   salaryType: "ORDINARY" | "INTEGRAL";
+  weeklyHours: number | null;
   withholdingDependents: boolean;
   withholdingHousingInterest: number;
   withholdingPrepaidHealth: number;

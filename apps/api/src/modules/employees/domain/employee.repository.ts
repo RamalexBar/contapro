@@ -28,6 +28,8 @@ export interface EmployeeRecord {
   bankName: string | null;
   bankAccountNumber: string | null;
   salaryType: string;
+  /** Tiempo parcial: horas por semana; null = jornada completa. */
+  weeklyHours: number | null;
   withholdingDependents: boolean;
   withholdingHousingInterest: number;
   withholdingPrepaidHealth: number;
@@ -59,6 +61,7 @@ export interface CreateEmployeeData {
   bankName?: string;
   bankAccountNumber?: string;
   salaryType?: string;
+  weeklyHours?: number | null;
   withholdingDependents?: boolean;
   withholdingHousingInterest?: number;
   withholdingPrepaidHealth?: number;
@@ -87,6 +90,7 @@ export interface UpdateEmployeeData {
   bankName?: string;
   bankAccountNumber?: string;
   salaryType?: string;
+  weeklyHours?: number | null;
   withholdingDependents?: boolean;
   withholdingHousingInterest?: number;
   withholdingPrepaidHealth?: number;

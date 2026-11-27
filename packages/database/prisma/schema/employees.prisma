@@ -36,6 +36,8 @@ model Employee {
   workerSubtype     String  @default("00") // subtipo trabajador DIAN
   // Salario integral (art. 132 CST): minimo 13 SMMLV, aportes sobre el 70%, sin cesantias ni prima.
   salaryType        String  @default("ORDINARY") // ORDINARY, INTEGRAL
+  // Tiempo parcial (2026-11-27): horas pactadas por semana. Null = jornada completa (la maxima legal).
+  weeklyHours       Int?
   // Soportes que el trabajador certifica para la retencion en la fuente (art. 387 E.T. y 126-1/126-4),
   // valores MENSUALES. Los topes legales los aplica payroll-calculator.ts.
   withholdingDependents       Boolean @default(false)

@@ -25,6 +25,8 @@ export const createEmployeeSchema = z.object({
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
   salaryType: z.enum(["ORDINARY", "INTEGRAL"]).optional(),
+  /** Tiempo parcial: horas pactadas por semana. Vacio = jornada completa. */
+  weeklyHours: z.number().int().min(1).max(47).nullable().optional(),
   withholdingDependents: z.boolean().optional(),
   withholdingHousingInterest: z.number().nonnegative().optional(),
   withholdingPrepaidHealth: z.number().nonnegative().optional(),
@@ -53,6 +55,8 @@ export const updateEmployeeSchema = z.object({
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
   salaryType: z.enum(["ORDINARY", "INTEGRAL"]).optional(),
+  /** Tiempo parcial: horas pactadas por semana. Vacio = jornada completa. */
+  weeklyHours: z.number().int().min(1).max(47).nullable().optional(),
   withholdingDependents: z.boolean().optional(),
   withholdingHousingInterest: z.number().nonnegative().optional(),
   withholdingPrepaidHealth: z.number().nonnegative().optional(),

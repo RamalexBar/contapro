@@ -44,12 +44,14 @@ const EMPTY_FORM = {
   pensionFund: "",
   compensationFund: "",
   salaryType: "ORDINARY",
+  weeklyHours: "",
 };
 
 const EMPTY_EDIT = {
   position: "",
   baseSalary: "",
   salaryType: "ORDINARY",
+  weeklyHours: "",
   withholdingDependents: false,
   withholdingHousingInterest: "",
   withholdingPrepaidHealth: "",
@@ -89,6 +91,7 @@ export function EmployeeListPage() {
         pensionFund: form.pensionFund || undefined,
         compensationFund: form.compensationFund || undefined,
         salaryType: form.salaryType as "ORDINARY" | "INTEGRAL",
+        weeklyHours: form.weeklyHours ? Number(form.weeklyHours) : null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
@@ -104,6 +107,7 @@ export function EmployeeListPage() {
         position: editValues.position,
         baseSalary: Number(editValues.baseSalary),
         salaryType: editValues.salaryType as "ORDINARY" | "INTEGRAL",
+        weeklyHours: editValues.weeklyHours ? Number(editValues.weeklyHours) : null,
         withholdingDependents: editValues.withholdingDependents,
         withholdingHousingInterest: Number(editValues.withholdingHousingInterest || 0),
         withholdingPrepaidHealth: Number(editValues.withholdingPrepaidHealth || 0),
@@ -131,6 +135,7 @@ export function EmployeeListPage() {
       position: employee.position,
       baseSalary: String(employee.baseSalary),
       salaryType: employee.salaryType,
+      weeklyHours: employee.weeklyHours ? String(employee.weeklyHours) : "",
       withholdingDependents: employee.withholdingDependents,
       withholdingHousingInterest: employee.withholdingHousingInterest ? String(employee.withholdingHousingInterest) : "",
       withholdingPrepaidHealth: employee.withholdingPrepaidHealth ? String(employee.withholdingPrepaidHealth) : "",
@@ -193,6 +198,15 @@ export function EmployeeListPage() {
               <option value="ORDINARY">Salario ordinario</option>
               <option value="INTEGRAL">Salario integral (min. 13 SMMLV)</option>
             </Select>
+            <Input
+              placeholder="Horas por semana (vacío = jornada completa)"
+              title="Tiempo parcial: horas por semana pactadas. Vacío = jornada completa (42 h). El salario mínimo se vuelve proporcional."
+              type="number"
+              min={1}
+              max={47}
+              value={form.weeklyHours}
+              onChange={(e) => setForm({ ...form, weeklyHours: e.target.value })}
+            />
             <Input
               placeholder="Fecha de ingreso"
               type="date"
@@ -278,7 +292,10 @@ export function EmployeeListPage() {
                         onChange={(e) => setEditValues({ ...editValues, baseSalary: e.target.value })}
                       />
                     ) : (
-                      formatCOP(employee.baseSalary)
+                      <>
+                        {formatCOP(employee.baseSalary)}
+                        {employee.weeklyHours && <span className="block text-xs text-slate-500">Tiempo parcial · {employee.weeklyHours} h/semana</span>}
+                      </>
                     )}
                   </Td>
                   <Td>{formatDate(employee.hireDate)}</Td>
@@ -343,6 +360,15 @@ export function EmployeeListPage() {
                           <option value="ORDINARY">Salario ordinario</option>
                           <option value="INTEGRAL">Salario integral (min. 13 SMMLV)</option>
                         </Select>
+                        <Input
+                          placeholder="Horas por semana (vacío = completa)"
+                          title="Tiempo parcial: horas por semana pactadas. Vacío = jornada completa (42 h). El salario mínimo se vuelve proporcional."
+                          type="number"
+                          min={1}
+                          max={47}
+                          value={editValues.weeklyHours}
+                          onChange={(e) => setEditValues({ ...editValues, weeklyHours: e.target.value })}
+                        />
                         <label className="flex items-center gap-2 text-sm text-slate-700">
                           <input
                             type="checkbox"
